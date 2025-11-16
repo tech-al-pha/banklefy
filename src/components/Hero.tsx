@@ -40,6 +40,9 @@ export const Hero = () => {
             <Button 
               size="lg" 
               className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 group"
+              onClick={() => {
+                document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
+              }}
             >
               <Upload className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
               Start Converting Free
@@ -48,6 +51,9 @@ export const Hero = () => {
               size="lg" 
               variant="outline"
               className="border-primary/50 text-foreground hover:bg-primary/10 backdrop-blur-lg transition-all duration-300"
+              onClick={() => {
+                document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+              }}
             >
               View Pricing
             </Button>

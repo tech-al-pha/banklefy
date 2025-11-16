@@ -1,8 +1,45 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Upload, FileText, CheckCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useState, useRef } from "react";
 
 export const UploadDemo = () => {
+  const { toast } = useToast();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      toast({
+        title: "File Selected",
+        description: `${file.name} - Ready to convert`,
+      });
+    }
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleConvert = () => {
+    if (!selectedFile) {
+      toast({
+        title: "No File Selected",
+        description: "Please select a bank statement to convert",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Coming Soon!",
+      description: "AI conversion engine will be implemented next. For now, upload is working!",
+    });
+  };
+
   return (
     <section className="relative py-24 px-6 overflow-hidden">
       {/* Background Glow */}
@@ -22,23 +59,56 @@ export const UploadDemo = () => {
         <div className="max-w-4xl mx-auto">
           <Card className="p-8 md:p-12 bg-card/60 backdrop-blur-lg border-primary/20">
             <div className="space-y-8">
+              {/* Hidden File Input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
               {/* Upload Zone */}
-              <div className="border-2 border-dashed border-primary/30 rounded-lg p-12 text-center hover:border-primary/60 transition-all duration-300 hover:bg-primary/5 cursor-pointer group">
+              <div 
+                onClick={handleUploadClick}
+                className="border-2 border-dashed border-primary/30 rounded-lg p-12 text-center hover:border-primary/60 transition-all duration-300 hover:bg-primary/5 cursor-pointer group"
+              >
                 <div className="space-y-4">
                   <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                     <Upload className="w-8 h-8 text-primary" />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-lg font-semibold">Drop your bank statement here</p>
+                    <p className="text-lg font-semibold">
+                      {selectedFile ? selectedFile.name : "Drop your bank statement here"}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       or click to browse files • Supports PDF, PNG, JPG
                     </p>
                   </div>
-                  <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                  <Button 
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUploadClick();
+                    }}
+                  >
                     Choose File
                   </Button>
                 </div>
               </div>
+
+              {/* Convert Button */}
+              {selectedFile && (
+                <div className="text-center">
+                  <Button
+                    size="lg"
+                    className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-neon"
+                    onClick={handleConvert}
+                  >
+                    Convert to Excel
+                  </Button>
+                </div>
+              )}
 
               {/* Process Steps */}
               <div className="grid md:grid-cols-3 gap-6">
