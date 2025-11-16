@@ -15,19 +15,51 @@ const Index = () => {
               BankMorph
             </div>
             <div className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <a 
+                href="#features" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
                 Features
               </a>
-              <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <a 
+                href="#pricing"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
                 Pricing
               </a>
-              <a href="#demo" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <a 
+                href="#demo"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
                 Demo
               </a>
-              <Button variant="outline" size="sm" className="border-primary/50 hover:bg-primary/10">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="border-primary/50 hover:bg-primary/10"
+                onClick={() => alert('Sign in coming soon! Authentication will be added next.')}
+              >
                 Sign In
               </Button>
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon">
+              <Button 
+                size="sm" 
+                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
+                onClick={() => {
+                  document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
                 Get Started
               </Button>
             </div>
@@ -71,6 +103,9 @@ const Index = () => {
           <Button 
             size="lg" 
             className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105"
+            onClick={() => {
+              document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
+            }}
           >
             Start Converting Now
           </Button>
