@@ -3,8 +3,22 @@ import { Features } from "@/components/Features";
 import { Pricing } from "@/components/Pricing";
 import { UploadDemo } from "@/components/UploadDemo";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
 
 const Index = () => {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleAuthClick = () => {
+    if (user) {
+      signOut();
+    } else {
+      navigate('/auth');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-dark text-foreground">
       {/* Navigation */}
@@ -49,9 +63,16 @@ const Index = () => {
                 variant="outline" 
                 size="sm" 
                 className="border-primary/50 hover:bg-primary/10"
-                onClick={() => alert('Sign in coming soon! Authentication will be added next.')}
+                onClick={handleAuthClick}
               >
-                Sign In
+                {user ? (
+                  <>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </>
+                ) : (
+                  'Sign In'
+                )}
               </Button>
               <Button 
                 size="sm" 
