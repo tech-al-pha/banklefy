@@ -1,30 +1,57 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, FileText, CheckCircle } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
+import { useNavigate } from "react-router-dom";
 
 export const UploadDemo = () => {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [converting, setConverting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+    if (!file) return;
+
+    // Validate file
+    const validation = validateFile(file);
+    if (!validation.success) {
       toast({
-        title: "File Selected",
-        description: `${file.name} - Ready to convert`,
+        variant: "destructive",
+        title: "Invalid file",
+        description: validation.error,
       });
+      return;
     }
+
+    setSelectedFile(file);
+    toast({
+      title: "File Selected",
+      description: `${file.name} - Ready to convert`,
+    });
   };
 
   const handleUploadClick = () => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to upload files.",
+      });
+      navigate('/auth');
+      return;
+    }
     fileInputRef.current?.click();
   };
 
-  const handleConvert = () => {
+  const handleConvert = async () => {
     if (!selectedFile) {
       toast({
         title: "No File Selected",
@@ -34,10 +61,77 @@ export const UploadDemo = () => {
       return;
     }
 
-    toast({
-      title: "Coming Soon!",
-      description: "AI conversion engine will be implemented next. For now, upload is working!",
-    });
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to convert files.",
+      });
+      navigate('/auth');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Upload file to Supabase Storage
+      const sanitized = sanitizeFilename(selectedFile.name);
+      const filePath = `${user.id}/${Date.now()}_${sanitized}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('bank-statements')
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      toast({
+        title: "File uploaded",
+        description: "Starting conversion...",
+      });
+
+      setUploading(false);
+      setConverting(true);
+
+      // Call edge function to process conversion
+      const { data, error: functionError } = await supabase.functions.invoke('convert-document', {
+        body: {
+          fileId: filePath,
+          fileName: selectedFile.name,
+        },
+      });
+
+      if (functionError) {
+        throw functionError;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast({
+        title: "Conversion started!",
+        description: "Your document is being processed. You'll be notified when it's ready.",
+      });
+
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error: any) {
+      console.error('Conversion error:', error);
+      toast({
+        variant: "destructive",
+        title: "Conversion failed",
+        description: error.message || "An error occurred during conversion.",
+      });
+    } finally {
+      setUploading(false);
+      setConverting(false);
+    }
   };
 
   return (
@@ -91,6 +185,7 @@ export const UploadDemo = () => {
                       e.stopPropagation();
                       handleUploadClick();
                     }}
+                    disabled={uploading || converting}
                   >
                     Choose File
                   </Button>
@@ -104,8 +199,19 @@ export const UploadDemo = () => {
                     size="lg"
                     className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-neon"
                     onClick={handleConvert}
+                    disabled={uploading || converting}
                   >
-                    Convert to Excel
+                    {uploading || converting ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        {uploading ? 'Uploading...' : 'Converting...'}
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-5 w-5" />
+                        Convert to Excel
+                      </>
+                    )}
                   </Button>
                 </div>
               )}
