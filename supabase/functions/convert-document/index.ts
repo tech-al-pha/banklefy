@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -174,24 +175,113 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Placeholder for actual AI conversion logic
-    // In production, this would:
-    // 1. Download the file from storage
-    // 2. Process with Lovable AI or external OCR/AI service
-    // 3. Generate Excel file
-    // 4. Upload result to storage
-    // 5. Update conversion record with result_path
+    // Convert file to base64 for AI processing
+    const base64Data = btoa(String.fromCharCode(...bytes));
+    const mimeType = lowerFileName.endsWith('.pdf') ? 'application/pdf' : 
+                     lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    // For now, simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    console.log('Starting AI conversion for file:', fileName);
 
-    // Update conversion status (placeholder)
+    // Process with Lovable AI
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY not configured');
+    }
+
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a bank statement data extraction expert. Extract transaction data from bank statements and return it as structured JSON. Include: date, description, amount, balance, and transaction type (debit/credit).'
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Extract all transactions from this bank statement. Return a JSON array with fields: date (YYYY-MM-DD), description, amount (number), balance (number), type (debit/credit). Only return the JSON array, no other text.'
+              },
+              {
+                type: 'image_url',
+                image_url: { url: dataUrl }
+              }
+            ]
+          }
+        ],
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error('AI API error:', aiResponse.status, errorText);
+      throw new Error(`AI processing failed: ${aiResponse.status}`);
+    }
+
+    const aiData = await aiResponse.json();
+    const extractedText = aiData.choices?.[0]?.message?.content || '';
+    
+    console.log('AI response received, parsing data...');
+
+    // Parse the JSON response
+    let transactions = [];
+    try {
+      // Extract JSON from the response (handle markdown code blocks)
+      const jsonMatch = extractedText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        transactions = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('No JSON array found in AI response');
+      }
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', parseError, extractedText);
+      throw new Error('Failed to extract transaction data from document');
+    }
+
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      throw new Error('No transactions found in the document');
+    }
+
+    console.log(`Extracted ${transactions.length} transactions`);
+
+    // Generate Excel file
+    const worksheet = XLSX.utils.json_to_sheet(transactions);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
+    
+    // Write to buffer
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    // Upload Excel file to storage
+    const resultPath = `results/${user.id}/${conversion.id}.xlsx`;
+    const { error: uploadResultError } = await supabase.storage
+      .from('bank-statements')
+      .upload(resultPath, excelBuffer, {
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        upsert: false,
+      });
+
+    if (uploadResultError) {
+      console.error('Failed to upload result:', uploadResultError);
+      throw uploadResultError;
+    }
+
+    console.log('Excel file uploaded successfully');
+
+    // Update conversion status
     const { error: updateError } = await supabase
       .from('conversions')
       .update({
         status: 'completed',
         completed_at: new Date().toISOString(),
-        result_path: `results/${user.id}/${conversion.id}.xlsx`,
+        result_path: resultPath,
       })
       .eq('id', conversion.id);
 
@@ -202,6 +292,7 @@ Deno.serve(async (req) => {
         .from('subscriptions')
         .update({ conversions_used: updatedSub.conversions_used - 1 })
         .eq('user_id', user.id);
+      throw updateError;
     }
 
     return new Response(
