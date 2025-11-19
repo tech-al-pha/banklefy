@@ -299,7 +299,8 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         conversionId: conversion.id,
-        message: 'Conversion started successfully',
+        transactions: transactions,
+        message: 'Conversion completed successfully',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

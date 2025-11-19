@@ -7,6 +7,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
 import { useNavigate } from "react-router-dom";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface Transaction {
+  date: string;
+  description: string;
+  amount: number;
+  balance: number;
+  type: string;
+}
 
 export const UploadDemo = () => {
   const { toast } = useToast();
@@ -14,6 +31,7 @@ export const UploadDemo = () => {
   const [uploading, setUploading] = useState(false);
   const [converting, setConverting] = useState(false);
   const [conversionResult, setConversionResult] = useState<{ id: string; resultPath: string } | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [downloading, setDownloading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
@@ -114,15 +132,19 @@ export const UploadDemo = () => {
         throw new Error(data.error);
       }
 
-      // Store conversion result for download
+      // Store conversion result and transaction data
       setConversionResult({
         id: data.conversionId,
         resultPath: `results/${user.id}/${data.conversionId}.xlsx`
       });
+      
+      if (data.transactions && Array.isArray(data.transactions)) {
+        setTransactions(data.transactions);
+      }
 
       toast({
         title: "Conversion complete!",
-        description: "Your Excel file is ready to download.",
+        description: `Extracted ${data.transactions?.length || 0} transactions. Review and download below.`,
       });
 
       setSelectedFile(null);
@@ -281,6 +303,66 @@ export const UploadDemo = () => {
                       )}
                     </Button>
                   )}
+                </div>
+              )}
+
+              {/* Transaction Preview */}
+              {transactions.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Extracted Transactions</h3>
+                    <span className="text-sm text-muted-foreground">
+                      {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} found
+                    </span>
+                  </div>
+                  
+                  <Card className="overflow-hidden border-primary/20">
+                    <ScrollArea className="h-[400px]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="font-semibold">Date</TableHead>
+                            <TableHead className="font-semibold">Description</TableHead>
+                            <TableHead className="font-semibold text-right">Amount</TableHead>
+                            <TableHead className="font-semibold text-right">Balance</TableHead>
+                            <TableHead className="font-semibold">Type</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {transactions.map((transaction, index) => (
+                            <TableRow key={index} className="hover:bg-muted/30">
+                              <TableCell className="font-medium">
+                                {transaction.date}
+                              </TableCell>
+                              <TableCell className="max-w-[300px] truncate">
+                                {transaction.description}
+                              </TableCell>
+                              <TableCell className={`text-right font-semibold ${
+                                transaction.type.toLowerCase() === 'debit' 
+                                  ? 'text-red-600 dark:text-red-400' 
+                                  : 'text-green-600 dark:text-green-400'
+                              }`}>
+                                {transaction.type.toLowerCase() === 'debit' ? '-' : '+'}
+                                ${Math.abs(transaction.amount).toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                ${transaction.balance.toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                  transaction.type.toLowerCase() === 'debit'
+                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                    : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                }`}>
+                                  {transaction.type}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  </Card>
                 </div>
               )}
 
