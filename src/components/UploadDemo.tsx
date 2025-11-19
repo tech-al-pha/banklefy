@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2 } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,8 @@ export const UploadDemo = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [conversionResult, setConversionResult] = useState<{ id: string; resultPath: string } | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -112,9 +114,15 @@ export const UploadDemo = () => {
         throw new Error(data.error);
       }
 
+      // Store conversion result for download
+      setConversionResult({
+        id: data.conversionId,
+        resultPath: `results/${user.id}/${data.conversionId}.xlsx`
+      });
+
       toast({
-        title: "Conversion started!",
-        description: "Your document is being processed. You'll be notified when it's ready.",
+        title: "Conversion complete!",
+        description: "Your Excel file is ready to download.",
       });
 
       setSelectedFile(null);
@@ -131,6 +139,44 @@ export const UploadDemo = () => {
     } finally {
       setUploading(false);
       setConverting(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!conversionResult || !user) return;
+
+    setDownloading(true);
+    try {
+      // Download file from Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('bank-statements')
+        .download(conversionResult.resultPath);
+
+      if (error) throw error;
+
+      // Create download link
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `converted_${Date.now()}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Downloaded!",
+        description: "Your Excel file has been downloaded.",
+      });
+    } catch (error: any) {
+      console.error('Download error:', error);
+      toast({
+        variant: "destructive",
+        title: "Download failed",
+        description: error.message || "Failed to download the file.",
+      });
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -194,10 +240,10 @@ export const UploadDemo = () => {
 
               {/* Convert Button */}
               {selectedFile && (
-                <div className="text-center">
+                <div className="text-center space-y-3">
                   <Button
                     size="lg"
-                    className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-neon"
+                    className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-neon w-full md:w-auto"
                     onClick={handleConvert}
                     disabled={uploading || converting}
                   >
@@ -213,6 +259,28 @@ export const UploadDemo = () => {
                       </>
                     )}
                   </Button>
+                  
+                  {/* Download Button */}
+                  {conversionResult && (
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white w-full md:w-auto"
+                      onClick={handleDownload}
+                      disabled={downloading}
+                    >
+                      {downloading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Downloading...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-5 w-5" />
+                          Download Excel File
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               )}
 
