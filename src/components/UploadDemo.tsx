@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -202,6 +202,59 @@ export const UploadDemo = () => {
     }
   };
 
+  const exportAsCSV = () => {
+    if (transactions.length === 0) return;
+
+    // Convert transactions to CSV
+    const headers = ['Date', 'Description', 'Amount', 'Balance', 'Type'];
+    const csvRows = [
+      headers.join(','),
+      ...transactions.map(t => 
+        [t.date, `"${t.description}"`, t.amount, t.balance, t.type].join(',')
+      )
+    ];
+    const csvContent = csvRows.join('\n');
+
+    // Create and download CSV file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transactions_${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "CSV Downloaded",
+      description: "Your transaction data has been exported to CSV.",
+    });
+  };
+
+  const exportAsJSON = () => {
+    if (transactions.length === 0) return;
+
+    // Convert transactions to JSON
+    const jsonContent = JSON.stringify(transactions, null, 2);
+
+    // Create and download JSON file
+    const blob = new Blob([jsonContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transactions_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "JSON Downloaded",
+      description: "Your transaction data has been exported to JSON.",
+    });
+  };
+
   return (
     <section className="relative py-24 px-6 overflow-hidden">
       {/* Background Glow */}
@@ -282,26 +335,51 @@ export const UploadDemo = () => {
                     )}
                   </Button>
                   
-                  {/* Download Button */}
+                  {/* Download Buttons */}
                   {conversionResult && (
-                    <Button
-                      size="lg"
-                      className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white w-full md:w-auto"
-                      onClick={handleDownload}
-                      disabled={downloading}
-                    >
-                      {downloading ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Downloading...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="mr-2 h-5 w-5" />
-                          Download Excel File
-                        </>
-                      )}
-                    </Button>
+                    <div className="w-full space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Download As:</p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          size="lg"
+                          className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white flex-1"
+                          onClick={handleDownload}
+                          disabled={downloading}
+                        >
+                          {downloading ? (
+                            <>
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                              Downloading...
+                            </>
+                          ) : (
+                            <>
+                              <FileSpreadsheet className="mr-2 h-5 w-5" />
+                              Excel
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={exportAsCSV}
+                          disabled={transactions.length === 0}
+                        >
+                          <FileText className="mr-2 h-5 w-5" />
+                          CSV
+                        </Button>
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          className="flex-1"
+                          onClick={exportAsJSON}
+                          disabled={transactions.length === 0}
+                        >
+                          <FileJson className="mr-2 h-5 w-5" />
+                          JSON
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
