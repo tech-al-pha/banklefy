@@ -59,6 +59,16 @@ const Index = () => {
               >
                 Demo
               </a>
+              {user && (
+                <Button 
+                  variant="ghost"
+                  size="sm" 
+                  onClick={() => navigate('/dashboard')}
+                  className="text-sm"
+                >
+                  Dashboard
+                </Button>
+              )}
               <Button 
                 variant="outline" 
                 size="sm" 
