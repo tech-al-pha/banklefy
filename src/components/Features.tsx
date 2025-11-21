@@ -5,32 +5,32 @@ const features = [
   {
     icon: Globe,
     title: "Multilingual Support",
-    description: "Support for 50+ languages including Hindi, Arabic, Mandarin, French, Spanish, and more",
+    description: "Akromeda supports over 50 languages including Hindi, Arabic, Mandarin, French, Spanish, German, Portuguese, Russian, and many more. Our AI accurately recognizes and processes bank statements in any language, making it perfect for international businesses and individuals working with global financial documents. No matter where your bank is located or what language your statements are in, Akromeda handles them all with precision.",
   },
   {
     icon: Brain,
     title: "AI-Powered OCR",
-    description: "Advanced OCR technology handles even scanned and low-quality bank statements",
+    description: "Our advanced Optical Character Recognition (OCR) technology powered by cutting-edge AI can extract data from any type of bank statement - whether it's a high-quality digital PDF or a low-resolution scanned document. The AI intelligently identifies transaction details, dates, amounts, and descriptions even from poor quality images, handwritten notes, or complex table structures. This ensures you can convert any statement, regardless of its source or quality.",
   },
   {
     icon: Zap,
     title: "Instant Processing",
-    description: "Lightning-fast conversion with results delivered in seconds, not hours",
+    description: "Experience lightning-fast conversion speeds with results delivered in seconds, not hours. Akromeda's optimized processing pipeline uses distributed computing to analyze and convert your statements instantly. Upload your document and get your Excel file almost immediately - perfect for time-sensitive accounting tasks, audits, or financial analysis. No waiting, no delays, just instant results.",
   },
   {
     icon: FileSpreadsheet,
     title: "Excel Compatible",
-    description: "Clean, audit-grade Excel files compatible with all accounting software",
+    description: "Get clean, professionally formatted Excel spreadsheets that are fully compatible with all major accounting software including QuickBooks, Xero, SAP, and more. Each converted file is structured with proper columns for dates, descriptions, debits, credits, and running balances - ready for immediate use in financial analysis, tax preparation, or bookkeeping. You can also export to CSV and JSON formats for maximum flexibility with your workflow.",
   },
   {
     icon: Lock,
     title: "Bank-Level Security",
-    description: "End-to-end encryption ensures your financial data stays private and secure",
+    description: "Your financial data security is our top priority. Akromeda uses military-grade end-to-end encryption to protect your sensitive banking information. All documents are encrypted during upload, processing, and storage. We never store your data longer than necessary, and you have full control to delete your conversions at any time. Our security measures meet international banking compliance standards, ensuring your financial information stays completely private and secure.",
   },
   {
     icon: Clock,
     title: "Batch Processing",
-    description: "Upload multiple statements at once and process them in parallel",
+    description: "Save time by uploading and processing multiple bank statements simultaneously. Whether you need to convert dozens of monthly statements or handle multiple accounts at once, Akromeda's batch processing feature handles them all in parallel. Perfect for accountants, financial analysts, and business owners who need to process large volumes of statements efficiently. Process your entire year's worth of statements in minutes, not hours.",
   },
 ];
 

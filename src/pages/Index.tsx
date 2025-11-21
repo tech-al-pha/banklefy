@@ -26,7 +26,7 @@ const Index = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              BankMorph
+              Akromeda
             </div>
             <div className="hidden md:flex items-center gap-6">
               <a 
@@ -128,7 +128,7 @@ const Index = () => {
             </span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Join thousands of businesses and individuals who trust BankMorph for accurate, 
+            Join thousands of businesses and individuals who trust Akromeda for accurate, 
             instant bank statement conversions.
           </p>
           <Button 
@@ -149,7 +149,7 @@ const Index = () => {
           <div className="grid md:grid-cols-4 gap-8">
             <div className="space-y-4">
               <div className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                BankMorph
+                Akromeda
               </div>
               <p className="text-sm text-muted-foreground">
                 AI-powered bank statement conversion for the modern world.
@@ -181,7 +181,7 @@ const Index = () => {
             </div>
           </div>
           <div className="mt-12 pt-8 border-t border-primary/10 text-center text-sm text-muted-foreground">
-            <p>© 2025 BankMorph. All rights reserved.</p>
+            <p>© 2025 Akromeda. All rights reserved.</p>
           </div>
         </div>
       </footer>
