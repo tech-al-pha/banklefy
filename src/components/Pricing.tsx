@@ -1,160 +1,150 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Check, Sparkles, Zap, Crown, Gift } from "lucide-react";
+import { Check } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
-const plans = [
+const monthlyPlans = [
   {
-    name: "Free",
-    icon: Gift,
-    price: "$0",
-    period: "forever",
-    description: "Get started with basic conversions",
-    limit: "1 statement/week",
-    features: [
-      "Basic conversion",
-      "Limited languages",
-      "Standard processing",
-      "Watermarked exports",
-    ],
-    cta: "Start Free",
+    name: "Starter",
+    price: "$10",
+    period: "month",
+    pages: "500",
+    description: "Perfect for small projects",
     highlighted: false,
   },
   {
-    name: "Daily Pass",
-    icon: Zap,
-    price: "$2",
-    period: "per day",
-    description: "Perfect for one-time needs",
-    limit: "Unlimited for 24 hours",
-    features: [
-      "All formats supported",
-      "50+ languages",
-      "No watermarks",
-      "Priority processing",
-      "OCR for scanned PDFs",
-    ],
-    cta: "Get Daily Pass",
-    highlighted: false,
-  },
-  {
-    name: "Monthly Pro",
-    icon: Sparkles,
-    price: "$15",
-    period: "per month",
-    description: "Best for regular users",
-    limit: "Unlimited conversions",
-    features: [
-      "Everything in Daily Pass",
-      "Batch uploads",
-      "Advanced OCR",
-      "Email support",
-      "Conversion history",
-      "Export templates",
-    ],
-    cta: "Start Pro Trial",
+    name: "Professional",
+    price: "$20",
+    period: "month",
+    pages: "1,500",
+    description: "Best for growing businesses",
     highlighted: true,
   },
   {
-    name: "Yearly Elite",
-    icon: Crown,
-    price: "$120",
-    period: "per year",
-    description: "Maximum value + API access",
-    limit: "Unlimited + API",
-    features: [
-      "Everything in Pro",
-      "API integration",
-      "Audit-grade formatting",
-      "Custom templates",
-      "Premium support",
-      "Team access (5 users)",
-    ],
-    cta: "Go Elite",
+    name: "Enterprise",
+    price: "$40",
+    period: "month",
+    pages: "4,000",
+    description: "For large-scale operations",
     highlighted: false,
   },
 ];
+
+const yearlyPlans = [
+  {
+    name: "Starter",
+    price: "$100",
+    period: "year",
+    pages: "12,000",
+    description: "Perfect for small projects",
+    highlighted: false,
+  },
+  {
+    name: "Professional",
+    price: "$200",
+    period: "year",
+    pages: "36,000",
+    description: "Best for growing businesses",
+    highlighted: true,
+  },
+  {
+    name: "Enterprise",
+    price: "$400",
+    period: "year",
+    pages: "96,000",
+    description: "For large-scale operations",
+    highlighted: false,
+  },
+];
+
+const PricingCard = ({ plan }: { plan: typeof monthlyPlans[0] }) => (
+  <Card
+    className={`relative p-8 bg-card/60 backdrop-blur-lg transition-all duration-300 ${
+      plan.highlighted
+        ? "border-primary shadow-neon scale-105"
+        : "border-primary/20 hover:border-primary/50 hover:shadow-card"
+    }`}
+  >
+    {plan.highlighted && (
+      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-primary text-primary-foreground border-0">
+        MOST POPULAR
+      </Badge>
+    )}
+
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h3 className="text-2xl font-bold text-foreground">{plan.name}</h3>
+        <p className="text-sm text-muted-foreground">{plan.description}</p>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-baseline gap-1">
+          <span className="text-5xl font-bold text-foreground">{plan.price}</span>
+          <span className="text-muted-foreground">/{plan.period}</span>
+        </div>
+      </div>
+
+      <div className="py-4 border-t border-border">
+        <div className="flex items-center gap-2 text-foreground">
+          <Check className="w-5 h-5 text-accent" />
+          <span className="text-lg font-medium">Up to {plan.pages} pages</span>
+        </div>
+      </div>
+
+      <Button
+        className={`w-full ${
+          plan.highlighted
+            ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
+            : "bg-card hover:bg-muted border border-primary/30 text-foreground"
+        } transition-all duration-300`}
+      >
+        Choose Plan
+      </Button>
+    </div>
+  </Card>
+);
 
 export const Pricing = () => {
   return (
     <section className="relative py-24 px-6">
       <div className="container mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+        <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold">
             Choose Your
             <span className="bg-gradient-primary bg-clip-text text-transparent"> Perfect Plan</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            From free trials to enterprise solutions, we've got you covered
+            Flexible pricing for every need - pay monthly or save with yearly plans
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
-          {plans.map((plan, index) => {
-            const Icon = plan.icon;
-            return (
-              <Card
-                key={index}
-                className={`relative p-6 bg-card/60 backdrop-blur-lg transition-all duration-300 ${
-                  plan.highlighted
-                    ? "border-primary shadow-neon scale-105 lg:scale-110"
-                    : "border-primary/20 hover:border-primary/50 hover:shadow-card"
-                }`}
-              >
-                {plan.highlighted && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-primary rounded-full text-xs font-semibold text-primary-foreground">
-                    MOST POPULAR
-                  </div>
-                )}
+        <Tabs defaultValue="monthly" className="max-w-6xl mx-auto">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-12">
+            <TabsTrigger value="monthly">Monthly Plans</TabsTrigger>
+            <TabsTrigger value="yearly">Yearly Plans</TabsTrigger>
+          </TabsList>
 
-                <div className="space-y-6">
-                  {/* Header */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Icon className={`w-5 h-5 ${plan.highlighted ? "text-primary" : "text-secondary"}`} />
-                      <h3 className="text-xl font-bold">{plan.name}</h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{plan.description}</p>
-                  </div>
+          <TabsContent value="monthly" className="space-y-8">
+            <div className="grid md:grid-cols-3 gap-8">
+              {monthlyPlans.map((plan, index) => (
+                <PricingCard key={index} plan={plan} />
+              ))}
+            </div>
+          </TabsContent>
 
-                  {/* Price */}
-                  <div className="space-y-1">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-foreground">{plan.price}</span>
-                      <span className="text-muted-foreground">/{plan.period}</span>
-                    </div>
-                    <p className="text-sm text-primary">{plan.limit}</p>
-                  </div>
+          <TabsContent value="yearly" className="space-y-8">
+            <div className="grid md:grid-cols-3 gap-8">
+              {yearlyPlans.map((plan, index) => (
+                <PricingCard key={index} plan={plan} />
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
 
-                  {/* Features */}
-                  <ul className="space-y-3">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <Check className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-                        <span className="text-sm text-muted-foreground">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {/* CTA */}
-                  <Button
-                    className={`w-full ${
-                      plan.highlighted
-                        ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
-                        : "bg-card hover:bg-muted border border-primary/30"
-                    } transition-all duration-300`}
-                  >
-                    {plan.cta}
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Enterprise CTA */}
         <div className="mt-16 text-center">
           <p className="text-muted-foreground mb-4">
-            Need custom solutions for your enterprise?
+            Need a custom solution for your organization?
           </p>
           <Button
             variant="outline"
