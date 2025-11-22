@@ -1,5 +1,6 @@
 import { Hero } from "@/components/Hero";
 import { Features } from "@/components/Features";
+import { HowItWorks } from "@/components/HowItWorks";
 import { Pricing } from "@/components/Pricing";
 import { UploadDemo } from "@/components/UploadDemo";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,9 @@ const Index = () => {
       {/* Hero Section */}
       <Hero />
 
+      {/* How It Works Section */}
+      <HowItWorks />
+
       {/* Features Section */}
       <div id="features">
         <Features />
@@ -168,7 +172,14 @@ const Index = () => {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><a href="#" className="hover:text-foreground transition-colors">About</a></li>
                 <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Privacy</a></li>
+                <li>
+                  <button 
+                    onClick={() => navigate('/privacy')}
+                    className="hover:text-foreground transition-colors text-left"
+                  >
+                    Privacy Policy
+                  </button>
+                </li>
               </ul>
             </div>
             <div className="space-y-3">

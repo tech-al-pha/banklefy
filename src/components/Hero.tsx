@@ -22,17 +22,18 @@ export const Hero = () => {
 
           {/* Heading */}
           <h1 className="text-5xl md:text-7xl font-bold leading-tight">
-            Convert Any Bank Statement,
+            AI Bank Statement Converter to Excel
             <br />
             <span className="bg-gradient-primary bg-clip-text text-transparent">
-              Any Language, Any Format
+              50+ Languages | OCR-Powered | Instant Results
             </span>
           </h1>
 
           {/* Description */}
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Transform bank statements from 50+ languages into clean Excel spreadsheets instantly. 
-            Powered by advanced AI with OCR support for scanned documents.
+            Convert bank statements to Excel with AI-powered OCR technology. 
+            Process PDF, scanned images, and photos from any bank in 50+ languages including 
+            Hindi, Arabic, Mandarin. Bank-level security, batch uploads, instant Excel compatibility.
           </p>
 
           {/* CTA Buttons */}
@@ -45,7 +46,7 @@ export const Hero = () => {
               }}
             >
               <Upload className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
-              Start Converting Free
+              Upload Your Statement Now
             </Button>
             <Button 
               size="lg" 
@@ -63,15 +64,15 @@ export const Hero = () => {
           <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto pt-12">
             <div className="space-y-2">
               <div className="text-3xl md:text-4xl font-bold text-primary">50+</div>
-              <div className="text-sm text-muted-foreground">Languages</div>
+              <div className="text-sm text-muted-foreground">Languages Supported</div>
             </div>
             <div className="space-y-2">
-              <div className="text-3xl md:text-4xl font-bold text-secondary">100%</div>
-              <div className="text-sm text-muted-foreground">Accurate</div>
+              <div className="text-3xl md:text-4xl font-bold text-secondary">99.9%</div>
+              <div className="text-sm text-muted-foreground">AI Accuracy</div>
             </div>
             <div className="space-y-2">
-              <div className="text-3xl md:text-4xl font-bold text-accent">Instant</div>
-              <div className="text-sm text-muted-foreground">Processing</div>
+              <div className="text-3xl md:text-4xl font-bold text-accent">&lt;30s</div>
+              <div className="text-sm text-muted-foreground">Fast Processing</div>
             </div>
           </div>
         </div>
