@@ -7,34 +7,29 @@ const Privacy = () => {
 
   const sections = [
     {
-      icon: FileCheck,
-      title: "Data Collection",
-      content: "We collect only the data necessary to provide our service. During document upload and processing, we temporarily access your bank statement files. No personal banking credentials are ever requested or stored. We may collect basic usage analytics to improve our service."
-    },
-    {
-      icon: Brain,
-      title: "AI Processing",
-      content: "Your documents are processed using secure AI and OCR technology. All processing happens in encrypted, isolated environments. Our AI models extract transaction data without human intervention. Documents are never used to train our AI models or shared with third parties."
+      icon: Trash2,
+      title: "Zero Data Retention",
+      content: "Your uploaded files are automatically deleted after conversion. We don't keep anything. Your data never stays on our servers beyond the processing time needed."
     },
     {
       icon: Lock,
       title: "End-to-End Encryption",
-      content: "All data transfers use bank-level 256-bit SSL/TLS encryption. Your uploaded files are encrypted at rest and in transit. Processing occurs in secure, compliant cloud infrastructure with multi-layer security protocols that meet international banking standards."
-    },
-    {
-      icon: Trash2,
-      title: "Data Retention",
-      content: "Your uploaded documents are automatically deleted from our servers immediately after processing is complete. Processed Excel files are stored temporarily (24 hours maximum) to allow you to download them. You can request immediate deletion of all your data at any time."
+      content: "All file transfers are encrypted using the latest TLS 1.4 protocols. Your documents are protected with military-grade security during upload, processing, and download."
     },
     {
       icon: Eye,
-      title: "No Data Sharing",
-      content: "We never sell, rent, or share your financial data with third parties. Your documents and extracted data remain completely private. We do not use your information for marketing purposes. No third-party analytics or advertising trackers are used on sensitive pages."
+      title: "No Tracking",
+      content: "We don't use cookies to track you. No ads, no profiling, no hidden scripts. Your privacy is respected at every step."
+    },
+    {
+      icon: Brain,
+      title: "AI-Powered, Human-Free",
+      content: "Your data is processed by secure AI systems — no human ever sees your files. Everything is automated, private, and confidential."
     },
     {
       icon: Globe,
-      title: "Compliance",
-      content: "We comply with GDPR (Europe), CCPA (California), and other global privacy regulations. Our service adheres to PCI DSS standards for financial data handling. Regular security audits ensure continuous compliance. We maintain SOC 2 Type II certification."
+      title: "Compliance-Ready",
+      content: "Built with GDPR, CCPA, and future-forward privacy standards in mind. We're committed to protecting your rights and data in 2026 and beyond."
     }
   ];
 
@@ -74,10 +69,10 @@ const Privacy = () => {
             Privacy Policy
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Complete transparency about how we protect and handle your financial data
+            Your data is treated like gold — private, secure, and never stored
           </p>
           <p className="text-sm text-muted-foreground">
-            Last updated: January 2025
+            Last updated: 2026
           </p>
         </div>
       </section>
@@ -108,18 +103,27 @@ const Privacy = () => {
         </div>
       </section>
 
-      {/* User Rights */}
+      {/* About Section */}
       <section className="py-16 px-6">
         <div className="container mx-auto max-w-4xl">
           <div className="bg-card/40 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-6">
-            <h2 className="text-3xl font-bold text-foreground">Your Rights</h2>
+            <h2 className="text-3xl font-bold text-foreground">About Akromeda</h2>
             <div className="space-y-4 text-muted-foreground">
-              <p><strong className="text-foreground">Access:</strong> You have the right to request a copy of all personal data we hold about you.</p>
-              <p><strong className="text-foreground">Deletion:</strong> You can request immediate deletion of your data at any time through your account settings.</p>
-              <p><strong className="text-foreground">Correction:</strong> You have the right to correct any inaccurate personal information.</p>
-              <p><strong className="text-foreground">Portability:</strong> You can request your data in a machine-readable format for transfer to another service.</p>
-              <p><strong className="text-foreground">Consent Withdrawal:</strong> You can withdraw consent for data processing at any time without affecting the lawfulness of previous processing.</p>
-              <p><strong className="text-foreground">Objection:</strong> You have the right to object to processing of your personal data for specific purposes.</p>
+              <p>
+                Akromeda is a smart, fast, and secure tool built to solve a very specific problem — converting bank statements from PDF to Excel with precision and ease.
+              </p>
+              <p>
+                This platform was created by <strong className="text-foreground">Sayyed Faizan Rizvi</strong>, a cybersecurity student from Harvard University, based in Kota, Rajasthan, India. In 2026, at the age of 18, Faizan launched Akromeda to help individuals and businesses save time and effort when dealing with financial data.
+              </p>
+              <div className="pt-4 space-y-2">
+                <h3 className="text-xl font-bold text-foreground">What Akromeda Does</h3>
+                <ul className="list-disc list-inside space-y-2">
+                  <li>Converts complex bank statement PDFs into clean, editable Excel sheets</li>
+                  <li>Maintains formatting, columns, and transaction clarity</li>
+                  <li>Works instantly — no software installation required</li>
+                  <li>Designed with data privacy and security at its core</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -128,10 +132,9 @@ const Privacy = () => {
       {/* Contact */}
       <section className="py-16 px-6 mb-16">
         <div className="container mx-auto max-w-4xl text-center space-y-6">
-          <h2 className="text-3xl font-bold">Questions About Privacy?</h2>
+          <h2 className="text-3xl font-bold">Questions or Concerns?</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            We're committed to transparency. If you have any questions or concerns about how we handle your data, 
-            please contact our privacy team at <a href="mailto:privacy@akromeda.com" className="text-primary hover:underline">privacy@akromeda.com</a>
+            You stay in control. Always. For any concerns, reach out at <a href="mailto:inspirexali@gmail.com" className="text-primary hover:underline">inspirexali@gmail.com</a>
           </p>
           <Button 
             size="lg" 

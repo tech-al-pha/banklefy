@@ -150,49 +150,74 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-primary/10 py-12 px-6">
         <div className="container mx-auto">
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div className="space-y-4">
-              <div className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              <h3 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
                 Akromeda
-              </div>
+              </h3>
               <p className="text-sm text-muted-foreground">
-                AI-powered bank statement conversion for the modern world.
+                Transform your bank statements into organized Excel files instantly with AI-powered precision.
               </p>
             </div>
-            <div className="space-y-3">
-              <h4 className="font-semibold">Product</h4>
+            
+            <div>
+              <h4 className="font-semibold mb-4 text-foreground">Product</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">API</a></li>
+                <li><a href="#features" className="hover:text-primary transition-colors">Features</a></li>
+                <li><a href="#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
+                <li><a href="#demo" className="hover:text-primary transition-colors">How It Works</a></li>
               </ul>
             </div>
-            <div className="space-y-3">
-              <h4 className="font-semibold">Company</h4>
+            
+            <div>
+              <h4 className="font-semibold mb-4 text-foreground">Company</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
                 <li>
                   <button 
                     onClick={() => navigate('/privacy')}
-                    className="hover:text-foreground transition-colors text-left"
+                    className="hover:text-primary transition-colors text-left"
+                  >
+                    About & Privacy
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => navigate('/privacy')}
+                    className="hover:text-primary transition-colors text-left"
                   >
                     Privacy Policy
                   </button>
                 </li>
               </ul>
             </div>
-            <div className="space-y-3">
-              <h4 className="font-semibold">Resources</h4>
+            
+            <div>
+              <h4 className="font-semibold mb-4 text-foreground">Contact</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Support</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Blog</a></li>
+                <li>
+                  <a href="tel:+917240233173" className="hover:text-primary transition-colors">
+                    📱 +91 7240233173
+                  </a>
+                </li>
+                <li>
+                  <a href="mailto:inspirexali@gmail.com" className="hover:text-primary transition-colors">
+                    📧 inspirexali@gmail.com
+                  </a>
+                </li>
+                <li>
+                  <a href="https://www.instagram.com/inspirexali" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+                    📸 @inspirexali
+                  </a>
+                </li>
+                <li className="text-muted-foreground/60">
+                  📍 Kota, Rajasthan, India
+                </li>
               </ul>
             </div>
           </div>
-          <div className="mt-12 pt-8 border-t border-primary/10 text-center text-sm text-muted-foreground">
-            <p>© 2025 Akromeda. All rights reserved.</p>
+          
+          <div className="pt-8 border-t border-primary/10 text-center text-sm text-muted-foreground">
+            <p>© 2026 Akromeda. Created by Sayyed Faizan Rizvi.</p>
           </div>
         </div>
       </footer>
