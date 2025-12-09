@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      anonymous_usage: {
+        Row: {
+          conversions_count: number
+          created_at: string
+          id: string
+          ip_address: string
+          last_reset_date: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          conversions_count?: number
+          created_at?: string
+          id?: string
+          ip_address: string
+          last_reset_date?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          conversions_count?: number
+          created_at?: string
+          id?: string
+          ip_address?: string
+          last_reset_date?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       conversions: {
         Row: {
           completed_at: string | null
@@ -82,7 +112,9 @@ export type Database = {
           conversions_used: number
           created_at: string
           id: string
+          last_reset_date: string
           tier: Database["public"]["Enums"]["subscription_tier"]
+          timezone: string
           updated_at: string
           user_id: string
         }
@@ -93,7 +125,9 @@ export type Database = {
           conversions_used?: number
           created_at?: string
           id?: string
+          last_reset_date?: string
           tier?: Database["public"]["Enums"]["subscription_tier"]
+          timezone?: string
           updated_at?: string
           user_id: string
         }
@@ -104,7 +138,9 @@ export type Database = {
           conversions_used?: number
           created_at?: string
           id?: string
+          last_reset_date?: string
           tier?: Database["public"]["Enums"]["subscription_tier"]
+          timezone?: string
           updated_at?: string
           user_id?: string
         }
@@ -133,11 +169,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_and_reset_daily_limit: {
+        Args: { p_ip_address?: string; p_timezone?: string; p_user_id?: string }
+        Returns: {
+          conversions_limit: number
+          conversions_used: number
+          needs_reset: boolean
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      increment_usage_count: {
+        Args: { p_ip_address?: string; p_user_id?: string }
         Returns: boolean
       }
     }

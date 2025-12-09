@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
 import { useNavigate } from "react-router-dom";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { UsageLimitBanner } from "./UsageLimitBanner";
 import {
   Table,
   TableBody,
@@ -30,12 +32,21 @@ export const UploadDemo = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [converting, setConverting] = useState(false);
-  const [conversionResult, setConversionResult] = useState<{ id: string; resultPath: string } | null>(null);
+  const [conversionResult, setConversionResult] = useState<{ id: string | null; resultPath: string | null; excelData?: string } | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [downloading, setDownloading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { 
+    remaining, 
+    conversionsLimit, 
+    limitReached, 
+    isAuthenticated, 
+    loading: usageLimitLoading,
+    refresh: refreshUsageLimit,
+    getTimezone
+  } = useUsageLimit();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,15 +71,29 @@ export const UploadDemo = () => {
   };
 
   const handleUploadClick = () => {
-    if (!user) {
+    if (limitReached) {
       toast({
-        title: "Sign in required",
-        description: "Please sign in to upload files.",
+        variant: "destructive",
+        title: "Limit reached",
+        description: isAuthenticated 
+          ? "You've reached your daily limit. Try again tomorrow!"
+          : "Sign up for a free account to get more conversions!",
       });
-      navigate('/auth');
+      if (!isAuthenticated) {
+        navigate('/auth');
+      }
       return;
     }
     fileInputRef.current?.click();
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
   };
 
   const handleConvert = async () => {
@@ -81,35 +106,54 @@ export const UploadDemo = () => {
       return;
     }
 
-    if (!user) {
+    if (limitReached) {
       toast({
-        title: "Sign in required",
-        description: "Please sign in to convert files.",
+        variant: "destructive",
+        title: "Limit reached",
+        description: isAuthenticated 
+          ? "You've reached your daily limit. Try again tomorrow!"
+          : "Sign up for a free account to get more conversions!",
       });
-      navigate('/auth');
+      if (!isAuthenticated) {
+        navigate('/auth');
+      }
       return;
     }
 
     setUploading(true);
 
     try {
-      // Upload file to Supabase Storage
-      const sanitized = sanitizeFilename(selectedFile.name);
-      const filePath = `${user.id}/${Date.now()}_${sanitized}`;
+      const timezone = getTimezone();
+      let requestBody: any = {
+        fileName: selectedFile.name,
+        timezone,
+      };
 
-      const { error: uploadError } = await supabase.storage
-        .from('bank-statements')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+      if (user) {
+        // Authenticated user - upload file to storage first
+        const sanitized = sanitizeFilename(selectedFile.name);
+        const filePath = `${Date.now()}_${sanitized}`;
 
-      if (uploadError) {
-        throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from('bank-statements')
+          .upload(`${user.id}/${filePath}`, selectedFile, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        requestBody.fileId = filePath;
+      } else {
+        // Anonymous user - send file as base64
+        const base64Data = await fileToBase64(selectedFile);
+        requestBody.fileData = base64Data;
       }
 
       toast({
-        title: "File uploaded",
+        title: user ? "File uploaded" : "Processing file",
         description: "Starting conversion...",
       });
 
@@ -118,10 +162,7 @@ export const UploadDemo = () => {
 
       // Call edge function to process conversion
       const { data, error: functionError } = await supabase.functions.invoke('convert-document', {
-        body: {
-          fileId: filePath,
-          fileName: selectedFile.name,
-        },
+        body: requestBody,
       });
 
       if (functionError) {
@@ -129,22 +170,30 @@ export const UploadDemo = () => {
       }
 
       if (data?.error) {
+        if (data?.limitReached) {
+          refreshUsageLimit();
+          throw new Error(data.message || 'Conversion limit reached');
+        }
         throw new Error(data.error);
       }
 
       // Store conversion result and transaction data
       setConversionResult({
         id: data.conversionId,
-        resultPath: `results/${user.id}/${data.conversionId}.xlsx`
+        resultPath: data.resultPath,
+        excelData: data.excelData,
       });
       
       if (data.transactions && Array.isArray(data.transactions)) {
         setTransactions(data.transactions);
       }
 
+      // Refresh usage limit after successful conversion
+      refreshUsageLimit();
+
       toast({
         title: "Conversion complete!",
-        description: `Extracted ${data.transactions?.length || 0} transactions. Review and download below.`,
+        description: `Extracted ${data.transactions?.length || 0} transactions. ${data.remaining} conversions remaining today.`,
       });
 
       setSelectedFile(null);
@@ -165,19 +214,34 @@ export const UploadDemo = () => {
   };
 
   const handleDownload = async () => {
-    if (!conversionResult || !user) return;
+    if (!conversionResult) return;
 
     setDownloading(true);
     try {
-      // Download file from Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('bank-statements')
-        .download(conversionResult.resultPath);
+      let blob: Blob;
 
-      if (error) throw error;
+      if (conversionResult.excelData) {
+        // Anonymous user - convert base64 to blob
+        const binaryString = atob(conversionResult.excelData);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      } else if (conversionResult.resultPath && user) {
+        // Authenticated user - download from storage
+        const { data, error } = await supabase.storage
+          .from('bank-statements')
+          .download(conversionResult.resultPath);
+
+        if (error) throw error;
+        blob = data;
+      } else {
+        throw new Error('No download available');
+      }
 
       // Create download link
-      const url = URL.createObjectURL(data);
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `converted_${Date.now()}.xlsx`;
@@ -273,6 +337,16 @@ export const UploadDemo = () => {
 
         <div className="max-w-4xl mx-auto">
           <Card className="p-8 md:p-12 bg-card/60 backdrop-blur-lg border-primary/20">
+            {/* Usage Limit Banner */}
+            {!usageLimitLoading && (
+              <UsageLimitBanner
+                remaining={remaining}
+                limit={conversionsLimit}
+                isAuthenticated={isAuthenticated}
+                limitReached={limitReached}
+              />
+            )}
+
             <div className="space-y-8">
               {/* Hidden File Input */}
               <input
@@ -286,18 +360,26 @@ export const UploadDemo = () => {
               {/* Upload Zone */}
               <div 
                 onClick={handleUploadClick}
-                className="border-2 border-dashed border-primary/30 rounded-lg p-12 text-center hover:border-primary/60 transition-all duration-300 hover:bg-primary/5 cursor-pointer group"
+                className={`border-2 border-dashed rounded-lg p-12 text-center transition-all duration-300 cursor-pointer group ${
+                  limitReached 
+                    ? 'border-muted/30 bg-muted/10 cursor-not-allowed' 
+                    : 'border-primary/30 hover:border-primary/60 hover:bg-primary/5'
+                }`}
               >
                 <div className="space-y-4">
-                  <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <Upload className="w-8 h-8 text-primary" />
+                  <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center transition-transform duration-300 ${
+                    limitReached ? 'bg-muted/10' : 'bg-primary/10 group-hover:scale-110'
+                  }`}>
+                    <Upload className={`w-8 h-8 ${limitReached ? 'text-muted-foreground' : 'text-primary'}`} />
                   </div>
                   <div className="space-y-2">
                     <p className="text-lg font-semibold">
                       {selectedFile ? selectedFile.name : "Drop your bank statement here"}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      or click to browse files • Supports PDF, PNG, JPG
+                      {limitReached 
+                        ? "Daily limit reached" 
+                        : "or click to browse files • Supports PDF, PNG, JPG"}
                     </p>
                   </div>
                   <Button 
@@ -306,15 +388,15 @@ export const UploadDemo = () => {
                       e.stopPropagation();
                       handleUploadClick();
                     }}
-                    disabled={uploading || converting}
+                    disabled={uploading || converting || limitReached}
                   >
-                    Choose File
+                    {limitReached ? "Limit Reached" : "Choose File"}
                   </Button>
                 </div>
               </div>
 
               {/* Convert Button */}
-              {selectedFile && (
+              {selectedFile && !limitReached && (
                 <div className="text-center space-y-3">
                   <Button
                     size="lg"
@@ -471,8 +553,8 @@ export const UploadDemo = () => {
                 </div>
 
                 <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/20">
-                  <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
-                    <CheckCircle className="w-4 h-4 text-accent" />
+                  <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
+                    <CheckCircle className="w-4 h-4 text-green-500" />
                   </div>
                   <div className="space-y-1">
                     <p className="font-semibold text-sm">3. Download</p>
@@ -484,21 +566,19 @@ export const UploadDemo = () => {
               </div>
 
               {/* Supported Languages */}
-              <div className="pt-6 border-t border-primary/10">
-                <p className="text-sm text-muted-foreground text-center mb-4">
-                  Supports 50+ languages including:
+              <div className="text-center pt-8 border-t border-muted">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Supports 50+ banks worldwide
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {["English", "Hindi", "Arabic", "Mandarin", "French", "Spanish", "Russian", "German", "+42 more"].map(
-                    (lang) => (
-                      <span
-                        key={lang}
-                        className="px-3 py-1 rounded-full bg-card text-xs text-foreground border border-primary/20"
-                      >
-                        {lang}
-                      </span>
-                    )
-                  )}
+                  {["English", "Spanish", "French", "German", "Arabic", "Hindi", "Chinese"].map((lang) => (
+                    <span 
+                      key={lang}
+                      className="px-3 py-1 text-xs rounded-full bg-muted/50 text-muted-foreground"
+                    >
+                      {lang}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
