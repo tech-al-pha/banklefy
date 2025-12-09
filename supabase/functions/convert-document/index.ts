@@ -75,8 +75,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate file name
-    if (typeof fileName !== 'string' || fileName.length > 255 || !/^[a-zA-Z0-9._\s-]+$/.test(fileName)) {
+    // Validate file name - allow common filename characters
+    if (typeof fileName !== 'string' || fileName.length > 255 || fileName.includes('..') || fileName.includes('/')) {
       return new Response(
         JSON.stringify({ error: 'Invalid file name' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
