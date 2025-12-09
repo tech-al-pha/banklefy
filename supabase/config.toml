@@ -1,1 +1,7 @@
 project_id = "gzzsuvfqpvzvmlnbsqcf"
+
+[functions.check-usage-limit]
+verify_jwt = false
+
+[functions.convert-document]
+verify_jwt = false

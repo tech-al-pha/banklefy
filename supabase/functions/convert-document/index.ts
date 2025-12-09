@@ -12,62 +12,110 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
+    // Get request data first
+    const { fileId, fileName, fileData: base64FileData, timezone } = await req.json();
+    const userTimezone = timezone || 'UTC';
+
+    // Get client IP address for anonymous users
+    const forwarded = req.headers.get('x-forwarded-for');
+    const ipAddress = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
+
+    // Create service role client for admin operations
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Authenticate user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    // Check if user is authenticated
+    const authHeader = req.headers.get('Authorization');
+    let user = null;
+    let supabase = supabaseAdmin;
+    
+    if (authHeader && authHeader !== 'Bearer null') {
+      supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        {
+          global: {
+            headers: { Authorization: authHeader },
+          },
+        }
+      );
+      
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      user = authUser;
+    }
 
-    if (authError || !user) {
+    console.log('Processing conversion:', { 
+      isAuthenticated: !!user, 
+      ipAddress: user ? 'hidden' : ipAddress,
+      timezone: userTimezone 
+    });
+
+    // For anonymous users, we need base64 file data since they can't use storage
+    // For authenticated users, we use fileId to download from storage
+    if (!fileName) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Missing required field: fileName' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get request data
-    const { fileId, fileName } = await req.json();
-
-    if (!fileId || !fileName) {
+    if (!user && !base64FileData) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: fileId, fileName' }),
+        JSON.stringify({ error: 'File data required for anonymous users' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (user && !fileId) {
+      return new Response(
+        JSON.stringify({ error: 'File ID required for authenticated users' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Validate file name
-    if (typeof fileName !== 'string' || fileName.length > 255 || !/^[a-zA-Z0-9._-]+$/.test(fileName)) {
+    if (typeof fileName !== 'string' || fileName.length > 255 || !/^[a-zA-Z0-9._\s-]+$/.test(fileName)) {
       return new Response(
         JSON.stringify({ error: 'Invalid file name' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Download and validate file content (magic bytes verification)
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from('bank-statements')
-      .download(`${user.id}/${fileId}`);
+    let bytes: Uint8Array;
 
-    if (downloadError || !fileData) {
-      return new Response(
-        JSON.stringify({ error: 'File not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (user && fileId) {
+      // Authenticated user - download from storage
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from('bank-statements')
+        .download(`${user.id}/${fileId}`);
+
+      if (downloadError || !fileData) {
+        return new Response(
+          JSON.stringify({ error: 'File not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const buffer = await fileData.arrayBuffer();
+      bytes = new Uint8Array(buffer);
+    } else {
+      // Anonymous user - decode base64 file data
+      try {
+        const base64Content = base64FileData.split(',')[1] || base64FileData;
+        const binaryString = atob(base64Content);
+        bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid file data' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
-
-    // Verify file content matches expected type
-    const buffer = await fileData.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
 
     // Check file size (10MB limit)
     if (bytes.length > 10 * 1024 * 1024) {
@@ -110,69 +158,76 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Atomically increment conversion usage and check limit
-    // This prevents race conditions by doing both operations in a single query
-    const { data: subscription, error: subError } = await supabase
-      .from('subscriptions')
-      .select('tier, conversions_used, conversions_limit')
-      .eq('user_id', user.id)
-      .single();
+    // Check and reset daily limit based on user type
+    const { data: limitResult, error: limitError } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
+      p_ip_address: user ? null : ipAddress,
+      p_user_id: user ? user.id : null,
+      p_timezone: userTimezone
+    });
 
-    if (subError || !subscription) {
+    if (limitError) {
+      console.error('Error checking limit:', limitError);
       return new Response(
-        JSON.stringify({ error: 'Subscription not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if user would exceed limit
-    if (subscription.conversions_used >= subscription.conversions_limit) {
-      return new Response(
-        JSON.stringify({
-          error: 'Conversion limit reached',
-          message: `You have reached your ${subscription.tier} plan limit of ${subscription.conversions_limit} conversions.`,
-        }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Atomically increment the counter - this prevents race conditions
-    const { data: updatedSub, error: incrementError } = await supabase
-      .from('subscriptions')
-      .update({ conversions_used: subscription.conversions_used + 1 })
-      .eq('user_id', user.id)
-      .eq('conversions_used', subscription.conversions_used) // Only update if value hasn't changed
-      .select()
-      .single();
-
-    if (incrementError || !updatedSub) {
-      // If update failed, another request beat us to it - reject this request
-      return new Response(
-        JSON.stringify({
-          error: 'Conversion limit reached',
-          message: 'Please try again.',
-        }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Create conversion record
-    const { data: conversion, error: convError } = await supabase
-      .from('conversions')
-      .insert({
-        user_id: user.id,
-        original_filename: fileName,
-        file_path: fileId,
-        status: 'processing',
-      })
-      .select()
-      .single();
-
-    if (convError || !conversion) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to create conversion record' }),
+        JSON.stringify({ error: 'Failed to check usage limit' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
+    const conversionsUsed = usageInfo?.conversions_used ?? 0;
+    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 6 : 2);
+
+    console.log('Usage info:', { conversionsUsed, conversionsLimit, user: !!user });
+
+    // Check if user would exceed limit
+    if (conversionsUsed >= conversionsLimit) {
+      return new Response(
+        JSON.stringify({
+          error: 'Conversion limit reached',
+          limitReached: true,
+          isAuthenticated: !!user,
+          message: user 
+            ? `You have reached your daily limit of ${conversionsLimit} conversions.`
+            : `You have reached your daily limit of ${conversionsLimit} free conversions. Sign up for a free account to get ${6} conversions per day!`,
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Increment usage count
+    const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
+      p_ip_address: user ? null : ipAddress,
+      p_user_id: user ? user.id : null
+    });
+
+    if (incrementError) {
+      console.error('Error incrementing usage:', incrementError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to update usage count' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create conversion record only for authenticated users
+    let conversion = null;
+    if (user) {
+      const { data: convData, error: convError } = await supabase
+        .from('conversions')
+        .insert({
+          user_id: user.id,
+          original_filename: fileName,
+          file_path: fileId,
+          status: 'processing',
+        })
+        .select()
+        .single();
+
+      if (convError) {
+        console.error('Failed to create conversion record:', convError);
+        // Don't fail the request, just log it
+      } else {
+        conversion = convData;
+      }
     }
 
     // Convert file to base64 for AI processing
@@ -259,48 +314,50 @@ Deno.serve(async (req) => {
     // Write to buffer
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     
-    // Upload Excel file to storage
-    const resultPath = `results/${user.id}/${conversion.id}.xlsx`;
-    const { error: uploadResultError } = await supabase.storage
-      .from('bank-statements')
-      .upload(resultPath, excelBuffer, {
-        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        upsert: false,
-      });
+    let resultPath = null;
 
-    if (uploadResultError) {
-      console.error('Failed to upload result:', uploadResultError);
-      throw uploadResultError;
+    // Only upload to storage for authenticated users
+    if (user && conversion) {
+      resultPath = `results/${user.id}/${conversion.id}.xlsx`;
+      const { error: uploadResultError } = await supabase.storage
+        .from('bank-statements')
+        .upload(resultPath, excelBuffer, {
+          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          upsert: false,
+        });
+
+      if (uploadResultError) {
+        console.error('Failed to upload result:', uploadResultError);
+        // Don't fail, just skip storage
+        resultPath = null;
+      } else {
+        console.log('Excel file uploaded successfully');
+
+        // Update conversion status
+        await supabase
+          .from('conversions')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            result_path: resultPath,
+          })
+          .eq('id', conversion.id);
+      }
     }
 
-    console.log('Excel file uploaded successfully');
-
-    // Update conversion status
-    const { error: updateError } = await supabase
-      .from('conversions')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        result_path: resultPath,
-      })
-      .eq('id', conversion.id);
-
-    if (updateError) {
-      console.error('Failed to update conversion:', updateError);
-      // If conversion failed, rollback the counter
-      await supabase
-        .from('subscriptions')
-        .update({ conversions_used: updatedSub.conversions_used - 1 })
-        .eq('user_id', user.id);
-      throw updateError;
-    }
+    // Convert Excel buffer to base64 for anonymous users
+    const excelBase64 = btoa(String.fromCharCode(...new Uint8Array(excelBuffer)));
 
     return new Response(
       JSON.stringify({
         success: true,
-        conversionId: conversion.id,
+        conversionId: conversion?.id || null,
+        resultPath: resultPath,
         transactions: transactions,
+        excelData: user ? null : excelBase64, // Only send base64 for anonymous users
         message: 'Conversion completed successfully',
+        remaining: conversionsLimit - conversionsUsed - 1,
+        isAuthenticated: !!user,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
