@@ -397,7 +397,7 @@ export const UploadDemo = () => {
 
               {/* Convert Button */}
               {selectedFile && !limitReached && (
-                <div className="text-center space-y-3">
+                <div className="text-center">
                   <Button
                     size="lg"
                     className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-neon w-full md:w-auto"
@@ -416,53 +416,55 @@ export const UploadDemo = () => {
                       </>
                     )}
                   </Button>
-                  
-                  {/* Download Buttons */}
-                  {conversionResult && (
-                    <div className="w-full space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Download As:</p>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <Button
-                          size="lg"
-                          className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white flex-1"
-                          onClick={handleDownload}
-                          disabled={downloading}
-                        >
-                          {downloading ? (
-                            <>
-                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                              Downloading...
-                            </>
-                          ) : (
-                            <>
-                              <FileSpreadsheet className="mr-2 h-5 w-5" />
-                              Excel
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={exportAsCSV}
-                          disabled={transactions.length === 0}
-                        >
-                          <FileText className="mr-2 h-5 w-5" />
-                          CSV
-                        </Button>
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          className="flex-1"
-                          onClick={exportAsJSON}
-                          disabled={transactions.length === 0}
-                        >
-                          <FileJson className="mr-2 h-5 w-5" />
-                          JSON
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                </div>
+              )}
+
+              {/* Download Buttons - Show after conversion */}
+              {conversionResult && (
+                <div className="text-center space-y-3">
+                  <div className="flex items-center justify-center gap-2 text-green-500">
+                    <CheckCircle className="h-5 w-5" />
+                    <span className="font-medium">Conversion Complete!</span>
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Download your file:</p>
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white"
+                      onClick={handleDownload}
+                      disabled={downloading}
+                    >
+                      {downloading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Downloading...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-5 w-5" />
+                          Download Excel
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={exportAsCSV}
+                      disabled={transactions.length === 0}
+                    >
+                      <FileText className="mr-2 h-5 w-5" />
+                      CSV
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={exportAsJSON}
+                      disabled={transactions.length === 0}
+                    >
+                      <FileJson className="mr-2 h-5 w-5" />
+                      JSON
+                    </Button>
+                  </div>
                 </div>
               )}
 
