@@ -230,8 +230,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Convert file to base64 for AI processing
-    const base64Data = btoa(String.fromCharCode(...bytes));
+    // Convert file to base64 for AI processing (chunk to avoid stack overflow)
+    const chunkSize = 8192;
+    let base64Data = '';
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      base64Data += String.fromCharCode(...chunk);
+    }
+    base64Data = btoa(base64Data);
     const mimeType = lowerFileName.endsWith('.pdf') ? 'application/pdf' : 
                      lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
     const dataUrl = `data:${mimeType};base64,${base64Data}`;
@@ -345,8 +351,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Convert Excel buffer to base64 for anonymous users
-    const excelBase64 = btoa(String.fromCharCode(...new Uint8Array(excelBuffer)));
+    // Convert Excel buffer to base64 for anonymous users (chunk to avoid stack overflow)
+    const excelBytes = new Uint8Array(excelBuffer);
+    let excelBase64 = '';
+    for (let i = 0; i < excelBytes.length; i += chunkSize) {
+      const chunk = excelBytes.subarray(i, i + chunkSize);
+      excelBase64 += String.fromCharCode(...chunk);
+    }
+    excelBase64 = btoa(excelBase64);
 
     return new Response(
       JSON.stringify({
