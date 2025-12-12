@@ -21,6 +21,7 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [recoverySessionReady, setRecoverySessionReady] = useState(false);
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -31,12 +32,21 @@ export default function Auth() {
     const type = searchParams.get('type');
     if (type === 'recovery') {
       setMode('reset');
+      setLoading(true);
       
       // Listen for the PASSWORD_RECOVERY event to establish the session
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'PASSWORD_RECOVERY') {
-          // Session is now established, user can reset password
-          console.log('Password recovery session established');
+        if (event === 'PASSWORD_RECOVERY' && session) {
+          setRecoverySessionReady(true);
+          setLoading(false);
+        }
+      });
+
+      // Also check if session already exists (in case event already fired)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setRecoverySessionReady(true);
+          setLoading(false);
         }
       });
 
@@ -93,6 +103,15 @@ export default function Auth() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!recoverySessionReady) {
+      toast({
+        variant: 'destructive',
+        title: 'Session not ready',
+        description: 'Please wait for the recovery session to be established or try clicking the link in your email again.',
+      });
+      return;
+    }
     
     try {
       passwordSchema.parse(password);
@@ -292,49 +311,58 @@ export default function Auth() {
 
           {mode === 'reset' && (
             <form onSubmit={handleResetPassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="password">New Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="bg-background/50"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Must be at least 8 characters
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                  className="bg-background/50"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  'Reset Password'
-                )}
-              </Button>
+              {loading && !recoverySessionReady ? (
+                <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Establishing secure session...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">New Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="bg-background/50"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Must be at least 8 characters
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="bg-background/50"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                    disabled={loading || !recoverySessionReady}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Reset Password'
+                    )}
+                  </Button>
+                </>
+              )}
             </form>
           )}
 
