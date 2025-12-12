@@ -2,13 +2,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
 import { useNavigate } from "react-router-dom";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { UsageLimitBanner } from "./UsageLimitBanner";
+import { useRecaptcha } from "@/hooks/useRecaptcha";
 import {
   Table,
   TableBody,
@@ -47,6 +48,17 @@ export const UploadDemo = () => {
     refresh: refreshUsageLimit,
     getTimezone
   } = useUsageLimit();
+  
+  // reCAPTCHA for anonymous users
+  const { recaptchaToken, isLoaded: recaptchaLoaded, renderRecaptcha, resetRecaptcha } = useRecaptcha();
+  const [showRecaptcha, setShowRecaptcha] = useState(false);
+
+  // Render reCAPTCHA when needed for anonymous users
+  useEffect(() => {
+    if (showRecaptcha && !user && recaptchaLoaded) {
+      renderRecaptcha('recaptcha-container');
+    }
+  }, [showRecaptcha, user, recaptchaLoaded, renderRecaptcha]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -64,6 +76,12 @@ export const UploadDemo = () => {
     }
 
     setSelectedFile(file);
+    
+    // Show reCAPTCHA for anonymous users
+    if (!user) {
+      setShowRecaptcha(true);
+    }
+    
     toast({
       title: "File Selected",
       description: `${file.name} - Ready to convert`,
@@ -120,6 +138,16 @@ export const UploadDemo = () => {
       return;
     }
 
+    // For anonymous users, require reCAPTCHA verification
+    if (!user && !recaptchaToken) {
+      toast({
+        variant: "destructive",
+        title: "Verification required",
+        description: "Please complete the CAPTCHA verification below.",
+      });
+      return;
+    }
+
     setUploading(true);
 
     try {
@@ -128,6 +156,11 @@ export const UploadDemo = () => {
         fileName: selectedFile.name,
         timezone,
       };
+
+      // Add reCAPTCHA token for anonymous users
+      if (!user && recaptchaToken) {
+        requestBody.recaptchaToken = recaptchaToken;
+      }
 
       if (user) {
         // Authenticated user - upload file to storage first
@@ -197,11 +230,15 @@ export const UploadDemo = () => {
       });
 
       setSelectedFile(null);
+      setShowRecaptcha(false);
+      resetRecaptcha();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (error: any) {
       console.error('Conversion error:', error);
+      // Reset reCAPTCHA on error so user can try again
+      resetRecaptcha();
       toast({
         variant: "destructive",
         title: "Conversion failed",
@@ -395,6 +432,22 @@ export const UploadDemo = () => {
                 </div>
               </div>
 
+              {/* reCAPTCHA for anonymous users */}
+              {showRecaptcha && !user && selectedFile && !limitReached && (
+                <div className="flex flex-col items-center gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    Please verify you're human to continue
+                  </p>
+                  <div id="recaptcha-container" className="flex justify-center" />
+                  {recaptchaToken && (
+                    <p className="text-sm text-green-500 flex items-center gap-1">
+                      <CheckCircle className="h-4 w-4" />
+                      Verified
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Convert Button */}
               {selectedFile && !limitReached && (
                 <div className="text-center">
@@ -402,7 +455,7 @@ export const UploadDemo = () => {
                     size="lg"
                     className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-neon w-full md:w-auto"
                     onClick={handleConvert}
-                    disabled={uploading || converting}
+                    disabled={uploading || converting || (!user && !recaptchaToken)}
                   >
                     {uploading || converting ? (
                       <>

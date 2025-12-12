@@ -6,6 +6,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Verify reCAPTCHA token with Google
+async function verifyRecaptcha(token: string): Promise<boolean> {
+  const secretKey = Deno.env.get('RECAPTCHA_SECRET_KEY');
+  if (!secretKey) {
+    console.error('RECAPTCHA_SECRET_KEY not configured');
+    return false;
+  }
+
+  try {
+    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `secret=${secretKey}&response=${token}`,
+    });
+
+    const data = await response.json();
+    console.log('reCAPTCHA verification result:', { success: data.success });
+    return data.success === true;
+  } catch (error) {
+    console.error('reCAPTCHA verification error:', error);
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -13,7 +39,7 @@ Deno.serve(async (req) => {
 
   try {
     // Get request data first
-    const { fileId, fileName, fileData: base64FileData, timezone } = await req.json();
+    const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken } = await req.json();
     const userTimezone = timezone || 'UTC';
 
     // Get client IP address for anonymous users
@@ -44,6 +70,25 @@ Deno.serve(async (req) => {
       
       const { data: { user: authUser } } = await supabase.auth.getUser();
       user = authUser;
+    }
+
+    // For anonymous users, require reCAPTCHA verification
+    if (!user) {
+      if (!recaptchaToken) {
+        return new Response(
+          JSON.stringify({ error: 'CAPTCHA verification required for anonymous users' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const isValidCaptcha = await verifyRecaptcha(recaptchaToken);
+      if (!isValidCaptcha) {
+        return new Response(
+          JSON.stringify({ error: 'CAPTCHA verification failed. Please try again.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      console.log('reCAPTCHA verified successfully for anonymous user');
     }
 
     console.log('Processing conversion:', { 
