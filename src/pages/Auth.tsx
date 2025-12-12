@@ -26,11 +26,21 @@ export default function Auth() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Check for password reset mode from URL
+  // Check for password reset mode from URL and handle recovery session
   useEffect(() => {
     const type = searchParams.get('type');
     if (type === 'recovery') {
       setMode('reset');
+      
+      // Listen for the PASSWORD_RECOVERY event to establish the session
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          // Session is now established, user can reset password
+          console.log('Password recovery session established');
+        }
+      });
+
+      return () => subscription.unsubscribe();
     }
   }, [searchParams]);
 
