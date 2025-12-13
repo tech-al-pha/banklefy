@@ -346,8 +346,9 @@ Deno.serve(async (req) => {
       } else {
         throw new Error('No JSON array found in AI response');
       }
-    } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError, extractedText);
+    } catch (parseError: unknown) {
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+      console.error('Failed to parse AI response:', errorMessage);
       throw new Error('Failed to extract transaction data from document');
     }
 
