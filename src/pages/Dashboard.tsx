@@ -139,7 +139,7 @@ const Dashboard = () => {
                 Back
               </Button>
               <div className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                BankMorph Dashboard
+                Akromeda Dashboard
               </div>
             </div>
             <div className="flex items-center gap-2">
