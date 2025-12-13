@@ -226,7 +226,7 @@ export default function Auth() {
 
         toast({
           title: 'Account created!',
-          description: 'You can now start using BankMorph.',
+          description: 'You can now start using Akromeda.',
         });
         navigate('/');
       }
@@ -261,7 +261,7 @@ export default function Auth() {
       <Card className="w-full max-w-md bg-card/80 backdrop-blur-lg border-primary/20 relative z-10">
         <CardHeader className="space-y-1">
           <CardTitle className="text-3xl font-bold text-center bg-gradient-primary bg-clip-text text-transparent">
-            BankMorph
+            Akromeda
           </CardTitle>
           <CardDescription className="text-center">
             {getCardDescription()}
