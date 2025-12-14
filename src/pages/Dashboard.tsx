@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { FileSpreadsheet, ArrowLeft, Loader2, Home } from "lucide-react";
 import { format } from "date-fns";
+import akromedaLogo from "@/assets/akromeda-logo.png";
 
 interface Conversion {
   id: string;
@@ -138,8 +139,11 @@ const Dashboard = () => {
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <div className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Akromeda Dashboard
+              <div className="flex items-center gap-2">
+                <img src={akromedaLogo} alt="Akromeda" className="h-8 w-8" />
+                <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                  Akromeda Dashboard
+                </span>
               </div>
             </div>
             <div className="flex items-center gap-2">

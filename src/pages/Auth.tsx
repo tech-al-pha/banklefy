@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
+import akromedaLogo from '@/assets/akromeda-logo.png';
 
 const emailSchema = z.string().email('Invalid email address').max(255);
 const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
@@ -260,6 +261,9 @@ export default function Auth() {
       
       <Card className="w-full max-w-md bg-card/80 backdrop-blur-lg border-primary/20 relative z-10">
         <CardHeader className="space-y-1">
+          <div className="flex justify-center mb-2">
+            <img src={akromedaLogo} alt="Akromeda" className="h-16 w-16" />
+          </div>
           <CardTitle className="text-3xl font-bold text-center bg-gradient-primary bg-clip-text text-transparent">
             Akromeda
           </CardTitle>
