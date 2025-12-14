@@ -6,11 +6,30 @@ import { UploadDemo } from "@/components/UploadDemo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { LogOut, Shield } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import akromedaLogo from "@/assets/akromeda-logo.png";
 
 const Index = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (user) {
+        const { data } = await supabase.rpc('has_role', {
+          _user_id: user.id,
+          _role: 'admin'
+        });
+        setIsAdmin(!!data);
+      } else {
+        setIsAdmin(false);
+      }
+    };
+    checkAdmin();
+  }, [user]);
 
   const handleAuthClick = () => {
     if (user) {
@@ -26,8 +45,11 @@ const Index = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Akromeda
+            <div className="flex items-center gap-2">
+              <img src={akromedaLogo} alt="Akromeda" className="h-8 w-8" />
+              <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                Akromeda
+              </span>
             </div>
             <div className="hidden md:flex items-center gap-6">
               <a 
@@ -68,6 +90,17 @@ const Index = () => {
                   className="text-sm"
                 >
                   Dashboard
+                </Button>
+              )}
+              {isAdmin && (
+                <Button 
+                  variant="ghost"
+                  size="sm" 
+                  onClick={() => navigate('/admin')}
+                  className="text-sm gap-1"
+                >
+                  <Shield className="h-4 w-4" />
+                  Admin
                 </Button>
               )}
               <Button 
@@ -152,9 +185,12 @@ const Index = () => {
         <div className="container mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div className="space-y-4">
-              <h3 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Akromeda
-              </h3>
+              <div className="flex items-center gap-2">
+                <img src={akromedaLogo} alt="Akromeda" className="h-8 w-8" />
+                <h3 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                  Akromeda
+                </h3>
+              </div>
               <p className="text-sm text-muted-foreground">
                 Transform your bank statements into organized Excel files instantly with AI-powered precision.
               </p>
