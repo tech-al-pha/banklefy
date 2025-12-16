@@ -99,7 +99,6 @@ Deno.serve(async (req) => {
         remaining,
         limitReached,
         isAuthenticated,
-        ipAddress: user ? null : ipAddress, // Only return IP for anonymous
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
