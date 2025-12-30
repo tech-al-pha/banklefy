@@ -18,7 +18,7 @@ declare global {
   }
 }
 
-const RECAPTCHA_SITE_KEY = '6LcrAS0sAAAAAPwQrVzuAyeq88LWxKnT7OIfUaqM';
+const RECAPTCHA_SITE_KEY = '6LdKSTssAAAAANVjpCJq2lpVeKgNrx6UQ-jAsg-F';
 
 export const useRecaptcha = () => {
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
