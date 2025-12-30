@@ -373,7 +373,7 @@ export const UploadDemo = () => {
         </div>
 
         <div className="max-w-4xl mx-auto">
-          <Card className="p-8 md:p-12 bg-card/60 backdrop-blur-lg border-primary/20">
+          <Card className="p-8 md:p-12 glass-premium lightning-border rounded-2xl">
             {/* Usage Limit Banner */}
             {!usageLimitLoading && (
               <UsageLimitBanner
@@ -394,23 +394,35 @@ export const UploadDemo = () => {
                 className="hidden"
               />
 
-              {/* Upload Zone */}
+              {/* Upload Zone - Lightning Border Glow Effect */}
               <div 
                 onClick={handleUploadClick}
-                className={`border-2 border-dashed rounded-lg p-12 text-center transition-all duration-300 cursor-pointer group ${
+                data-hover
+                className={`upload-zone-lightning rounded-xl p-12 text-center transition-all duration-500 cursor-pointer group relative ${
                   limitReached 
-                    ? 'border-muted/30 bg-muted/10 cursor-not-allowed' 
-                    : 'border-primary/30 hover:border-primary/60 hover:bg-primary/5'
+                    ? 'opacity-50 cursor-not-allowed' 
+                    : ''
                 }`}
               >
-                <div className="space-y-4">
-                  <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center transition-transform duration-300 ${
-                    limitReached ? 'bg-muted/10' : 'bg-primary/10 group-hover:scale-110'
+                {/* Inner glow effect */}
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/5 via-transparent to-lightning/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                
+                <div className="space-y-6 relative z-10">
+                  {/* Icon with premium glow */}
+                  <div className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 ${
+                    limitReached 
+                      ? 'bg-muted/10' 
+                      : 'bg-gradient-to-br from-primary/20 to-lightning/10 group-hover:scale-110 group-hover:shadow-lightning'
                   }`}>
-                    <Upload className={`w-8 h-8 ${limitReached ? 'text-muted-foreground' : 'text-primary'}`} />
+                    <Upload className={`w-10 h-10 transition-all duration-300 ${
+                      limitReached 
+                        ? 'text-muted-foreground utility-icon-muted' 
+                        : 'text-primary group-hover:text-lightning'
+                    }`} />
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-lg font-semibold">
+                  
+                  <div className="space-y-3">
+                    <p className="text-xl font-semibold tracking-wide">
                       {selectedFile ? selectedFile.name : "Drop your bank statement here"}
                     </p>
                     <p className="text-sm text-muted-foreground">
@@ -419,8 +431,9 @@ export const UploadDemo = () => {
                         : "or click to browse files • Supports PDF, PNG, JPG"}
                     </p>
                   </div>
+                  
                   <Button 
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                    className="btn-premium bg-gradient-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-3 shadow-neon"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleUploadClick();
