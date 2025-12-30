@@ -12,7 +12,7 @@ const Logo = () => {
       <img 
         src={amLogo} 
         alt="Akromeda" 
-        className="h-12 w-auto transition-all duration-300 group-hover:drop-shadow-[0_0_12px_hsl(var(--primary)/0.6)]"
+        className="h-14 w-auto transition-all duration-500 group-hover:drop-shadow-[0_0_20px_hsl(42_85%_55%/0.7)] group-hover:scale-105"
       />
     </div>
   );
