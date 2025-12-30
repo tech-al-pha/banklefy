@@ -47,15 +47,21 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        lightning: "hsl(var(--lightning))",
+        highlight: "hsl(var(--highlight))",
+        "warm-brown": "hsl(var(--warm-brown))",
       },
       backgroundImage: {
         'gradient-primary': 'var(--gradient-primary)',
         'gradient-dark': 'var(--gradient-dark)',
         'gradient-glow': 'var(--gradient-glow)',
+        'gradient-lightning': 'var(--gradient-lightning)',
       },
       boxShadow: {
         'neon': 'var(--shadow-neon)',
         'card': 'var(--shadow-card)',
+        'lightning': 'var(--shadow-lightning)',
+        'luxury': 'var(--shadow-luxury)',
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -79,10 +85,30 @@ export default {
             height: "0",
           },
         },
+        "lightning-flow": {
+          "0%, 100%": {
+            backgroundPosition: "0% 50%",
+          },
+          "50%": {
+            backgroundPosition: "100% 50%",
+          },
+        },
+        "pulse-glow": {
+          "0%, 100%": {
+            opacity: "0.5",
+            boxShadow: "0 0 20px hsl(42 85% 55% / 0.3)",
+          },
+          "50%": {
+            opacity: "1",
+            boxShadow: "0 0 40px hsl(195 100% 50% / 0.6), 0 0 60px hsl(42 85% 55% / 0.4)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "lightning-flow": "lightning-flow 2s linear infinite",
+        "pulse-glow": "pulse-glow 2s ease-in-out infinite",
       },
     },
   },

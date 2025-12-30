@@ -2,58 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* Definition of the design system - Premium Luxury Dark Theme
+   Colors based on: #2B1C10, #987284, #6E493A, #E1D4C1, #F4E1D2
+   All colors MUST be HSL.
 */
 
 @layer base {
   :root {
-    /* Akromeda Futuristic Fintech Theme - Dark Mode Primary */
-    --background: 225 35% 6%;
-    --foreground: 200 100% 95%;
+    /* Premium Luxury Dark Theme */
+    --background: 22 47% 12%;
+    --foreground: 39 35% 82%;
 
-    --card: 225 30% 10%;
-    --card-foreground: 200 100% 95%;
+    --card: 22 40% 10%;
+    --card-foreground: 39 35% 82%;
 
-    --popover: 225 30% 10%;
-    --popover-foreground: 200 100% 95%;
+    --popover: 22 40% 10%;
+    --popover-foreground: 39 35% 82%;
 
-    /* Neon Cyan Primary */
-    --primary: 192 100% 50%;
-    --primary-foreground: 225 35% 6%;
+    /* Warm Brown Primary - Luxurious Gold Accent */
+    --primary: 42 85% 55%;
+    --primary-foreground: 22 47% 8%;
 
-    /* Electric Purple Secondary */
-    --secondary: 270 70% 65%;
-    --secondary-foreground: 225 35% 6%;
+    /* Mauve/Dusty Rose Secondary */
+    --secondary: 338 15% 56%;
+    --secondary-foreground: 22 47% 8%;
 
-    --muted: 225 20% 20%;
-    --muted-foreground: 200 20% 60%;
+    --muted: 22 30% 20%;
+    --muted-foreground: 338 10% 55%;
 
-    /* Neon Green Accent */
-    --accent: 145 85% 50%;
-    --accent-foreground: 225 35% 6%;
+    /* Gold Accent - Lightning Effect */
+    --accent: 42 100% 60%;
+    --accent-foreground: 22 47% 8%;
+
+    /* Neon Electric Blue for Lightning */
+    --lightning: 195 100% 50%;
+    --lightning-glow: 195 100% 65%;
 
     --destructive: 0 85% 60%;
-    --destructive-foreground: 200 100% 95%;
+    --destructive-foreground: 39 35% 82%;
 
-    --border: 225 20% 20%;
-    --input: 225 20% 20%;
-    --ring: 192 100% 50%;
+    --border: 22 25% 18%;
+    --input: 22 25% 18%;
+    --ring: 42 85% 55%;
 
     --radius: 0.75rem;
 
-    /* Glassmorphism */
-    --glass-bg: 225 30% 10% / 0.6;
-    --glass-border: 192 100% 50% / 0.2;
+    /* Cream/Peach Highlights */
+    --highlight: 27 56% 89%;
+    --highlight-foreground: 22 47% 8%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(192 100% 50%), hsl(270 70% 65%));
-    --gradient-dark: linear-gradient(180deg, hsl(225 35% 6%), hsl(225 35% 4%));
-    --gradient-glow: radial-gradient(circle at center, hsl(192 100% 50% / 0.15), transparent);
+    /* Warm Brown Accent */
+    --warm-brown: 16 31% 33%;
 
-    /* Shadows */
-    --shadow-neon: 0 0 20px hsl(192 100% 50% / 0.5);
-    --shadow-card: 0 10px 40px hsl(225 35% 3% / 0.8);
+    /* Glassmorphism - Premium */
+    --glass-bg: 22 40% 10% / 0.7;
+    --glass-border: 42 85% 55% / 0.15;
+
+    /* Premium Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(42 85% 55%), hsl(42 100% 65%));
+    --gradient-dark: linear-gradient(180deg, hsl(22 47% 12%), hsl(22 47% 6%));
+    --gradient-glow: radial-gradient(circle at center, hsl(42 85% 55% / 0.15), transparent);
+    --gradient-lightning: linear-gradient(90deg, hsl(195 100% 50%), hsl(42 100% 60%), hsl(195 100% 50%));
+
+    /* Premium Shadows */
+    --shadow-neon: 0 0 30px hsl(42 85% 55% / 0.4);
+    --shadow-lightning: 0 0 40px hsl(195 100% 50% / 0.5);
+    --shadow-card: 0 15px 50px hsl(22 47% 3% / 0.9);
+    --shadow-luxury: 0 25px 80px hsl(22 47% 3% / 0.8);
 
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -67,5 +82,209 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    cursor: none;
   }
+
+  /* Custom Rolls-Royce Style Cursor */
+  .luxury-cursor {
+    position: fixed;
+    width: 40px;
+    height: 40px;
+    border: 2px solid hsl(42 85% 55% / 0.6);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform 0.15s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
+    mix-blend-mode: difference;
+    backdrop-filter: blur(2px);
+  }
+
+  .luxury-cursor::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    background: hsl(42 85% 55%);
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+  }
+
+  .luxury-cursor.hover {
+    transform: scale(1.5);
+    border-color: hsl(195 100% 50% / 0.8);
+    box-shadow: 0 0 20px hsl(195 100% 50% / 0.5);
+  }
+
+  .luxury-cursor.hover::before {
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+}
+
+/* Lightning Border Animation */
+@keyframes lightning-flow {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes lightning-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    box-shadow: 0 0 20px hsl(42 85% 55% / 0.3);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 40px hsl(195 100% 50% / 0.6), 0 0 60px hsl(42 85% 55% / 0.4);
+  }
+}
+
+@keyframes electric-spark {
+  0%, 100% {
+    filter: brightness(1) saturate(1);
+  }
+  25% {
+    filter: brightness(1.3) saturate(1.2);
+  }
+  50% {
+    filter: brightness(1) saturate(1);
+  }
+  75% {
+    filter: brightness(1.2) saturate(1.1);
+  }
+}
+
+/* Lightning Border Glow Effect */
+.lightning-border {
+  position: relative;
+  overflow: hidden;
+}
+
+.lightning-border::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(42 85% 55%),
+    hsl(195 100% 50%),
+    hsl(42 100% 60%),
+    hsl(195 100% 50%),
+    hsl(42 85% 55%),
+    transparent
+  );
+  background-size: 300% 100%;
+  border-radius: inherit;
+  animation: lightning-flow 3s linear infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.lightning-border::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: hsl(var(--card));
+  border-radius: calc(var(--radius) - 2px);
+  z-index: -1;
+}
+
+.lightning-border:hover::before {
+  opacity: 1;
+  animation: lightning-flow 1.5s linear infinite, electric-spark 0.5s ease-in-out infinite;
+}
+
+.lightning-border:hover {
+  animation: lightning-pulse 2s ease-in-out infinite;
+}
+
+/* Upload Zone Lightning Effect */
+.upload-zone-lightning {
+  position: relative;
+  background: linear-gradient(135deg, hsl(22 40% 10% / 0.9), hsl(22 40% 8% / 0.95));
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.upload-zone-lightning::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(
+    45deg,
+    transparent 20%,
+    hsl(42 85% 55% / 0.3) 30%,
+    hsl(195 100% 50% / 0.5) 50%,
+    hsl(42 100% 60% / 0.3) 70%,
+    transparent 80%
+  );
+  background-size: 400% 400%;
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.upload-zone-lightning:hover::before {
+  opacity: 1;
+  animation: lightning-flow 2s linear infinite;
+}
+
+.upload-zone-lightning:hover {
+  border-color: hsl(42 85% 55% / 0.5);
+  box-shadow: 
+    0 0 30px hsl(42 85% 55% / 0.3),
+    0 0 60px hsl(195 100% 50% / 0.2),
+    inset 0 0 30px hsl(42 85% 55% / 0.05);
+}
+
+/* Utility Icon Muted Style */
+.utility-icon-muted {
+  color: hsl(var(--muted-foreground));
+  opacity: 0.6;
+  transition: all 0.3s ease;
+}
+
+.utility-icon-muted:hover {
+  color: hsl(var(--primary));
+  opacity: 1;
+}
+
+/* Glassmorphism Premium Card */
+.glass-premium {
+  background: hsl(var(--glass-bg));
+  backdrop-filter: blur(20px);
+  border: 1px solid hsl(var(--glass-border));
+  box-shadow: var(--shadow-luxury);
+}
+
+/* Premium Button Glow */
+.btn-premium {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-premium::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, hsl(42 85% 55% / 0.3), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
+}
+
+.btn-premium:hover::before {
+  transform: translateX(100%);
+}
+
+.btn-premium:hover {
+  box-shadow: 0 0 30px hsl(42 85% 55% / 0.4);
 }
