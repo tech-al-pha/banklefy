@@ -14,9 +14,10 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     return requestOrigin;
   }
   
-  // For Lovable project preview URLs - only allow this specific project ID
+  // For Lovable preview URLs - allow both .lovable.app and .lovableproject.com with this project ID
+  const lovableAppPattern = /^https:\/\/[a-z0-9-]+\.lovable\.app$/;
   const projectIdPattern = /^https:\/\/[a-z0-9-]+-gzzsuvfqpvzvmlnbsqcf\.lovableproject\.com$/;
-  if (requestOrigin && projectIdPattern.test(requestOrigin)) {
+  if (requestOrigin && (lovableAppPattern.test(requestOrigin) || projectIdPattern.test(requestOrigin))) {
     return requestOrigin;
   }
   
