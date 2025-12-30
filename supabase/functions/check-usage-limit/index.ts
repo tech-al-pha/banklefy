@@ -15,7 +15,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
   }
   
   // For Lovable preview URLs - allow both .lovable.app and .lovableproject.com with this project ID
-  const lovableAppPattern = /^https:\/\/[a-z0-9-]+\.lovable\.app$/;
+  const lovableAppPattern = /^https:\/\/id-preview--[a-z0-9-]+\.lovable\.app$/;
   const projectIdPattern = /^https:\/\/[a-z0-9-]+-gzzsuvfqpvzvmlnbsqcf\.lovableproject\.com$/;
   if (requestOrigin && (lovableAppPattern.test(requestOrigin) || projectIdPattern.test(requestOrigin))) {
     return requestOrigin;
@@ -28,6 +28,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
 const getCorsHeaders = (req: Request) => ({
   'Access-Control-Allow-Origin': getAllowedOrigin(req.headers.get('origin')),
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 });
 
 // Sanitize error messages to prevent information leakage
