@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { LogOut, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import akromedaLogo from "@/assets/akromeda-logo.png";
+import Logo from "@/components/Logo";
 
 const Index = () => {
   const { user, signOut } = useAuth();
@@ -45,12 +45,7 @@ const Index = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <img src={akromedaLogo} alt="Akromeda" className="h-8 w-8" />
-              <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Akromeda
-              </span>
-            </div>
+            <Logo />
             <div className="hidden md:flex items-center gap-6">
               <a 
                 href="#features" 
@@ -185,12 +180,7 @@ const Index = () => {
         <div className="container mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <img src={akromedaLogo} alt="Akromeda" className="h-8 w-8" />
-                <h3 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                  Akromeda
-                </h3>
-              </div>
+              <Logo />
               <p className="text-sm text-muted-foreground">
                 Transform your bank statements into organized Excel files instantly with AI-powered precision.
               </p>
