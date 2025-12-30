@@ -14,8 +14,9 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     return requestOrigin;
   }
   
-  // For Lovable project preview URLs
-  if (requestOrigin && requestOrigin.includes('.lovableproject.com')) {
+  // For Lovable project preview URLs - only allow this specific project ID
+  const projectIdPattern = /^https:\/\/[a-z0-9-]+-gzzsuvfqpvzvmlnbsqcf\.lovableproject\.com$/;
+  if (requestOrigin && projectIdPattern.test(requestOrigin)) {
     return requestOrigin;
   }
   
@@ -28,6 +29,37 @@ const getCorsHeaders = (req: Request) => ({
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 });
 
+// Sanitize error messages to prevent information leakage
+const sanitizeError = (error: unknown): string => {
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes('relation') || msg.includes('table') || msg.includes('column')) {
+      return 'Database configuration error';
+    }
+    if (msg.includes('auth') || msg.includes('jwt') || msg.includes('token')) {
+      return 'Authentication failed';
+    }
+    if (msg.includes('storage') || msg.includes('bucket')) {
+      return 'File storage error';
+    }
+  }
+  return 'An unexpected error occurred. Please try again later.';
+};
+
+// Get client IP address securely (use rightmost IP in chain as it's most trusted)
+const getClientIp = (req: Request): string => {
+  const forwarded = req.headers.get('x-forwarded-for');
+  if (forwarded) {
+    // Get the rightmost IP (most trusted, added by our edge infrastructure)
+    const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
+    return ips[ips.length - 1] || 'unknown';
+  }
+  // Fallback to other headers
+  return req.headers.get('cf-connecting-ip') || 
+         req.headers.get('x-real-ip') || 
+         'unknown';
+};
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   
@@ -39,9 +71,8 @@ Deno.serve(async (req) => {
     const { timezone } = await req.json();
     const userTimezone = timezone || 'UTC';
 
-    // Get client IP address
-    const forwarded = req.headers.get('x-forwarded-for');
-    const ipAddress = forwarded ? forwarded.split(',')[0].trim() : 'unknown';
+    // Get client IP address securely
+    const ipAddress = getClientIp(req);
 
     console.log('Checking usage limit for IP:', ipAddress, 'Timezone:', userTimezone);
 
@@ -128,8 +159,8 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    console.error('Internal error:', error);
+    const errorMessage = sanitizeError(error);
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
