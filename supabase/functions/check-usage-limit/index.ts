@@ -1,11 +1,36 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Get allowed origin from environment or use default
+const getAllowedOrigin = (requestOrigin: string | null): string => {
+  const allowedOrigins = [
+    Deno.env.get('ALLOWED_ORIGIN') || '',
+    'https://akromeda.lovable.app',
+    'http://localhost:8080',
+    'http://localhost:5173',
+  ].filter(Boolean);
+  
+  // Check if the request origin is in our allowed list
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+  
+  // For Lovable project preview URLs
+  if (requestOrigin && requestOrigin.includes('.lovableproject.com')) {
+    return requestOrigin;
+  }
+  
+  // Default to first allowed origin
+  return allowedOrigins[0] || 'https://akromeda.lovable.app';
 };
 
+const getCorsHeaders = (req: Request) => ({
+  'Access-Control-Allow-Origin': getAllowedOrigin(req.headers.get('origin')),
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+});
+
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
