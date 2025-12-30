@@ -103,6 +103,14 @@ async function verifyRecaptcha(token: string): Promise<boolean> {
   }
 }
 
+// Validate timezone to prevent injection attacks (defense in depth)
+const isValidTimezone = (tz: string): boolean => {
+  if (!tz || typeof tz !== 'string' || tz.length > 50) return false;
+  // Only allow alphanumeric, underscores, slashes, plus, minus (valid IANA timezone chars)
+  const validPattern = /^[A-Za-z0-9_/+-]+$/;
+  return validPattern.test(tz);
+};
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   
@@ -113,7 +121,7 @@ Deno.serve(async (req) => {
   try {
     // Get request data first
     const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken } = await req.json();
-    const userTimezone = timezone || 'UTC';
+    const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
 
     // Get client IP address securely for anonymous users
     const ipAddress = getClientIp(req);
