@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 
 export const LuxuryCursor = () => {
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState({ x: -100, y: -100 });
   const [isHovering, setIsHovering] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [hasMoved, setHasMoved] = useState(false);
 
   useEffect(() => {
     const updatePosition = (e: MouseEvent) => {
       setPosition({ x: e.clientX, y: e.clientY });
       setIsVisible(true);
+      setHasMoved(true);
     };
 
     const handleMouseEnter = () => setIsVisible(true);
@@ -47,7 +49,7 @@ export const LuxuryCursor = () => {
     };
   }, []);
 
-  if (!isVisible) return null;
+  if (!isVisible || !hasMoved) return null;
 
   return (
     <div
