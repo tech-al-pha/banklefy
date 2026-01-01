@@ -7,9 +7,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
-import akromedaLogo from '@/assets/akromeda-logo.png';
+import amLogo from '@/assets/am-logo.png';
 
 const emailSchema = z.string().email('Invalid email address').max(255);
 const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
@@ -21,6 +21,8 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [recoverySessionReady, setRecoverySessionReady] = useState(false);
   const [searchParams] = useSearchParams();
@@ -256,13 +258,22 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-6 relative">
       <div className="absolute inset-0 bg-gradient-glow opacity-30" />
+      
+      {/* Back button */}
+      <button
+        onClick={() => navigate('/')}
+        className="absolute top-6 left-6 z-20 flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+      >
+        <ArrowLeft className="h-5 w-5" />
+        <span>Back</span>
+      </button>
       
       <Card className="w-full max-w-md bg-card/80 backdrop-blur-lg border-primary/20 relative z-10">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-2">
-            <img src={akromedaLogo} alt="Akromeda" className="h-16 w-16" />
+            <img src={amLogo} alt="Akromeda" className="h-16 w-auto" />
           </div>
           <CardTitle className="text-3xl font-bold text-center bg-gradient-primary bg-clip-text text-transparent">
             Akromeda
@@ -324,32 +335,50 @@ export default function Auth() {
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="password">New Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={loading}
-                      className="bg-background/50"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        disabled={loading}
+                        className="bg-background/50 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       Must be at least 8 characters
                     </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      placeholder="••••••••"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      disabled={loading}
-                      className="bg-background/50"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        required
+                        disabled={loading}
+                        className="bg-background/50 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
                   <Button
                     type="submit"
@@ -388,16 +417,25 @@ export default function Auth() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="bg-background/50"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="bg-background/50 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   {mode === 'signup' && (
                     <p className="text-xs text-muted-foreground">
                       Must be at least 8 characters
