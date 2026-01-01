@@ -451,7 +451,7 @@ Deno.serve(async (req) => {
 
     // Only upload to storage for authenticated users
     if (user && conversion) {
-      resultPath = `results/${user.id}/${conversion.id}.xlsx`;
+      resultPath = `${user.id}/results/${conversion.id}.xlsx`;
       const { error: uploadResultError } = await supabase.storage
         .from('bank-statements')
         .upload(resultPath, excelBuffer, {
