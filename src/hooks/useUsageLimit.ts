@@ -13,7 +13,7 @@ interface UsageLimit {
 }
 
 export const useUsageLimit = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [usageLimit, setUsageLimit] = useState<UsageLimit>({
     conversionsUsed: 0,
     conversionsLimit: 2,
@@ -37,9 +37,11 @@ export const useUsageLimit = () => {
       setUsageLimit(prev => ({ ...prev, loading: true, error: null }));
 
       const timezone = getTimezone();
-      
+      const accessToken = session?.access_token;
+
       const { data, error } = await supabase.functions.invoke('check-usage-limit', {
         body: { timezone },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
 
       if (error) {
@@ -63,7 +65,7 @@ export const useUsageLimit = () => {
         error: err.message || 'Failed to check usage limit',
       }));
     }
-  }, [user]);
+  }, [user, session?.access_token]);
 
   useEffect(() => {
     checkUsageLimit();
