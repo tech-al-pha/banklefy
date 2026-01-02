@@ -194,8 +194,13 @@ export const UploadDemo = () => {
       setConverting(true);
 
       // Call edge function to process conversion
+      // Explicitly pass the current access token to avoid being treated as anonymous.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
       const { data, error: functionError } = await supabase.functions.invoke('convert-document', {
         body: requestBody,
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
 
       if (functionError) {
