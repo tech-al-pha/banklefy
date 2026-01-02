@@ -199,7 +199,42 @@ export const UploadDemo = () => {
       });
 
       if (functionError) {
-        throw functionError;
+        // Supabase returns a generic message for non-2xx responses.
+        // Try to extract a useful message from the response body.
+        const ctx = (functionError as any).context;
+        let message = functionError.message || 'Conversion failed';
+
+        try {
+          // context can be a Response, or an object holding a Response
+          const res: Response | undefined =
+            ctx instanceof Response
+              ? ctx
+              : ctx?.response instanceof Response
+                ? ctx.response
+                : undefined;
+
+          if (res) {
+            const payload = await res.clone().json().catch(() => null);
+            if (payload && typeof payload === 'object') {
+              if ((payload as any).limitReached) {
+                refreshUsageLimit();
+              }
+              message = (payload as any).message || (payload as any).error || message;
+            }
+          } else if (ctx && typeof ctx.json === 'function') {
+            const payload = await ctx.json().catch(() => null);
+            if (payload && typeof payload === 'object') {
+              if ((payload as any).limitReached) {
+                refreshUsageLimit();
+              }
+              message = (payload as any).message || (payload as any).error || message;
+            }
+          }
+        } catch {
+          // ignore parsing issues
+        }
+
+        throw new Error(message);
       }
 
       if (data?.error) {
