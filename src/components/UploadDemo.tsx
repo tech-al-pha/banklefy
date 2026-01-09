@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,14 +19,56 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
+// Enhanced Transaction interface with Universal Schema
 interface Transaction {
   date: string;
   description: string;
-  amount: number;
+  category: string;
+  debit: number;
+  credit: number;
   balance: number;
-  type: string;
+  isDuplicate?: boolean;
+  duplicateGroup?: number | null;
+  // Legacy fields for backward compatibility
+  amount?: number;
+  type?: string;
 }
+
+interface Analytics {
+  totalTransactions: number;
+  totalCredits: number;
+  totalDebits: number;
+  netFlow: number;
+  duplicateCount: number;
+  categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }>;
+}
+
+// Category color mapping
+const categoryColors: Record<string, string> = {
+  "Salary/Income": "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  "Transfer In": "bg-green-500/20 text-green-400 border-green-500/30",
+  "Transfer Out": "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  "Bills & Utilities": "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  "Shopping": "bg-pink-500/20 text-pink-400 border-pink-500/30",
+  "Food & Dining": "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  "Transportation": "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+  "Entertainment": "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  "Healthcare": "bg-red-500/20 text-red-400 border-red-500/30",
+  "Education": "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
+  "Insurance": "bg-slate-500/20 text-slate-400 border-slate-500/30",
+  "Investments": "bg-teal-500/20 text-teal-400 border-teal-500/30",
+  "Loan/EMI": "bg-rose-500/20 text-rose-400 border-rose-500/30",
+  "Cash": "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  "Bank Fees": "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  "Other": "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+};
 
 export const UploadDemo = () => {
   const { toast } = useToast();
@@ -35,7 +77,9 @@ export const UploadDemo = () => {
   const [converting, setConverting] = useState(false);
   const [conversionResult, setConversionResult] = useState<{ id: string | null; resultPath: string | null; excelData?: string } | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -260,6 +304,10 @@ export const UploadDemo = () => {
       if (data.transactions && Array.isArray(data.transactions)) {
         setTransactions(data.transactions);
       }
+      
+      if (data.analytics) {
+        setAnalytics(data.analytics);
+      }
 
       // Refresh usage limit after successful conversion
       refreshUsageLimit();
@@ -346,12 +394,12 @@ export const UploadDemo = () => {
   const exportAsCSV = () => {
     if (transactions.length === 0) return;
 
-    // Convert transactions to CSV
-    const headers = ['Date', 'Description', 'Amount', 'Balance', 'Type'];
+    // Convert transactions to CSV with new schema
+    const headers = ['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Is Duplicate'];
     const csvRows = [
       headers.join(','),
       ...transactions.map(t => 
-        [t.date, `"${t.description}"`, t.amount, t.balance, t.type].join(',')
+        [t.date, `"${t.description}"`, `"${t.category}"`, t.debit, t.credit, t.balance, t.isDuplicate ? 'Yes' : 'No'].join(',')
       )
     ];
     const csvContent = csvRows.join('\n');
@@ -574,14 +622,100 @@ export const UploadDemo = () => {
                 </div>
               )}
 
+              {/* Analytics Summary */}
+              {analytics && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <PieChart className="w-5 h-5 text-primary" />
+                    Financial Analytics
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                        <TrendingUp className="w-4 h-4 text-green-500" />
+                        Total Credits
+                      </div>
+                      <p className="text-2xl font-bold text-green-500">
+                        ₹{analytics.totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </p>
+                    </Card>
+                    
+                    <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                        <TrendingDown className="w-4 h-4 text-red-500" />
+                        Total Debits
+                      </div>
+                      <p className="text-2xl font-bold text-red-500">
+                        ₹{analytics.totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </p>
+                    </Card>
+                    
+                    <Card className={`p-4 bg-gradient-to-br ${analytics.netFlow >= 0 ? 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20' : 'from-orange-500/10 to-orange-500/5 border-orange-500/20'}`}>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                        {analytics.netFlow >= 0 ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-orange-500" />}
+                        Net Flow
+                      </div>
+                      <p className={`text-2xl font-bold ${analytics.netFlow >= 0 ? 'text-emerald-500' : 'text-orange-500'}`}>
+                        {analytics.netFlow >= 0 ? '+' : ''}₹{analytics.netFlow.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </p>
+                    </Card>
+                    
+                    {analytics.duplicateCount > 0 && (
+                      <Card className="p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                          <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                          Duplicates Found
+                        </div>
+                        <p className="text-2xl font-bold text-yellow-500">
+                          {analytics.duplicateCount}
+                        </p>
+                      </Card>
+                    )}
+                  </div>
+
+                  {/* Category Breakdown */}
+                  <div className="mt-4">
+                    <p className="text-sm text-muted-foreground mb-3">Category Breakdown</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(analytics.categoryBreakdown)
+                        .sort((a, b) => b[1].count - a[1].count)
+                        .slice(0, 8)
+                        .map(([category, data]) => (
+                          <Badge 
+                            key={category} 
+                            variant="outline" 
+                            className={`${categoryColors[category] || categoryColors['Other']} border`}
+                          >
+                            {category}: {data.count}
+                          </Badge>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Transaction Preview */}
               {transactions.length > 0 && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <h3 className="text-lg font-semibold">Extracted Transactions</h3>
-                    <span className="text-sm text-muted-foreground">
-                      {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} found
-                    </span>
+                    <div className="flex items-center gap-3">
+                      {analytics && analytics.duplicateCount > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowDuplicatesOnly(!showDuplicatesOnly)}
+                          className={showDuplicatesOnly ? 'bg-yellow-500/20 border-yellow-500/50' : ''}
+                        >
+                          <AlertTriangle className="w-4 h-4 mr-1" />
+                          {showDuplicatesOnly ? 'Show All' : `Show Duplicates (${analytics.duplicateCount})`}
+                        </Button>
+                      )}
+                      <span className="text-sm text-muted-foreground">
+                        {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} found
+                      </span>
+                    </div>
                   </div>
                   
                   <Card className="overflow-hidden border-primary/20">
@@ -591,39 +725,54 @@ export const UploadDemo = () => {
                           <TableRow className="bg-muted/50">
                             <TableHead className="font-semibold">Date</TableHead>
                             <TableHead className="font-semibold">Description</TableHead>
-                            <TableHead className="font-semibold text-right">Amount</TableHead>
+                            <TableHead className="font-semibold">Category</TableHead>
+                            <TableHead className="font-semibold text-right">Debit</TableHead>
+                            <TableHead className="font-semibold text-right">Credit</TableHead>
                             <TableHead className="font-semibold text-right">Balance</TableHead>
-                            <TableHead className="font-semibold">Type</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {transactions.map((transaction, index) => (
-                            <TableRow key={index} className="hover:bg-muted/30">
+                          {transactions
+                            .filter(t => !showDuplicatesOnly || t.isDuplicate)
+                            .map((transaction, index) => (
+                            <TableRow 
+                              key={index} 
+                              className={`hover:bg-muted/30 ${transaction.isDuplicate ? 'bg-yellow-500/5 border-l-2 border-l-yellow-500' : ''}`}
+                            >
                               <TableCell className="font-medium">
-                                {transaction.date}
+                                <div className="flex items-center gap-2">
+                                  {transaction.date}
+                                  {transaction.isDuplicate && (
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        Potential duplicate (Group #{transaction.duplicateGroup})
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
                               </TableCell>
-                              <TableCell className="max-w-[300px] truncate">
+                              <TableCell className="max-w-[200px] truncate">
                                 {transaction.description}
                               </TableCell>
-                              <TableCell className={`text-right font-semibold ${
-                                transaction.type.toLowerCase() === 'debit' 
-                                  ? 'text-red-600 dark:text-red-400' 
-                                  : 'text-green-600 dark:text-green-400'
-                              }`}>
-                                {transaction.type.toLowerCase() === 'debit' ? '-' : '+'}
-                                ${Math.abs(transaction.amount).toFixed(2)}
+                              <TableCell>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${categoryColors[transaction.category] || categoryColors['Other']} border`}
+                                >
+                                  {transaction.category}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold text-red-500">
+                                {transaction.debit > 0 ? `₹${transaction.debit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}
+                              </TableCell>
+                              <TableCell className="text-right font-semibold text-green-500">
+                                {transaction.credit > 0 ? `₹${transaction.credit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}
                               </TableCell>
                               <TableCell className="text-right">
-                                ${transaction.balance.toFixed(2)}
-                              </TableCell>
-                              <TableCell>
-                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                  transaction.type.toLowerCase() === 'debit'
-                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                    : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                }`}>
-                                  {transaction.type}
-                                </span>
+                                ₹{transaction.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </TableCell>
                             </TableRow>
                           ))}
