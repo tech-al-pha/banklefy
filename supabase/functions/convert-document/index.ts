@@ -387,14 +387,51 @@ Deno.serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'You are a bank statement data extraction expert. Extract transaction data from bank statements and return it as structured JSON. Include: date, description, amount, balance, and transaction type (debit/credit).'
+            content: `You are a professional bank statement data extraction and financial analysis expert. Your job is to extract transaction data from bank statements of ANY bank worldwide and normalize them into a standardized schema.
+
+UNIVERSAL SCHEMA (all fields required):
+- date: Normalized to YYYY-MM-DD format (handle DD/MM/YYYY, MM/DD/YYYY, DD-Mon-YY, etc.)
+- description: Clean transaction description (remove excessive whitespace, normalize case)
+- category: Classify into one of these categories:
+  * "Salary/Income" - salary credits, wages, business income
+  * "Transfer In" - incoming transfers, deposits
+  * "Transfer Out" - outgoing transfers, sent money
+  * "Bills & Utilities" - electricity, water, gas, internet, phone
+  * "Shopping" - retail, e-commerce, Amazon, Flipkart, etc.
+  * "Food & Dining" - restaurants, Swiggy, Zomato, groceries
+  * "Transportation" - Uber, Ola, fuel, parking, tolls
+  * "Entertainment" - movies, Netflix, Spotify, gaming
+  * "Healthcare" - hospitals, pharmacies, medical
+  * "Education" - school fees, courses, books
+  * "Insurance" - premiums, policies
+  * "Investments" - mutual funds, stocks, FD, RD
+  * "Loan/EMI" - loan payments, EMI deductions
+  * "Cash" - ATM withdrawals, cash deposits
+  * "Bank Fees" - charges, penalties, service fees
+  * "Other" - uncategorized transactions
+- debit: Amount debited (as positive number, 0 if credit transaction)
+- credit: Amount credited (as positive number, 0 if debit transaction)
+- balance: Running balance after transaction (number)
+
+SMART DATA CLEANING RULES:
+1. Date Normalization: Convert all dates to YYYY-MM-DD regardless of input format
+2. Amount Cleaning: Handle comma separators (1,234.56 → 1234.56), handle lakhs format (1,23,456.78 → 123456.78)
+3. Description Cleaning: Remove multiple spaces, trim whitespace, capitalize first letter
+4. Detect duplicates: If you see transactions with identical date, description, and amount - add isDuplicate: true
+
+DUPLICATE DETECTION:
+Mark transactions as potential duplicates if they have:
+- Same date AND same amount AND similar description (>80% match)
+- Add field: isDuplicate (boolean) and duplicateGroup (number - same group ID for suspected duplicates)
+
+Return ONLY a valid JSON array, no markdown, no explanation.`
           },
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: 'Extract all transactions from this bank statement. Return a JSON array with fields: date (YYYY-MM-DD), description, amount (number), balance (number), type (debit/credit). Only return the JSON array, no other text.'
+                text: 'Extract ALL transactions from this bank statement. Apply the universal schema with smart cleaning and duplicate detection. Return only the JSON array.'
               },
               {
                 type: 'image_url',
@@ -436,6 +473,65 @@ Deno.serve(async (req) => {
     if (!Array.isArray(transactions) || transactions.length === 0) {
       throw new Error('No transactions found in the document');
     }
+
+    // Post-processing: Additional validation and cleaning
+    transactions = transactions.map((t, index) => {
+      // Ensure all required fields exist with defaults
+      const cleaned = {
+        date: t.date || 'Unknown',
+        description: (t.description || 'Unknown Transaction').trim(),
+        category: t.category || 'Other',
+        debit: typeof t.debit === 'number' ? Math.abs(t.debit) : (t.type?.toLowerCase() === 'debit' ? Math.abs(t.amount || 0) : 0),
+        credit: typeof t.credit === 'number' ? Math.abs(t.credit) : (t.type?.toLowerCase() === 'credit' ? Math.abs(t.amount || 0) : 0),
+        balance: typeof t.balance === 'number' ? t.balance : 0,
+        isDuplicate: t.isDuplicate || false,
+        duplicateGroup: t.duplicateGroup || null,
+        // Keep legacy fields for backward compatibility
+        amount: t.amount || (t.debit || 0) - (t.credit || 0),
+        type: t.type || (t.debit > 0 ? 'debit' : 'credit'),
+      };
+      return cleaned;
+    });
+
+    // Secondary duplicate detection (in case AI missed some)
+    const duplicateMap = new Map();
+    transactions.forEach((t, i) => {
+      const key = `${t.date}_${Math.abs(t.debit || t.credit)}_${t.description.substring(0, 20).toLowerCase()}`;
+      if (duplicateMap.has(key)) {
+        const groupId = duplicateMap.get(key).groupId;
+        t.isDuplicate = true;
+        t.duplicateGroup = groupId;
+        duplicateMap.get(key).transaction.isDuplicate = true;
+        duplicateMap.get(key).transaction.duplicateGroup = groupId;
+      } else {
+        duplicateMap.set(key, { transaction: t, groupId: i + 1 });
+      }
+    });
+
+    // Calculate analytics summary
+    const totalCredits = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
+    const totalDebits = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
+    const duplicateCount = transactions.filter(t => t.isDuplicate).length;
+    
+    // Category breakdown
+    const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
+    transactions.forEach(t => {
+      if (!categoryBreakdown[t.category]) {
+        categoryBreakdown[t.category] = { count: 0, totalDebit: 0, totalCredit: 0 };
+      }
+      categoryBreakdown[t.category].count++;
+      categoryBreakdown[t.category].totalDebit += t.debit || 0;
+      categoryBreakdown[t.category].totalCredit += t.credit || 0;
+    });
+
+    const analytics = {
+      totalTransactions: transactions.length,
+      totalCredits,
+      totalDebits,
+      netFlow: totalCredits - totalDebits,
+      duplicateCount,
+      categoryBreakdown,
+    };
 
     console.log(`Extracted ${transactions.length} transactions`);
 
@@ -493,6 +589,7 @@ Deno.serve(async (req) => {
         conversionId: conversion?.id || null,
         resultPath: resultPath,
         transactions: transactions,
+        analytics: analytics,
         excelData: user ? null : excelBase64, // Only send base64 for anonymous users
         message: 'Conversion completed successfully',
         remaining: conversionsLimit - conversionsUsed - 1,
