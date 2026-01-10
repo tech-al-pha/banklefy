@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { UsageLimitBanner } from "./UsageLimitBanner";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
+import { FraudAlertPanel } from "./FraudAlertPanel";
 import {
   Table,
   TableBody,
@@ -36,9 +37,22 @@ interface Transaction {
   balance: number;
   isDuplicate?: boolean;
   duplicateGroup?: number | null;
+  balanceMismatch?: boolean;
+  expectedBalance?: number | null;
+  riskFlag?: string | null;
   // Legacy fields for backward compatibility
   amount?: number;
   type?: string;
+}
+
+interface RiskAnalysis {
+  integrityScore: number;
+  balanceMismatches: number;
+  averageDailyBalance: number;
+  maxDip: { amount: number; date: string | null };
+  maxPeak: number;
+  riskFlags: { type: string; count: number }[];
+  fraudAlerts: any[];
 }
 
 interface Analytics {
@@ -48,6 +62,7 @@ interface Analytics {
   netFlow: number;
   duplicateCount: number;
   categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }>;
+  riskAnalysis?: RiskAnalysis;
 }
 
 // Category color mapping
@@ -622,6 +637,11 @@ export const UploadDemo = () => {
                 </div>
               )}
 
+              {/* Risk Analysis & Fraud Detection Panel */}
+              {analytics?.riskAnalysis && (
+                <FraudAlertPanel riskAnalysis={analytics.riskAnalysis} />
+              )}
+
               {/* Analytics Summary */}
               {analytics && (
                 <div className="space-y-4">
@@ -737,12 +757,40 @@ export const UploadDemo = () => {
                             .map((transaction, index) => (
                             <TableRow 
                               key={index} 
-                              className={`hover:bg-muted/30 ${transaction.isDuplicate ? 'bg-yellow-500/5 border-l-2 border-l-yellow-500' : ''}`}
+                              className={`hover:bg-muted/30 ${
+                                transaction.balanceMismatch 
+                                  ? 'bg-red-500/10 border-l-2 border-l-red-500' 
+                                  : transaction.riskFlag 
+                                    ? 'bg-orange-500/5 border-l-2 border-l-orange-500'
+                                    : transaction.isDuplicate 
+                                      ? 'bg-yellow-500/5 border-l-2 border-l-yellow-500' 
+                                      : ''
+                              }`}
                             >
                               <TableCell className="font-medium">
                                 <div className="flex items-center gap-2">
                                   {transaction.date}
-                                  {transaction.isDuplicate && (
+                                  {transaction.balanceMismatch && (
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <ShieldAlert className="w-4 h-4 text-red-500" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        Balance mismatch! Expected: ₹{transaction.expectedBalance?.toLocaleString('en-IN')}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {transaction.riskFlag && !transaction.balanceMismatch && (
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <AlertTriangle className="w-4 h-4 text-orange-500" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        Risk Flag: {transaction.riskFlag}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                  {transaction.isDuplicate && !transaction.balanceMismatch && !transaction.riskFlag && (
                                     <Tooltip>
                                       <TooltipTrigger>
                                         <AlertTriangle className="w-4 h-4 text-yellow-500" />
@@ -771,8 +819,13 @@ export const UploadDemo = () => {
                               <TableCell className="text-right font-semibold text-green-500">
                                 {transaction.credit > 0 ? `₹${transaction.credit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className={`text-right ${transaction.balanceMismatch ? 'text-red-500' : ''}`}>
                                 ₹{transaction.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                {transaction.balanceMismatch && transaction.expectedBalance && (
+                                  <div className="text-xs text-muted-foreground">
+                                    Expected: ₹{transaction.expectedBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  </div>
+                                )}
                               </TableCell>
                             </TableRow>
                           ))}
