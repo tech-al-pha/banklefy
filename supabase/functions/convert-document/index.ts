@@ -477,7 +477,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
     // Post-processing: Additional validation and cleaning
     transactions = transactions.map((t, index) => {
       // Ensure all required fields exist with defaults
-      const cleaned = {
+      const cleaned: Record<string, any> = {
         date: t.date || 'Unknown',
         description: (t.description || 'Unknown Transaction').trim(),
         category: t.category || 'Other',
@@ -489,6 +489,10 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
         // Keep legacy fields for backward compatibility
         amount: t.amount || (t.debit || 0) - (t.credit || 0),
         type: t.type || (t.debit > 0 ? 'debit' : 'credit'),
+        // Fraud detection fields (will be populated later)
+        balanceMismatch: false,
+        expectedBalance: null,
+        riskFlag: null,
       };
       return cleaned;
     });
@@ -508,6 +512,222 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
       }
     });
 
+    // ============= FRAUD DETECTION: BALANCE RECONCILIATION =============
+    console.log('Starting balance reconciliation and fraud detection...');
+    
+    interface FraudAlert {
+      type: string;
+      severity: 'low' | 'medium' | 'high' | 'critical';
+      description: string;
+      affectedRows: number[];
+      metadata: Record<string, any>;
+    }
+    
+    const fraudAlerts: FraudAlert[] = [];
+    const balanceMismatches: { rowIndex: number; expected: number; actual: number; difference: number }[] = [];
+    
+    // Balance Reconciliation: Verify running balance for each transaction
+    // Formula: Balance[n-1] + Credit[n] - Debit[n] = Balance[n]
+    for (let i = 1; i < transactions.length; i++) {
+      const prevBalance = transactions[i - 1].balance;
+      const currentCredit = transactions[i].credit || 0;
+      const currentDebit = transactions[i].debit || 0;
+      const expectedBalance = prevBalance + currentCredit - currentDebit;
+      const actualBalance = transactions[i].balance;
+      
+      // Allow small tolerance for rounding (0.01)
+      const difference = Math.abs(expectedBalance - actualBalance);
+      if (difference > 0.01) {
+        balanceMismatches.push({
+          rowIndex: i,
+          expected: expectedBalance,
+          actual: actualBalance,
+          difference: difference,
+        });
+        // Mark the transaction with integrity issue
+        transactions[i].balanceMismatch = true;
+        transactions[i].expectedBalance = expectedBalance;
+      }
+    }
+    
+    // If balance mismatches found, create fraud alert
+    if (balanceMismatches.length > 0) {
+      const mismatchPercentage = (balanceMismatches.length / transactions.length) * 100;
+      let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
+      
+      if (mismatchPercentage > 20) severity = 'critical';
+      else if (mismatchPercentage > 10) severity = 'high';
+      else if (mismatchPercentage > 5) severity = 'medium';
+      
+      fraudAlerts.push({
+        type: 'BALANCE_INTEGRITY',
+        severity,
+        description: `${balanceMismatches.length} transaction(s) have balance discrepancies. Mathematical reconciliation failed.`,
+        affectedRows: balanceMismatches.map(m => m.rowIndex),
+        metadata: {
+          totalMismatches: balanceMismatches.length,
+          mismatchPercentage: mismatchPercentage.toFixed(2),
+          details: balanceMismatches.slice(0, 10), // First 10 mismatches
+        },
+      });
+    }
+
+    // HIGH-RISK TRANSACTION DETECTION
+    const highRiskKeywords = {
+      gambling: ['bet365', 'betway', 'dream11', 'stake', 'casino', 'poker', 'gambling', 'lottery', 'rummy', 'betting'],
+      paydayLoan: ['payday', 'quickloan', 'fastcash', 'instantloan', 'moneynow', 'cashadvance'],
+      bouncedPayment: ['cheque return', 'ecs return', 'nach return', 'dishonor', 'bounce', 'returned unpaid', 'insufficient funds'],
+    };
+    
+    const riskTransactions: { type: string; indices: number[]; transactions: any[] }[] = [];
+    
+    transactions.forEach((t, index) => {
+      const desc = t.description.toLowerCase();
+      
+      // Gambling detection
+      if (highRiskKeywords.gambling.some(k => desc.includes(k))) {
+        const existing = riskTransactions.find(r => r.type === 'gambling');
+        if (existing) {
+          existing.indices.push(index);
+          existing.transactions.push({ date: t.date, description: t.description, amount: t.debit || t.credit });
+        } else {
+          riskTransactions.push({
+            type: 'gambling',
+            indices: [index],
+            transactions: [{ date: t.date, description: t.description, amount: t.debit || t.credit }],
+          });
+        }
+        transactions[index].riskFlag = 'gambling';
+      }
+      
+      // Payday loan detection
+      if (highRiskKeywords.paydayLoan.some(k => desc.includes(k))) {
+        const existing = riskTransactions.find(r => r.type === 'paydayLoan');
+        if (existing) {
+          existing.indices.push(index);
+          existing.transactions.push({ date: t.date, description: t.description, amount: t.debit || t.credit });
+        } else {
+          riskTransactions.push({
+            type: 'paydayLoan',
+            indices: [index],
+            transactions: [{ date: t.date, description: t.description, amount: t.debit || t.credit }],
+          });
+        }
+        transactions[index].riskFlag = 'paydayLoan';
+      }
+      
+      // Bounced payment detection
+      if (highRiskKeywords.bouncedPayment.some(k => desc.includes(k))) {
+        const existing = riskTransactions.find(r => r.type === 'bouncedPayment');
+        if (existing) {
+          existing.indices.push(index);
+          existing.transactions.push({ date: t.date, description: t.description, amount: t.debit || t.credit });
+        } else {
+          riskTransactions.push({
+            type: 'bouncedPayment',
+            indices: [index],
+            transactions: [{ date: t.date, description: t.description, amount: t.debit || t.credit }],
+          });
+        }
+        transactions[index].riskFlag = 'bouncedPayment';
+      }
+    });
+    
+    // Create alerts for high-risk transactions
+    riskTransactions.forEach(risk => {
+      const riskLabels: Record<string, { label: string; severity: 'medium' | 'high' | 'critical' }> = {
+        gambling: { label: 'Gambling/Betting Activity', severity: 'high' },
+        paydayLoan: { label: 'Payday Loan Activity', severity: 'medium' },
+        bouncedPayment: { label: 'Bounced/Returned Payments', severity: 'critical' },
+      };
+      
+      const riskInfo = riskLabels[risk.type];
+      fraudAlerts.push({
+        type: `HIGH_RISK_${risk.type.toUpperCase()}`,
+        severity: riskInfo.severity,
+        description: `${risk.indices.length} ${riskInfo.label} detected. This may impact creditworthiness assessment.`,
+        affectedRows: risk.indices,
+        metadata: {
+          count: risk.indices.length,
+          transactions: risk.transactions,
+        },
+      });
+    });
+
+    // CIRCULAR TRADING DETECTION
+    // Look for high-frequency transfers between same parties
+    const transferPairs = new Map<string, { count: number; indices: number[]; totalAmount: number }>();
+    transactions.forEach((t, index) => {
+      if (t.category === 'Transfer In' || t.category === 'Transfer Out') {
+        // Extract potential account identifier from description (simplified)
+        const desc = t.description.toLowerCase();
+        const match = desc.match(/(?:to|from|upi|imps|neft|rtgs)\s*[:\-]?\s*([a-z0-9@\-_.]+)/);
+        if (match) {
+          const key = match[1].substring(0, 20);
+          const existing = transferPairs.get(key);
+          if (existing) {
+            existing.count++;
+            existing.indices.push(index);
+            existing.totalAmount += (t.debit || t.credit);
+          } else {
+            transferPairs.set(key, { count: 1, indices: [index], totalAmount: t.debit || t.credit });
+          }
+        }
+      }
+    });
+    
+    // Flag circular trading (>5 transfers to same party)
+    transferPairs.forEach((value, key) => {
+      if (value.count >= 5) {
+        fraudAlerts.push({
+          type: 'CIRCULAR_TRADING',
+          severity: 'high',
+          description: `High-frequency transfers detected: ${value.count} transactions to/from similar account. Possible circular trading.`,
+          affectedRows: value.indices,
+          metadata: {
+            transferCount: value.count,
+            totalAmount: value.totalAmount,
+            pattern: key,
+          },
+        });
+        value.indices.forEach(i => {
+          transactions[i].riskFlag = 'circularTrading';
+        });
+      }
+    });
+
+    // LIQUIDITY ANALYSIS
+    const balances = transactions.map(t => t.balance);
+    const minBalance = Math.min(...balances);
+    const maxBalance = Math.max(...balances);
+    const avgBalance = balances.reduce((a, b) => a + b, 0) / balances.length;
+    const minBalanceIndex = balances.indexOf(minBalance);
+    const maxDipDate = transactions[minBalanceIndex]?.date || null;
+    
+    // Detect days with zero or negative balance
+    const zeroDays = transactions.filter(t => t.balance <= 0);
+    if (zeroDays.length > 0) {
+      fraudAlerts.push({
+        type: 'LIQUIDITY_CRISIS',
+        severity: zeroDays.length > 3 ? 'critical' : 'high',
+        description: `Account reached zero or negative balance on ${zeroDays.length} occasion(s). Indicates liquidity stress.`,
+        affectedRows: transactions.map((t, i) => t.balance <= 0 ? i : -1).filter(i => i >= 0),
+        metadata: {
+          zeroDaysCount: zeroDays.length,
+          lowestBalance: minBalance,
+        },
+      });
+    }
+
+    // Calculate integrity score (100 = perfect, 0 = highly suspicious)
+    let integrityScore = 100;
+    integrityScore -= Math.min(30, balanceMismatches.length * 3); // Max 30 deduction for mismatches
+    integrityScore -= Math.min(20, riskTransactions.length * 5); // Max 20 for risk transactions
+    integrityScore -= Math.min(20, zeroDays.length * 5); // Max 20 for zero balance days
+    integrityScore = Math.max(0, integrityScore);
+
+    console.log(`Fraud detection complete. Found ${fraudAlerts.length} alerts. Integrity score: ${integrityScore}`);
+
     // Calculate analytics summary
     const totalCredits = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
     const totalDebits = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
@@ -524,6 +744,17 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
       categoryBreakdown[t.category].totalCredit += t.credit || 0;
     });
 
+    // Risk analysis summary
+    const riskAnalysis = {
+      integrityScore,
+      balanceMismatches: balanceMismatches.length,
+      averageDailyBalance: avgBalance,
+      maxDip: { amount: minBalance, date: maxDipDate },
+      maxPeak: maxBalance,
+      riskFlags: riskTransactions.map(r => ({ type: r.type, count: r.indices.length })),
+      fraudAlerts,
+    };
+
     const analytics = {
       totalTransactions: transactions.length,
       totalCredits,
@@ -531,6 +762,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
       netFlow: totalCredits - totalDebits,
       duplicateCount,
       categoryBreakdown,
+      riskAnalysis,
     };
 
     console.log(`Extracted ${transactions.length} transactions`);

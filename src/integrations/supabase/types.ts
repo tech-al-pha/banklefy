@@ -44,6 +44,42 @@ export type Database = {
         }
         Relationships: []
       }
+      category_corrections: {
+        Row: {
+          corrected_category: string
+          created_at: string
+          description_pattern: string
+          id: string
+          original_category: string
+          updated_at: string
+          usage_count: number | null
+          user_id: string
+          weight: number | null
+        }
+        Insert: {
+          corrected_category: string
+          created_at?: string
+          description_pattern: string
+          id?: string
+          original_category: string
+          updated_at?: string
+          usage_count?: number | null
+          user_id: string
+          weight?: number | null
+        }
+        Update: {
+          corrected_category?: string
+          created_at?: string
+          description_pattern?: string
+          id?: string
+          original_category?: string
+          updated_at?: string
+          usage_count?: number | null
+          user_id?: string
+          weight?: number | null
+        }
+        Relationships: []
+      }
       conversions: {
         Row: {
           completed_at: string | null
@@ -80,6 +116,59 @@ export type Database = {
         }
         Relationships: []
       }
+      fraud_alerts: {
+        Row: {
+          affected_rows: Json | null
+          alert_type: string
+          conversion_id: string
+          created_at: string
+          description: string
+          id: string
+          metadata: Json | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          severity: Database["public"]["Enums"]["fraud_severity"]
+          status: Database["public"]["Enums"]["alert_status"]
+          user_id: string
+        }
+        Insert: {
+          affected_rows?: Json | null
+          alert_type: string
+          conversion_id: string
+          created_at?: string
+          description: string
+          id?: string
+          metadata?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: Database["public"]["Enums"]["fraud_severity"]
+          status?: Database["public"]["Enums"]["alert_status"]
+          user_id: string
+        }
+        Update: {
+          affected_rows?: Json | null
+          alert_type?: string
+          conversion_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          metadata?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: Database["public"]["Enums"]["fraud_severity"]
+          status?: Database["public"]["Enums"]["alert_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fraud_alerts_conversion_id_fkey"
+            columns: ["conversion_id"]
+            isOneToOne: false
+            referencedRelation: "conversions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -103,6 +192,74 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      risk_analysis: {
+        Row: {
+          average_daily_balance: number | null
+          balance_mismatches: number | null
+          conversion_id: string
+          created_at: string
+          emi_debits: Json | null
+          foir_score: number | null
+          id: string
+          integrity_score: number | null
+          max_dip_amount: number | null
+          max_dip_date: string | null
+          net_cashflow: number | null
+          risk_flags: Json | null
+          salary_credits: Json | null
+          total_inflow: number | null
+          total_outflow: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          average_daily_balance?: number | null
+          balance_mismatches?: number | null
+          conversion_id: string
+          created_at?: string
+          emi_debits?: Json | null
+          foir_score?: number | null
+          id?: string
+          integrity_score?: number | null
+          max_dip_amount?: number | null
+          max_dip_date?: string | null
+          net_cashflow?: number | null
+          risk_flags?: Json | null
+          salary_credits?: Json | null
+          total_inflow?: number | null
+          total_outflow?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          average_daily_balance?: number | null
+          balance_mismatches?: number | null
+          conversion_id?: string
+          created_at?: string
+          emi_debits?: Json | null
+          foir_score?: number | null
+          id?: string
+          integrity_score?: number | null
+          max_dip_amount?: number | null
+          max_dip_date?: string | null
+          net_cashflow?: number | null
+          risk_flags?: Json | null
+          salary_credits?: Json | null
+          total_inflow?: number | null
+          total_outflow?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_analysis_conversion_id_fkey"
+            columns: ["conversion_id"]
+            isOneToOne: false
+            referencedRelation: "conversions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -190,7 +347,9 @@ export type Database = {
       }
     }
     Enums: {
+      alert_status: "pending" | "reviewed" | "dismissed" | "confirmed"
       app_role: "admin" | "user"
+      fraud_severity: "low" | "medium" | "high" | "critical"
       subscription_tier: "free" | "daily" | "business"
     }
     CompositeTypes: {
@@ -319,7 +478,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      alert_status: ["pending", "reviewed", "dismissed", "confirmed"],
       app_role: ["admin", "user"],
+      fraud_severity: ["low", "medium", "high", "critical"],
       subscription_tier: ["free", "daily", "business"],
     },
   },
