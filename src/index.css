@@ -2,75 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system - Premium Luxury Dark Theme
-   Colors based on: #2B1C10, #987284, #6E493A, #E1D4C1, #F4E1D2
+/* Definition of the design system - Modern Futuristic SaaS Dark Theme
    All colors MUST be HSL.
 */
 
 @layer base {
   :root {
-    /* Premium Luxury Dark Theme */
-    --background: 22 47% 12%;
-    --foreground: 39 35% 82%;
+    /* Modern Dark Navy Theme */
+    --background: 230 20% 4%;
+    --foreground: 0 0% 96%;
 
-    --card: 22 40% 10%;
-    --card-foreground: 39 35% 82%;
+    --card: 230 20% 7%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 22 40% 10%;
-    --popover-foreground: 39 35% 82%;
+    --popover: 230 20% 6%;
+    --popover-foreground: 0 0% 96%;
 
-    /* Warm Brown Primary - Luxurious Gold Accent */
-    --primary: 42 85% 55%;
-    --primary-foreground: 22 47% 8%;
+    /* Electric Blue Primary */
+    --primary: 215 100% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    /* Mauve/Dusty Rose Secondary */
-    --secondary: 338 15% 56%;
-    --secondary-foreground: 22 47% 8%;
+    /* Purple Secondary */
+    --secondary: 265 85% 60%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 22 30% 20%;
-    --muted-foreground: 338 10% 55%;
+    --muted: 230 15% 14%;
+    --muted-foreground: 230 10% 58%;
 
-    /* Gold Accent - Lightning Effect */
-    --accent: 42 100% 60%;
-    --accent-foreground: 22 47% 8%;
+    /* Cyan Accent */
+    --accent: 175 100% 45%;
+    --accent-foreground: 230 20% 4%;
 
-    /* Neon Electric Blue for Lightning */
-    --lightning: 195 100% 50%;
-    --lightning-glow: 195 100% 65%;
+    /* Special */
+    --lightning: 175 100% 50%;
+    --lightning-glow: 215 100% 60%;
 
     --destructive: 0 85% 60%;
-    --destructive-foreground: 39 35% 82%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 22 25% 18%;
-    --input: 22 25% 18%;
-    --ring: 42 85% 55%;
+    --border: 230 15% 18%;
+    --input: 230 15% 12%;
+    --ring: 215 100% 50%;
 
     --radius: 0.75rem;
 
-    /* Cream/Peach Highlights */
-    --highlight: 27 56% 89%;
-    --highlight-foreground: 22 47% 8%;
+    --highlight: 265 85% 65%;
+    --highlight-foreground: 0 0% 100%;
 
-    /* Warm Brown Accent */
+    /* Keep legacy token (unused but referenced in config) */
     --warm-brown: 16 31% 33%;
 
-    /* Glassmorphism - Premium */
-    --glass-bg: 22 40% 10% / 0.7;
-    --glass-border: 42 85% 55% / 0.15;
+    /* Glass */
+    --glass-bg: 230 20% 7% / 0.72;
+    --glass-border: 215 100% 50% / 0.18;
 
-    /* Premium Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(42 85% 55%), hsl(42 100% 65%));
-    --gradient-dark: linear-gradient(180deg, hsl(22 47% 12%), hsl(22 47% 6%));
-    --gradient-glow: radial-gradient(circle at center, hsl(42 85% 55% / 0.15), transparent);
-    --gradient-lightning: linear-gradient(90deg, hsl(195 100% 50%), hsl(42 100% 60%), hsl(195 100% 50%));
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(215 100% 50%), hsl(265 85% 60%));
+    --gradient-dark: linear-gradient(180deg, hsl(230 20% 4%), hsl(230 25% 8%));
+    --gradient-glow: radial-gradient(circle at center, hsl(215 100% 50% / 0.16), transparent 60%);
+    --gradient-lightning: linear-gradient(90deg, hsl(175 100% 50%), hsl(215 100% 50%), hsl(265 85% 60%), hsl(215 100% 50%), hsl(175 100% 50%));
+    --gradient-mesh:
+      radial-gradient(ellipse at 20% 25%, hsl(265 85% 60% / 0.18) 0%, transparent 55%),
+      radial-gradient(ellipse at 80% 70%, hsl(215 100% 50% / 0.14) 0%, transparent 55%),
+      radial-gradient(ellipse at 50% 50%, hsl(175 100% 50% / 0.07) 0%, transparent 70%);
 
-    /* Premium Shadows */
-    --shadow-neon: 0 0 30px hsl(42 85% 55% / 0.4);
-    --shadow-lightning: 0 0 40px hsl(195 100% 50% / 0.5);
-    --shadow-card: 0 15px 50px hsl(22 47% 3% / 0.9);
-    --shadow-luxury: 0 25px 80px hsl(22 47% 3% / 0.8);
+    /* Shadows */
+    --shadow-neon: 0 0 30px hsl(215 100% 50% / 0.35);
+    --shadow-lightning: 0 0 40px hsl(175 100% 50% / 0.5);
+    --shadow-card: 0 15px 50px hsl(230 30% 0% / 0.85);
+    --shadow-luxury: 0 25px 80px hsl(230 30% 0% / 0.7);
 
-    /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
@@ -81,49 +82,54 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     cursor: none;
   }
 
-  /* Custom Rolls-Royce Style Cursor */
-  .luxury-cursor {
-    position: fixed;
-    width: 40px;
-    height: 40px;
-    border: 2px solid hsl(42 85% 55% / 0.6);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 9999;
-    transition: transform 0.15s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
-    mix-blend-mode: difference;
-    backdrop-filter: blur(2px);
-  }
-
-  .luxury-cursor::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 6px;
-    height: 6px;
-    background: hsl(42 85% 55%);
-    border-radius: 50%;
-    transition: transform 0.2s ease;
-  }
-
-  .luxury-cursor.hover {
-    transform: scale(1.5);
-    border-color: hsl(195 100% 50% / 0.8);
-    box-shadow: 0 0 20px hsl(195 100% 50% / 0.5);
-  }
-
-  .luxury-cursor.hover::before {
-    transform: translate(-50%, -50%) scale(0.5);
+  a, button, [role="button"], input, textarea, select, [data-hover] {
+    cursor: none;
   }
 }
 
-/* Lightning Border Animation */
+/* Rolls-Royce style cursor (keep existing class names for compatibility) */
+.luxury-cursor {
+  position: fixed;
+  width: 40px;
+  height: 40px;
+  border: 2px solid hsl(215 100% 50% / 0.6);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transition: transform 0.15s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
+  mix-blend-mode: difference;
+  backdrop-filter: blur(2px);
+}
+
+.luxury-cursor::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  background: hsl(175 100% 50%);
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.luxury-cursor.hover {
+  transform: scale(1.5);
+  border-color: hsl(175 100% 50% / 0.8);
+  box-shadow: 0 0 20px hsl(175 100% 50% / 0.5);
+}
+
+.luxury-cursor.hover::before {
+  transform: translate(-50%, -50%) scale(0.5);
+}
+
+/* Animations */
 @keyframes lightning-flow {
   0%, 100% {
     background-position: 0% 50%;
@@ -136,11 +142,11 @@
 @keyframes lightning-pulse {
   0%, 100% {
     opacity: 0.5;
-    box-shadow: 0 0 20px hsl(42 85% 55% / 0.3);
+    box-shadow: 0 0 20px hsl(215 100% 50% / 0.25);
   }
   50% {
     opacity: 1;
-    box-shadow: 0 0 40px hsl(195 100% 50% / 0.6), 0 0 60px hsl(42 85% 55% / 0.4);
+    box-shadow: 0 0 40px hsl(175 100% 50% / 0.55), 0 0 60px hsl(215 100% 50% / 0.35);
   }
 }
 
@@ -159,6 +165,56 @@
   }
 }
 
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Effects / Utilities */
+.mesh-bg {
+  background: var(--gradient-mesh);
+}
+
+.glass-navbar {
+  background: hsl(230 20% 6% / 0.78);
+  backdrop-filter: blur(18px) saturate(180%);
+  border-bottom: 1px solid hsl(215 100% 50% / 0.12);
+}
+
+.nav-link {
+  position: relative;
+  color: hsl(var(--muted-foreground));
+  transition: var(--transition-smooth);
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+}
+
+.nav-link:hover {
+  color: hsl(var(--foreground));
+  background: hsl(215 100% 50% / 0.12);
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--gradient-primary);
+  transform: translateX(-50%);
+  transition: width 0.3s ease;
+  opacity: 0.7;
+}
+
+.nav-link:hover::after {
+  width: 46%;
+}
+
 /* Lightning Border Glow Effect */
 .lightning-border {
   position: relative;
@@ -172,11 +228,11 @@
   background: linear-gradient(
     90deg,
     transparent,
-    hsl(42 85% 55%),
-    hsl(195 100% 50%),
-    hsl(42 100% 60%),
-    hsl(195 100% 50%),
-    hsl(42 85% 55%),
+    hsl(215 100% 50%),
+    hsl(175 100% 50%),
+    hsl(265 85% 60%),
+    hsl(175 100% 50%),
+    hsl(215 100% 50%),
     transparent
   );
   background-size: 300% 100%;
@@ -208,7 +264,7 @@
 /* Upload Zone Lightning Effect */
 .upload-zone-lightning {
   position: relative;
-  background: linear-gradient(135deg, hsl(22 40% 10% / 0.9), hsl(22 40% 8% / 0.95));
+  background: linear-gradient(135deg, hsl(230 20% 7% / 0.9), hsl(230 25% 6% / 0.95));
   border: 2px solid transparent;
   transition: all 0.3s ease;
 }
@@ -220,9 +276,9 @@
   background: linear-gradient(
     45deg,
     transparent 20%,
-    hsl(42 85% 55% / 0.3) 30%,
-    hsl(195 100% 50% / 0.5) 50%,
-    hsl(42 100% 60% / 0.3) 70%,
+    hsl(215 100% 50% / 0.25) 30%,
+    hsl(175 100% 50% / 0.5) 50%,
+    hsl(265 85% 60% / 0.25) 70%,
     transparent 80%
   );
   background-size: 400% 400%;
@@ -238,18 +294,17 @@
 }
 
 .upload-zone-lightning:hover {
-  border-color: hsl(42 85% 55% / 0.5);
-  box-shadow: 
-    0 0 30px hsl(42 85% 55% / 0.3),
-    0 0 60px hsl(195 100% 50% / 0.2),
-    inset 0 0 30px hsl(42 85% 55% / 0.05);
+  border-color: hsl(215 100% 50% / 0.5);
+  box-shadow:
+    0 0 30px hsl(215 100% 50% / 0.25),
+    0 0 60px hsl(265 85% 60% / 0.15),
+    inset 0 0 30px hsl(175 100% 50% / 0.05);
 }
 
-/* Utility Icon Muted Style */
 .utility-icon-muted {
   color: hsl(var(--muted-foreground));
-  opacity: 0.6;
-  transition: all 0.3s ease;
+  opacity: 0.65;
+  transition: var(--transition-smooth);
 }
 
 .utility-icon-muted:hover {
@@ -257,7 +312,6 @@
   opacity: 1;
 }
 
-/* Glassmorphism Premium Card */
 .glass-premium {
   background: hsl(var(--glass-bg));
   backdrop-filter: blur(20px);
@@ -265,26 +319,60 @@
   box-shadow: var(--shadow-luxury);
 }
 
-/* Premium Button Glow */
 .btn-premium {
   position: relative;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: var(--transition-smooth);
 }
 
 .btn-premium::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, hsl(42 85% 55% / 0.3), transparent);
-  transform: translateX(-100%);
-  transition: transform 0.5s ease;
+  background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.14), transparent);
+  transform: translateX(-120%);
+  transition: transform 0.6s ease;
 }
 
 .btn-premium:hover::before {
-  transform: translateX(100%);
+  transform: translateX(120%);
 }
 
 .btn-premium:hover {
-  box-shadow: 0 0 30px hsl(42 85% 55% / 0.4);
+  box-shadow: var(--shadow-neon);
+  transform: translateY(-1px);
+}
+
+.bento-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: linear-gradient(135deg, hsl(230 20% 7%), hsl(230 25% 9%));
+  border: 1px solid hsl(215 100% 50% / 0.12);
+  transition: var(--transition-smooth);
+}
+
+.bento-card:hover {
+  border-color: hsl(215 100% 50% / 0.28);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-3px);
+}
+
+.pricing-featured {
+  background: linear-gradient(135deg, hsl(215 100% 50% / 0.11), hsl(265 85% 60% / 0.06));
+  border: 2px solid hsl(215 100% 50% / 0.32);
+  box-shadow: var(--shadow-neon);
+}
+
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    hsl(215 100% 50% / 0.25) 20%,
+    hsl(265 85% 60% / 0.25) 50%,
+    hsl(215 100% 50% / 0.25) 80%,
+    transparent 100%
+  );
+  margin: 0 auto;
+  max-width: 80%;
 }
