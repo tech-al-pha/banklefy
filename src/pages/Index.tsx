@@ -41,19 +41,19 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-dark text-foreground">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
+      {/* Navigation - Glassmorphism */}
+      <nav className="fixed top-0 left-0 right-0 z-50 glass-navbar">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Logo />
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-2">
               <a 
                 href="#features" 
                 onClick={(e) => {
                   e.preventDefault();
                   document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                className="nav-link text-sm cursor-pointer"
               >
                 Features
               </a>
@@ -63,7 +63,7 @@ const Index = () => {
                   e.preventDefault();
                   document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                className="nav-link text-sm cursor-pointer"
               >
                 Pricing
               </a>
@@ -73,7 +73,7 @@ const Index = () => {
                   e.preventDefault();
                   document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                className="nav-link text-sm cursor-pointer"
               >
                 Demo
               </a>
@@ -82,7 +82,7 @@ const Index = () => {
                   variant="ghost"
                   size="sm" 
                   onClick={() => navigate('/dashboard')}
-                  className="text-sm"
+                  className="nav-link text-sm"
                 >
                   Dashboard
                 </Button>
@@ -92,7 +92,7 @@ const Index = () => {
                   variant="ghost"
                   size="sm" 
                   onClick={() => navigate('/admin')}
-                  className="text-sm gap-1"
+                  className="nav-link text-sm gap-1"
                 >
                   <Shield className="h-4 w-4" />
                   Admin
@@ -101,7 +101,7 @@ const Index = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="border-primary/50 hover:bg-primary/10"
+                className="ml-2 border-primary/30 hover:bg-primary/10 hover:border-primary/50"
                 onClick={handleAuthClick}
               >
                 {user ? (
@@ -115,7 +115,7 @@ const Index = () => {
               </Button>
               <Button 
                 size="sm" 
-                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
+                className="btn-premium bg-gradient-primary text-white shadow-neon"
                 onClick={() => {
                   document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
                 }}
