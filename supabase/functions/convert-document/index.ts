@@ -696,46 +696,269 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
       }
     });
 
-    // LIQUIDITY ANALYSIS
-    const balances = transactions.map(t => t.balance);
-    const minBalance = Math.min(...balances);
-    const maxBalance = Math.max(...balances);
-    const avgBalance = balances.reduce((a, b) => a + b, 0) / balances.length;
-    const minBalanceIndex = balances.indexOf(minBalance);
-    const maxDipDate = transactions[minBalanceIndex]?.date || null;
+    // ============= FOIR & SALARY ANALYSIS (UNDERWRITING ENGINE) =============
+    console.log('Starting FOIR & Salary Analysis...');
     
-    // Detect days with zero or negative balance
-    const zeroDays = transactions.filter(t => t.balance <= 0);
+    // Keywords for salary detection
+    const salaryKeywords = ['salary', 'sal cr', 'sal/', 'payroll', 'wages', 'income', 'stipend', 'pension', 'honorarium'];
+    const emiKeywords = ['emi', 'loan', 'instalment', 'installment', 'repayment', 'housing loan', 'car loan', 'personal loan', 'credit card', 'nach', 'auto debit'];
+    
+    // Fetch user's category corrections for behavioral learning (if authenticated)
+    let categoryCorrections: Map<string, string> = new Map();
+    if (user) {
+      const { data: corrections } = await supabaseAdmin
+        .from('category_corrections')
+        .select('description_pattern, corrected_category, weight')
+        .eq('user_id', user.id)
+        .order('weight', { ascending: false });
+      
+      if (corrections) {
+        corrections.forEach((c: any) => {
+          categoryCorrections.set(c.description_pattern.toLowerCase(), c.corrected_category);
+        });
+        console.log(`Loaded ${corrections.length} category corrections for user`);
+      }
+    }
+    
+    // Identify salary credits
+    interface SalaryCredit {
+      date: string;
+      amount: number;
+      description: string;
+      rowIndex: number;
+    }
+    const salaryCredits: SalaryCredit[] = [];
+    
+    // Identify EMI/Loan debits
+    interface EMIDebit {
+      date: string;
+      amount: number;
+      description: string;
+      rowIndex: number;
+      loanType: string;
+    }
+    const emiDebits: EMIDebit[] = [];
+    
+    transactions.forEach((t: any, index: number) => {
+      const desc = t.description.toLowerCase();
+      
+      // Apply category corrections first (behavioral learning)
+      const correctedCategory = categoryCorrections.get(desc) || 
+                               [...categoryCorrections.entries()].find(([pattern]) => desc.includes(pattern))?.[1];
+      if (correctedCategory) {
+        t.category = correctedCategory;
+      }
+      
+      // Detect salary credits
+      if (t.credit > 0 && (
+        salaryKeywords.some(k => desc.includes(k)) ||
+        t.category === 'Salary/Income' ||
+        (t.credit >= 30000 && (desc.includes('neft') || desc.includes('rtgs') || desc.includes('imps')))
+      )) {
+        salaryCredits.push({
+          date: t.date,
+          amount: t.credit,
+          description: t.description,
+          rowIndex: index,
+        });
+        if (t.category !== 'Salary/Income') {
+          t.category = 'Salary/Income';
+        }
+      }
+      
+      // Detect EMI/Loan debits
+      if (t.debit > 0 && (
+        emiKeywords.some(k => desc.includes(k)) ||
+        t.category === 'Loan/EMI'
+      )) {
+        let loanType = 'Unknown';
+        if (desc.includes('housing') || desc.includes('home loan') || desc.includes('mortgage')) loanType = 'Housing';
+        else if (desc.includes('car') || desc.includes('vehicle') || desc.includes('auto')) loanType = 'Vehicle';
+        else if (desc.includes('personal') || desc.includes('pl')) loanType = 'Personal';
+        else if (desc.includes('credit card') || desc.includes('cc')) loanType = 'Credit Card';
+        else if (desc.includes('education') || desc.includes('student')) loanType = 'Education';
+        else if (emiKeywords.some(k => desc.includes(k))) loanType = 'EMI';
+        
+        emiDebits.push({
+          date: t.date,
+          amount: t.debit,
+          description: t.description,
+          rowIndex: index,
+          loanType,
+        });
+        if (t.category !== 'Loan/EMI') {
+          t.category = 'Loan/EMI';
+        }
+      }
+    });
+    
+    // Calculate monthly aggregates
+    const monthlyData: Map<string, { salaries: number; emis: number }> = new Map();
+    
+    transactions.forEach((t: any) => {
+      const month = t.date.substring(0, 7);
+      if (!monthlyData.has(month)) {
+        monthlyData.set(month, { salaries: 0, emis: 0 });
+      }
+    });
+    
+    salaryCredits.forEach(s => {
+      const month = s.date.substring(0, 7);
+      const existing = monthlyData.get(month) || { salaries: 0, emis: 0 };
+      existing.salaries += s.amount;
+      monthlyData.set(month, existing);
+    });
+    
+    emiDebits.forEach(e => {
+      const month = e.date.substring(0, 7);
+      const existing = monthlyData.get(month) || { salaries: 0, emis: 0 };
+      existing.emis += e.amount;
+      monthlyData.set(month, existing);
+    });
+    
+    // Calculate average monthly income and EMI
+    const months = Array.from(monthlyData.values());
+    const totalSalaryIncome = months.reduce((sum, m) => sum + m.salaries, 0);
+    const totalEMIOutflow = months.reduce((sum, m) => sum + m.emis, 0);
+    const avgMonthlyIncome = months.length > 0 ? totalSalaryIncome / months.length : 0;
+    const avgMonthlyEMI = months.length > 0 ? totalEMIOutflow / months.length : 0;
+    
+    // Calculate FOIR (Fixed Obligation to Income Ratio)
+    const foirScore = avgMonthlyIncome > 0 ? (avgMonthlyEMI / avgMonthlyIncome) * 100 : 0;
+    
+    // Group EMI debits by loan type
+    const emiByType: Record<string, { count: number; totalAmount: number }> = {};
+    emiDebits.forEach(e => {
+      if (!emiByType[e.loanType]) {
+        emiByType[e.loanType] = { count: 0, totalAmount: 0 };
+      }
+      emiByType[e.loanType].count++;
+      emiByType[e.loanType].totalAmount += e.amount;
+    });
+    
+    // Underwriting recommendation
+    let eligibilityStatus: 'excellent' | 'good' | 'moderate' | 'poor' | 'ineligible' = 'good';
+    let eligibilityMessage = '';
+    const eligibilityFactors: string[] = [];
+    
+    if (foirScore === 0 && salaryCredits.length === 0) {
+      eligibilityStatus = 'moderate';
+      eligibilityMessage = 'No salary income detected. Unable to calculate FOIR.';
+      eligibilityFactors.push('No identifiable salary credits');
+    } else if (foirScore <= 30) {
+      eligibilityStatus = 'excellent';
+      eligibilityMessage = 'Excellent debt-to-income ratio. High loan eligibility.';
+      eligibilityFactors.push('FOIR below 30% - excellent');
+    } else if (foirScore <= 50) {
+      eligibilityStatus = 'good';
+      eligibilityMessage = 'Good debt-to-income ratio. Eligible for most loans.';
+      eligibilityFactors.push('FOIR between 30-50% - acceptable');
+    } else if (foirScore <= 65) {
+      eligibilityStatus = 'moderate';
+      eligibilityMessage = 'Moderate debt burden. May face stricter approval criteria.';
+      eligibilityFactors.push('FOIR above 50% - elevated');
+    } else {
+      eligibilityStatus = 'poor';
+      eligibilityMessage = 'High debt burden. Loan approval may be difficult.';
+      eligibilityFactors.push('FOIR above 65% - high risk');
+    }
+    
+    if (riskTransactions.some(r => r.type === 'gambling')) {
+      if (eligibilityStatus === 'excellent') eligibilityStatus = 'good';
+      else if (eligibilityStatus === 'good') eligibilityStatus = 'moderate';
+      eligibilityFactors.push('Gambling activity detected');
+    }
+    
+    if (riskTransactions.some(r => r.type === 'bouncedPayment')) {
+      if (eligibilityStatus === 'excellent' || eligibilityStatus === 'good') eligibilityStatus = 'moderate';
+      else if (eligibilityStatus === 'moderate') eligibilityStatus = 'poor';
+      eligibilityFactors.push('Bounced payments on record');
+    }
+    
+    // Track zero balance days for eligibility and integrity scoring
+    const zeroDays = transactions.filter((t: any) => t.balance <= 0);
+    
     if (zeroDays.length > 0) {
+      eligibilityFactors.push('Zero/negative balance instances');
+      // Add liquidity crisis alert
       fraudAlerts.push({
         type: 'LIQUIDITY_CRISIS',
         severity: zeroDays.length > 3 ? 'critical' : 'high',
         description: `Account reached zero or negative balance on ${zeroDays.length} occasion(s). Indicates liquidity stress.`,
-        affectedRows: transactions.map((t, i) => t.balance <= 0 ? i : -1).filter(i => i >= 0),
+        affectedRows: transactions.map((t: any, i: number) => t.balance <= 0 ? i : -1).filter((i: number) => i >= 0),
         metadata: {
           zeroDaysCount: zeroDays.length,
-          lowestBalance: minBalance,
+          lowestBalance: Math.min(...transactions.map((t: any) => t.balance)),
         },
       });
     }
+    
+    const disposableIncome = avgMonthlyIncome - avgMonthlyEMI;
+    const maxNewEMI = disposableIncome * 0.5;
+    const estimatedLoanEligibility = maxNewEMI > 0 ? maxNewEMI * 60 : 0;
+    
+    const underwritingAnalysis = {
+      salaryCredits: salaryCredits.map(s => ({
+        date: s.date,
+        amount: s.amount,
+        description: s.description,
+      })),
+      emiDebits: emiDebits.map(e => ({
+        date: e.date,
+        amount: e.amount,
+        description: e.description,
+        loanType: e.loanType,
+      })),
+      monthlyBreakdown: Array.from(monthlyData.entries()).map(([month, data]) => ({
+        month,
+        salaryIncome: data.salaries,
+        emiOutflow: data.emis,
+      })),
+      summary: {
+        avgMonthlyIncome,
+        avgMonthlyEMI,
+        foirScore: Math.round(foirScore * 100) / 100,
+        foirStatus: foirScore <= 30 ? 'excellent' : foirScore <= 50 ? 'good' : foirScore <= 65 ? 'moderate' : 'high',
+        emiByLoanType: emiByType,
+        totalSalaryDetected: salaryCredits.length,
+        totalEMIDetected: emiDebits.length,
+      },
+      eligibility: {
+        status: eligibilityStatus,
+        message: eligibilityMessage,
+        factors: eligibilityFactors,
+        maxNewEMI: Math.round(maxNewEMI),
+        estimatedLoanEligibility: Math.round(estimatedLoanEligibility),
+      },
+    };
+    
+    console.log(`FOIR Analysis complete. Score: ${foirScore.toFixed(2)}%, Status: ${eligibilityStatus}`);
+
+    // LIQUIDITY ANALYSIS
+    const balances = transactions.map((t: any) => t.balance);
+    const minBalance = Math.min(...balances);
+    const maxBalance = Math.max(...balances);
+    const avgBalance = balances.reduce((a: number, b: number) => a + b, 0) / balances.length;
+    const minBalanceIndex = balances.indexOf(minBalance);
+    const maxDipDate = transactions[minBalanceIndex]?.date || null;
 
     // Calculate integrity score (100 = perfect, 0 = highly suspicious)
     let integrityScore = 100;
-    integrityScore -= Math.min(30, balanceMismatches.length * 3); // Max 30 deduction for mismatches
-    integrityScore -= Math.min(20, riskTransactions.length * 5); // Max 20 for risk transactions
-    integrityScore -= Math.min(20, zeroDays.length * 5); // Max 20 for zero balance days
+    integrityScore -= Math.min(30, balanceMismatches.length * 3);
+    integrityScore -= Math.min(20, riskTransactions.length * 5);
+    integrityScore -= Math.min(20, zeroDays.length * 5);
     integrityScore = Math.max(0, integrityScore);
 
     console.log(`Fraud detection complete. Found ${fraudAlerts.length} alerts. Integrity score: ${integrityScore}`);
 
     // Calculate analytics summary
-    const totalCredits = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
-    const totalDebits = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
-    const duplicateCount = transactions.filter(t => t.isDuplicate).length;
+    const totalCredits = transactions.reduce((sum: number, t: any) => sum + (t.credit || 0), 0);
+    const totalDebits = transactions.reduce((sum: number, t: any) => sum + (t.debit || 0), 0);
+    const duplicateCount = transactions.filter((t: any) => t.isDuplicate).length;
     
     // Category breakdown
     const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
-    transactions.forEach(t => {
+    transactions.forEach((t: any) => {
       if (!categoryBreakdown[t.category]) {
         categoryBreakdown[t.category] = { count: 0, totalDebit: 0, totalCredit: 0 };
       }
@@ -744,7 +967,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
       categoryBreakdown[t.category].totalCredit += t.credit || 0;
     });
 
-    // Risk analysis summary
+    // Risk analysis summary (including FOIR)
     const riskAnalysis = {
       integrityScore,
       balanceMismatches: balanceMismatches.length,
@@ -753,6 +976,9 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
       maxPeak: maxBalance,
       riskFlags: riskTransactions.map(r => ({ type: r.type, count: r.indices.length })),
       fraudAlerts,
+      foirScore: Math.round(foirScore * 100) / 100,
+      avgMonthlyIncome,
+      avgMonthlyEMI,
     };
 
     const analytics = {
@@ -763,6 +989,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
       duplicateCount,
       categoryBreakdown,
       riskAnalysis,
+      underwriting: underwritingAnalysis,
     };
 
     console.log(`Extracted ${transactions.length} transactions`);
