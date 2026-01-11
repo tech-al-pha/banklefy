@@ -11,6 +11,7 @@ import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { UsageLimitBanner } from "./UsageLimitBanner";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 import { FraudAlertPanel } from "./FraudAlertPanel";
+import { UnderwritingPanel } from "./UnderwritingPanel";
 import {
   Table,
   TableBody,
@@ -55,6 +56,28 @@ interface RiskAnalysis {
   fraudAlerts: any[];
 }
 
+interface UnderwritingAnalysis {
+  salaryCredits: { date: string; amount: number; description: string }[];
+  emiDebits: { date: string; amount: number; description: string; loanType: string }[];
+  monthlyBreakdown: { month: string; salaryIncome: number; emiOutflow: number }[];
+  summary: {
+    avgMonthlyIncome: number;
+    avgMonthlyEMI: number;
+    foirScore: number;
+    foirStatus: 'excellent' | 'good' | 'moderate' | 'high';
+    emiByLoanType: Record<string, { count: number; totalAmount: number }>;
+    totalSalaryDetected: number;
+    totalEMIDetected: number;
+  };
+  eligibility: {
+    status: 'excellent' | 'good' | 'moderate' | 'poor' | 'ineligible';
+    message: string;
+    factors: string[];
+    maxNewEMI: number;
+    estimatedLoanEligibility: number;
+  };
+}
+
 interface Analytics {
   totalTransactions: number;
   totalCredits: number;
@@ -63,6 +86,7 @@ interface Analytics {
   duplicateCount: number;
   categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }>;
   riskAnalysis?: RiskAnalysis;
+  underwriting?: UnderwritingAnalysis;
 }
 
 // Category color mapping
@@ -635,6 +659,11 @@ export const UploadDemo = () => {
                     </Button>
                   </div>
                 </div>
+              )}
+
+              {/* FOIR & Underwriting Analysis Panel */}
+              {analytics?.underwriting && (
+                <UnderwritingPanel underwriting={analytics.underwriting} />
               )}
 
               {/* Risk Analysis & Fraud Detection Panel */}
