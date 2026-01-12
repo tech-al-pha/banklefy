@@ -2,14 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, Users, FileText, TrendingUp, Calendar, Shield } from 'lucide-react';
+import { Users, FileText, TrendingUp, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import akromedaLogo from '@/assets/akromeda-logo.png';
+import { AdminHeader } from '@/components/layout';
+import { StatCard, DailyStatsChart } from '@/components/cards';
+import { UsersTable } from '@/components/tables';
+import { PageLoader } from '@/components/common';
 
 interface UserProfile {
   id: string;
@@ -172,11 +170,7 @@ export default function Admin() {
   };
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!isAdmin) {
@@ -185,186 +179,46 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-gradient-dark">
-      {/* Header */}
-      <header className="border-b border-primary/10 bg-background/80 backdrop-blur-lg">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/')}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Button>
-              <div className="flex items-center gap-3">
-                <img src={akromedaLogo} alt="Akromeda" className="h-8 w-8" />
-                <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                  Admin Dashboard
-                </span>
-              </div>
-            </div>
-            <Badge variant="outline" className="border-primary/50 text-primary">
-              <Shield className="h-3 w-3 mr-1" />
-              Admin
-            </Badge>
-          </div>
-        </div>
-      </header>
+      <AdminHeader />
 
       <main className="container mx-auto px-6 py-8 space-y-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Users
-              </CardTitle>
-              <Users className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{users.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Registered accounts
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Conversions
-              </CardTitle>
-              <FileText className="h-4 w-4 text-secondary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{stats.total}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats.completed} completed, {stats.failed} failed
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Today's Conversions
-              </CardTitle>
-              <Calendar className="h-4 w-4 text-accent" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">{stats.todayCount}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Conversions today
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Success Rate
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-foreground">
-                {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Completion rate
-              </p>
-            </CardContent>
-          </Card>
+          <StatCard
+            title="Total Users"
+            value={users.length}
+            description="Registered accounts"
+            icon={Users}
+            iconClassName="text-primary"
+          />
+          <StatCard
+            title="Total Conversions"
+            value={stats.total}
+            description={`${stats.completed} completed, ${stats.failed} failed`}
+            icon={FileText}
+            iconClassName="text-secondary"
+          />
+          <StatCard
+            title="Today's Conversions"
+            value={stats.todayCount}
+            description="Conversions today"
+            icon={Calendar}
+            iconClassName="text-accent"
+          />
+          <StatCard
+            title="Success Rate"
+            value={`${stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%`}
+            description="Completion rate"
+            icon={TrendingUp}
+            iconClassName="text-green-500"
+          />
         </div>
 
         {/* Daily Stats Chart */}
-        <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
-          <CardHeader>
-            <CardTitle>Conversions - Last 7 Days</CardTitle>
-            <CardDescription>Daily conversion activity</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-2 h-32">
-              {dailyStats.map((day, i) => {
-                const maxCount = Math.max(...dailyStats.map(d => d.count), 1);
-                const height = (day.count / maxCount) * 100;
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                    <div 
-                      className="w-full bg-primary/80 rounded-t transition-all duration-300 hover:bg-primary"
-                      style={{ height: `${Math.max(height, 4)}%` }}
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(day.date).toLocaleDateString('en-US', { weekday: 'short' })}
-                    </span>
-                    <span className="text-xs font-medium">{day.count}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+        <DailyStatsChart data={dailyStats} />
 
         {/* Users Table */}
-        <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
-          <CardHeader>
-            <CardTitle>User Management</CardTitle>
-            <CardDescription>All registered users and their subscription status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[400px]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Tier</TableHead>
-                    <TableHead>Usage</TableHead>
-                    <TableHead>Joined</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
-                        No users found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    users.map((u) => (
-                      <TableRow key={u.id}>
-                        <TableCell className="font-medium">{u.email}</TableCell>
-                        <TableCell>{u.full_name || '-'}</TableCell>
-                        <TableCell>
-                          <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>
-                            {u.role}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize">
-                            {u.subscription?.tier || 'free'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {u.subscription
-                            ? `${u.subscription.conversions_used}/${u.subscription.conversions_limit}`
-                            : '-'}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(u.created_at).toLocaleDateString()}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+        <UsersTable users={users} />
       </main>
     </div>
   );
