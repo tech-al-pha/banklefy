@@ -2,10 +2,21 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { DashboardHeader } from "@/components/layout";
-import { ConversionsTable } from "@/components/tables";
-import { PageLoader } from "@/components/common";
+import { FileSpreadsheet, ArrowLeft, Loader2, Home } from "lucide-react";
+import { format } from "date-fns";
+import akromedaLogo from "@/assets/akromeda-logo.png";
 
 interface Conversion {
   id: string;
@@ -19,7 +30,7 @@ interface Conversion {
 }
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [conversions, setConversions] = useState<Conversion[]>([]);
@@ -91,13 +102,71 @@ const Dashboard = () => {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+        return <Badge className="bg-green-600">Completed</Badge>;
+      case "processing":
+        return <Badge className="bg-yellow-600">Processing</Badge>;
+      case "failed":
+        return <Badge variant="destructive">Failed</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
   if (loading) {
-    return <PageLoader />;
+    return (
+      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gradient-dark text-foreground">
-      <DashboardHeader title="Akromeda Dashboard" />
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/")}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              <div className="flex items-center gap-2">
+                <img src={akromedaLogo} alt="Akromeda" className="h-8 w-8" />
+                <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                  Akromeda Dashboard
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/")}
+              >
+                <Home className="mr-2 h-4 w-4" />
+                Home
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={signOut}
+                className="border-primary/50 hover:bg-primary/10"
+              >
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        </div>
+      </nav>
 
       {/* Main Content */}
       <div className="container mx-auto px-6 pt-24 pb-12">
@@ -110,11 +179,69 @@ const Dashboard = () => {
             </p>
           </div>
 
-          <ConversionsTable 
-            conversions={conversions}
-            downloadingId={downloadingId}
-            onDownload={downloadExcel}
-          />
+          <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
+            {conversions.length === 0 ? (
+              <div className="p-12 text-center">
+                <p className="text-muted-foreground mb-4">No conversions yet</p>
+                <Button onClick={() => navigate("/")}>
+                  Start Converting
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>File Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Completed</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {conversions.map((conversion) => (
+                    <TableRow key={conversion.id}>
+                      <TableCell className="font-medium">
+                        {conversion.original_filename}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(conversion.status)}</TableCell>
+                      <TableCell>
+                        {format(new Date(conversion.created_at), "MMM d, yyyy HH:mm")}
+                      </TableCell>
+                      <TableCell>
+                        {conversion.completed_at
+                          ? format(new Date(conversion.completed_at), "MMM d, yyyy HH:mm")
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {conversion.status === "completed" && conversion.result_path ? (
+                          <Button
+                            size="sm"
+                            onClick={() => downloadExcel(conversion)}
+                            disabled={downloadingId === conversion.id}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            {downloadingId === conversion.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <FileSpreadsheet className="mr-2 h-4 w-4" />
+                            )}
+                            Download Excel
+                          </Button>
+                        ) : conversion.status === "failed" ? (
+                          <span className="text-sm text-destructive">
+                            {conversion.error_message || "Conversion failed"}
+                          </span>
+                        ) : (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Card>
         </div>
       </div>
     </div>

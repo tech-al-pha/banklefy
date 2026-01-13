@@ -60,62 +60,55 @@ const yearlyPlans = [
 
 const PricingCard = ({ plan }: { plan: typeof monthlyPlans[0] }) => (
   <Card
-    className={`relative overflow-hidden rounded-2xl ${
-      plan.highlighted ? "pricing-featured" : "bento-card"
+    className={`relative p-8 bg-card/60 backdrop-blur-lg transition-all duration-300 ${
+      plan.highlighted
+        ? "border-primary shadow-neon scale-105"
+        : "border-primary/20 hover:border-primary/50 hover:shadow-card"
     }`}
   >
-    <div className="p-8">
-      {plan.highlighted && (
-        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-primary text-primary-foreground border-0 shadow-neon">
-          MOST POPULAR
-        </Badge>
-      )}
+    {plan.highlighted && (
+      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-primary text-primary-foreground border-0">
+        MOST POPULAR
+      </Badge>
+    )}
 
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <h3 className="text-2xl font-bold text-foreground">{plan.name}</h3>
-          <p className="text-sm text-muted-foreground">{plan.description}</p>
-        </div>
-
-        <div className="space-y-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-5xl font-bold text-foreground">{plan.price}</span>
-            <span className="text-muted-foreground">/{plan.period}</span>
-          </div>
-        </div>
-
-        <div className="py-4 border-t border-border/70">
-          <div className="flex items-center gap-2 text-foreground">
-            <Check className={`w-5 h-5 ${plan.highlighted ? "text-primary" : "text-accent"}`} />
-            <span className="text-lg font-medium">Up to {plan.pages} pages</span>
-          </div>
-        </div>
-
-        <Button
-          className={`w-full transition-all duration-300 ${
-            plan.highlighted
-              ? "btn-premium bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
-              : "border border-primary/25 bg-background/10 hover:bg-primary/10 hover:border-primary/45"
-          }`}
-          variant={plan.highlighted ? "default" : "outline"}
-        >
-          Choose Plan
-        </Button>
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h3 className="text-2xl font-bold text-foreground">{plan.name}</h3>
+        <p className="text-sm text-muted-foreground">{plan.description}</p>
       </div>
-    </div>
 
-    {/* Decorative glow */}
-    <div className="pointer-events-none absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-300">
-      <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
+      <div className="space-y-1">
+        <div className="flex items-baseline gap-1">
+          <span className="text-5xl font-bold text-foreground">{plan.price}</span>
+          <span className="text-muted-foreground">/{plan.period}</span>
+        </div>
+      </div>
+
+      <div className="py-4 border-t border-border">
+        <div className="flex items-center gap-2 text-foreground">
+          <Check className="w-5 h-5 text-accent" />
+          <span className="text-lg font-medium">Up to {plan.pages} pages</span>
+        </div>
+      </div>
+
+      <Button
+        className={`w-full ${
+          plan.highlighted
+            ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
+            : "bg-card hover:bg-muted border border-primary/30 text-foreground"
+        } transition-all duration-300`}
+      >
+        Choose Plan
+      </Button>
     </div>
   </Card>
 );
 
 export const Pricing = () => {
   return (
-    <section id="pricing" className="relative py-24 px-6 overflow-hidden">
-      <div className="absolute inset-0 mesh-bg opacity-35" />
-      <div className="container mx-auto relative z-10">
+    <section className="relative py-24 px-6">
+      <div className="container mx-auto">
         <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold">
             Choose Your
@@ -127,7 +120,7 @@ export const Pricing = () => {
         </div>
 
         <Tabs defaultValue="monthly" className="max-w-6xl mx-auto">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-12 bg-card/40 border border-primary/20 backdrop-blur-lg">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-12">
             <TabsTrigger value="monthly">Monthly Plans</TabsTrigger>
             <TabsTrigger value="yearly">Yearly Plans</TabsTrigger>
           </TabsList>
@@ -150,8 +143,13 @@ export const Pricing = () => {
         </Tabs>
 
         <div className="mt-16 text-center">
-          <p className="text-muted-foreground mb-4">Need a custom solution for your organization?</p>
-          <Button variant="outline" className="border-secondary/40 hover:bg-secondary/10">
+          <p className="text-muted-foreground mb-4">
+            Need a custom solution for your organization?
+          </p>
+          <Button
+            variant="outline"
+            className="border-secondary/50 text-foreground hover:bg-secondary/10 backdrop-blur-lg"
+          >
             Contact Sales
           </Button>
         </div>

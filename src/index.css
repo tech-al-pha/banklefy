@@ -2,95 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system - Premium Dark SaaS Dashboard Theme
-   Colors from user palette:
-   - #682EC7 (Purple accent)
-   - #7DE260 (Green success)
-   - #FF9F0A (Orange warning)
-   - #06071A (Dark navy background)
-   - #191A30 (Card background)
-   - #282939 (Lighter card/border)
-   - #74769A (Muted text)
-   - #E0E1EE (Light text)
+/* Definition of the design system - Premium Luxury Dark Theme
+   Colors based on: #2B1C10, #987284, #6E493A, #E1D4C1, #F4E1D2
    All colors MUST be HSL.
 */
 
 @layer base {
   :root {
-    /* Dark Navy Background - #06071A */
-    --background: 235 60% 6%;
-    --foreground: 233 33% 94%;
+    /* Premium Luxury Dark Theme */
+    --background: 22 47% 12%;
+    --foreground: 39 35% 82%;
 
-    /* Card Background - #191A30 */
-    --card: 237 31% 14%;
-    --card-foreground: 233 33% 94%;
+    --card: 22 40% 10%;
+    --card-foreground: 39 35% 82%;
 
-    /* Popover - slightly lighter than card */
-    --popover: 237 28% 16%;
-    --popover-foreground: 233 33% 94%;
+    --popover: 22 40% 10%;
+    --popover-foreground: 39 35% 82%;
 
-    /* Purple Primary - #682EC7 */
-    --primary: 266 64% 48%;
-    --primary-foreground: 0 0% 100%;
+    /* Warm Brown Primary - Luxurious Gold Accent */
+    --primary: 42 85% 55%;
+    --primary-foreground: 22 47% 8%;
 
-    /* Lighter Purple Secondary */
-    --secondary: 266 50% 35%;
-    --secondary-foreground: 233 33% 94%;
+    /* Mauve/Dusty Rose Secondary */
+    --secondary: 338 15% 56%;
+    --secondary-foreground: 22 47% 8%;
 
-    /* Muted - #282939 */
-    --muted: 235 17% 19%;
-    --muted-foreground: 235 15% 53%;
+    --muted: 22 30% 20%;
+    --muted-foreground: 338 10% 55%;
 
-    /* Green Accent - #7DE260 */
-    --accent: 107 66% 63%;
-    --accent-foreground: 235 60% 6%;
+    /* Gold Accent - Lightning Effect */
+    --accent: 42 100% 60%;
+    --accent-foreground: 22 47% 8%;
 
-    /* Orange for warnings - #FF9F0A */
-    --warning: 37 100% 52%;
-    --warning-foreground: 235 60% 6%;
-
-    /* Special colors */
-    --lightning: 266 64% 48%;
-    --lightning-glow: 266 70% 55%;
+    /* Neon Electric Blue for Lightning */
+    --lightning: 195 100% 50%;
+    --lightning-glow: 195 100% 65%;
 
     --destructive: 0 85% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive-foreground: 39 35% 82%;
 
-    /* Border - #282939 */
-    --border: 235 17% 19%;
-    --input: 237 28% 16%;
-    --ring: 266 64% 48%;
+    --border: 22 25% 18%;
+    --input: 22 25% 18%;
+    --ring: 42 85% 55%;
 
     --radius: 0.75rem;
 
-    --highlight: 266 64% 55%;
-    --highlight-foreground: 0 0% 100%;
+    /* Cream/Peach Highlights */
+    --highlight: 27 56% 89%;
+    --highlight-foreground: 22 47% 8%;
 
-    /* Keep legacy token */
+    /* Warm Brown Accent */
     --warm-brown: 16 31% 33%;
 
-    /* Glass effects */
-    --glass-bg: 237 31% 14% / 0.85;
-    --glass-border: 266 64% 48% / 0.2;
+    /* Glassmorphism - Premium */
+    --glass-bg: 22 40% 10% / 0.7;
+    --glass-border: 42 85% 55% / 0.15;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(266 64% 48%), hsl(266 70% 60%));
-    --gradient-dark: linear-gradient(180deg, hsl(235 60% 6%), hsl(237 31% 10%));
-    --gradient-glow: radial-gradient(circle at center, hsl(266 64% 48% / 0.2), transparent 60%);
-    --gradient-lightning: linear-gradient(90deg, hsl(266 64% 48%), hsl(266 70% 60%), hsl(107 66% 63%), hsl(266 70% 60%), hsl(266 64% 48%));
-    --gradient-mesh:
-      radial-gradient(ellipse at 20% 25%, hsl(266 64% 48% / 0.15) 0%, transparent 55%),
-      radial-gradient(ellipse at 80% 70%, hsl(266 70% 60% / 0.1) 0%, transparent 55%),
-      radial-gradient(ellipse at 50% 50%, hsl(107 66% 63% / 0.05) 0%, transparent 70%);
+    /* Premium Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(42 85% 55%), hsl(42 100% 65%));
+    --gradient-dark: linear-gradient(180deg, hsl(22 47% 12%), hsl(22 47% 6%));
+    --gradient-glow: radial-gradient(circle at center, hsl(42 85% 55% / 0.15), transparent);
+    --gradient-lightning: linear-gradient(90deg, hsl(195 100% 50%), hsl(42 100% 60%), hsl(195 100% 50%));
 
-    /* Shadows */
-    --shadow-neon: 0 0 30px hsl(266 64% 48% / 0.4);
-    --shadow-lightning: 0 0 40px hsl(266 64% 48% / 0.5);
-    --shadow-card: 0 15px 50px hsl(235 60% 3% / 0.8);
-    --shadow-luxury: 0 25px 80px hsl(235 60% 3% / 0.6);
-    --shadow-glow-sm: 0 0 15px hsl(266 64% 48% / 0.3);
-    --shadow-glow-lg: 0 0 50px hsl(266 64% 48% / 0.5);
+    /* Premium Shadows */
+    --shadow-neon: 0 0 30px hsl(42 85% 55% / 0.4);
+    --shadow-lightning: 0 0 40px hsl(195 100% 50% / 0.5);
+    --shadow-card: 0 15px 50px hsl(22 47% 3% / 0.9);
+    --shadow-luxury: 0 25px 80px hsl(22 47% 3% / 0.8);
 
+    /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
@@ -101,54 +81,49 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    @apply bg-background text-foreground;
     cursor: none;
   }
 
-  a, button, [role="button"], input, textarea, select, [data-hover] {
-    cursor: none;
+  /* Custom Rolls-Royce Style Cursor */
+  .luxury-cursor {
+    position: fixed;
+    width: 40px;
+    height: 40px;
+    border: 2px solid hsl(42 85% 55% / 0.6);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform 0.15s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
+    mix-blend-mode: difference;
+    backdrop-filter: blur(2px);
+  }
+
+  .luxury-cursor::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    background: hsl(42 85% 55%);
+    border-radius: 50%;
+    transition: transform 0.2s ease;
+  }
+
+  .luxury-cursor.hover {
+    transform: scale(1.5);
+    border-color: hsl(195 100% 50% / 0.8);
+    box-shadow: 0 0 20px hsl(195 100% 50% / 0.5);
+  }
+
+  .luxury-cursor.hover::before {
+    transform: translate(-50%, -50%) scale(0.5);
   }
 }
 
-/* Premium cursor styling */
-.luxury-cursor {
-  position: fixed;
-  width: 40px;
-  height: 40px;
-  border: 2px solid hsl(266 64% 48% / 0.6);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 9999;
-  transition: transform 0.15s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
-  mix-blend-mode: difference;
-  backdrop-filter: blur(2px);
-}
-
-.luxury-cursor::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 6px;
-  height: 6px;
-  background: hsl(266 64% 48%);
-  border-radius: 50%;
-  transition: transform 0.2s ease;
-}
-
-.luxury-cursor.hover {
-  transform: scale(1.5);
-  border-color: hsl(266 70% 60% / 0.8);
-  box-shadow: 0 0 20px hsl(266 64% 48% / 0.5);
-}
-
-.luxury-cursor.hover::before {
-  transform: translate(-50%, -50%) scale(0.5);
-}
-
-/* Animations */
+/* Lightning Border Animation */
 @keyframes lightning-flow {
   0%, 100% {
     background-position: 0% 50%;
@@ -161,11 +136,11 @@
 @keyframes lightning-pulse {
   0%, 100% {
     opacity: 0.5;
-    box-shadow: 0 0 20px hsl(266 64% 48% / 0.25);
+    box-shadow: 0 0 20px hsl(42 85% 55% / 0.3);
   }
   50% {
     opacity: 1;
-    box-shadow: 0 0 40px hsl(266 64% 48% / 0.55), 0 0 60px hsl(266 70% 60% / 0.35);
+    box-shadow: 0 0 40px hsl(195 100% 50% / 0.6), 0 0 60px hsl(42 85% 55% / 0.4);
   }
 }
 
@@ -184,65 +159,6 @@
   }
 }
 
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 20px hsl(266 64% 48% / 0.3);
-  }
-  50% {
-    box-shadow: 0 0 40px hsl(266 64% 48% / 0.6);
-  }
-}
-
-/* Effects / Utilities */
-.mesh-bg {
-  background: var(--gradient-mesh);
-}
-
-.glass-navbar {
-  background: hsl(237 31% 10% / 0.9);
-  backdrop-filter: blur(18px) saturate(180%);
-  border-bottom: 1px solid hsl(266 64% 48% / 0.15);
-}
-
-.nav-link {
-  position: relative;
-  color: hsl(var(--muted-foreground));
-  transition: var(--transition-smooth);
-  padding: 0.5rem 1rem;
-  border-radius: 9999px;
-}
-
-.nav-link:hover {
-  color: hsl(var(--foreground));
-  background: hsl(266 64% 48% / 0.12);
-}
-
-.nav-link::after {
-  content: '';
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  width: 0;
-  height: 2px;
-  background: var(--gradient-primary);
-  transform: translateX(-50%);
-  transition: width 0.3s ease;
-  opacity: 0.7;
-}
-
-.nav-link:hover::after {
-  width: 46%;
-}
-
 /* Lightning Border Glow Effect */
 .lightning-border {
   position: relative;
@@ -256,11 +172,11 @@
   background: linear-gradient(
     90deg,
     transparent,
-    hsl(266 64% 48%),
-    hsl(266 70% 60%),
-    hsl(107 66% 63%),
-    hsl(266 70% 60%),
-    hsl(266 64% 48%),
+    hsl(42 85% 55%),
+    hsl(195 100% 50%),
+    hsl(42 100% 60%),
+    hsl(195 100% 50%),
+    hsl(42 85% 55%),
     transparent
   );
   background-size: 300% 100%;
@@ -292,7 +208,7 @@
 /* Upload Zone Lightning Effect */
 .upload-zone-lightning {
   position: relative;
-  background: linear-gradient(135deg, hsl(237 31% 14% / 0.9), hsl(237 31% 12% / 0.95));
+  background: linear-gradient(135deg, hsl(22 40% 10% / 0.9), hsl(22 40% 8% / 0.95));
   border: 2px solid transparent;
   transition: all 0.3s ease;
 }
@@ -304,9 +220,9 @@
   background: linear-gradient(
     45deg,
     transparent 20%,
-    hsl(266 64% 48% / 0.25) 30%,
-    hsl(266 70% 60% / 0.5) 50%,
-    hsl(107 66% 63% / 0.25) 70%,
+    hsl(42 85% 55% / 0.3) 30%,
+    hsl(195 100% 50% / 0.5) 50%,
+    hsl(42 100% 60% / 0.3) 70%,
     transparent 80%
   );
   background-size: 400% 400%;
@@ -322,17 +238,18 @@
 }
 
 .upload-zone-lightning:hover {
-  border-color: hsl(266 64% 48% / 0.5);
-  box-shadow:
-    0 0 30px hsl(266 64% 48% / 0.25),
-    0 0 60px hsl(266 70% 60% / 0.15),
-    inset 0 0 30px hsl(266 64% 48% / 0.05);
+  border-color: hsl(42 85% 55% / 0.5);
+  box-shadow: 
+    0 0 30px hsl(42 85% 55% / 0.3),
+    0 0 60px hsl(195 100% 50% / 0.2),
+    inset 0 0 30px hsl(42 85% 55% / 0.05);
 }
 
+/* Utility Icon Muted Style */
 .utility-icon-muted {
   color: hsl(var(--muted-foreground));
-  opacity: 0.65;
-  transition: var(--transition-smooth);
+  opacity: 0.6;
+  transition: all 0.3s ease;
 }
 
 .utility-icon-muted:hover {
@@ -340,6 +257,7 @@
   opacity: 1;
 }
 
+/* Glassmorphism Premium Card */
 .glass-premium {
   background: hsl(var(--glass-bg));
   backdrop-filter: blur(20px);
@@ -347,91 +265,26 @@
   box-shadow: var(--shadow-luxury);
 }
 
+/* Premium Button Glow */
 .btn-premium {
   position: relative;
   overflow: hidden;
-  transition: var(--transition-smooth);
+  transition: all 0.3s ease;
 }
 
 .btn-premium::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.14), transparent);
-  transform: translateX(-120%);
-  transition: transform 0.6s ease;
+  background: linear-gradient(90deg, transparent, hsl(42 85% 55% / 0.3), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
 }
 
 .btn-premium:hover::before {
-  transform: translateX(120%);
+  transform: translateX(100%);
 }
 
 .btn-premium:hover {
-  box-shadow: var(--shadow-neon);
-  transform: translateY(-1px);
-}
-
-.bento-card {
-  position: relative;
-  overflow: hidden;
-  border-radius: 1.25rem;
-  background: linear-gradient(135deg, hsl(237 31% 14%), hsl(237 28% 16%));
-  border: 1px solid hsl(235 17% 25%);
-  transition: var(--transition-smooth);
-}
-
-.bento-card:hover {
-  border-color: hsl(266 64% 48% / 0.35);
-  box-shadow: var(--shadow-card);
-  transform: translateY(-3px);
-}
-
-.pricing-featured {
-  background: linear-gradient(135deg, hsl(266 64% 48% / 0.12), hsl(266 70% 60% / 0.06));
-  border: 2px solid hsl(266 64% 48% / 0.35);
-  box-shadow: var(--shadow-neon);
-}
-
-.section-divider {
-  height: 1px;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    hsl(266 64% 48% / 0.25) 20%,
-    hsl(266 70% 60% / 0.25) 50%,
-    hsl(266 64% 48% / 0.25) 80%,
-    transparent 100%
-  );
-  margin: 0 auto;
-  max-width: 80%;
-}
-
-/* Status colors using accent colors */
-.status-success {
-  color: hsl(107 66% 63%);
-}
-
-.status-warning {
-  color: hsl(37 100% 52%);
-}
-
-.status-error {
-  color: hsl(0 85% 60%);
-}
-
-/* Sidebar active state */
-.sidebar-active {
-  background: linear-gradient(90deg, hsl(266 64% 48% / 0.2), transparent);
-  border-left: 3px solid hsl(266 64% 48%);
-}
-
-/* Premium card gradient background */
-.card-gradient {
-  background: linear-gradient(145deg, hsl(237 31% 14%), hsl(237 28% 12%));
-}
-
-/* Go Premium card styling */
-.premium-cta-card {
-  background: linear-gradient(135deg, hsl(266 64% 48% / 0.15), hsl(237 31% 14%));
-  border: 1px solid hsl(266 64% 48% / 0.25);
-  border-radius: 1rem;
+  box-shadow: 0 0 30px hsl(42 85% 55% / 0.4);
 }

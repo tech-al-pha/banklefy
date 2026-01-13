@@ -53,10 +53,6 @@ export default {
         },
         lightning: "hsl(var(--lightning))",
         highlight: "hsl(var(--highlight))",
-        warning: {
-          DEFAULT: "hsl(var(--warning))",
-          foreground: "hsl(var(--warning-foreground))",
-        },
         "warm-brown": "hsl(var(--warm-brown))",
       },
       backgroundImage: {
