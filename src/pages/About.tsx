@@ -1,0 +1,130 @@
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Phone, Mail, Instagram, MapPin, ArrowLeft, ShieldCheck, Zap, Award } from "lucide-react";
+import Logo from "@/components/Logo";
+
+const AboutPage = () => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="min-h-screen bg-[#0A0502] text-white font-sans selection:bg-primary/30">
+      {/* Header Area */}
+      <nav className="border-b border-primary/10 bg-black/40 backdrop-blur-md p-4 sticky top-0 z-50">
+        <div className="container mx-auto flex items-center justify-between">
+          <Logo />
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate('/')} 
+            className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter"
+          >
+            <ArrowLeft size={18} /> Back to Home
+          </Button>
+        </div>
+      </nav>
+
+      <main className="container mx-auto px-6 py-16 max-w-4xl">
+        {/* About Section - Upgraded with Harvard/Cybersecurity details */}
+        <section className="space-y-8 mb-20 animate-in fade-in slide-in-from-bottom-5 duration-700">
+          <div className="space-y-2">
+            <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter text-primary uppercase">
+              The Vision
+            </h1>
+            <p className="text-xl md:text-2xl font-bold text-white/80 italic tracking-tight">
+              Where Precision Meets Cybersecurity.
+            </p>
+          </div>
+          
+          <div className="space-y-8 text-lg text-muted-foreground leading-relaxed italic">
+            <p>
+              Akromeda isn't just a tool; it’s a global standard for financial data integrity. 
+              In an era where data is the new currency, we’ve engineered a platform that doesn't 
+              just convert files—it secures your entire financial workflow.
+            </p>
+
+            <div className="p-8 bg-gradient-to-r from-primary/10 to-transparent border-l-4 border-primary rounded-r-[2rem] space-y-4">
+              <p className="text-white font-medium text-xl not-italic">
+                The Brainchild of <span className="text-primary underline decoration-2 underline-offset-4">Sayyed Faizan Rizvi</span>
+              </p>
+              <p className="text-muted-foreground">
+                Architected by a dedicated **Cybersecurity specialist from Harvard University**, 
+                based in the educational heart of **Kota, Rajasthan**. At just 18 years old, 
+                Faizan recognized a critical vulnerability in how sensitive financial documents 
+                were being handled globally. 
+              </p>
+              <p className="text-muted-foreground">
+                By fusing advanced encryption with seamless AI automation, **Akromeda was launched in 2026** to empower businesses with instant, military-grade bank statement conversions, 
+                ensuring your data remains as private as it is powerful.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Value Props - Extra "Badha-chadha" points for impact */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-24">
+          <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-2">
+            <ShieldCheck className="text-primary" size={32} />
+            <h3 className="font-bold text-white uppercase text-sm tracking-widest">Cyber-Safe</h3>
+            <p className="text-xs text-muted-foreground italic">Built on the security principles of Harvard's finest elite.</p>
+          </div>
+          <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-2">
+            <Zap className="text-primary" size={32} />
+            <h3 className="font-bold text-white uppercase text-sm tracking-widest">Instant Flux</h3>
+            <p className="text-xs text-muted-foreground italic">Converting complex data in 2026 speeds that defy manual entry.</p>
+          </div>
+          <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-2">
+            <Award className="text-primary" size={32} />
+            <h3 className="font-bold text-white uppercase text-sm tracking-widest">100% Accuracy</h3>
+            <p className="text-xs text-muted-foreground italic">Zero-error conversion designed for high-stakes financial data.</p>
+          </div>
+        </div>
+
+        {/* Contact Grid - Clean Footer Info */}
+        <section className="space-y-10">
+          <h2 className="text-2xl font-black uppercase tracking-widest border-b border-white/10 pb-4">
+            Connect with the Creator
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <a href="tel:+917240233173" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><Phone size={24} /></div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Hotline</p>
+                <p className="text-xl font-bold">+91 7240233173</p>
+              </div>
+            </a>
+
+            <a href="mailto:inspirexali@gmail.com" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><Mail size={24} /></div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Direct Mail</p>
+                <p className="text-xl font-bold">inspirexali@gmail.com</p>
+              </div>
+            </a>
+
+            <a href="https://instagram.com/inspirexali" target="_blank" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><Instagram size={24} /></div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Social</p>
+                <p className="text-xl font-bold">@inspirexali</p>
+              </div>
+            </a>
+
+            <div className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6">
+              <div className="bg-primary/10 p-4 rounded-full text-primary"><MapPin size={24} /></div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">HQ</p>
+                <p className="text-xl font-bold italic text-white/80 uppercase">Kota, Rajasthan, India</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer className="mt-20 pt-8 border-t border-white/5 text-center text-xs text-muted-foreground tracking-[0.3em] uppercase">
+          © 2026 Akromeda | Engineered for Excellence
+        </footer>
+      </main>
+    </div>
+  );
+};
+
+export default AboutPage;

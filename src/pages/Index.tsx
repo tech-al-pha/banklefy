@@ -6,7 +6,7 @@ import { UploadDemo } from "@/components/UploadDemo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Shield } from "lucide-react";
+import { LogOut, Shield, History, Settings, PlayCircle } from "lucide-react"; // PlayCircle add kiya hai icon ke liye
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
@@ -47,61 +47,57 @@ const Index = () => {
           <div className="flex items-center justify-between">
             <Logo />
             <div className="hidden md:flex items-center gap-6">
-              <a 
-                href="#features" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                Features
-              </a>
-              <a 
-                href="#pricing"
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                Pricing
-              </a>
-              <a 
-                href="#demo"
+              
+              {/* FIXED: Demo Button matches History/Settings style now */}
+              <Button 
+                variant="ghost"
+                size="sm" 
                 onClick={(e) => {
                   e.preventDefault();
                   document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium"
               >
+                <PlayCircle className="h-4 w-4" />
                 Demo
-              </a>
-              {user && (
-                <Button 
-                  variant="ghost"
-                  size="sm" 
-                  onClick={() => navigate('/dashboard')}
-                  className="text-sm"
-                >
-                  Dashboard
-                </Button>
-              )}
+              </Button>
+
+              <Button 
+                variant="ghost"
+                size="sm" 
+                onClick={() => navigate('/dashboard')}
+                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
+              >
+                <History className="h-4 w-4" />
+                History
+              </Button>
+
+              <Button 
+                variant="ghost"
+                size="sm" 
+                onClick={() => navigate('/settings')}
+                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
+              >
+                <Settings className="h-4 w-4" />
+                Settings
+              </Button>
+
               {isAdmin && (
                 <Button 
                   variant="ghost"
                   size="sm" 
                   onClick={() => navigate('/admin')}
-                  className="text-sm gap-1"
+                  className="text-sm gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all"
                 >
                   <Shield className="h-4 w-4" />
                   Admin
                 </Button>
               )}
+
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="border-primary/50 hover:bg-primary/10"
+                className="border-primary/50 text-foreground hover:bg-primary/10 transition-colors"
                 onClick={handleAuthClick}
               >
                 {user ? (
@@ -113,9 +109,10 @@ const Index = () => {
                   'Sign In'
                 )}
               </Button>
+
               <Button 
                 size="sm" 
-                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-transform active:scale-95"
                 onClick={() => {
                   document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
                 }}
@@ -127,23 +124,17 @@ const Index = () => {
         </div>
       </nav>
 
-      {/* Hero Section */}
       <Hero />
-
-      {/* How It Works Section */}
       <HowItWorks />
 
-      {/* Features Section */}
       <div id="features">
         <Features />
       </div>
 
-      {/* Pricing Section */}
       <div id="pricing">
         <Pricing />
       </div>
 
-      {/* Upload Demo Section */}
       <div id="demo">
         <UploadDemo />
       </div>
@@ -163,87 +154,67 @@ const Index = () => {
             Join thousands of businesses and individuals who trust Akromeda for accurate, 
             instant bank statement conversions.
           </p>
-          <Button 
+          <button 
             size="lg" 
-            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 px-8 py-3 rounded-md font-bold"
             onClick={() => {
               document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
             }}
           >
             Start Converting Now
-          </Button>
+          </button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-primary/10 py-12 px-6">
+      <footer className="border-t border-primary/10 py-16 px-6 bg-background">
         <div className="container mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
             <div className="space-y-4">
               <Logo />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 Transform your bank statements into organized Excel files instantly with AI-powered precision.
               </p>
             </div>
             
-            <div>
-              <h4 className="font-semibold mb-4 text-foreground">Product</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#features" className="hover:text-primary transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
-                <li><a href="#demo" className="hover:text-primary transition-colors">How It Works</a></li>
-              </ul>
+            <div className="flex flex-col md:items-center">
+              <div>
+                <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">Product</h4>
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li><a href="#features" className="hover:text-primary transition-colors">Features</a></li>
+                  <li><a href="#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
+                  <li><a href="#demo" className="hover:text-primary transition-colors">How It Works</a></li>
+                </ul>
+              </div>
             </div>
             
-            <div>
-              <h4 className="font-semibold mb-4 text-foreground">Company</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <button 
-                    onClick={() => navigate('/privacy')}
-                    className="hover:text-primary transition-colors text-left"
-                  >
-                    About & Privacy
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => navigate('/privacy')}
-                    className="hover:text-primary transition-colors text-left"
-                  >
-                    Privacy Policy
-                  </button>
-                </li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-semibold mb-4 text-foreground">Contact</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>
-                  <a href="tel:+917240233173" className="hover:text-primary transition-colors">
-                    📱 +91 7240233173
-                  </a>
-                </li>
-                <li>
-                  <a href="mailto:inspirexali@gmail.com" className="hover:text-primary transition-colors">
-                    📧 inspirexali@gmail.com
-                  </a>
-                </li>
-                <li>
-                  <a href="https://www.instagram.com/inspirexali" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-                    📸 @inspirexali
-                  </a>
-                </li>
-                <li className="text-muted-foreground/60">
-                  📍 Kota, Rajasthan, India
-                </li>
-              </ul>
+            <div className="flex flex-col md:items-end">
+              <div className="w-full md:w-auto">
+                <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">Company</h4>
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li>
+                    <button 
+                      onClick={() => navigate('/about')}
+                      className="hover:text-primary transition-colors text-left font-medium"
+                    >
+                      About 
+                    </button>
+                  </li>
+                  <li>
+                    <button 
+                      onClick={() => navigate('/privacy')}
+                      className="hover:text-primary transition-colors text-left font-medium"
+                    >
+                      Privacy Policy
+                    </button>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
           
-          <div className="pt-8 border-t border-primary/10 text-center text-sm text-muted-foreground">
-            <p>© 2026 Akromeda. Created by Sayyed Faizan Rizvi.</p>
+          <div className="pt-8 border-t border-primary/10 text-center text-xs text-muted-foreground tracking-[0.2em] uppercase">
+            <p>© 2026 Akromeda. Created by Faizan Rizvi.</p>
           </div>
         </div>
       </footer>
