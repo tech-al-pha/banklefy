@@ -24,67 +24,51 @@ export const HowItWorks = () => {
 
   return (
     <section className="py-24 px-6 relative overflow-hidden">
-      {/* Background Elements */}
-      <div className="absolute inset-0 mesh-bg opacity-50" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 rounded-full blur-[150px]" />
+      <div className="absolute inset-0 bg-gradient-subtle opacity-30" />
       
       <div className="container mx-auto relative z-10">
-        {/* Section Header */}
-        <div className="text-center mb-20 space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/10 border border-secondary/20 backdrop-blur-sm mb-4">
-            <span className="text-sm font-medium text-secondary">Simple Process</span>
-          </div>
+        <div className="text-center mb-16 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold">
-            How It <span className="gradient-text">Works</span>
+            How It Works
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Transform your bank statements into Excel in three simple steps
           </p>
         </div>
 
-        {/* Timeline Steps */}
-        <div className="max-w-4xl mx-auto">
-          <div className="relative">
-            {/* Vertical Line */}
-            <div className="absolute left-8 md:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-primary/50 via-secondary/50 to-accent/50 md:-translate-x-1/2" />
-
-            {steps.map((step, index) => (
-              <div 
-                key={index} 
-                className={`relative flex items-start gap-8 mb-16 last:mb-0 ${
-                  index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'
-                }`}
-              >
-                {/* Number Badge - Centered on line */}
-                <div className="absolute left-8 md:left-1/2 -translate-x-1/2 z-10">
-                  <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center shadow-neon">
-                    <span className="text-xl font-bold text-white">{step.number}</span>
-                  </div>
+        <div className="grid md:grid-cols-3 gap-12 max-w-5xl mx-auto">
+          {steps.map((step, index) => (
+            <div 
+              key={index} 
+              className="relative group"
+            >
+              {/* Connection Line */}
+              {index < steps.length - 1 && (
+                <div className="hidden md:block absolute top-16 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-primary/50 to-transparent" />
+              )}
+              
+              {/* Card */}
+              <div className="relative bg-card/40 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-4 hover:border-primary/40 transition-all duration-300 hover:shadow-neon group-hover:scale-105">
+                {/* Number Badge */}
+                <div className="absolute -top-4 -right-4 w-12 h-12 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-lg shadow-neon">
+                  {step.number}
                 </div>
 
-                {/* Content Card */}
-                <div className={`ml-24 md:ml-0 md:w-[calc(50%-4rem)] ${index % 2 === 0 ? 'md:pr-8' : 'md:pl-8'}`}>
-                  <div className="bento-card group">
-                    {/* Icon */}
-                    <div className="w-14 h-14 rounded-xl bg-gradient-glow border border-primary/20 flex items-center justify-center mb-6 group-hover:shadow-neon transition-all duration-300">
-                      <step.icon className="w-7 h-7 text-primary" />
-                    </div>
-
-                    {/* Content */}
-                    <h3 className="text-2xl font-bold mb-3 group-hover:gradient-text transition-all duration-300">
-                      {step.title}
-                    </h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {step.description}
-                    </p>
-                  </div>
+                {/* Icon */}
+                <div className="w-16 h-16 bg-gradient-primary rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <step.icon className="w-8 h-8 text-primary-foreground" />
                 </div>
 
-                {/* Empty space for alternating layout */}
-                <div className="hidden md:block md:w-[calc(50%-4rem)]" />
+                {/* Content */}
+                <h3 className="text-2xl font-bold text-foreground">
+                  {step.title}
+                </h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  {step.description}
+                </p>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>
