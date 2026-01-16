@@ -155,7 +155,6 @@ const Index = () => {
             instant bank statement conversions.
           </p>
           <button 
-            size="lg" 
             className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 px-8 py-3 rounded-md font-bold"
             onClick={() => {
               document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
