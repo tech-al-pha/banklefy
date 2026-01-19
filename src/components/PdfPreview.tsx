@@ -42,14 +42,17 @@ export const PdfPreview = ({
       // Dynamically import pdf.js
       const pdfjsLib = await import('pdfjs-dist');
       
-      // Set worker source
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      // Disable worker to avoid loading issues (use main thread)
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
       const arrayBuffer = await file.arrayBuffer();
       
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
         password: password || undefined,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: true,
       });
 
       try {
