@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
@@ -28,6 +28,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+// Lazy load PDF preview for performance
+const PdfPreview = lazy(() => import('./PdfPreview').then(m => ({ default: m.PdfPreview })));
 
 // Enhanced Transaction interface with Universal Schema
 interface Transaction {
@@ -620,29 +623,22 @@ export const UploadDemo = () => {
                 </div>
               </div>
 
-              {/* PDF Password Input */}
-              {showPasswordInput && selectedFile && !limitReached && (
-                <div className="flex flex-col items-center gap-3 p-4 rounded-lg bg-muted/20 border border-primary/20">
-                  <div className="flex items-center gap-2 text-primary">
-                    <Lock className="h-4 w-4" />
-                    <span className="text-sm font-medium">PDF Password (optional)</span>
+              {/* PDF Preview with Thumbnails */}
+              {selectedFile && showPasswordInput && !limitReached && (
+                <Suspense fallback={
+                  <div className="flex items-center justify-center p-8 bg-muted/20 rounded-lg border border-border">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                    <span className="text-sm text-muted-foreground">Loading preview...</span>
                   </div>
-                  <Input
-                    type="password"
-                    placeholder="Enter password if PDF is protected"
-                    value={pdfPassword}
-                    onChange={(e) => {
-                      setPdfPassword(e.target.value);
-                      setPasswordError(false);
-                    }}
-                    className={`max-w-xs text-center ${passwordError ? 'border-destructive' : ''}`}
+                }>
+                  <PdfPreview
+                    file={selectedFile}
+                    password={pdfPassword}
+                    onPasswordChange={setPdfPassword}
+                    passwordError={passwordError}
+                    onPasswordError={setPasswordError}
                   />
-                  {passwordError && (
-                    <p className="text-sm text-destructive">
-                      Incorrect password. Please try again.
-                    </p>
-                  )}
-                </div>
+                </Suspense>
               )}
 
               {/* reCAPTCHA for anonymous users */}
