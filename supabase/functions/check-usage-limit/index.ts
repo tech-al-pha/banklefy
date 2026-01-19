@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     }
 
     let conversionsUsed = 0;
-    let conversionsLimit = 2; // Default for anonymous
+    let conversionsLimit = 100; // Default for anonymous
     let isAuthenticated = false;
 
     if (user) {
