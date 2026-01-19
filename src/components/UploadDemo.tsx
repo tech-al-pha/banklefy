@@ -325,6 +325,10 @@ export const UploadDemo = () => {
               if ((payload as any).limitReached) {
                 refreshUsageLimit();
               }
+              if ((payload as any).requiresPassword) {
+                setPasswordError(true);
+                setShowPasswordInput(true);
+              }
               message = (payload as any).message || (payload as any).error || message;
             }
           } else if (ctx && typeof ctx.json === 'function') {
@@ -332,6 +336,10 @@ export const UploadDemo = () => {
             if (payload && typeof payload === 'object') {
               if ((payload as any).limitReached) {
                 refreshUsageLimit();
+              }
+              if ((payload as any).requiresPassword) {
+                setPasswordError(true);
+                setShowPasswordInput(true);
               }
               message = (payload as any).message || (payload as any).error || message;
             }
@@ -347,6 +355,11 @@ export const UploadDemo = () => {
         if (data?.limitReached) {
           refreshUsageLimit();
           throw new Error(data.message || 'Conversion limit reached');
+        }
+        if (data?.requiresPassword) {
+          setPasswordError(true);
+          setShowPasswordInput(true);
+          throw new Error(data.error);
         }
         throw new Error(data.error);
       }

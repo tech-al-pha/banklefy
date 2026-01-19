@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
+import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1';
 
 // Get allowed origin from environment or use default
 const getAllowedOrigin = (requestOrigin: string | null): string => {
@@ -363,11 +364,68 @@ Deno.serve(async (req) => {
       }
     }
 
+    // For PDFs, try to handle password-protected files
+    let processedBytes = bytes;
+    if (lowerFileName.endsWith('.pdf')) {
+      try {
+        // Try to load PDF - if it's encrypted, we'll handle it
+        const loadOptions: { password?: string } = {};
+        if (pdfPassword && pdfPassword.trim()) {
+          loadOptions.password = pdfPassword.trim();
+        }
+        
+        try {
+          const pdfDoc = await PDFDocument.load(bytes, { 
+            ignoreEncryption: false,
+            ...loadOptions
+          });
+          
+          // If we get here, PDF loaded successfully
+          // Save it back to bytes (this removes encryption if password was provided)
+          processedBytes = await pdfDoc.save();
+          console.log('PDF processed successfully, pages:', pdfDoc.getPageCount());
+        } catch (pdfError: unknown) {
+          const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError);
+          console.log('PDF load error:', errorMsg);
+          
+          // Check if it's a password/encryption error
+          if (errorMsg.toLowerCase().includes('encrypt') || 
+              errorMsg.toLowerCase().includes('password') ||
+              errorMsg.toLowerCase().includes('protected')) {
+            
+            if (!pdfPassword) {
+              return new Response(
+                JSON.stringify({ 
+                  error: 'This PDF is password-protected. Please enter the password and try again.',
+                  requiresPassword: true 
+                }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            } else {
+              return new Response(
+                JSON.stringify({ 
+                  error: 'Incorrect PDF password. Please check and try again.',
+                  requiresPassword: true,
+                  wrongPassword: true
+                }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+          }
+          
+          // For other PDF errors, try to proceed anyway (some PDFs have minor issues but are still readable)
+          console.log('PDF validation warning, proceeding with original bytes');
+        }
+      } catch (outerError) {
+        console.log('PDF processing outer error, proceeding with original:', outerError);
+      }
+    }
+
     // Convert file to base64 for AI processing (chunk to avoid stack overflow)
     const chunkSize = 8192;
     let base64Data = '';
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
+    for (let i = 0; i < processedBytes.length; i += chunkSize) {
+      const chunk = processedBytes.subarray(i, i + chunkSize);
       base64Data += String.fromCharCode(...chunk);
     }
     base64Data = btoa(base64Data);
@@ -390,7 +448,7 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
           {
             role: 'system',
