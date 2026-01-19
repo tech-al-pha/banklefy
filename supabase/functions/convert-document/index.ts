@@ -46,19 +46,23 @@ const sanitizeError = (error: unknown): string => {
     if (msg.includes('storage') || msg.includes('bucket')) {
       return 'File storage error';
     }
+    // For known safe error messages we explicitly return, pass them through
+    const safeMessages = [
+      'no transactions found in the document',
+      'failed to extract transaction data from document',
+      'the document has no pages',
+      'document appears to be empty or corrupted',
+      'unable to read document content',
+      'invalid or unsupported document format',
+    ];
+    if (safeMessages.some(safe => msg.includes(safe))) {
+      return error.message;
+    }
     if (msg.includes('ai') || msg.includes('gateway') || msg.includes('lovable')) {
       return 'Processing service unavailable';
     }
     if (msg.includes('api') || msg.includes('fetch')) {
       return 'External service error';
-    }
-    // For known safe error messages we explicitly return, pass them through
-    const safeMessages = [
-      'no transactions found in the document',
-      'failed to extract transaction data from document',
-    ];
-    if (safeMessages.some(safe => msg.includes(safe))) {
-      return error.message;
     }
   }
   return 'An unexpected error occurred. Please try again later.';
@@ -446,7 +450,32 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error('AI API error:', aiResponse.status, errorText);
-      throw new Error(`AI processing failed: ${aiResponse.status}`);
+      
+      // Parse specific error messages from the AI provider
+      try {
+        const errorData = JSON.parse(errorText);
+        const rawError = errorData?.error?.metadata?.raw;
+        if (rawError) {
+          const parsedRaw = JSON.parse(rawError);
+          const errorMessage = parsedRaw?.error?.message;
+          if (errorMessage) {
+            // Map known AI errors to user-friendly messages
+            if (errorMessage.toLowerCase().includes('no pages')) {
+              throw new Error('The document has no pages. Please upload a valid PDF with readable content.');
+            }
+            if (errorMessage.toLowerCase().includes('invalid')) {
+              throw new Error('Invalid or unsupported document format. Please try a different file.');
+            }
+          }
+        }
+      } catch (parseErr) {
+        // If parsing fails, continue with generic error
+        if (parseErr instanceof Error && parseErr.message.includes('document')) {
+          throw parseErr;
+        }
+      }
+      
+      throw new Error('Unable to read document content. Please ensure the file is not corrupted.');
     }
 
     const aiData = await aiResponse.json();
