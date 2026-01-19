@@ -85,7 +85,7 @@
     cursor: none;
   }
 
-  /* Custom Rolls-Royce Style Cursor */
+  /* Custom Rolls-Royce Style Cursor - Optimized for performance */
   .luxury-cursor {
     position: fixed;
     width: 40px;
@@ -94,9 +94,9 @@
     border-radius: 50%;
     pointer-events: none;
     z-index: 9999;
-    transition: transform 0.15s ease-out, border-color 0.3s ease, box-shadow 0.3s ease;
-    mix-blend-mode: difference;
-    backdrop-filter: blur(2px);
+    will-change: left, top, transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
 
   .luxury-cursor::before {
@@ -109,13 +109,13 @@
     height: 6px;
     background: hsl(42 85% 55%);
     border-radius: 50%;
-    transition: transform 0.2s ease;
   }
 
   .luxury-cursor.hover {
     transform: scale(1.5);
     border-color: hsl(42 85% 55% / 0.9);
     box-shadow: 0 0 25px hsl(42 85% 55% / 0.6);
+    transition: transform 0.15s ease-out, border-color 0.15s ease, box-shadow 0.15s ease;
   }
 
   .luxury-cursor.hover::before {
