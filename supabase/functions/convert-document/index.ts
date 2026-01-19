@@ -310,7 +310,7 @@ Deno.serve(async (req) => {
 
     const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
     const conversionsUsed = usageInfo?.conversions_used ?? 0;
-    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 6 : 2);
+    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 6 : 100);
 
     console.log('Usage info:', { conversionsUsed, conversionsLimit, user: !!user });
 

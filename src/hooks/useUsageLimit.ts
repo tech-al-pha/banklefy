@@ -16,8 +16,8 @@ export const useUsageLimit = () => {
   const { user, session } = useAuth();
   const [usageLimit, setUsageLimit] = useState<UsageLimit>({
     conversionsUsed: 0,
-    conversionsLimit: 2,
-    remaining: 2,
+    conversionsLimit: 100,
+    remaining: 100,
     limitReached: false,
     isAuthenticated: false,
     loading: true,
@@ -50,7 +50,7 @@ export const useUsageLimit = () => {
 
       setUsageLimit({
         conversionsUsed: data.conversionsUsed ?? 0,
-        conversionsLimit: data.conversionsLimit ?? (user ? 6 : 2),
+        conversionsLimit: data.conversionsLimit ?? (user ? 6 : 100),
         remaining: data.remaining ?? 0,
         limitReached: data.limitReached ?? false,
         isAuthenticated: data.isAuthenticated ?? !!user,

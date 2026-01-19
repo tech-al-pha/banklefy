@@ -326,14 +326,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_and_reset_daily_limit: {
-        Args: { p_ip_address?: string; p_timezone?: string; p_user_id?: string }
-        Returns: {
-          conversions_limit: number
-          conversions_used: number
-          needs_reset: boolean
-        }[]
-      }
+      check_and_reset_daily_limit:
+        | {
+            Args: {
+              p_ip_address?: string
+              p_timezone?: string
+              p_user_id?: string
+            }
+            Returns: {
+              conversions_limit: number
+              conversions_used: number
+              needs_reset: boolean
+            }[]
+          }
+        | {
+            Args: {
+              p_ip_address?: string
+              p_timezone?: string
+              p_user_id?: string
+            }
+            Returns: {
+              conversions_limit: number
+              conversions_used: number
+              needs_reset: boolean
+            }[]
+          }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
