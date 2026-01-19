@@ -114,12 +114,13 @@
 
   .luxury-cursor.hover {
     transform: scale(1.5);
-    border-color: hsl(195 100% 50% / 0.8);
-    box-shadow: 0 0 20px hsl(195 100% 50% / 0.5);
+    border-color: hsl(42 85% 55% / 0.9);
+    box-shadow: 0 0 25px hsl(42 85% 55% / 0.6);
   }
 
   .luxury-cursor.hover::before {
     transform: translate(-50%, -50%) scale(0.5);
+    background: hsl(42 100% 60%);
   }
 }
 
@@ -135,12 +136,12 @@
 
 @keyframes lightning-pulse {
   0%, 100% {
-    opacity: 0.5;
-    box-shadow: 0 0 20px hsl(42 85% 55% / 0.3);
+    opacity: 0.7;
+    box-shadow: 0 0 15px hsl(42 85% 55% / 0.2);
   }
   50% {
     opacity: 1;
-    box-shadow: 0 0 40px hsl(195 100% 50% / 0.6), 0 0 60px hsl(42 85% 55% / 0.4);
+    box-shadow: 0 0 25px hsl(42 85% 55% / 0.35);
   }
 }
 
@@ -159,90 +160,29 @@
   }
 }
 
-/* Lightning Border Glow Effect */
+/* Lightning Border Glow Effect - Simplified for performance */
 .lightning-border {
   position: relative;
-  overflow: hidden;
-}
-
-.lightning-border::before {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    hsl(42 85% 55%),
-    hsl(195 100% 50%),
-    hsl(42 100% 60%),
-    hsl(195 100% 50%),
-    hsl(42 85% 55%),
-    transparent
-  );
-  background-size: 300% 100%;
-  border-radius: inherit;
-  animation: lightning-flow 3s linear infinite;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  z-index: -1;
-}
-
-.lightning-border::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  background: hsl(var(--card));
-  border-radius: calc(var(--radius) - 2px);
-  z-index: -1;
-}
-
-.lightning-border:hover::before {
-  opacity: 1;
-  animation: lightning-flow 1.5s linear infinite, electric-spark 0.5s ease-in-out infinite;
+  border: 1px solid hsl(42 85% 55% / 0.2);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .lightning-border:hover {
-  animation: lightning-pulse 2s ease-in-out infinite;
+  border-color: hsl(42 85% 55% / 0.5);
+  box-shadow: 0 0 20px hsl(42 85% 55% / 0.2);
 }
 
-/* Upload Zone Lightning Effect */
+/* Upload Zone - Simplified for performance */
 .upload-zone-lightning {
   position: relative;
   background: linear-gradient(135deg, hsl(22 40% 10% / 0.9), hsl(22 40% 8% / 0.95));
-  border: 2px solid transparent;
-  transition: all 0.3s ease;
-}
-
-.upload-zone-lightning::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  background: linear-gradient(
-    45deg,
-    transparent 20%,
-    hsl(42 85% 55% / 0.3) 30%,
-    hsl(195 100% 50% / 0.5) 50%,
-    hsl(42 100% 60% / 0.3) 70%,
-    transparent 80%
-  );
-  background-size: 400% 400%;
-  border-radius: inherit;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-
-.upload-zone-lightning:hover::before {
-  opacity: 1;
-  animation: lightning-flow 2s linear infinite;
+  border: 2px solid hsl(42 85% 55% / 0.15);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .upload-zone-lightning:hover {
   border-color: hsl(42 85% 55% / 0.5);
-  box-shadow: 
-    0 0 30px hsl(42 85% 55% / 0.3),
-    0 0 60px hsl(195 100% 50% / 0.2),
-    inset 0 0 30px hsl(42 85% 55% / 0.05);
+  box-shadow: 0 0 25px hsl(42 85% 55% / 0.25);
 }
 
 /* Utility Icon Muted Style */
