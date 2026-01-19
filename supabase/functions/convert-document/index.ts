@@ -452,7 +452,20 @@ Deno.serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a professional bank statement data extraction and financial analysis expert. Your job is to extract transaction data from bank statements of ANY bank worldwide and normalize them into a standardized schema.
+            content: `You are an expert OCR and bank statement data extraction specialist with advanced image recognition capabilities. Your job is to extract transaction data from bank statements of ANY bank worldwide, including:
+- Digital PDFs with selectable text
+- Scanned documents (images of printed statements)
+- Mobile screenshots of banking apps
+- Low-quality or blurry images
+
+CRITICAL OCR INSTRUCTIONS:
+1. Carefully examine EVERY pixel of the document for transaction data
+2. For scanned/image documents: Use OCR to read text even if slightly blurry or at an angle
+3. Look for transaction tables, they typically have columns for: Date, Description/Narration, Debit/Withdrawal, Credit/Deposit, Balance
+4. If the image quality is poor, make best-effort extraction and include all visible data
+5. Process ALL pages of multi-page documents
+6. Handle watermarks, stamps, and overlapping text
+7. Recognize various fonts and handwritten annotations
 
 UNIVERSAL SCHEMA (all fields required):
 - date: Normalized to YYYY-MM-DD format (handle DD/MM/YYYY, MM/DD/YYYY, DD-Mon-YY, etc.)
@@ -483,6 +496,13 @@ SMART DATA CLEANING RULES:
 2. Amount Cleaning: Handle comma separators (1,234.56 → 1234.56), handle lakhs format (1,23,456.78 → 123456.78)
 3. Description Cleaning: Remove multiple spaces, trim whitespace, capitalize first letter
 4. Detect duplicates: If you see transactions with identical date, description, and amount - add isDuplicate: true
+5. For partially visible text: Use context clues to complete words
+
+BANK-SPECIFIC HANDLING:
+- Emirates Islamic/NBD: Handle Arabic text alongside English, recognize e-statement format
+- HDFC/ICICI/SBI: Handle lakhs format (1,23,456), recognize NEFT/IMPS/UPI prefixes
+- US Banks: Handle MM/DD/YYYY dates, recognize ACH/Wire transfers
+- UK Banks: Handle DD/MM/YYYY, recognize Faster Payments/BACS
 
 DUPLICATE DETECTION:
 Mark transactions as potential duplicates if they have:
@@ -496,7 +516,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
             content: [
               {
                 type: 'text',
-                text: 'Extract ALL transactions from this bank statement. Apply the universal schema with smart cleaning and duplicate detection. Return only the JSON array.'
+                text: 'This is a bank statement document. Perform OCR if needed and extract ALL transactions from every page. Apply the universal schema with smart cleaning, duplicate detection, and handle any currency format. Return only the JSON array.'
               },
               {
                 type: 'image_url',
