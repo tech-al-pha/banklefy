@@ -1,20 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export const LuxuryCursor = () => {
-  const [position, setPosition] = useState({ x: -100, y: -100 });
+  const cursorRef = useRef<HTMLDivElement>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const [hasMoved, setHasMoved] = useState(false);
+  const positionRef = useRef({ x: -100, y: -100 });
+  const rafRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
-    const updatePosition = (e: MouseEvent) => {
-      setPosition({ x: e.clientX, y: e.clientY });
-      setIsVisible(true);
-      setHasMoved(true);
+    const updateCursor = () => {
+      if (cursorRef.current) {
+        cursorRef.current.style.left = `${positionRef.current.x - 20}px`;
+        cursorRef.current.style.top = `${positionRef.current.y - 20}px`;
+      }
     };
 
-    const handleMouseEnter = () => setIsVisible(true);
+    const handleMouseMove = (e: MouseEvent) => {
+      positionRef.current = { x: e.clientX, y: e.clientY };
+      setIsVisible(true);
+      
+      // Use requestAnimationFrame for smooth updates
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      rafRef.current = requestAnimationFrame(updateCursor);
+    };
+
     const handleMouseLeave = () => setIsVisible(false);
+    const handleMouseEnter = () => setIsVisible(true);
 
     const handleHoverStart = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -23,40 +36,41 @@ export const LuxuryCursor = () => {
         target.tagName === "A" ||
         target.closest("button") ||
         target.closest("a") ||
-        target.closest("[data-hover]") ||
-        target.classList.contains("upload-zone-lightning")
+        target.closest("[data-hover]")
       ) {
         setIsHovering(true);
       }
     };
 
-    const handleHoverEnd = () => {
-      setIsHovering(false);
-    };
+    const handleHoverEnd = () => setIsHovering(false);
 
-    document.addEventListener("mousemove", updatePosition);
+    document.addEventListener("mousemove", handleMouseMove, { passive: true });
     document.addEventListener("mouseenter", handleMouseEnter);
     document.addEventListener("mouseleave", handleMouseLeave);
     document.addEventListener("mouseover", handleHoverStart);
     document.addEventListener("mouseout", handleHoverEnd);
 
     return () => {
-      document.removeEventListener("mousemove", updatePosition);
+      document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseenter", handleMouseEnter);
       document.removeEventListener("mouseleave", handleMouseLeave);
       document.removeEventListener("mouseover", handleHoverStart);
       document.removeEventListener("mouseout", handleHoverEnd);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
     };
   }, []);
 
-  if (!isVisible || !hasMoved) return null;
+  if (!isVisible) return null;
 
   return (
     <div
+      ref={cursorRef}
       className={`luxury-cursor ${isHovering ? "hover" : ""}`}
       style={{
-        left: position.x - 20,
-        top: position.y - 20,
+        left: -100,
+        top: -100,
       }}
     />
   );
