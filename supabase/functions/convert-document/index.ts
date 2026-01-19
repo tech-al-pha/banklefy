@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
 import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1';
+import * as pdfjsLib from 'https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs';
 
 // Get allowed origin from environment or use default
 const getAllowedOrigin = (requestOrigin: string | null): string => {
@@ -364,36 +365,30 @@ Deno.serve(async (req) => {
       }
     }
 
-    // For PDFs, try to handle password-protected files
+    // For PDFs, check if encrypted and handle password
     let processedBytes = bytes;
+    let extractedTextContent = '';
+    let isEncryptedPdf = false;
+    
     if (lowerFileName.endsWith('.pdf')) {
       try {
-        // Try to load PDF - if it's encrypted, we'll handle it
-        const loadOptions: { password?: string } = {};
-        if (pdfPassword && pdfPassword.trim()) {
-          loadOptions.password = pdfPassword.trim();
-        }
-        
+        // First, try to load without password to detect if it's encrypted
         try {
-          const pdfDoc = await PDFDocument.load(bytes, { 
-            ignoreEncryption: false,
-            ...loadOptions
-          });
-          
-          // If we get here, PDF loaded successfully
-          // Save it back to bytes (this removes encryption if password was provided)
+          const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: false });
+          // If we get here, PDF is not encrypted
           processedBytes = await pdfDoc.save();
-          console.log('PDF processed successfully, pages:', pdfDoc.getPageCount());
+          console.log('PDF processed successfully (not encrypted), pages:', pdfDoc.getPageCount());
         } catch (pdfError: unknown) {
           const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError);
-          console.log('PDF load error:', errorMsg);
+          console.log('PDF check result:', errorMsg);
           
           // Check if it's a password/encryption error
           if (errorMsg.toLowerCase().includes('encrypt') || 
               errorMsg.toLowerCase().includes('password') ||
               errorMsg.toLowerCase().includes('protected')) {
+            isEncryptedPdf = true;
             
-            if (!pdfPassword) {
+            if (!pdfPassword || !pdfPassword.trim()) {
               return new Response(
                 JSON.stringify({ 
                   error: 'This PDF is password-protected. Please enter the password and try again.',
@@ -401,37 +396,72 @@ Deno.serve(async (req) => {
                 }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
               );
-            } else {
-              return new Response(
-                JSON.stringify({ 
-                  error: 'Incorrect PDF password. Please check and try again.',
-                  requiresPassword: true,
-                  wrongPassword: true
-                }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-              );
             }
+            
+            // Use pdfjs-dist to decrypt and extract text with password
+            console.log('PDF is encrypted, attempting to decrypt with password...');
+            
+            try {
+              // Load PDF with password using pdfjs-dist
+              const loadingTask = pdfjsLib.getDocument({
+                data: bytes,
+                password: pdfPassword.trim(),
+              });
+              
+              const pdfDocument = await loadingTask.promise;
+              console.log('PDF decrypted successfully, pages:', pdfDocument.numPages);
+              
+              // Extract text from all pages
+              const textParts: string[] = [];
+              for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+                const page = await pdfDocument.getPage(pageNum);
+                const textContent = await page.getTextContent();
+              const pageText = textContent.items
+                  // deno-lint-ignore no-explicit-any
+                  .filter((item: any) => 'str' in item)
+                  // deno-lint-ignore no-explicit-any
+                  .map((item: any) => item.str || '')
+                  .join(' ');
+                textParts.push(`--- Page ${pageNum} ---\n${pageText}`);
+              }
+              
+              extractedTextContent = textParts.join('\n\n');
+              console.log('Extracted text length:', extractedTextContent.length);
+              
+              // If we successfully extracted text, we'll use text-based processing
+              if (!extractedTextContent.trim()) {
+                throw new Error('No text content extracted from PDF');
+              }
+            } catch (decryptError: unknown) {
+              const decryptMsg = decryptError instanceof Error ? decryptError.message : String(decryptError);
+              console.log('PDF decryption error:', decryptMsg);
+              
+              // Check for incorrect password
+              if (decryptMsg.toLowerCase().includes('incorrect password') || 
+                  decryptMsg.toLowerCase().includes('wrong password') ||
+                  decryptMsg.toLowerCase().includes('invalid password') ||
+                  decryptMsg.toLowerCase().includes('passwordexception')) {
+                return new Response(
+                  JSON.stringify({ 
+                    error: 'Incorrect PDF password. Please check and try again.',
+                    requiresPassword: true,
+                    wrongPassword: true
+                  }),
+                  { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                );
+              }
+              
+              throw decryptError;
+            }
+          } else {
+            // For other PDF errors, try to proceed anyway
+            console.log('PDF validation warning, proceeding with original bytes');
           }
-          
-          // For other PDF errors, try to proceed anyway (some PDFs have minor issues but are still readable)
-          console.log('PDF validation warning, proceeding with original bytes');
         }
       } catch (outerError) {
         console.log('PDF processing outer error, proceeding with original:', outerError);
       }
     }
-
-    // Convert file to base64 for AI processing (chunk to avoid stack overflow)
-    const chunkSize = 8192;
-    let base64Data = '';
-    for (let i = 0; i < processedBytes.length; i += chunkSize) {
-      const chunk = processedBytes.subarray(i, i + chunkSize);
-      base64Data += String.fromCharCode(...chunk);
-    }
-    base64Data = btoa(base64Data);
-    const mimeType = lowerFileName.endsWith('.pdf') ? 'application/pdf' : 
-                     lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
-    const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
     console.log('Starting AI conversion for file:', fileName);
 
@@ -441,13 +471,78 @@ Deno.serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    // Build AI request based on whether we have extracted text or image
+    let aiRequestBody;
+    
+    if (extractedTextContent && extractedTextContent.trim()) {
+      // For encrypted PDFs, use text-based extraction
+      console.log('Using text-based extraction for encrypted PDF');
+      aiRequestBody = {
+        model: 'google/gemini-2.5-pro',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert bank statement data extraction specialist. Your job is to extract transaction data from bank statement text content.
+
+UNIVERSAL SCHEMA (all fields required):
+- date: Normalized to YYYY-MM-DD format (handle DD/MM/YYYY, MM/DD/YYYY, DD-Mon-YY, etc.)
+- description: Clean transaction description (remove excessive whitespace, normalize case)
+- category: Classify into one of these categories:
+  * "Salary/Income" - salary credits, wages, business income
+  * "Transfer In" - incoming transfers, deposits
+  * "Transfer Out" - outgoing transfers, sent money
+  * "Bills & Utilities" - electricity, water, gas, internet, phone
+  * "Shopping" - retail, e-commerce, Amazon, Flipkart, etc.
+  * "Food & Dining" - restaurants, Swiggy, Zomato, groceries
+  * "Transportation" - Uber, Ola, fuel, parking, tolls
+  * "Entertainment" - movies, Netflix, Spotify, gaming
+  * "Healthcare" - hospitals, pharmacies, medical
+  * "Education" - school fees, courses, books
+  * "Insurance" - premiums, policies
+  * "Investments" - mutual funds, stocks, FD, RD
+  * "Loan/EMI" - loan payments, EMI deductions
+  * "Cash" - ATM withdrawals, cash deposits
+  * "Bank Fees" - charges, penalties, service fees
+  * "Other" - uncategorized transactions
+- debit: Amount debited (as positive number, 0 if credit transaction)
+- credit: Amount credited (as positive number, 0 if debit transaction)
+- balance: Running balance after transaction (number)
+
+SMART DATA CLEANING RULES:
+1. Date Normalization: Convert all dates to YYYY-MM-DD regardless of input format
+2. Amount Cleaning: Handle comma separators (1,234.56 → 1234.56), handle lakhs format (1,23,456.78 → 123456.78)
+3. Description Cleaning: Remove multiple spaces, trim whitespace, capitalize first letter
+4. Detect duplicates: If you see transactions with identical date, description, and amount - add isDuplicate: true
+
+BANK-SPECIFIC HANDLING:
+- Emirates Islamic/NBD: Handle Arabic text alongside English, recognize e-statement format
+- HDFC/ICICI/SBI: Handle lakhs format (1,23,456), recognize NEFT/IMPS/UPI prefixes
+- US Banks: Handle MM/DD/YYYY dates, recognize ACH/Wire transfers
+- UK Banks: Handle DD/MM/YYYY, recognize Faster Payments/BACS
+
+Return ONLY a valid JSON array, no markdown, no explanation.`
+          },
+          {
+            role: 'user',
+            content: `Extract ALL transactions from this bank statement text content. Apply the universal schema with smart cleaning and duplicate detection. Return only the JSON array.\n\n${extractedTextContent}`
+          }
+        ],
+      };
+    } else {
+      // For non-encrypted PDFs or images, use image-based extraction
+      // Convert file to base64 for AI processing (chunk to avoid stack overflow)
+      const chunkSize = 8192;
+      let base64Data = '';
+      for (let i = 0; i < processedBytes.length; i += chunkSize) {
+        const chunk = processedBytes.subarray(i, i + chunkSize);
+        base64Data += String.fromCharCode(...chunk);
+      }
+      base64Data = btoa(base64Data);
+      const mimeType = lowerFileName.endsWith('.pdf') ? 'application/pdf' : 
+                       lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      const dataUrl = `data:${mimeType};base64,${base64Data}`;
+
+      aiRequestBody = {
         model: 'google/gemini-2.5-pro',
         messages: [
           {
@@ -525,8 +620,18 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
             ]
           }
         ],
-      }),
+      };
+    }
+
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(aiRequestBody),
     });
+
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
@@ -1154,8 +1259,9 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
     // Convert Excel buffer to base64 for anonymous users (chunk to avoid stack overflow)
     const excelBytes = new Uint8Array(excelBuffer);
     let excelBase64 = '';
-    for (let i = 0; i < excelBytes.length; i += chunkSize) {
-      const chunk = excelBytes.subarray(i, i + chunkSize);
+    const excelChunkSize = 8192;
+    for (let i = 0; i < excelBytes.length; i += excelChunkSize) {
+      const chunk = excelBytes.subarray(i, i + excelChunkSize);
       excelBase64 += String.fromCharCode(...chunk);
     }
     excelBase64 = btoa(excelBase64);
