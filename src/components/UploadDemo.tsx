@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -119,6 +120,9 @@ export const UploadDemo = () => {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
+  const [pdfPassword, setPdfPassword] = useState('');
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [passwordError, setPasswordError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -159,6 +163,15 @@ export const UploadDemo = () => {
     }
 
     setSelectedFile(file);
+    setPasswordError(false);
+    setPdfPassword('');
+    
+    // Show password input for PDF files
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      setShowPasswordInput(true);
+    } else {
+      setShowPasswordInput(false);
+    }
     
     // Show reCAPTCHA for anonymous users
     if (!user) {
@@ -239,6 +252,11 @@ export const UploadDemo = () => {
         fileName: selectedFile.name,
         timezone,
       };
+
+      // Add PDF password if provided
+      if (pdfPassword.trim()) {
+        requestBody.pdfPassword = pdfPassword.trim();
+      }
 
       // Add reCAPTCHA token for anonymous users
       if (!user && recaptchaToken) {
@@ -358,19 +376,36 @@ export const UploadDemo = () => {
 
       setSelectedFile(null);
       setShowRecaptcha(false);
+      setShowPasswordInput(false);
+      setPdfPassword('');
+      setPasswordError(false);
       resetRecaptcha();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (error: any) {
       console.error('Conversion error:', error);
-      // Reset reCAPTCHA on error so user can try again
-      resetRecaptcha();
-      toast({
-        variant: "destructive",
-        title: "Conversion failed",
-        description: error.message || "An error occurred during conversion.",
-      });
+      const errorMessage = error.message || '';
+      
+      // Check if it's a password-related error
+      if (errorMessage.toLowerCase().includes('password') || 
+          errorMessage.toLowerCase().includes('encrypted') ||
+          errorMessage.toLowerCase().includes('protected')) {
+        setPasswordError(true);
+        toast({
+          variant: "destructive",
+          title: "Password Required",
+          description: "This PDF is password-protected. Please enter the correct password.",
+        });
+      } else {
+        // Reset reCAPTCHA on error so user can try again
+        resetRecaptcha();
+        toast({
+          variant: "destructive",
+          title: "Conversion failed",
+          description: errorMessage || "An error occurred during conversion.",
+        });
+      }
     } finally {
       setUploading(false);
       setConverting(false);
@@ -532,19 +567,19 @@ export const UploadDemo = () => {
                 }`}
               >
                 {/* Inner glow effect */}
-                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/5 via-transparent to-lightning/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/5 via-transparent to-primary/3 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 
                 <div className="space-y-6 relative z-10">
                   {/* Icon with premium glow */}
                   <div className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 ${
                     limitReached 
                       ? 'bg-muted/10' 
-                      : 'bg-gradient-to-br from-primary/20 to-lightning/10 group-hover:scale-110 group-hover:shadow-lightning'
+                      : 'bg-gradient-to-br from-primary/20 to-primary/10 group-hover:scale-110 group-hover:shadow-neon'
                   }`}>
                     <Upload className={`w-10 h-10 transition-all duration-300 ${
                       limitReached 
                         ? 'text-muted-foreground utility-icon-muted' 
-                        : 'text-primary group-hover:text-lightning'
+                        : 'text-primary group-hover:text-accent'
                     }`} />
                   </div>
                   
@@ -571,6 +606,31 @@ export const UploadDemo = () => {
                   </Button>
                 </div>
               </div>
+
+              {/* PDF Password Input */}
+              {showPasswordInput && selectedFile && !limitReached && (
+                <div className="flex flex-col items-center gap-3 p-4 rounded-lg bg-muted/20 border border-primary/20">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Lock className="h-4 w-4" />
+                    <span className="text-sm font-medium">PDF Password (optional)</span>
+                  </div>
+                  <Input
+                    type="password"
+                    placeholder="Enter password if PDF is protected"
+                    value={pdfPassword}
+                    onChange={(e) => {
+                      setPdfPassword(e.target.value);
+                      setPasswordError(false);
+                    }}
+                    className={`max-w-xs text-center ${passwordError ? 'border-destructive' : ''}`}
+                  />
+                  {passwordError && (
+                    <p className="text-sm text-destructive">
+                      Incorrect password. Please try again.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* reCAPTCHA for anonymous users */}
               {showRecaptcha && !user && selectedFile && !limitReached && (

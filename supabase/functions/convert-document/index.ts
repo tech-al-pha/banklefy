@@ -54,6 +54,9 @@ const sanitizeError = (error: unknown): string => {
       'document appears to be empty or corrupted',
       'unable to read document content',
       'invalid or unsupported document format',
+      'password',
+      'encrypted',
+      'protected',
     ];
     if (safeMessages.some(safe => msg.includes(safe))) {
       return error.message;
@@ -125,7 +128,7 @@ Deno.serve(async (req) => {
 
   try {
     // Get request data first
-    const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken } = await req.json();
+    const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken, pdfPassword } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
 
     // Get client IP address securely for anonymous users
@@ -463,6 +466,11 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
             if (errorMessage.toLowerCase().includes('no pages')) {
               throw new Error('The document has no pages. Please upload a valid PDF with readable content.');
             }
+            if (errorMessage.toLowerCase().includes('password') || 
+                errorMessage.toLowerCase().includes('encrypted') ||
+                errorMessage.toLowerCase().includes('protected')) {
+              throw new Error('This PDF is password-protected. Please enter the correct password and try again.');
+            }
             if (errorMessage.toLowerCase().includes('invalid')) {
               throw new Error('Invalid or unsupported document format. Please try a different file.');
             }
@@ -470,7 +478,10 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
         }
       } catch (parseErr) {
         // If parsing fails, continue with generic error
-        if (parseErr instanceof Error && parseErr.message.includes('document')) {
+        if (parseErr instanceof Error && 
+            (parseErr.message.includes('document') || 
+             parseErr.message.includes('password') ||
+             parseErr.message.includes('PDF'))) {
           throw parseErr;
         }
       }
