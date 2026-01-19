@@ -623,23 +623,39 @@ export const UploadDemo = () => {
                 </div>
               </div>
 
-              {/* PDF Preview with Thumbnails */}
+              {/* PDF Password Input - Always visible for PDF files */}
               {selectedFile && showPasswordInput && !limitReached && (
-                <Suspense fallback={
-                  <div className="flex items-center justify-center p-8 bg-muted/20 rounded-lg border border-border">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-                    <span className="text-sm text-muted-foreground">Loading preview...</span>
+                <div className="space-y-4 p-6 bg-muted/10 rounded-xl border-2 border-primary/30">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/20 rounded-lg">
+                      <Lock className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-primary">PDF Password (optional)</p>
+                      <p className="text-xs text-muted-foreground">Enter password if your PDF is protected</p>
+                    </div>
                   </div>
-                }>
-                  <PdfPreview
-                    file={selectedFile}
-                    password={pdfPassword}
-                    onPasswordChange={setPdfPassword}
-                    passwordError={passwordError}
-                    onPasswordError={setPasswordError}
+                  
+                  <Input
+                    type="password"
+                    placeholder="Enter PDF password..."
+                    value={pdfPassword}
+                    onChange={(e) => {
+                      setPdfPassword(e.target.value);
+                      setPasswordError(false);
+                    }}
+                    className={`bg-background/50 border-2 ${passwordError ? 'border-destructive focus:border-destructive' : 'border-primary/40 focus:border-primary'}`}
                   />
-                </Suspense>
+                  
+                  {passwordError && (
+                    <p className="text-sm text-destructive flex items-center gap-1">
+                      <AlertTriangle className="h-4 w-4" />
+                      Incorrect password. Please try again.
+                    </p>
+                  )}
+                </div>
               )}
+
 
               {/* reCAPTCHA for anonymous users */}
               {showRecaptcha && !user && selectedFile && !limitReached && (
