@@ -46,11 +46,11 @@ export const UsageLimitBanner = ({
 
   // Show usage counter
   return (
-    <div className="flex items-center justify-between mb-4 px-4 py-2 rounded-lg bg-muted/50">
+    <div className="flex items-center justify-between mb-6 px-5 py-3 rounded-xl bg-[#1a120b]/80 border border-primary/20">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Crown className="h-4 w-4 text-primary" />
         <span>
-          <strong className="text-foreground">{remaining}</strong> of {limit} conversions remaining today
+          <strong className="text-primary">{remaining}</strong> of {limit} conversions remaining today
         </span>
       </div>
       {!isAuthenticated && (
@@ -58,7 +58,7 @@ export const UsageLimitBanner = ({
           variant="link"
           size="sm"
           onClick={() => navigate('/auth')}
-          className="text-primary hover:text-primary/80 p-0 h-auto"
+          className="text-primary hover:text-primary/80 p-0 h-auto font-medium"
         >
           Sign up for more →
         </Button>
