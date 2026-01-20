@@ -2,12 +2,11 @@
 // Main orchestrator that routes to specialized modules
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-// Note: pdfjs-dist doesn't work in Deno edge functions due to worker requirements
-// We use Gemini OCR directly for PDF processing instead
+// Note: Using Groq Vision for OCR instead of Gemini
 
 // Import modular processors
 import { 
-  callGeminiFlashOCR, 
+  callGroqVisionOCR, 
   classifyDocument, 
   type RawTransaction 
 } from './ocr-processor.ts';
@@ -391,19 +390,19 @@ Deno.serve(async (req) => {
                      lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
     if (classification.needsOCR) {
-      // Use Gemini Flash for OCR on scanned/image documents
-      console.log(`Document needs OCR (type: ${classification.type}), using Gemini Flash...`);
+      // Use Groq Vision for OCR on all documents
+      console.log(`Document needs OCR (type: ${classification.type}), using Groq Vision...`);
       
-      const ocrResult = await callGeminiFlashOCR(base64Data, mimeType);
+      const ocrResult = await callGroqVisionOCR(base64Data, mimeType);
       
       if (ocrResult.success && ocrResult.transactions && ocrResult.transactions.length > 0) {
         rawTransactions = ocrResult.transactions;
-        console.log(`Gemini OCR extracted ${rawTransactions.length} transactions`);
+        console.log(`Groq Vision OCR extracted ${rawTransactions.length} transactions`);
       } else if (ocrResult.success && ocrResult.text) {
         extractedText = ocrResult.text;
-        console.log('Gemini OCR extracted text, will parse for transactions');
+        console.log('Groq Vision OCR extracted text, will parse for transactions');
       } else {
-        console.log('Gemini OCR failed or returned no data, will try Groq next');
+        console.log('Groq Vision OCR failed or returned no data, will try text extraction');
       }
     }
 
