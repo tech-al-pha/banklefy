@@ -748,7 +748,21 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
     };
 
     // Generate Excel with ExcelJS
-    const excelBuffer = await generateProfessionalExcel(transactions, analytics);
+    const excelResult = generateProfessionalExcel({
+      transactions,
+      analytics: {
+        totalCredits,
+        totalDebits,
+        netFlow: totalCredits - totalDebits,
+        duplicateCount,
+        categoryBreakdown,
+      },
+      underwriting: underwritingResult,
+      fraudAlerts,
+      liquidity: liquidityMetrics,
+      reconciliation,
+    });
+    const excelBuffer = excelResult.buffer;
     
     let resultPath = null;
 
