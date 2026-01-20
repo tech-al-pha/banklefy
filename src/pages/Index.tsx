@@ -1,5 +1,4 @@
 import { Hero } from "@/components/Hero";
-import { Features } from "@/components/Features";
 import { HowItWorks } from "@/components/HowItWorks";
 import { Pricing } from "@/components/Pricing";
 import { UploadDemo } from "@/components/UploadDemo";
@@ -43,7 +42,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-dark text-foreground">
+    <div className="min-h-screen bg-[#0A0502] text-foreground">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
         <div className="container mx-auto px-6 py-4">
@@ -135,10 +134,6 @@ const Index = () => {
       <Hero />
       <HowItWorks />
 
-      <div id="features">
-        <Features />
-      </div>
-
       <div id="pricing">
         <Pricing />
       </div>
@@ -187,7 +182,14 @@ const Index = () => {
               <div>
                 <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.product')}</h4>
                 <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li><a href="#features" className="hover:text-primary transition-colors">{t('footer.features')}</a></li>
+                  <li>
+                    <button 
+                      onClick={() => navigate('/features')}
+                      className="hover:text-primary transition-colors text-left font-medium"
+                    >
+                      {t('footer.features')}
+                    </button>
+                  </li>
                   <li><a href="#pricing" className="hover:text-primary transition-colors">{t('footer.pricing')}</a></li>
                   <li><a href="#demo" className="hover:text-primary transition-colors">{t('footer.howItWorks')}</a></li>
                 </ul>
