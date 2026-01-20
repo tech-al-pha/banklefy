@@ -15,7 +15,7 @@ export const Hero = () => {
 
       <div className="relative z-10 container mx-auto px-6 text-center">
         <div className="max-w-5xl mx-auto flex flex-col items-center space-y-10">
-          <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-card/60 backdrop-blur-lg border border-primary/30 shadow-lg mb-4 shrink-0">
+          <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#1a120b]/90 backdrop-blur-xl border border-primary/30 shadow-lg mb-4 shrink-0">
             <Zap className="w-4 h-4 text-primary fill-primary" />
             <span className="text-sm text-foreground/90 font-bold tracking-tight">
               AI-Powered Financial Intelligence
@@ -54,7 +54,7 @@ export const Hero = () => {
             <Button 
               size="lg" 
               variant="outline"
-              className="w-full sm:w-auto border-primary/50 text-foreground hover:bg-primary/10 backdrop-blur-lg transition-all duration-300 px-8"
+              className="w-full sm:w-auto border-primary/40 bg-[#1a120b]/80 text-primary hover:bg-[#1a120b] hover:border-primary/60 backdrop-blur-xl transition-all duration-300 px-8"
               onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
             >
               View Pricing

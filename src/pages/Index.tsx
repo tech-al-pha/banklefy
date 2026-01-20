@@ -44,7 +44,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[#0A0502] text-foreground">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Logo />
@@ -143,13 +143,12 @@ const Index = () => {
       </div>
 
       {/* Footer CTA */}
-      <section className="relative py-24 px-6 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-primary opacity-10" />
+      <section className="relative py-24 px-6 overflow-hidden bg-[#0A0502]">
         <div className="container mx-auto text-center relative z-10 space-y-6">
-          <h2 className="text-4xl md:text-5xl font-bold">
+          <h2 className="text-4xl md:text-5xl font-bold italic">
             {t('footer.cta.title')}
             <br />
-            <span className="bg-gradient-primary bg-clip-text text-transparent">
+            <span className="text-primary">
               {t('footer.cta.subtitle')}
             </span>
           </h2>
@@ -157,7 +156,7 @@ const Index = () => {
             {t('footer.cta.desc')}
           </p>
           <button 
-            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 px-8 py-3 rounded-md font-bold"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 px-8 py-4 rounded-lg font-bold text-lg"
             onClick={() => {
               document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
             }}
@@ -168,7 +167,7 @@ const Index = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-primary/10 py-16 px-6 bg-background">
+      <footer className="border-t border-primary/20 py-16 px-6 bg-[#0A0502]">
         <div className="container mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
             <div className="space-y-4">

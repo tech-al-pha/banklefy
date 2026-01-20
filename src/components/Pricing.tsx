@@ -62,15 +62,15 @@ const yearlyPlans = [
 
 const PricingCard = ({ plan }: { plan: typeof monthlyPlans[0] }) => (
   <Card
-    className={`relative p-8 bg-card/60 backdrop-blur-lg transition-all duration-300 ${
+    className={`relative p-8 bg-[#1a120b]/80 backdrop-blur-xl transition-all duration-300 rounded-2xl ${
       plan.highlighted
-        ? "border-primary shadow-neon scale-105"
-        : "border-primary/20 hover:border-primary/50 hover:shadow-card"
+        ? "border-2 border-primary shadow-neon scale-105"
+        : "border border-primary/20 hover:border-primary/40 hover:shadow-card"
     }`}
   >
     {plan.highlighted && (
-      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-primary text-primary-foreground border-0 font-bold">
-        MOST POPULAR
+      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground border-0 font-bold px-4 py-1 uppercase tracking-wider text-xs">
+        Most Popular
       </Badge>
     )}
 
@@ -90,7 +90,7 @@ const PricingCard = ({ plan }: { plan: typeof monthlyPlans[0] }) => (
         )}
       </div>
 
-      <div className="py-4 border-t border-white/5">
+      <div className="py-4">
         <div className="flex items-center gap-2 text-white/90">
           <Check className="w-5 h-5 text-primary" />
           <span className="text-lg font-bold">Up to {plan.pages} pages</span>
@@ -98,10 +98,10 @@ const PricingCard = ({ plan }: { plan: typeof monthlyPlans[0] }) => (
       </div>
 
       <Button
-        className={`w-full h-12 text-base font-bold uppercase tracking-wider ${
+        className={`w-full h-12 text-base font-bold uppercase tracking-wider rounded-lg ${
           plan.highlighted
             ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
-            : "bg-white/5 hover:bg-white/10 border border-primary/30 text-white"
+            : "bg-[#1a120b] hover:bg-[#251a10] border border-primary/30 text-primary"
         } transition-all duration-300`}
       >
         Choose Plan
@@ -112,10 +112,7 @@ const PricingCard = ({ plan }: { plan: typeof monthlyPlans[0] }) => (
 
 export const Pricing = () => {
   return (
-    <section id="pricing" className="relative py-24 px-6 overflow-hidden">
-      {/* Background Glows */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-gradient-glow opacity-20 -z-10 pointer-events-none" />
-      
+    <section id="pricing" className="relative py-24 px-6 overflow-hidden bg-[#0A0502]">
       <div className="container mx-auto">
         <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
           <h2 className="text-4xl md:text-6xl font-black tracking-tight text-white leading-tight">
@@ -128,9 +125,9 @@ export const Pricing = () => {
         </div>
 
         <Tabs defaultValue="monthly" className="max-w-6xl mx-auto">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-16 bg-white/5 p-1 border border-white/10 rounded-full h-14">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-16 bg-[#1a120b]/80 backdrop-blur-xl p-1.5 border border-primary/20 rounded-full h-14">
             <TabsTrigger value="monthly" className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Monthly Plans</TabsTrigger>
-            <TabsTrigger value="yearly" className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold">Yearly Plans</TabsTrigger>
+            <TabsTrigger value="yearly" className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold text-muted-foreground">Yearly Plans</TabsTrigger>
           </TabsList>
 
           <TabsContent value="monthly">

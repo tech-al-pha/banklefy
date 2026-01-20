@@ -835,10 +835,7 @@ export const UploadDemo = () => {
   };
 
   return (
-    <section className="relative py-24 px-6 overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-secondary/20 rounded-full blur-3xl" />
-
+    <section className="relative py-24 px-6 overflow-hidden bg-[#0A0502]">
       <div className="container mx-auto relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold">
@@ -851,7 +848,7 @@ export const UploadDemo = () => {
         </div>
 
         <div className="max-w-4xl mx-auto">
-          <Card className="p-8 md:p-12 glass-premium lightning-border rounded-2xl">
+          <Card className="p-8 md:p-12 bg-[#1a120b]/80 backdrop-blur-xl border border-primary/20 rounded-2xl">
             {/* Usage Limit Banner */}
             {!usageLimitLoading && (
               <UsageLimitBanner
@@ -872,11 +869,11 @@ export const UploadDemo = () => {
                 className="hidden"
               />
 
-              {/* Upload Zone - Lightning Border Glow Effect */}
+              {/* Upload Zone - Dark Brown Theme */}
               <div 
                 onClick={handleUploadClick}
                 data-hover
-                className={`upload-zone-lightning rounded-xl p-12 text-center transition-all duration-500 cursor-pointer group relative ${
+                className={`bg-[#0f0906]/80 border-2 border-primary/20 hover:border-primary/40 rounded-xl p-12 text-center transition-all duration-500 cursor-pointer group relative ${
                   limitReached 
                     ? 'opacity-50 cursor-not-allowed' 
                     : ''
@@ -890,7 +887,7 @@ export const UploadDemo = () => {
                   <div className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 ${
                     limitReached 
                       ? 'bg-muted/10' 
-                      : 'bg-gradient-to-br from-primary/20 to-primary/10 group-hover:scale-110 group-hover:shadow-neon'
+                      : 'bg-primary/20 group-hover:scale-110 group-hover:shadow-neon'
                   }`}>
                     <Upload className={`w-10 h-10 transition-all duration-300 ${
                       limitReached 
@@ -900,7 +897,7 @@ export const UploadDemo = () => {
                   </div>
                   
                   <div className="space-y-3">
-                    <p className="text-xl font-semibold tracking-wide">
+                    <p className="text-xl font-semibold tracking-wide text-white">
                       {selectedFile ? selectedFile.name : "Drop your bank statement here"}
                     </p>
                     <p className="text-sm text-muted-foreground">
@@ -909,17 +906,24 @@ export const UploadDemo = () => {
                         : "or click to browse files • Supports PDF, PNG, JPG"}
                     </p>
                   </div>
-                  
-                  <Button 
-                    className="btn-premium bg-gradient-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-3 shadow-neon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleUploadClick();
-                    }}
-                    disabled={uploading || converting || limitReached}
-                  >
-                    {limitReached ? "Limit Reached" : "Choose File"}
-                  </Button>
+
+                  {/* reCAPTCHA radio button indicator */}
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="w-8 h-8 rounded-full border-2 border-primary/40 flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-primary" />
+                    </div>
+                    
+                    <Button 
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-3 rounded-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUploadClick();
+                      }}
+                      disabled={uploading || converting || limitReached}
+                    >
+                      {limitReached ? "Limit Reached" : "Choose File"}
+                    </Button>
+                  </div>
                 </div>
               </div>
 
