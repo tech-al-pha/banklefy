@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, RefreshCw, XCircle } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, RefreshCw, XCircle, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -557,6 +557,287 @@ export const UploadDemo = () => {
     });
   };
 
+  const exportAsPDF = async () => {
+    if (transactions.length === 0 && !analytics) return;
+
+    try {
+      const { jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let yPos = 20;
+
+      // Title
+      doc.setFontSize(20);
+      doc.setTextColor(40, 40, 40);
+      doc.text('Bank Statement Analysis Report', pageWidth / 2, yPos, { align: 'center' });
+      yPos += 15;
+
+      // Date
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: 'center' });
+      yPos += 15;
+
+      // Financial Summary Section
+      if (analytics) {
+        doc.setFontSize(14);
+        doc.setTextColor(40);
+        doc.text('Financial Summary', 14, yPos);
+        yPos += 8;
+
+        doc.setFontSize(10);
+        doc.setTextColor(60);
+        const summaryData = [
+          ['Total Transactions', analytics.totalTransactions.toString()],
+          ['Total Credits', `₹${analytics.totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['Total Debits', `₹${analytics.totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['Net Cash Flow', `₹${analytics.netFlow.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+        ];
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Metric', 'Value']],
+          body: summaryData,
+          theme: 'grid',
+          headStyles: { fillColor: [59, 130, 246] },
+          margin: { left: 14, right: 14 },
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+      }
+
+      // FOIR & Loan Eligibility Section
+      if (analytics?.underwriting) {
+        const uw = analytics.underwriting;
+
+        doc.setFontSize(14);
+        doc.setTextColor(40);
+        doc.text('FOIR & Loan Eligibility Analysis', 14, yPos);
+        yPos += 8;
+
+        const foirData = [
+          ['Average Monthly Income', `₹${uw.summary.avgMonthlyIncome.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['Average Monthly EMI', `₹${uw.summary.avgMonthlyEMI.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['FOIR Score', `${uw.summary.foirScore.toFixed(2)}%`],
+          ['FOIR Status', uw.summary.foirStatus.toUpperCase()],
+          ['Eligibility Status', uw.eligibility.status.toUpperCase()],
+          ['Max New EMI Possible', `₹${uw.eligibility.maxNewEMI.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['Estimated Loan Eligibility', `₹${uw.eligibility.estimatedLoanEligibility.toLocaleString('en-IN', { minimumFractionDigits: 0 })}`],
+        ];
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Parameter', 'Value']],
+          body: foirData,
+          theme: 'grid',
+          headStyles: { fillColor: [16, 185, 129] },
+          margin: { left: 14, right: 14 },
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+
+        // Eligibility Factors
+        if (uw.eligibility.factors.length > 0) {
+          doc.setFontSize(12);
+          doc.text('Eligibility Factors:', 14, yPos);
+          yPos += 6;
+          doc.setFontSize(9);
+          uw.eligibility.factors.forEach((factor) => {
+            doc.text(`• ${factor}`, 18, yPos);
+            yPos += 5;
+          });
+          yPos += 5;
+        }
+
+        // Salary Credits Detected
+        if (uw.salaryCredits.length > 0) {
+          doc.addPage();
+          yPos = 20;
+          doc.setFontSize(14);
+          doc.setTextColor(40);
+          doc.text('Salary Credits Detected', 14, yPos);
+          yPos += 8;
+
+          const salaryData = uw.salaryCredits.map(s => [
+            s.date,
+            `₹${s.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+            s.description.substring(0, 40),
+          ]);
+
+          autoTable(doc, {
+            startY: yPos,
+            head: [['Date', 'Amount', 'Description']],
+            body: salaryData,
+            theme: 'grid',
+            headStyles: { fillColor: [34, 197, 94] },
+            margin: { left: 14, right: 14 },
+          });
+          yPos = (doc as any).lastAutoTable.finalY + 10;
+        }
+
+        // EMI Debits Detected
+        if (uw.emiDebits.length > 0) {
+          doc.setFontSize(14);
+          doc.text('EMI/Loan Debits Detected', 14, yPos);
+          yPos += 8;
+
+          const emiData = uw.emiDebits.map(e => [
+            e.date,
+            `₹${e.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+            e.loanType,
+            e.description.substring(0, 30),
+          ]);
+
+          autoTable(doc, {
+            startY: yPos,
+            head: [['Date', 'Amount', 'Loan Type', 'Description']],
+            body: emiData,
+            theme: 'grid',
+            headStyles: { fillColor: [239, 68, 68] },
+            margin: { left: 14, right: 14 },
+          });
+          yPos = (doc as any).lastAutoTable.finalY + 10;
+        }
+      }
+
+      // Risk Analysis Section
+      if (analytics?.riskAnalysis) {
+        const risk = analytics.riskAnalysis;
+
+        doc.addPage();
+        yPos = 20;
+        doc.setFontSize(14);
+        doc.setTextColor(40);
+        doc.text('Risk & Fraud Analysis', 14, yPos);
+        yPos += 8;
+
+        const riskData = [
+          ['Document Integrity Score', `${risk.integrityScore}%`],
+          ['Balance Mismatches', risk.balanceMismatches.toString()],
+          ['Average Daily Balance', `₹${risk.averageDailyBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['Max Dip Amount', `₹${risk.maxDip.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['Max Dip Date', risk.maxDip.date || 'N/A'],
+        ];
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Metric', 'Value']],
+          body: riskData,
+          theme: 'grid',
+          headStyles: { fillColor: [249, 115, 22] },
+          margin: { left: 14, right: 14 },
+        });
+        yPos = (doc as any).lastAutoTable.finalY + 10;
+
+        // Risk Flags
+        if (risk.riskFlags.length > 0) {
+          doc.setFontSize(12);
+          doc.text('Risk Flags Detected:', 14, yPos);
+          yPos += 6;
+
+          const flagData = risk.riskFlags.map(f => [f.type, f.count.toString()]);
+
+          autoTable(doc, {
+            startY: yPos,
+            head: [['Risk Type', 'Count']],
+            body: flagData,
+            theme: 'grid',
+            headStyles: { fillColor: [220, 38, 38] },
+            margin: { left: 14, right: 14 },
+          });
+          yPos = (doc as any).lastAutoTable.finalY + 10;
+        }
+
+        // Fraud Alerts
+        if (risk.fraudAlerts.length > 0) {
+          doc.setFontSize(12);
+          doc.text('Fraud Alerts:', 14, yPos);
+          yPos += 6;
+
+          const alertData = risk.fraudAlerts.map((a: any) => [
+            a.alert_type || a.type || 'Unknown',
+            a.severity || 'medium',
+            (a.description || '').substring(0, 50),
+          ]);
+
+          autoTable(doc, {
+            startY: yPos,
+            head: [['Type', 'Severity', 'Description']],
+            body: alertData,
+            theme: 'grid',
+            headStyles: { fillColor: [185, 28, 28] },
+            margin: { left: 14, right: 14 },
+          });
+          yPos = (doc as any).lastAutoTable.finalY + 10;
+        }
+      }
+
+      // Transactions Table
+      if (transactions.length > 0) {
+        doc.addPage();
+        yPos = 20;
+        doc.setFontSize(14);
+        doc.setTextColor(40);
+        doc.text('Transaction Details', 14, yPos);
+        yPos += 8;
+
+        const txnData = transactions.slice(0, 100).map(t => [
+          t.date,
+          t.description.substring(0, 25),
+          t.category,
+          t.debit > 0 ? `₹${t.debit.toLocaleString('en-IN')}` : '-',
+          t.credit > 0 ? `₹${t.credit.toLocaleString('en-IN')}` : '-',
+          `₹${t.balance.toLocaleString('en-IN')}`,
+        ]);
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance']],
+          body: txnData,
+          theme: 'grid',
+          headStyles: { fillColor: [99, 102, 241] },
+          styles: { fontSize: 8 },
+          margin: { left: 14, right: 14 },
+        });
+
+        if (transactions.length > 100) {
+          yPos = (doc as any).lastAutoTable.finalY + 5;
+          doc.setFontSize(9);
+          doc.setTextColor(100);
+          doc.text(`... and ${transactions.length - 100} more transactions`, 14, yPos);
+        }
+      }
+
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(
+          `Page ${i} of ${pageCount} | Generated by Akromeda`,
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
+      }
+
+      doc.save(`bank_statement_analysis_${Date.now()}.pdf`);
+
+      toast({
+        title: "PDF Report Downloaded",
+        description: "Your complete analysis report has been exported to PDF.",
+      });
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: "Failed to generate PDF report.",
+      });
+    }
+  };
+
   return (
     <section className="relative py-24 px-6 overflow-hidden">
       {/* Background Glow */}
@@ -680,19 +961,23 @@ export const UploadDemo = () => {
               )}
 
 
-              {/* reCAPTCHA for anonymous users */}
-              {showRecaptcha && !user && selectedFile && !limitReached && (
+              {/* reCAPTCHA for anonymous users - hide after verification */}
+              {showRecaptcha && !user && selectedFile && !limitReached && !recaptchaToken && (
                 <div className="flex flex-col items-center gap-3">
                   <p className="text-sm text-muted-foreground">
                     Please verify you're human to continue
                   </p>
                   <div id="recaptcha-container" className="flex justify-center" />
-                  {recaptchaToken && (
-                    <p className="text-sm text-green-500 flex items-center gap-1">
-                      <CheckCircle className="h-4 w-4" />
-                      Verified
-                    </p>
-                  )}
+                </div>
+              )}
+              
+              {/* Show verified badge briefly */}
+              {showRecaptcha && !user && selectedFile && !limitReached && recaptchaToken && (
+                <div className="flex justify-center">
+                  <p className="text-sm text-green-500 flex items-center gap-2 bg-green-500/10 px-4 py-2 rounded-full">
+                    <CheckCircle className="h-4 w-4" />
+                    Verified - Ready to convert
+                  </p>
                 </div>
               )}
 
@@ -773,6 +1058,15 @@ export const UploadDemo = () => {
                           Download Excel
                         </>
                       )}
+                    </Button>
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white"
+                      onClick={exportAsPDF}
+                      disabled={transactions.length === 0 && !analytics}
+                    >
+                      <FileDown className="mr-2 h-5 w-5" />
+                      PDF Report
                     </Button>
                     <Button
                       size="lg"
