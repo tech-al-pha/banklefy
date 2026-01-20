@@ -1,9 +1,38 @@
+// ============= AKROMEDA MULTI-LAYERED INTELLIGENCE ENGINE =============
+// Main orchestrator that routes to specialized modules
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
-import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1';
 import * as pdfjsLib from 'https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs';
 
-// Get allowed origin from environment or use default
+// Import modular processors
+import { 
+  callGeminiFlashOCR, 
+  classifyDocument, 
+  extractTextWithPDFJS,
+  type RawTransaction 
+} from './ocr-processor.ts';
+import { 
+  callGroqCategorizer, 
+  applyPatternCategorization,
+  CATEGORY_LIST,
+  type ProcessedTransaction,
+} from './categorizer.ts';
+import { 
+  reconcileBalances, 
+  detectDuplicates, 
+  detectHighRiskTransactions, 
+  detectCircularTrading,
+  performUnderwritingAnalysis,
+  analyzeLiquidity,
+  generateFraudAlerts,
+  calculateIntegrityScore,
+  type FraudAlert,
+  type RiskTransaction,
+  type Transaction,
+} from './financial-engine.ts';
+import { generateProfessionalExcel } from './excel-generator.ts';
+
+// ============= CORS & SECURITY HELPERS =============
 const getAllowedOrigin = (requestOrigin: string | null): string => {
   const allowedOrigins = [
     Deno.env.get('ALLOWED_ORIGIN') || '',
@@ -12,19 +41,16 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     'http://localhost:5173',
   ].filter(Boolean);
   
-  // Check if the request origin is in our allowed list
   if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
     return requestOrigin;
   }
   
-  // For Lovable preview URLs - allow all .lovable.app and .lovableproject.com subdomains
   const lovableAppPattern = /^https:\/\/[a-z0-9-]+\.lovable\.app$/;
   const lovableProjectPattern = /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/;
   if (requestOrigin && (lovableAppPattern.test(requestOrigin) || lovableProjectPattern.test(requestOrigin))) {
     return requestOrigin;
   }
   
-  // Default to first allowed origin
   return allowedOrigins[0] || 'https://akromeda.lovable.app';
 };
 
@@ -34,11 +60,9 @@ const getCorsHeaders = (req: Request) => ({
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 });
 
-// Sanitize error messages to prevent information leakage
 const sanitizeError = (error: unknown): string => {
   if (error instanceof Error) {
     const msg = error.message.toLowerCase();
-    // Map known error patterns to safe messages
     if (msg.includes('relation') || msg.includes('table') || msg.includes('column')) {
       return 'Database configuration error';
     }
@@ -48,7 +72,6 @@ const sanitizeError = (error: unknown): string => {
     if (msg.includes('storage') || msg.includes('bucket')) {
       return 'File storage error';
     }
-    // For known safe error messages we explicitly return, pass them through
     const safeMessages = [
       'no transactions found in the document',
       'failed to extract transaction data from document',
@@ -73,21 +96,17 @@ const sanitizeError = (error: unknown): string => {
   return 'An unexpected error occurred. Please try again later.';
 };
 
-// Get client IP address securely (use rightmost IP in chain as it's most trusted)
 const getClientIp = (req: Request): string => {
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
-    // Get the rightmost IP (most trusted, added by our edge infrastructure)
     const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
     return ips[ips.length - 1] || 'unknown';
   }
-  // Fallback to other headers
   return req.headers.get('cf-connecting-ip') || 
          req.headers.get('x-real-ip') || 
          'unknown';
 };
 
-// Verify reCAPTCHA token with Google
 async function verifyRecaptcha(token: string): Promise<boolean> {
   const secretKey = Deno.env.get('RECAPTCHA_SECRET_KEY');
   if (!secretKey) {
@@ -98,12 +117,9 @@ async function verifyRecaptcha(token: string): Promise<boolean> {
   try {
     const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: `secret=${secretKey}&response=${token}`,
     });
-
     const data = await response.json();
     console.log('reCAPTCHA verification result:', { success: data.success });
     return data.success === true;
@@ -113,14 +129,13 @@ async function verifyRecaptcha(token: string): Promise<boolean> {
   }
 }
 
-// Validate timezone to prevent injection attacks (defense in depth)
 const isValidTimezone = (tz: string): boolean => {
   if (!tz || typeof tz !== 'string' || tz.length > 50) return false;
-  // Only allow alphanumeric, underscores, slashes, plus, minus (valid IANA timezone chars)
   const validPattern = /^[A-Za-z0-9_/+-]+$/;
   return validPattern.test(tz);
 };
 
+// ============= MAIN HANDLER =============
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   
@@ -129,20 +144,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get request data first
+    // Parse request
     const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken, pdfPassword } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
-
-    // Get client IP address securely for anonymous users
     const ipAddress = getClientIp(req);
 
-    // Create service role client for admin operations
+    // Create Supabase clients
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Check if user is authenticated
+    // Check authentication
     const authHeader = req.headers.get('Authorization');
     let user = null;
     let supabase = supabaseAdmin;
@@ -151,18 +164,13 @@ Deno.serve(async (req) => {
       supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        {
-          global: {
-            headers: { Authorization: authHeader },
-          },
-        }
+        { global: { headers: { Authorization: authHeader } } }
       );
-      
       const { data: { user: authUser } } = await supabase.auth.getUser();
       user = authUser;
     }
 
-    // For anonymous users, require reCAPTCHA verification
+    // Anonymous users require reCAPTCHA
     if (!user) {
       if (!recaptchaToken) {
         return new Response(
@@ -170,7 +178,6 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
       const isValidCaptcha = await verifyRecaptcha(recaptchaToken);
       if (!isValidCaptcha) {
         return new Response(
@@ -187,8 +194,7 @@ Deno.serve(async (req) => {
       timezone: userTimezone 
     });
 
-    // For anonymous users, we need base64 file data since they can't use storage
-    // For authenticated users, we use fileId to download from storage
+    // Validate request
     if (!fileName) {
       return new Response(
         JSON.stringify({ error: 'Missing required field: fileName' }),
@@ -210,7 +216,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate file name - allow common filename characters
     if (typeof fileName !== 'string' || fileName.length > 255 || fileName.includes('..') || fileName.includes('/')) {
       return new Response(
         JSON.stringify({ error: 'Invalid file name' }),
@@ -218,10 +223,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get file bytes
     let bytes: Uint8Array;
 
     if (user && fileId) {
-      // Authenticated user - download from storage
       const { data: fileData, error: downloadError } = await supabase.storage
         .from('bank-statements')
         .download(`${user.id}/${fileId}`);
@@ -236,7 +241,6 @@ Deno.serve(async (req) => {
       const buffer = await fileData.arrayBuffer();
       bytes = new Uint8Array(buffer);
     } else {
-      // Anonymous user - decode base64 file data
       try {
         const base64Content = base64FileData.split(',')[1] || base64FileData;
         const binaryString = atob(base64Content);
@@ -244,7 +248,7 @@ Deno.serve(async (req) => {
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
         }
-      } catch (e) {
+      } catch {
         return new Response(
           JSON.stringify({ error: 'Invalid file data' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -252,7 +256,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Check file size (10MB limit)
+    // Validate file size (10MB limit)
     if (bytes.length > 10 * 1024 * 1024) {
       return new Response(
         JSON.stringify({ error: 'File exceeds 10MB limit' }),
@@ -260,10 +264,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify magic bytes based on file extension
+    // Validate magic bytes
     const lowerFileName = fileName.toLowerCase();
     if (lowerFileName.endsWith('.pdf')) {
-      // PDF magic bytes: %PDF (0x25 0x50 0x44 0x46)
       if (bytes[0] !== 0x25 || bytes[1] !== 0x50 || bytes[2] !== 0x44 || bytes[3] !== 0x46) {
         return new Response(
           JSON.stringify({ error: 'Invalid PDF file format' }),
@@ -271,7 +274,6 @@ Deno.serve(async (req) => {
         );
       }
     } else if (lowerFileName.endsWith('.png')) {
-      // PNG magic bytes: 0x89 0x50 0x4E 0x47
       if (bytes[0] !== 0x89 || bytes[1] !== 0x50 || bytes[2] !== 0x4E || bytes[3] !== 0x47) {
         return new Response(
           JSON.stringify({ error: 'Invalid PNG file format' }),
@@ -279,7 +281,6 @@ Deno.serve(async (req) => {
         );
       }
     } else if (lowerFileName.endsWith('.jpg') || lowerFileName.endsWith('.jpeg')) {
-      // JPEG magic bytes: 0xFF 0xD8 0xFF
       if (bytes[0] !== 0xFF || bytes[1] !== 0xD8 || bytes[2] !== 0xFF) {
         return new Response(
           JSON.stringify({ error: 'Invalid JPEG file format' }),
@@ -293,7 +294,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check and reset daily limit based on user type
+    // Check usage limits
     const { data: limitResult, error: limitError } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
       p_ip_address: user ? null : ipAddress,
       p_user_id: user ? user.id : null,
@@ -314,7 +315,6 @@ Deno.serve(async (req) => {
 
     console.log('Usage info:', { conversionsUsed, conversionsLimit, user: !!user });
 
-    // Check if user would exceed limit
     if (conversionsUsed >= conversionsLimit) {
       return new Response(
         JSON.stringify({
@@ -323,7 +323,7 @@ Deno.serve(async (req) => {
           isAuthenticated: !!user,
           message: user 
             ? `You have reached your daily limit of ${conversionsLimit} conversions.`
-            : `You have reached your daily limit of ${conversionsLimit} free conversions. Sign up for a free account to get ${6} conversions per day!`,
+            : `You have reached your daily limit of ${conversionsLimit} free conversions. Sign up for a free account to get 6 conversions per day!`,
         }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -343,7 +343,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create conversion record only for authenticated users
+    // Create conversion record for authenticated users
     let conversion = null;
     if (user) {
       const { data: convData, error: convError } = await supabase
@@ -359,44 +359,31 @@ Deno.serve(async (req) => {
 
       if (convError) {
         console.error('Failed to create conversion record:', convError);
-        // Don't fail the request, just log it
       } else {
         conversion = convData;
       }
     }
 
-    // For PDFs, check if encrypted and handle password
-    let processedBytes = bytes;
-    let extractedTextContent = '';
-    let isEncryptedPdf = false;
+    // ============= LAYER 1: SMART DOCUMENT ROUTER =============
+    console.log('Starting multi-layered AI conversion for:', fileName);
     
+    let extractedText = '';
+    let rawTransactions: RawTransaction[] = [];
+    let pageCount = 0;
+    
+    // First, try to extract text directly (for password-protected PDFs)
     if (lowerFileName.endsWith('.pdf')) {
       try {
-        // First, try using pdfjs-dist WITHOUT password to check if PDF needs one
-        // This is more reliable than pdf-lib for detecting encryption
+        // Check if PDF needs a password
         try {
-          const testLoadingTask = pdfjsLib.getDocument({
-            data: bytes.slice(), // Use a copy to avoid consuming the buffer
-          });
-          
-          const testPdfDoc = await testLoadingTask.promise;
-          // If we get here, PDF is NOT encrypted - it opened fine without password
-          console.log('PDF is not encrypted, pages:', testPdfDoc.numPages);
-          
-          // Now use pdf-lib to process the bytes for compatibility
-          try {
-            const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
-            processedBytes = await pdfDoc.save();
-          } catch {
-            // If pdf-lib fails, just use original bytes
-            processedBytes = bytes;
-          }
+          const testResult = await extractTextWithPDFJS(bytes, pdfjsLib);
+          extractedText = testResult.text;
+          pageCount = testResult.pageCount;
+          console.log('PDF is not encrypted, extracted text length:', extractedText.length);
         } catch (pdfError: unknown) {
           const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError);
           console.log('PDF check result:', errorMsg);
           
-          // Only treat as encrypted if pdfjs-dist explicitly says it needs a password
-          // Look for specific password-related error messages from pdfjs-dist
           const isPasswordError = 
             errorMsg.includes('PasswordException') ||
             errorMsg.includes('Incorrect Password') ||
@@ -404,8 +391,6 @@ Deno.serve(async (req) => {
             (errorMsg.toLowerCase().includes('password') && errorMsg.toLowerCase().includes('required'));
           
           if (isPasswordError) {
-            isEncryptedPdf = true;
-            
             if (!pdfPassword || !pdfPassword.trim()) {
               return new Response(
                 JSON.stringify({ 
@@ -416,49 +401,19 @@ Deno.serve(async (req) => {
               );
             }
             
-            // Use pdfjs-dist to decrypt and extract text with password
-            console.log('PDF is encrypted, attempting to decrypt with password...');
-            
+            // Try with password
             try {
-              // Load PDF with password using pdfjs-dist
-              const loadingTask = pdfjsLib.getDocument({
-                data: bytes,
-                password: pdfPassword.trim(),
-              });
-              
-              const pdfDocument = await loadingTask.promise;
-              console.log('PDF decrypted successfully, pages:', pdfDocument.numPages);
-              
-              // Extract text from all pages
-              const textParts: string[] = [];
-              for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-                const page = await pdfDocument.getPage(pageNum);
-                const textContent = await page.getTextContent();
-              const pageText = textContent.items
-                  // deno-lint-ignore no-explicit-any
-                  .filter((item: any) => 'str' in item)
-                  // deno-lint-ignore no-explicit-any
-                  .map((item: any) => item.str || '')
-                  .join(' ');
-                textParts.push(`--- Page ${pageNum} ---\n${pageText}`);
-              }
-              
-              extractedTextContent = textParts.join('\n\n');
-              console.log('Extracted text length:', extractedTextContent.length);
-              
-              // If we successfully extracted text, we'll use text-based processing
-              if (!extractedTextContent.trim()) {
-                throw new Error('No text content extracted from PDF');
-              }
+              const result = await extractTextWithPDFJS(bytes, pdfjsLib, pdfPassword);
+              extractedText = result.text;
+              pageCount = result.pageCount;
+              console.log('PDF decrypted successfully, pages:', pageCount);
             } catch (decryptError: unknown) {
               const decryptMsg = decryptError instanceof Error ? decryptError.message : String(decryptError);
               console.log('PDF decryption error:', decryptMsg);
               
-              // Check for incorrect password
               if (decryptMsg.toLowerCase().includes('incorrect password') || 
                   decryptMsg.toLowerCase().includes('wrong password') ||
-                  decryptMsg.toLowerCase().includes('invalid password') ||
-                  decryptMsg.toLowerCase().includes('passwordexception')) {
+                  decryptMsg.toLowerCase().includes('invalid password')) {
                 return new Response(
                   JSON.stringify({ 
                     error: 'Incorrect PDF password. Please check and try again.',
@@ -468,484 +423,236 @@ Deno.serve(async (req) => {
                   { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
                 );
               }
-              
               throw decryptError;
             }
-          } else {
-            // For other PDF errors, try to proceed anyway
-            console.log('PDF validation warning, proceeding with original bytes');
           }
         }
       } catch (outerError) {
-        console.log('PDF processing outer error, proceeding with original:', outerError);
+        console.log('PDF processing outer error, will try OCR:', outerError);
       }
     }
 
-    console.log('Starting AI conversion for file:', fileName);
+    // ============= LAYER 2: INTELLIGENT PROCESSING ROUTER =============
+    const classification = classifyDocument(extractedText, bytes, fileName);
+    console.log('Document classification:', classification);
 
-    // Process with Lovable AI
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    // Convert bytes to base64 for OCR if needed
+    const chunkSize = 8192;
+    let base64Data = '';
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      base64Data += String.fromCharCode(...chunk);
     }
-
-    // Build AI request based on whether we have extracted text or image
-    let aiRequestBody;
+    base64Data = btoa(base64Data);
     
-    if (extractedTextContent && extractedTextContent.trim()) {
-      // For encrypted PDFs, use text-based extraction
-      console.log('Using text-based extraction for encrypted PDF');
-      aiRequestBody = {
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert bank statement data extraction specialist. Your job is to extract transaction data from bank statement text content.
+    const mimeType = lowerFileName.endsWith('.pdf') ? 'application/pdf' : 
+                     lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-UNIVERSAL SCHEMA (all fields required):
-- date: Normalized to YYYY-MM-DD format (handle DD/MM/YYYY, MM/DD/YYYY, DD-Mon-YY, etc.)
-- description: Clean transaction description (remove excessive whitespace, normalize case)
-- category: Classify into one of these categories:
-  * "Salary/Income" - salary credits, wages, business income
-  * "Transfer In" - incoming transfers, deposits
-  * "Transfer Out" - outgoing transfers, sent money
-  * "Bills & Utilities" - electricity, water, gas, internet, phone
-  * "Shopping" - retail, e-commerce, Amazon, Flipkart, etc.
-  * "Food & Dining" - restaurants, Swiggy, Zomato, groceries
-  * "Transportation" - Uber, Ola, fuel, parking, tolls
-  * "Entertainment" - movies, Netflix, Spotify, gaming
-  * "Healthcare" - hospitals, pharmacies, medical
-  * "Education" - school fees, courses, books
-  * "Insurance" - premiums, policies
-  * "Investments" - mutual funds, stocks, FD, RD
-  * "Loan/EMI" - loan payments, EMI deductions
-  * "Cash" - ATM withdrawals, cash deposits
-  * "Bank Fees" - charges, penalties, service fees
-  * "Other" - uncategorized transactions
-- debit: Amount debited (as positive number, 0 if credit transaction)
-- credit: Amount credited (as positive number, 0 if debit transaction)
-- balance: Running balance after transaction (number)
-
-SMART DATA CLEANING RULES:
-1. Date Normalization: Convert all dates to YYYY-MM-DD regardless of input format
-2. Amount Cleaning: Handle comma separators (1,234.56 → 1234.56), handle lakhs format (1,23,456.78 → 123456.78)
-3. Description Cleaning: Remove multiple spaces, trim whitespace, capitalize first letter
-4. Detect duplicates: If you see transactions with identical date, description, and amount - add isDuplicate: true
-
-BANK-SPECIFIC HANDLING:
-- Emirates Islamic/NBD: Handle Arabic text alongside English, recognize e-statement format
-- HDFC/ICICI/SBI: Handle lakhs format (1,23,456), recognize NEFT/IMPS/UPI prefixes
-- US Banks: Handle MM/DD/YYYY dates, recognize ACH/Wire transfers
-- UK Banks: Handle DD/MM/YYYY, recognize Faster Payments/BACS
-
-Return ONLY a valid JSON array, no markdown, no explanation.`
-          },
-          {
-            role: 'user',
-            content: `Extract ALL transactions from this bank statement text content. Apply the universal schema with smart cleaning and duplicate detection. Return only the JSON array.\n\n${extractedTextContent}`
-          }
-        ],
-      };
-    } else {
-      // For non-encrypted PDFs or images, use image-based extraction
-      // Convert file to base64 for AI processing (chunk to avoid stack overflow)
-      const chunkSize = 8192;
-      let base64Data = '';
-      for (let i = 0; i < processedBytes.length; i += chunkSize) {
-        const chunk = processedBytes.subarray(i, i + chunkSize);
-        base64Data += String.fromCharCode(...chunk);
+    if (classification.needsOCR) {
+      // Use Gemini Flash for OCR on scanned/image documents
+      console.log(`Document needs OCR (type: ${classification.type}), using Gemini Flash...`);
+      
+      const ocrResult = await callGeminiFlashOCR(base64Data, mimeType);
+      
+      if (ocrResult.success && ocrResult.transactions && ocrResult.transactions.length > 0) {
+        rawTransactions = ocrResult.transactions;
+        console.log(`Gemini OCR extracted ${rawTransactions.length} transactions`);
+      } else if (ocrResult.success && ocrResult.text) {
+        extractedText = ocrResult.text;
+        console.log('Gemini OCR extracted text, will parse for transactions');
+      } else {
+        console.log('Gemini OCR failed or returned no data, falling back to Lovable AI');
       }
-      base64Data = btoa(base64Data);
-      const mimeType = lowerFileName.endsWith('.pdf') ? 'application/pdf' : 
-                       lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
-      const dataUrl = `data:${mimeType};base64,${base64Data}`;
+    }
 
-      aiRequestBody = {
-        model: 'google/gemini-2.5-pro',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert OCR and bank statement data extraction specialist with advanced image recognition capabilities. Your job is to extract transaction data from bank statements of ANY bank worldwide, including:
-- Digital PDFs with selectable text
-- Scanned documents (images of printed statements)
-- Mobile screenshots of banking apps
-- Low-quality or blurry images
+    // If we don't have transactions yet, use Lovable AI for extraction
+    if (rawTransactions.length === 0) {
+      console.log('Using Lovable AI for transaction extraction...');
+      
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+      if (!LOVABLE_API_KEY) {
+        throw new Error('LOVABLE_API_KEY not configured');
+      }
 
-CRITICAL OCR INSTRUCTIONS:
-1. Carefully examine EVERY pixel of the document for transaction data
-2. For scanned/image documents: Use OCR to read text even if slightly blurry or at an angle
-3. Look for transaction tables, they typically have columns for: Date, Description/Narration, Debit/Withdrawal, Credit/Deposit, Balance
-4. If the image quality is poor, make best-effort extraction and include all visible data
-5. Process ALL pages of multi-page documents
-6. Handle watermarks, stamps, and overlapping text
-7. Recognize various fonts and handwritten annotations
+      // Build AI request based on whether we have text or need image processing
+      let aiRequestBody;
+      
+      if (extractedText && extractedText.trim().length > 200) {
+        // Text-based extraction (digital PDF or already OCR'd)
+        console.log('Using text-based extraction');
+        aiRequestBody = {
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an expert bank statement data extraction specialist. Extract ALL transactions.
 
 UNIVERSAL SCHEMA (all fields required):
-- date: Normalized to YYYY-MM-DD format (handle DD/MM/YYYY, MM/DD/YYYY, DD-Mon-YY, etc.)
-- description: Clean transaction description (remove excessive whitespace, normalize case)
-- category: Classify into one of these categories:
-  * "Salary/Income" - salary credits, wages, business income
-  * "Transfer In" - incoming transfers, deposits
-  * "Transfer Out" - outgoing transfers, sent money
-  * "Bills & Utilities" - electricity, water, gas, internet, phone
-  * "Shopping" - retail, e-commerce, Amazon, Flipkart, etc.
-  * "Food & Dining" - restaurants, Swiggy, Zomato, groceries
-  * "Transportation" - Uber, Ola, fuel, parking, tolls
-  * "Entertainment" - movies, Netflix, Spotify, gaming
-  * "Healthcare" - hospitals, pharmacies, medical
-  * "Education" - school fees, courses, books
-  * "Insurance" - premiums, policies
-  * "Investments" - mutual funds, stocks, FD, RD
-  * "Loan/EMI" - loan payments, EMI deductions
-  * "Cash" - ATM withdrawals, cash deposits
-  * "Bank Fees" - charges, penalties, service fees
-  * "Other" - uncategorized transactions
-- debit: Amount debited (as positive number, 0 if credit transaction)
-- credit: Amount credited (as positive number, 0 if debit transaction)
-- balance: Running balance after transaction (number)
-
-SMART DATA CLEANING RULES:
-1. Date Normalization: Convert all dates to YYYY-MM-DD regardless of input format
-2. Amount Cleaning: Handle comma separators (1,234.56 → 1234.56), handle lakhs format (1,23,456.78 → 123456.78)
-3. Description Cleaning: Remove multiple spaces, trim whitespace, capitalize first letter
-4. Detect duplicates: If you see transactions with identical date, description, and amount - add isDuplicate: true
-5. For partially visible text: Use context clues to complete words
+- date: Normalized to YYYY-MM-DD format
+- description: Clean transaction description
+- category: One of: ${CATEGORY_LIST.join(', ')}
+- debit: Amount debited (positive number, 0 if credit)
+- credit: Amount credited (positive number, 0 if debit)
+- balance: Running balance after transaction
 
 BANK-SPECIFIC HANDLING:
-- Emirates Islamic/NBD: Handle Arabic text alongside English, recognize e-statement format
-- HDFC/ICICI/SBI: Handle lakhs format (1,23,456), recognize NEFT/IMPS/UPI prefixes
-- US Banks: Handle MM/DD/YYYY dates, recognize ACH/Wire transfers
-- UK Banks: Handle DD/MM/YYYY, recognize Faster Payments/BACS
-
-DUPLICATE DETECTION:
-Mark transactions as potential duplicates if they have:
-- Same date AND same amount AND similar description (>80% match)
-- Add field: isDuplicate (boolean) and duplicateGroup (number - same group ID for suspected duplicates)
+- Emirates Islamic/NBD: Handle Arabic text alongside English
+- HDFC/ICICI/SBI: Handle lakhs format (1,23,456)
+- US Banks: Handle MM/DD/YYYY dates
+- UK Banks: Handle DD/MM/YYYY
 
 Return ONLY a valid JSON array, no markdown, no explanation.`
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'This is a bank statement document. Perform OCR if needed and extract ALL transactions from every page. Apply the universal schema with smart cleaning, duplicate detection, and handle any currency format. Return only the JSON array.'
-              },
-              {
-                type: 'image_url',
-                image_url: { url: dataUrl }
+            },
+            {
+              role: 'user',
+              content: `Extract ALL transactions from this bank statement:\n\n${extractedText}`
+            }
+          ],
+        };
+      } else {
+        // Image-based extraction
+        console.log('Using image-based extraction');
+        const dataUrl = `data:${mimeType};base64,${base64Data}`;
+        
+        aiRequestBody = {
+          model: 'google/gemini-2.5-pro',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an expert OCR and bank statement data extraction specialist.
+
+UNIVERSAL SCHEMA (all fields required):
+- date: Normalized to YYYY-MM-DD format
+- description: Clean transaction description
+- category: One of: ${CATEGORY_LIST.join(', ')}
+- debit: Amount debited (positive number, 0 if credit)
+- credit: Amount credited (positive number, 0 if debit)
+- balance: Running balance after transaction
+
+Return ONLY a valid JSON array, no markdown, no explanation.`
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'Extract ALL transactions from this bank statement. Return only the JSON array.' },
+                { type: 'image_url', image_url: { url: dataUrl } }
+              ]
+            }
+          ],
+        };
+      }
+
+      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(aiRequestBody),
+      });
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error('AI API error:', aiResponse.status, errorText);
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          const rawError = errorData?.error?.metadata?.raw;
+          if (rawError) {
+            const parsedRaw = JSON.parse(rawError);
+            const errorMessage = parsedRaw?.error?.message;
+            if (errorMessage) {
+              if (errorMessage.toLowerCase().includes('no pages')) {
+                throw new Error('The document has no pages. Please upload a valid PDF with readable content.');
               }
-            ]
-          }
-        ],
-      };
-    }
-
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(aiRequestBody),
-    });
-
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      
-      // Parse specific error messages from the AI provider
-      try {
-        const errorData = JSON.parse(errorText);
-        const rawError = errorData?.error?.metadata?.raw;
-        if (rawError) {
-          const parsedRaw = JSON.parse(rawError);
-          const errorMessage = parsedRaw?.error?.message;
-          if (errorMessage) {
-            // Map known AI errors to user-friendly messages
-            if (errorMessage.toLowerCase().includes('no pages')) {
-              throw new Error('The document has no pages. Please upload a valid PDF with readable content.');
-            }
-            if (errorMessage.toLowerCase().includes('password') || 
-                errorMessage.toLowerCase().includes('encrypted') ||
-                errorMessage.toLowerCase().includes('protected')) {
-              throw new Error('This PDF is password-protected. Please enter the correct password and try again.');
-            }
-            if (errorMessage.toLowerCase().includes('invalid')) {
-              throw new Error('Invalid or unsupported document format. Please try a different file.');
+              if (errorMessage.toLowerCase().includes('password') || 
+                  errorMessage.toLowerCase().includes('encrypted')) {
+                throw new Error('This PDF is password-protected. Please enter the correct password and try again.');
+              }
             }
           }
+        } catch (parseErr) {
+          if (parseErr instanceof Error && 
+              (parseErr.message.includes('document') || parseErr.message.includes('password'))) {
+            throw parseErr;
+          }
         }
-      } catch (parseErr) {
-        // If parsing fails, continue with generic error
-        if (parseErr instanceof Error && 
-            (parseErr.message.includes('document') || 
-             parseErr.message.includes('password') ||
-             parseErr.message.includes('PDF'))) {
-          throw parseErr;
-        }
+        
+        throw new Error('Unable to read document content. Please ensure the file is not corrupted.');
       }
+
+      const aiData = await aiResponse.json();
+      const responseText = aiData.choices?.[0]?.message?.content || '';
       
-      throw new Error('Unable to read document content. Please ensure the file is not corrupted.');
-    }
-
-    const aiData = await aiResponse.json();
-    const extractedText = aiData.choices?.[0]?.message?.content || '';
-    
-    console.log('AI response received, parsing data...');
-
-    // Parse the JSON response
-    let transactions = [];
-    try {
-      // Extract JSON from the response (handle markdown code blocks)
-      const jsonMatch = extractedText.match(/\[[\s\S]*\]/);
+      // Parse JSON from response
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
-        transactions = JSON.parse(jsonMatch[0]);
+        rawTransactions = JSON.parse(jsonMatch[0]);
+        console.log(`Lovable AI extracted ${rawTransactions.length} transactions`);
       } else {
         throw new Error('No JSON array found in AI response');
       }
-    } catch (parseError: unknown) {
-      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
-      console.error('Failed to parse AI response:', errorMessage);
-      throw new Error('Failed to extract transaction data from document');
     }
 
-    if (!Array.isArray(transactions) || transactions.length === 0) {
+    if (!rawTransactions || rawTransactions.length === 0) {
       throw new Error('No transactions found in the document');
     }
 
-    // Post-processing: Additional validation and cleaning
-    transactions = transactions.map((t, index) => {
-      // Ensure all required fields exist with defaults
-      const cleaned: Record<string, any> = {
-        date: t.date || 'Unknown',
-        description: (t.description || 'Unknown Transaction').trim(),
-        category: t.category || 'Other',
-        debit: typeof t.debit === 'number' ? Math.abs(t.debit) : (t.type?.toLowerCase() === 'debit' ? Math.abs(t.amount || 0) : 0),
-        credit: typeof t.credit === 'number' ? Math.abs(t.credit) : (t.type?.toLowerCase() === 'credit' ? Math.abs(t.amount || 0) : 0),
-        balance: typeof t.balance === 'number' ? t.balance : 0,
-        isDuplicate: t.isDuplicate || false,
-        duplicateGroup: t.duplicateGroup || null,
-        // Keep legacy fields for backward compatibility
-        amount: t.amount || (t.debit || 0) - (t.credit || 0),
-        type: t.type || (t.debit > 0 ? 'debit' : 'credit'),
-        // Fraud detection fields (will be populated later)
-        balanceMismatch: false,
-        expectedBalance: null,
-        riskFlag: null,
-      };
-      return cleaned;
-    });
-
-    // Secondary duplicate detection (in case AI missed some)
-    const duplicateMap = new Map();
-    transactions.forEach((t, i) => {
-      const key = `${t.date}_${Math.abs(t.debit || t.credit)}_${t.description.substring(0, 20).toLowerCase()}`;
-      if (duplicateMap.has(key)) {
-        const groupId = duplicateMap.get(key).groupId;
-        t.isDuplicate = true;
-        t.duplicateGroup = groupId;
-        duplicateMap.get(key).transaction.isDuplicate = true;
-        duplicateMap.get(key).transaction.duplicateGroup = groupId;
-      } else {
-        duplicateMap.set(key, { transaction: t, groupId: i + 1 });
-      }
-    });
-
-    // ============= FRAUD DETECTION: BALANCE RECONCILIATION =============
-    console.log('Starting balance reconciliation and fraud detection...');
+    // ============= LAYER 3: GROQ CATEGORIZATION (Lightning Fast) =============
+    console.log('Starting Groq categorization...');
     
-    interface FraudAlert {
-      type: string;
-      severity: 'low' | 'medium' | 'high' | 'critical';
-      description: string;
-      affectedRows: number[];
-      metadata: Record<string, any>;
-    }
+    let categorizedTransactions: ProcessedTransaction[];
     
-    const fraudAlerts: FraudAlert[] = [];
-    const balanceMismatches: { rowIndex: number; expected: number; actual: number; difference: number }[] = [];
+    const groqResult = await callGroqCategorizer(rawTransactions);
     
-    // Balance Reconciliation: Verify running balance for each transaction
-    // Formula: Balance[n-1] + Credit[n] - Debit[n] = Balance[n]
-    for (let i = 1; i < transactions.length; i++) {
-      const prevBalance = transactions[i - 1].balance;
-      const currentCredit = transactions[i].credit || 0;
-      const currentDebit = transactions[i].debit || 0;
-      const expectedBalance = prevBalance + currentCredit - currentDebit;
-      const actualBalance = transactions[i].balance;
-      
-      // Allow small tolerance for rounding (0.01)
-      const difference = Math.abs(expectedBalance - actualBalance);
-      if (difference > 0.01) {
-        balanceMismatches.push({
-          rowIndex: i,
-          expected: expectedBalance,
-          actual: actualBalance,
-          difference: difference,
-        });
-        // Mark the transaction with integrity issue
-        transactions[i].balanceMismatch = true;
-        transactions[i].expectedBalance = expectedBalance;
-      }
-    }
-    
-    // If balance mismatches found, create fraud alert
-    if (balanceMismatches.length > 0) {
-      const mismatchPercentage = (balanceMismatches.length / transactions.length) * 100;
-      let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
-      
-      if (mismatchPercentage > 20) severity = 'critical';
-      else if (mismatchPercentage > 10) severity = 'high';
-      else if (mismatchPercentage > 5) severity = 'medium';
-      
-      fraudAlerts.push({
-        type: 'BALANCE_INTEGRITY',
-        severity,
-        description: `${balanceMismatches.length} transaction(s) have balance discrepancies. Mathematical reconciliation failed.`,
-        affectedRows: balanceMismatches.map(m => m.rowIndex),
-        metadata: {
-          totalMismatches: balanceMismatches.length,
-          mismatchPercentage: mismatchPercentage.toFixed(2),
-          details: balanceMismatches.slice(0, 10), // First 10 mismatches
-        },
-      });
+    if (groqResult.success && groqResult.transactions) {
+      categorizedTransactions = groqResult.transactions;
+      console.log('Groq categorization successful');
+    } else {
+      // Fallback to pattern-based categorization
+      console.log('Using pattern-based categorization fallback');
+      categorizedTransactions = applyPatternCategorization(rawTransactions);
     }
 
-    // HIGH-RISK TRANSACTION DETECTION
-    const highRiskKeywords = {
-      gambling: ['bet365', 'betway', 'dream11', 'stake', 'casino', 'poker', 'gambling', 'lottery', 'rummy', 'betting'],
-      paydayLoan: ['payday', 'quickloan', 'fastcash', 'instantloan', 'moneynow', 'cashadvance'],
-      bouncedPayment: ['cheque return', 'ecs return', 'nach return', 'dishonor', 'bounce', 'returned unpaid', 'insufficient funds'],
-    };
-    
-    const riskTransactions: { type: string; indices: number[]; transactions: any[] }[] = [];
-    
-    transactions.forEach((t, index) => {
-      const desc = t.description.toLowerCase();
-      
-      // Gambling detection
-      if (highRiskKeywords.gambling.some(k => desc.includes(k))) {
-        const existing = riskTransactions.find(r => r.type === 'gambling');
-        if (existing) {
-          existing.indices.push(index);
-          existing.transactions.push({ date: t.date, description: t.description, amount: t.debit || t.credit });
-        } else {
-          riskTransactions.push({
-            type: 'gambling',
-            indices: [index],
-            transactions: [{ date: t.date, description: t.description, amount: t.debit || t.credit }],
-          });
-        }
-        transactions[index].riskFlag = 'gambling';
-      }
-      
-      // Payday loan detection
-      if (highRiskKeywords.paydayLoan.some(k => desc.includes(k))) {
-        const existing = riskTransactions.find(r => r.type === 'paydayLoan');
-        if (existing) {
-          existing.indices.push(index);
-          existing.transactions.push({ date: t.date, description: t.description, amount: t.debit || t.credit });
-        } else {
-          riskTransactions.push({
-            type: 'paydayLoan',
-            indices: [index],
-            transactions: [{ date: t.date, description: t.description, amount: t.debit || t.credit }],
-          });
-        }
-        transactions[index].riskFlag = 'paydayLoan';
-      }
-      
-      // Bounced payment detection
-      if (highRiskKeywords.bouncedPayment.some(k => desc.includes(k))) {
-        const existing = riskTransactions.find(r => r.type === 'bouncedPayment');
-        if (existing) {
-          existing.indices.push(index);
-          existing.transactions.push({ date: t.date, description: t.description, amount: t.debit || t.credit });
-        } else {
-          riskTransactions.push({
-            type: 'bouncedPayment',
-            indices: [index],
-            transactions: [{ date: t.date, description: t.description, amount: t.debit || t.credit }],
-          });
-        }
-        transactions[index].riskFlag = 'bouncedPayment';
-      }
-    });
-    
-    // Create alerts for high-risk transactions
-    riskTransactions.forEach(risk => {
-      const riskLabels: Record<string, { label: string; severity: 'medium' | 'high' | 'critical' }> = {
-        gambling: { label: 'Gambling/Betting Activity', severity: 'high' },
-        paydayLoan: { label: 'Payday Loan Activity', severity: 'medium' },
-        bouncedPayment: { label: 'Bounced/Returned Payments', severity: 'critical' },
-      };
-      
-      const riskInfo = riskLabels[risk.type];
-      fraudAlerts.push({
-        type: `HIGH_RISK_${risk.type.toUpperCase()}`,
-        severity: riskInfo.severity,
-        description: `${risk.indices.length} ${riskInfo.label} detected. This may impact creditworthiness assessment.`,
-        affectedRows: risk.indices,
-        metadata: {
-          count: risk.indices.length,
-          transactions: risk.transactions,
-        },
-      });
-    });
+    // Convert to Transaction type for financial engine
+    const transactions: Transaction[] = categorizedTransactions.map(t => ({
+      date: t.date,
+      description: t.description,
+      category: t.category,
+      debit: t.debit,
+      credit: t.credit,
+      balance: t.balance,
+      isDuplicate: t.isDuplicate,
+      duplicateGroup: t.duplicateGroup,
+      balanceMismatch: t.balanceMismatch,
+      expectedBalance: t.expectedBalance,
+      riskFlag: t.riskFlag,
+    }));
 
-    // CIRCULAR TRADING DETECTION
-    // Look for high-frequency transfers between same parties
-    const transferPairs = new Map<string, { count: number; indices: number[]; totalAmount: number }>();
-    transactions.forEach((t, index) => {
-      if (t.category === 'Transfer In' || t.category === 'Transfer Out') {
-        // Extract potential account identifier from description (simplified)
-        const desc = t.description.toLowerCase();
-        const match = desc.match(/(?:to|from|upi|imps|neft|rtgs)\s*[:\-]?\s*([a-z0-9@\-_.]+)/);
-        if (match) {
-          const key = match[1].substring(0, 20);
-          const existing = transferPairs.get(key);
-          if (existing) {
-            existing.count++;
-            existing.indices.push(index);
-            existing.totalAmount += (t.debit || t.credit);
-          } else {
-            transferPairs.set(key, { count: 1, indices: [index], totalAmount: t.debit || t.credit });
-          }
-        }
-      }
-    });
+    // ============= LAYER 4: FINANCIAL ENGINE (Pure TypeScript) =============
+    console.log('Starting financial analysis...');
     
-    // Flag circular trading (>5 transfers to same party)
-    transferPairs.forEach((value, key) => {
-      if (value.count >= 5) {
-        fraudAlerts.push({
-          type: 'CIRCULAR_TRADING',
-          severity: 'high',
-          description: `High-frequency transfers detected: ${value.count} transactions to/from similar account. Possible circular trading.`,
-          affectedRows: value.indices,
-          metadata: {
-            transferCount: value.count,
-            totalAmount: value.totalAmount,
-            pattern: key,
-          },
-        });
-        value.indices.forEach(i => {
-          transactions[i].riskFlag = 'circularTrading';
-        });
-      }
-    });
-
-    // ============= FOIR & SALARY ANALYSIS (UNDERWRITING ENGINE) =============
-    console.log('Starting FOIR & Salary Analysis...');
+    // Balance Reconciliation
+    const reconciliation = reconcileBalances(transactions);
+    console.log(`Balance reconciliation: ${reconciliation.mismatches.length} mismatches, integrity: ${reconciliation.integrityScore}`);
     
-    // Keywords for salary detection
-    const salaryKeywords = ['salary', 'sal cr', 'sal/', 'payroll', 'wages', 'income', 'stipend', 'pension', 'honorarium'];
-    const emiKeywords = ['emi', 'loan', 'instalment', 'installment', 'repayment', 'housing loan', 'car loan', 'personal loan', 'credit card', 'nach', 'auto debit'];
+    // Duplicate Detection
+    const duplicateCount = detectDuplicates(transactions);
+    console.log(`Duplicate detection: ${duplicateCount} duplicates found`);
     
-    // Fetch user's category corrections for behavioral learning (if authenticated)
-    let categoryCorrections: Map<string, string> = new Map();
+    // High-Risk Transaction Detection
+    const riskTransactions = detectHighRiskTransactions(transactions);
+    console.log(`High-risk detection: ${riskTransactions.length} risk types found`);
+    
+    // Circular Trading Detection
+    const circularResult = detectCircularTrading(transactions);
+    if (circularResult) {
+      riskTransactions.push(circularResult);
+    }
+    console.log(`Circular trading: ${circularResult ? circularResult.indices.length : 0} transactions flagged`);
+    
+    // Fetch user's category corrections for behavioral learning
+    let categoryCorrections: Map<string, string> | undefined;
     if (user) {
       const { data: corrections } = await supabaseAdmin
         .from('category_corrections')
@@ -953,253 +660,43 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
         .eq('user_id', user.id)
         .order('weight', { ascending: false });
       
-      if (corrections) {
-        corrections.forEach((c: any) => {
-          categoryCorrections.set(c.description_pattern.toLowerCase(), c.corrected_category);
+      if (corrections && corrections.length > 0) {
+        categoryCorrections = new Map();
+        corrections.forEach((c: { description_pattern: string; corrected_category: string }) => {
+          categoryCorrections!.set(c.description_pattern.toLowerCase(), c.corrected_category);
         });
         console.log(`Loaded ${corrections.length} category corrections for user`);
       }
     }
     
-    // Identify salary credits
-    interface SalaryCredit {
-      date: string;
-      amount: number;
-      description: string;
-      rowIndex: number;
-    }
-    const salaryCredits: SalaryCredit[] = [];
+    // FOIR and Underwriting Analysis
+    const underwritingResult = performUnderwritingAnalysis(transactions, categoryCorrections);
+    console.log(`FOIR Analysis: score=${underwritingResult.foir.score}%, status=${underwritingResult.foir.status}`);
     
-    // Identify EMI/Loan debits
-    interface EMIDebit {
-      date: string;
-      amount: number;
-      description: string;
-      rowIndex: number;
-      loanType: string;
-    }
-    const emiDebits: EMIDebit[] = [];
+    // Liquidity Analysis
+    const liquidityMetrics = analyzeLiquidity(transactions);
     
-    transactions.forEach((t: any, index: number) => {
-      const desc = t.description.toLowerCase();
-      
-      // Apply category corrections first (behavioral learning)
-      const correctedCategory = categoryCorrections.get(desc) || 
-                               [...categoryCorrections.entries()].find(([pattern]) => desc.includes(pattern))?.[1];
-      if (correctedCategory) {
-        t.category = correctedCategory;
-      }
-      
-      // Detect salary credits
-      if (t.credit > 0 && (
-        salaryKeywords.some(k => desc.includes(k)) ||
-        t.category === 'Salary/Income' ||
-        (t.credit >= 30000 && (desc.includes('neft') || desc.includes('rtgs') || desc.includes('imps')))
-      )) {
-        salaryCredits.push({
-          date: t.date,
-          amount: t.credit,
-          description: t.description,
-          rowIndex: index,
-        });
-        if (t.category !== 'Salary/Income') {
-          t.category = 'Salary/Income';
-        }
-      }
-      
-      // Detect EMI/Loan debits
-      if (t.debit > 0 && (
-        emiKeywords.some(k => desc.includes(k)) ||
-        t.category === 'Loan/EMI'
-      )) {
-        let loanType = 'Unknown';
-        if (desc.includes('housing') || desc.includes('home loan') || desc.includes('mortgage')) loanType = 'Housing';
-        else if (desc.includes('car') || desc.includes('vehicle') || desc.includes('auto')) loanType = 'Vehicle';
-        else if (desc.includes('personal') || desc.includes('pl')) loanType = 'Personal';
-        else if (desc.includes('credit card') || desc.includes('cc')) loanType = 'Credit Card';
-        else if (desc.includes('education') || desc.includes('student')) loanType = 'Education';
-        else if (emiKeywords.some(k => desc.includes(k))) loanType = 'EMI';
-        
-        emiDebits.push({
-          date: t.date,
-          amount: t.debit,
-          description: t.description,
-          rowIndex: index,
-          loanType,
-        });
-        if (t.category !== 'Loan/EMI') {
-          t.category = 'Loan/EMI';
-        }
-      }
-    });
+    // Generate Fraud Alerts
+    const fraudAlerts = generateFraudAlerts(
+      reconciliation,
+      riskTransactions,
+      liquidityMetrics,
+      transactions.length
+    );
     
-    // Calculate monthly aggregates
-    const monthlyData: Map<string, { salaries: number; emis: number }> = new Map();
-    
-    transactions.forEach((t: any) => {
-      const month = t.date.substring(0, 7);
-      if (!monthlyData.has(month)) {
-        monthlyData.set(month, { salaries: 0, emis: 0 });
-      }
-    });
-    
-    salaryCredits.forEach(s => {
-      const month = s.date.substring(0, 7);
-      const existing = monthlyData.get(month) || { salaries: 0, emis: 0 };
-      existing.salaries += s.amount;
-      monthlyData.set(month, existing);
-    });
-    
-    emiDebits.forEach(e => {
-      const month = e.date.substring(0, 7);
-      const existing = monthlyData.get(month) || { salaries: 0, emis: 0 };
-      existing.emis += e.amount;
-      monthlyData.set(month, existing);
-    });
-    
-    // Calculate average monthly income and EMI
-    const months = Array.from(monthlyData.values());
-    const totalSalaryIncome = months.reduce((sum, m) => sum + m.salaries, 0);
-    const totalEMIOutflow = months.reduce((sum, m) => sum + m.emis, 0);
-    const avgMonthlyIncome = months.length > 0 ? totalSalaryIncome / months.length : 0;
-    const avgMonthlyEMI = months.length > 0 ? totalEMIOutflow / months.length : 0;
-    
-    // Calculate FOIR (Fixed Obligation to Income Ratio)
-    const foirScore = avgMonthlyIncome > 0 ? (avgMonthlyEMI / avgMonthlyIncome) * 100 : 0;
-    
-    // Group EMI debits by loan type
-    const emiByType: Record<string, { count: number; totalAmount: number }> = {};
-    emiDebits.forEach(e => {
-      if (!emiByType[e.loanType]) {
-        emiByType[e.loanType] = { count: 0, totalAmount: 0 };
-      }
-      emiByType[e.loanType].count++;
-      emiByType[e.loanType].totalAmount += e.amount;
-    });
-    
-    // Underwriting recommendation
-    let eligibilityStatus: 'excellent' | 'good' | 'moderate' | 'poor' | 'ineligible' = 'good';
-    let eligibilityMessage = '';
-    const eligibilityFactors: string[] = [];
-    
-    if (foirScore === 0 && salaryCredits.length === 0) {
-      eligibilityStatus = 'moderate';
-      eligibilityMessage = 'No salary income detected. Unable to calculate FOIR.';
-      eligibilityFactors.push('No identifiable salary credits');
-    } else if (foirScore <= 30) {
-      eligibilityStatus = 'excellent';
-      eligibilityMessage = 'Excellent debt-to-income ratio. High loan eligibility.';
-      eligibilityFactors.push('FOIR below 30% - excellent');
-    } else if (foirScore <= 50) {
-      eligibilityStatus = 'good';
-      eligibilityMessage = 'Good debt-to-income ratio. Eligible for most loans.';
-      eligibilityFactors.push('FOIR between 30-50% - acceptable');
-    } else if (foirScore <= 65) {
-      eligibilityStatus = 'moderate';
-      eligibilityMessage = 'Moderate debt burden. May face stricter approval criteria.';
-      eligibilityFactors.push('FOIR above 50% - elevated');
-    } else {
-      eligibilityStatus = 'poor';
-      eligibilityMessage = 'High debt burden. Loan approval may be difficult.';
-      eligibilityFactors.push('FOIR above 65% - high risk');
-    }
-    
-    if (riskTransactions.some(r => r.type === 'gambling')) {
-      if (eligibilityStatus === 'excellent') eligibilityStatus = 'good';
-      else if (eligibilityStatus === 'good') eligibilityStatus = 'moderate';
-      eligibilityFactors.push('Gambling activity detected');
-    }
-    
-    if (riskTransactions.some(r => r.type === 'bouncedPayment')) {
-      if (eligibilityStatus === 'excellent' || eligibilityStatus === 'good') eligibilityStatus = 'moderate';
-      else if (eligibilityStatus === 'moderate') eligibilityStatus = 'poor';
-      eligibilityFactors.push('Bounced payments on record');
-    }
-    
-    // Track zero balance days for eligibility and integrity scoring
-    const zeroDays = transactions.filter((t: any) => t.balance <= 0);
-    
-    if (zeroDays.length > 0) {
-      eligibilityFactors.push('Zero/negative balance instances');
-      // Add liquidity crisis alert
-      fraudAlerts.push({
-        type: 'LIQUIDITY_CRISIS',
-        severity: zeroDays.length > 3 ? 'critical' : 'high',
-        description: `Account reached zero or negative balance on ${zeroDays.length} occasion(s). Indicates liquidity stress.`,
-        affectedRows: transactions.map((t: any, i: number) => t.balance <= 0 ? i : -1).filter((i: number) => i >= 0),
-        metadata: {
-          zeroDaysCount: zeroDays.length,
-          lowestBalance: Math.min(...transactions.map((t: any) => t.balance)),
-        },
-      });
-    }
-    
-    const disposableIncome = avgMonthlyIncome - avgMonthlyEMI;
-    const maxNewEMI = disposableIncome * 0.5;
-    const estimatedLoanEligibility = maxNewEMI > 0 ? maxNewEMI * 60 : 0;
-    
-    const underwritingAnalysis = {
-      salaryCredits: salaryCredits.map(s => ({
-        date: s.date,
-        amount: s.amount,
-        description: s.description,
-      })),
-      emiDebits: emiDebits.map(e => ({
-        date: e.date,
-        amount: e.amount,
-        description: e.description,
-        loanType: e.loanType,
-      })),
-      monthlyBreakdown: Array.from(monthlyData.entries()).map(([month, data]) => ({
-        month,
-        salaryIncome: data.salaries,
-        emiOutflow: data.emis,
-      })),
-      summary: {
-        avgMonthlyIncome,
-        avgMonthlyEMI,
-        foirScore: Math.round(foirScore * 100) / 100,
-        foirStatus: foirScore <= 30 ? 'excellent' : foirScore <= 50 ? 'good' : foirScore <= 65 ? 'moderate' : 'high',
-        emiByLoanType: emiByType,
-        totalSalaryDetected: salaryCredits.length,
-        totalEMIDetected: emiDebits.length,
-      },
-      eligibility: {
-        status: eligibilityStatus,
-        message: eligibilityMessage,
-        factors: eligibilityFactors,
-        maxNewEMI: Math.round(maxNewEMI),
-        estimatedLoanEligibility: Math.round(estimatedLoanEligibility),
-      },
-    };
-    
-    console.log(`FOIR Analysis complete. Score: ${foirScore.toFixed(2)}%, Status: ${eligibilityStatus}`);
+    // Calculate Final Integrity Score
+    const integrityScore = calculateIntegrityScore(reconciliation, riskTransactions, liquidityMetrics);
+    console.log(`Analysis complete. Integrity score: ${integrityScore}, Fraud alerts: ${fraudAlerts.length}`);
 
-    // LIQUIDITY ANALYSIS
-    const balances = transactions.map((t: any) => t.balance);
-    const minBalance = Math.min(...balances);
-    const maxBalance = Math.max(...balances);
-    const avgBalance = balances.reduce((a: number, b: number) => a + b, 0) / balances.length;
-    const minBalanceIndex = balances.indexOf(minBalance);
-    const maxDipDate = transactions[minBalanceIndex]?.date || null;
-
-    // Calculate integrity score (100 = perfect, 0 = highly suspicious)
-    let integrityScore = 100;
-    integrityScore -= Math.min(30, balanceMismatches.length * 3);
-    integrityScore -= Math.min(20, riskTransactions.length * 5);
-    integrityScore -= Math.min(20, zeroDays.length * 5);
-    integrityScore = Math.max(0, integrityScore);
-
-    console.log(`Fraud detection complete. Found ${fraudAlerts.length} alerts. Integrity score: ${integrityScore}`);
-
-    // Calculate analytics summary
-    const totalCredits = transactions.reduce((sum: number, t: any) => sum + (t.credit || 0), 0);
-    const totalDebits = transactions.reduce((sum: number, t: any) => sum + (t.debit || 0), 0);
-    const duplicateCount = transactions.filter((t: any) => t.isDuplicate).length;
+    // ============= LAYER 5: PROFESSIONAL EXCEL EXPORT =============
+    console.log('Generating professional Excel export...');
+    
+    const totalCredits = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
+    const totalDebits = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
     
     // Category breakdown
     const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
-    transactions.forEach((t: any) => {
+    transactions.forEach(t => {
       if (!categoryBreakdown[t.category]) {
         categoryBreakdown[t.category] = { count: 0, totalDebit: 0, totalCredit: 0 };
       }
@@ -1208,18 +705,35 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
       categoryBreakdown[t.category].totalCredit += t.credit || 0;
     });
 
-    // Risk analysis summary (including FOIR)
+    // Build underwriting analysis for response
+    const underwritingAnalysis = {
+      salaryCredits: underwritingResult.salaryCredits,
+      emiDebits: underwritingResult.emiDebits,
+      monthlyBreakdown: underwritingResult.monthlyBreakdown,
+      summary: {
+        avgMonthlyIncome: underwritingResult.foir.avgMonthlyIncome,
+        avgMonthlyEMI: underwritingResult.foir.avgMonthlyEMI,
+        foirScore: underwritingResult.foir.score,
+        foirStatus: underwritingResult.foir.status,
+        emiByLoanType: underwritingResult.emiByLoanType,
+        totalSalaryDetected: underwritingResult.salaryCredits.length,
+        totalEMIDetected: underwritingResult.emiDebits.length,
+      },
+      eligibility: underwritingResult.eligibility,
+    };
+
+    // Build risk analysis for response
     const riskAnalysis = {
       integrityScore,
-      balanceMismatches: balanceMismatches.length,
-      averageDailyBalance: avgBalance,
-      maxDip: { amount: minBalance, date: maxDipDate },
-      maxPeak: maxBalance,
+      balanceMismatches: reconciliation.mismatches.length,
+      averageDailyBalance: liquidityMetrics.avgBalance,
+      maxDip: { amount: liquidityMetrics.minBalance, date: liquidityMetrics.maxDipDate },
+      maxPeak: liquidityMetrics.maxBalance,
       riskFlags: riskTransactions.map(r => ({ type: r.type, count: r.indices.length })),
       fraudAlerts,
-      foirScore: Math.round(foirScore * 100) / 100,
-      avgMonthlyIncome,
-      avgMonthlyEMI,
+      foirScore: underwritingResult.foir.score,
+      avgMonthlyIncome: underwritingResult.foir.avgMonthlyIncome,
+      avgMonthlyEMI: underwritingResult.foir.avgMonthlyEMI,
     };
 
     const analytics = {
@@ -1233,19 +747,12 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
       underwriting: underwritingAnalysis,
     };
 
-    console.log(`Extracted ${transactions.length} transactions`);
-
-    // Generate Excel file
-    const worksheet = XLSX.utils.json_to_sheet(transactions);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
-    
-    // Write to buffer
-    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    // Generate Excel with ExcelJS
+    const excelBuffer = await generateProfessionalExcel(transactions, analytics);
     
     let resultPath = null;
 
-    // Only upload to storage for authenticated users
+    // Upload for authenticated users
     if (user && conversion) {
       resultPath = `${user.id}/results/${conversion.id}.xlsx`;
       const { error: uploadResultError } = await supabase.storage
@@ -1257,7 +764,6 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
 
       if (uploadResultError) {
         console.error('Failed to upload result:', uploadResultError);
-        // Don't fail, just skip storage
         resultPath = null;
       } else {
         console.log('Excel file uploaded successfully');
@@ -1271,10 +777,45 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
             result_path: resultPath,
           })
           .eq('id', conversion.id);
+          
+        // Store risk analysis
+        await supabaseAdmin
+          .from('risk_analysis')
+          .upsert({
+            user_id: user.id,
+            conversion_id: conversion.id,
+            integrity_score: integrityScore,
+            balance_mismatches: reconciliation.mismatches.length,
+            average_daily_balance: liquidityMetrics.avgBalance,
+            max_dip_amount: liquidityMetrics.minBalance,
+            max_dip_date: liquidityMetrics.maxDipDate,
+            total_inflow: totalCredits,
+            total_outflow: totalDebits,
+            net_cashflow: totalCredits - totalDebits,
+            foir_score: underwritingResult.foir.score,
+            salary_credits: underwritingResult.salaryCredits,
+            emi_debits: underwritingResult.emiDebits,
+            risk_flags: riskAnalysis.riskFlags,
+          });
+          
+        // Store fraud alerts
+        for (const alert of fraudAlerts) {
+          await supabaseAdmin
+            .from('fraud_alerts')
+            .insert({
+              user_id: user.id,
+              conversion_id: conversion.id,
+              alert_type: alert.type,
+              severity: alert.severity,
+              description: alert.description,
+              affected_rows: alert.affectedRows,
+              metadata: alert.metadata,
+            });
+        }
       }
     }
 
-    // Convert Excel buffer to base64 for anonymous users (chunk to avoid stack overflow)
+    // Convert Excel buffer to base64 for anonymous users
     const excelBytes = new Uint8Array(excelBuffer);
     let excelBase64 = '';
     const excelChunkSize = 8192;
@@ -1284,6 +825,8 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
     }
     excelBase64 = btoa(excelBase64);
 
+    console.log(`Conversion complete. ${transactions.length} transactions processed.`);
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -1291,7 +834,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
         resultPath: resultPath,
         transactions: transactions,
         analytics: analytics,
-        excelData: user ? null : excelBase64, // Only send base64 for anonymous users
+        excelData: user ? null : excelBase64,
         message: 'Conversion completed successfully',
         remaining: conversionsLimit - conversionsUsed - 1,
         isAuthenticated: !!user,

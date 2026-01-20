@@ -9,6 +9,13 @@ export interface ProcessedTransaction {
   credit: number;
   balance: number;
   originalDescription?: string;
+  isDuplicate?: boolean;
+  duplicateGroup?: number | null;
+  balanceMismatch?: boolean;
+  expectedBalance?: number | null;
+  riskFlag?: string | null;
+  amount?: number;
+  type?: string;
 }
 
 export interface CategorizationResult {
@@ -17,6 +24,26 @@ export interface CategorizationResult {
   error?: string;
   processingTimeMs?: number;
 }
+
+// Category list for external use
+export const CATEGORY_LIST = [
+  'Salary/Income',
+  'Transfer In',
+  'Transfer Out',
+  'Bills & Utilities',
+  'Shopping',
+  'Food & Dining',
+  'Transportation',
+  'Entertainment',
+  'Healthcare',
+  'Education',
+  'Insurance',
+  'Investments',
+  'Loan/EMI',
+  'Cash',
+  'Bank Fees',
+  'Other',
+];
 
 const GROQ_SYSTEM_PROMPT = `You are a lightning-fast transaction categorizer for bank statements. For each transaction:
 
@@ -226,9 +253,17 @@ export function fallbackCategorize(transactions: any[]): ProcessedTransaction[] 
       credit: typeof t.credit === 'number' ? Math.abs(t.credit) : 0,
       balance: typeof t.balance === 'number' ? t.balance : 0,
       originalDescription: t.description,
+      isDuplicate: false,
+      duplicateGroup: null,
+      balanceMismatch: false,
+      expectedBalance: null,
+      riskFlag: null,
     };
   });
 }
+
+// Alias for backward compatibility
+export const applyPatternCategorization = fallbackCategorize;
 
 function cleanDescription(desc: string): string {
   return desc
