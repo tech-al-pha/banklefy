@@ -6,15 +6,18 @@ import { UploadDemo } from "@/components/UploadDemo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Shield, History, Settings, PlayCircle } from "lucide-react"; // PlayCircle add kiya hai icon ke liye
+import { LogOut, Shield, Settings, PlayCircle, MessageCircle, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
+import { LanguageSelector } from "@/components/LanguageSelector";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Index = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -48,7 +51,7 @@ const Index = () => {
             <Logo />
             <div className="hidden md:flex items-center gap-6">
               
-              {/* FIXED: Demo Button matches History/Settings style now */}
+              {/* Demo Button */}
               <Button 
                 variant="ghost"
                 size="sm" 
@@ -59,17 +62,29 @@ const Index = () => {
                 className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium"
               >
                 <PlayCircle className="h-4 w-4" />
-                Demo
+                {t('nav.demo')}
               </Button>
 
+              {/* About Button */}
+              <Button 
+                variant="ghost"
+                size="sm" 
+                onClick={() => navigate('/about')}
+                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
+              >
+                <Info className="h-4 w-4" />
+                {t('nav.about')}
+              </Button>
+
+              {/* Chat Aura Button */}
               <Button 
                 variant="ghost"
                 size="sm" 
                 onClick={() => navigate('/dashboard')}
                 className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
               >
-                <History className="h-4 w-4" />
-                History
+                <MessageCircle className="h-4 w-4" />
+                {t('nav.chatAura')}
               </Button>
 
               <Button 
@@ -79,7 +94,7 @@ const Index = () => {
                 className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
               >
                 <Settings className="h-4 w-4" />
-                Settings
+                {t('nav.settings')}
               </Button>
 
               {isAdmin && (
@@ -90,9 +105,12 @@ const Index = () => {
                   className="text-sm gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all"
                 >
                   <Shield className="h-4 w-4" />
-                  Admin
+                  {t('nav.admin')}
                 </Button>
               )}
+
+              {/* Language Selector */}
+              <LanguageSelector />
 
               <Button 
                 variant="outline" 
@@ -103,10 +121,10 @@ const Index = () => {
                 {user ? (
                   <>
                     <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
+                    {t('nav.signOut')}
                   </>
                 ) : (
-                  'Sign In'
+                  t('nav.signIn')
                 )}
               </Button>
 
@@ -117,7 +135,7 @@ const Index = () => {
                   document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
                 }}
               >
-                Get Started
+                {t('nav.getStarted')}
               </Button>
             </div>
           </div>
@@ -144,15 +162,14 @@ const Index = () => {
         <div className="absolute inset-0 bg-gradient-primary opacity-10" />
         <div className="container mx-auto text-center relative z-10 space-y-6">
           <h2 className="text-4xl md:text-5xl font-bold">
-            Ready to Transform Your
+            {t('footer.cta.title')}
             <br />
             <span className="bg-gradient-primary bg-clip-text text-transparent">
-              Financial Workflow?
+              {t('footer.cta.subtitle')}
             </span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Join thousands of businesses and individuals who trust Akromeda for accurate, 
-            instant bank statement conversions.
+            {t('footer.cta.desc')}
           </p>
           <button 
             className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 px-8 py-3 rounded-md font-bold"
@@ -160,7 +177,7 @@ const Index = () => {
               document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
             }}
           >
-            Start Converting Now
+            {t('footer.cta.btn')}
           </button>
         </div>
       </section>
@@ -172,31 +189,31 @@ const Index = () => {
             <div className="space-y-4">
               <Logo />
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Transform your bank statements into organized Excel files instantly with AI-powered precision.
+                {t('hero.subtitle')}
               </p>
             </div>
             
             <div className="flex flex-col md:items-center">
               <div>
-                <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">Product</h4>
+                <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.product')}</h4>
                 <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li><a href="#features" className="hover:text-primary transition-colors">Features</a></li>
-                  <li><a href="#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
-                  <li><a href="#demo" className="hover:text-primary transition-colors">How It Works</a></li>
+                  <li><a href="#features" className="hover:text-primary transition-colors">{t('footer.features')}</a></li>
+                  <li><a href="#pricing" className="hover:text-primary transition-colors">{t('footer.pricing')}</a></li>
+                  <li><a href="#demo" className="hover:text-primary transition-colors">{t('footer.howItWorks')}</a></li>
                 </ul>
               </div>
             </div>
             
             <div className="flex flex-col md:items-end">
               <div className="w-full md:w-auto">
-                <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">Company</h4>
+                <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.company')}</h4>
                 <ul className="space-y-3 text-sm text-muted-foreground">
                   <li>
                     <button 
                       onClick={() => navigate('/about')}
                       className="hover:text-primary transition-colors text-left font-medium"
                     >
-                      About 
+                      {t('footer.about')}
                     </button>
                   </li>
                   <li>
@@ -204,7 +221,7 @@ const Index = () => {
                       onClick={() => navigate('/privacy')}
                       className="hover:text-primary transition-colors text-left font-medium"
                     >
-                      Privacy Policy
+                      {t('footer.privacy')}
                     </button>
                   </li>
                 </ul>
@@ -213,7 +230,7 @@ const Index = () => {
           </div>
           
           <div className="pt-8 border-t border-primary/10 text-center text-xs text-muted-foreground tracking-[0.2em] uppercase">
-            <p>© 2026 Akromeda. Created by Faizan Rizvi.</p>
+            <p>{t('footer.copyright')}</p>
           </div>
         </div>
       </footer>

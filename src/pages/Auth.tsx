@@ -10,15 +10,25 @@ import { useAuth } from '@/hooks/useAuth';
 import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
 import amLogo from '@/assets/am-logo.png';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const emailSchema = z.string().email('Invalid email address').max(255);
 const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
 
 type AuthMode = 'login' | 'signup' | 'forgot' | 'reset';
 
+// Key for storing remembered email
+const REMEMBERED_EMAIL_KEY = 'akromeda_remembered_email';
+
 export default function Auth() {
-  const [mode, setMode] = useState<AuthMode>('login');
-  const [email, setEmail] = useState('');
+  const { t } = useLanguage();
+  
+  // Check if user has visited before (returning user)
+  const rememberedEmail = localStorage.getItem(REMEMBERED_EMAIL_KEY);
+  const isReturningUser = !!rememberedEmail;
+  
+  const [mode, setMode] = useState<AuthMode>(isReturningUser ? 'login' : 'signup');
+  const [email, setEmail] = useState(rememberedEmail || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -200,9 +210,12 @@ export default function Auth() {
           return;
         }
 
+        // Remember this email for next time
+        localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim());
+
         toast({
-          title: 'Welcome back!',
-          description: 'You have successfully signed in.',
+          title: t('auth.welcome'),
+          description: t('auth.signedIn'),
         });
         navigate('/');
       } else {
@@ -227,9 +240,12 @@ export default function Auth() {
           return;
         }
 
+        // Remember this email for next time
+        localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim());
+
         toast({
-          title: 'Account created!',
-          description: 'You can now start using Akromeda.',
+          title: t('auth.accountCreated'),
+          description: t('auth.canUse'),
         });
         navigate('/');
       }
@@ -253,7 +269,7 @@ export default function Auth() {
       case 'signup':
         return 'Create a new account';
       default:
-        return 'Sign in to your account';
+        return isReturningUser ? `Welcome back! Sign in as ${rememberedEmail}` : 'Sign in to your account';
     }
   };
 
@@ -286,7 +302,7 @@ export default function Auth() {
           {mode === 'forgot' && (
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('auth.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -403,7 +419,7 @@ export default function Auth() {
             <>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t('auth.email')}</Label>
                   <Input
                     id="email"
                     type="email"
@@ -414,9 +430,22 @@ export default function Auth() {
                     disabled={loading}
                     className="bg-background/50"
                   />
+                  {isReturningUser && mode === 'login' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+                        setEmail('');
+                        setMode('signup');
+                      }}
+                      className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                    >
+                      Not you? Use a different account
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">{t('auth.password')}</Label>
                   <div className="relative">
                     <Input
                       id="password"
@@ -449,7 +478,7 @@ export default function Auth() {
                     className="text-sm text-muted-foreground hover:text-primary hover:underline"
                     disabled={loading}
                   >
-                    Forgot password?
+                    {t('auth.forgotPassword')}
                   </button>
                 )}
                 <Button
@@ -463,7 +492,7 @@ export default function Auth() {
                       {mode === 'login' ? 'Signing in...' : 'Creating account...'}
                     </>
                   ) : (
-                    mode === 'login' ? 'Sign In' : 'Sign Up'
+                    mode === 'login' ? t('auth.signIn') : t('auth.signUp')
                   )}
                 </Button>
               </form>
@@ -476,8 +505,8 @@ export default function Auth() {
                   disabled={loading}
                 >
                   {mode === 'login'
-                    ? "Don't have an account? Sign up"
-                    : 'Already have an account? Sign in'}
+                    ? t('auth.noAccount')
+                    : t('auth.hasAccount')}
                 </button>
               </div>
             </>
