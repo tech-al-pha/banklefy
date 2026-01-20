@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, RefreshCw, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -126,6 +126,7 @@ export const UploadDemo = () => {
   const [pdfPassword, setPdfPassword] = useState('');
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
+  const [lastError, setLastError] = useState<{ message: string; canRetry: boolean } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -214,6 +215,9 @@ export const UploadDemo = () => {
   };
 
   const handleConvert = async () => {
+    // Clear previous errors
+    setLastError(null);
+    
     if (!selectedFile) {
       toast({
         title: "No File Selected",
@@ -401,25 +405,44 @@ export const UploadDemo = () => {
       }
     } catch (error: any) {
       console.error('Conversion error:', error);
-      const errorMessage = error.message || '';
+      const errorMessage = error.message || 'An unexpected error occurred';
       
       // Check if it's a password-related error
       if (errorMessage.toLowerCase().includes('password') || 
           errorMessage.toLowerCase().includes('encrypted') ||
           errorMessage.toLowerCase().includes('protected')) {
         setPasswordError(true);
+        setLastError({ message: 'This PDF is password-protected. Please enter the correct password.', canRetry: true });
         toast({
           variant: "destructive",
           title: "Password Required",
           description: "This PDF is password-protected. Please enter the correct password.",
         });
-      } else {
-        // Reset reCAPTCHA on error so user can try again
-        resetRecaptcha();
+      } else if (errorMessage.toLowerCase().includes('limit')) {
+        // Limit reached - cannot retry
+        setLastError({ message: errorMessage, canRetry: false });
         toast({
           variant: "destructive",
-          title: "Conversion failed",
-          description: errorMessage || "An error occurred during conversion.",
+          title: "Limit Reached",
+          description: errorMessage,
+        });
+      } else if (errorMessage.toLowerCase().includes('captcha') || errorMessage.toLowerCase().includes('verification')) {
+        // CAPTCHA error - can retry after completing verification
+        resetRecaptcha();
+        setLastError({ message: 'Verification failed. Please complete the CAPTCHA again.', canRetry: true });
+        toast({
+          variant: "destructive",
+          title: "Verification Failed",
+          description: "Please complete the CAPTCHA verification again.",
+        });
+      } else {
+        // General error - can retry
+        resetRecaptcha();
+        setLastError({ message: errorMessage, canRetry: true });
+        toast({
+          variant: "destructive",
+          title: "Conversion Failed",
+          description: errorMessage,
         });
       }
     } finally {
@@ -673,8 +696,35 @@ export const UploadDemo = () => {
                 </div>
               )}
 
+              {/* Error Panel with Retry */}
+              {lastError && selectedFile && !converting && !uploading && (
+                <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-xl space-y-3">
+                  <div className="flex items-start gap-3">
+                    <XCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-destructive">Conversion Failed</p>
+                      <p className="text-sm text-muted-foreground mt-1">{lastError.message}</p>
+                    </div>
+                  </div>
+                  {lastError.canRetry && (
+                    <Button
+                      variant="outline"
+                      className="w-full border-destructive/50 hover:bg-destructive/10 text-destructive"
+                      onClick={() => {
+                        setLastError(null);
+                        handleConvert();
+                      }}
+                      disabled={!user && !recaptchaToken}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Try Again
+                    </Button>
+                  )}
+                </div>
+              )}
+
               {/* Convert Button */}
-              {selectedFile && !limitReached && (
+              {selectedFile && !limitReached && !lastError && (
                 <div className="text-center">
                   <Button
                     size="lg"
