@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, RefreshCw, XCircle, FileDown } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -127,6 +127,7 @@ export const UploadDemo = () => {
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
   const [lastError, setLastError] = useState<{ message: string; canRetry: boolean } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -169,13 +170,8 @@ export const UploadDemo = () => {
     setSelectedFile(file);
     setPasswordError(false);
     setPdfPassword('');
-    
-    // Show password input for PDF files
-    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-      setShowPasswordInput(true);
-    } else {
-      setShowPasswordInput(false);
-    }
+    setShowPasswordInput(false); // Don't show password field by default - only when backend says it's needed
+    setShowPassword(false);
     
     // Show reCAPTCHA for anonymous users
     if (!user) {
@@ -927,29 +923,38 @@ export const UploadDemo = () => {
                 </div>
               </div>
 
-              {/* PDF Password Input - Always visible for PDF files */}
+              {/* PDF Password Input - Only show when password is required */}
               {selectedFile && showPasswordInput && !limitReached && (
-                <div className="space-y-4 p-6 bg-muted/10 rounded-xl border-2 border-primary/30">
+                <div className="space-y-4 p-6 bg-destructive/5 rounded-xl border-2 border-destructive/30">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/20 rounded-lg">
-                      <Lock className="h-5 w-5 text-primary" />
+                    <div className="p-2 bg-destructive/20 rounded-lg">
+                      <Lock className="h-5 w-5 text-destructive" />
                     </div>
                     <div>
-                      <p className="font-semibold text-primary">PDF Password (optional)</p>
-                      <p className="text-xs text-muted-foreground">Enter password if your PDF is protected</p>
+                      <p className="font-semibold text-destructive">Password Required</p>
+                      <p className="text-xs text-muted-foreground">This PDF is password protected. Enter the password to continue.</p>
                     </div>
                   </div>
                   
-                  <Input
-                    type="password"
-                    placeholder="Enter PDF password..."
-                    value={pdfPassword}
-                    onChange={(e) => {
-                      setPdfPassword(e.target.value);
-                      setPasswordError(false);
-                    }}
-                    className={`bg-background/50 border-2 ${passwordError ? 'border-destructive focus:border-destructive' : 'border-primary/40 focus:border-primary'}`}
-                  />
+                  <div className="relative">
+                    <Input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter PDF password..."
+                      value={pdfPassword}
+                      onChange={(e) => {
+                        setPdfPassword(e.target.value);
+                        setPasswordError(false);
+                      }}
+                      className={`bg-background/50 border-2 pr-10 ${passwordError ? 'border-destructive focus:border-destructive' : 'border-destructive/40 focus:border-destructive'}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                   
                   {passwordError && (
                     <p className="text-sm text-destructive flex items-center gap-1">
