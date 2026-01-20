@@ -372,20 +372,38 @@ Deno.serve(async (req) => {
     
     if (lowerFileName.endsWith('.pdf')) {
       try {
-        // First, try to load without password to detect if it's encrypted
+        // First, try using pdfjs-dist WITHOUT password to check if PDF needs one
+        // This is more reliable than pdf-lib for detecting encryption
         try {
-          const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: false });
-          // If we get here, PDF is not encrypted
-          processedBytes = await pdfDoc.save();
-          console.log('PDF processed successfully (not encrypted), pages:', pdfDoc.getPageCount());
+          const testLoadingTask = pdfjsLib.getDocument({
+            data: bytes.slice(), // Use a copy to avoid consuming the buffer
+          });
+          
+          const testPdfDoc = await testLoadingTask.promise;
+          // If we get here, PDF is NOT encrypted - it opened fine without password
+          console.log('PDF is not encrypted, pages:', testPdfDoc.numPages);
+          
+          // Now use pdf-lib to process the bytes for compatibility
+          try {
+            const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+            processedBytes = await pdfDoc.save();
+          } catch {
+            // If pdf-lib fails, just use original bytes
+            processedBytes = bytes;
+          }
         } catch (pdfError: unknown) {
           const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError);
           console.log('PDF check result:', errorMsg);
           
-          // Check if it's a password/encryption error
-          if (errorMsg.toLowerCase().includes('encrypt') || 
-              errorMsg.toLowerCase().includes('password') ||
-              errorMsg.toLowerCase().includes('protected')) {
+          // Only treat as encrypted if pdfjs-dist explicitly says it needs a password
+          // Look for specific password-related error messages from pdfjs-dist
+          const isPasswordError = 
+            errorMsg.includes('PasswordException') ||
+            errorMsg.includes('Incorrect Password') ||
+            errorMsg.includes('No password given') ||
+            (errorMsg.toLowerCase().includes('password') && errorMsg.toLowerCase().includes('required'));
+          
+          if (isPasswordError) {
             isEncryptedPdf = true;
             
             if (!pdfPassword || !pdfPassword.trim()) {
