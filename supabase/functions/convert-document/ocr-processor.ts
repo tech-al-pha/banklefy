@@ -1,7 +1,7 @@
-// ============= GEMINI FLASH OCR PROCESSOR =============
-// Specialized for scanned/image documents
+// ============= GROQ VISION OCR PROCESSOR =============
+// Using Groq's Llama Vision model for OCR
 
-export interface GeminiOCRResult {
+export interface OCRResult {
   success: boolean;
   text?: string;
   transactions?: RawTransaction[];
@@ -19,7 +19,7 @@ export interface RawTransaction {
   type?: string;
 }
 
-const GEMINI_OCR_PROMPT = `You are an expert OCR and bank statement data extraction specialist with advanced image recognition capabilities.
+const OCR_PROMPT = `You are an expert OCR and bank statement data extraction specialist with advanced image recognition capabilities.
 
 CRITICAL OCR INSTRUCTIONS:
 1. Carefully examine EVERY pixel of the document for transaction data
@@ -46,62 +46,58 @@ BANK-SPECIFIC HANDLING:
 
 Return ONLY a valid JSON array, no markdown, no explanation.`;
 
-export async function callGeminiFlashOCR(
+export async function callGroqVisionOCR(
   imageBase64: string, 
   mimeType: string
-): Promise<GeminiOCRResult> {
-  const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+): Promise<OCRResult> {
+  const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
   
-  if (!GEMINI_API_KEY) {
-    console.log('GEMINI_API_KEY not configured, skipping Gemini OCR');
-    return { success: false, error: 'Gemini API key not configured' };
+  if (!GROQ_API_KEY) {
+    console.log('GROQ_API_KEY not configured, skipping Groq Vision OCR');
+    return { success: false, error: 'Groq API key not configured' };
   }
   
   try {
-    console.log('Calling Gemini 2.0 Flash for OCR...');
+    console.log('Calling Groq Llama Vision for OCR...');
     
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: GEMINI_OCR_PROMPT + '\n\nExtract ALL transactions from this bank statement. Return only JSON array.' },
+    const dataUrl = `data:${mimeType};base64,${imageBase64}`;
+    
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.2-90b-vision-preview',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: OCR_PROMPT + '\n\nExtract ALL transactions from this bank statement. Return only JSON array.' },
               { 
-                inline_data: { 
-                  mime_type: mimeType, 
-                  data: imageBase64 
-                } 
+                type: 'image_url', 
+                image_url: { url: dataUrl } 
               }
             ]
-          }],
-          generationConfig: { 
-            temperature: 0.1,
-            maxOutputTokens: 8192,
-          },
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-          ]
-        })
-      }
-    );
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 8000,
+      })
+    });
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Gemini OCR error:', response.status, errorText);
-      return { success: false, error: `Gemini API error: ${response.status}` };
+      console.error('Groq Vision OCR error:', response.status, errorText);
+      return { success: false, error: `Groq API error: ${response.status}` };
     }
     
     const data = await response.json();
-    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const textContent = data.choices?.[0]?.message?.content;
     
     if (!textContent) {
-      return { success: false, error: 'No content in Gemini response' };
+      return { success: false, error: 'No content in Groq response' };
     }
     
     // Parse JSON from response
@@ -109,17 +105,17 @@ export async function callGeminiFlashOCR(
     if (jsonMatch) {
       try {
         const transactions = JSON.parse(jsonMatch[0]);
-        console.log(`Gemini OCR extracted ${transactions.length} transactions`);
+        console.log(`Groq Vision OCR extracted ${transactions.length} transactions`);
         return { success: true, transactions, text: textContent };
       } catch (parseError) {
-        console.error('Failed to parse Gemini JSON:', parseError);
+        console.error('Failed to parse Groq JSON:', parseError);
         return { success: true, text: textContent };
       }
     }
     
     return { success: true, text: textContent };
   } catch (error) {
-    console.error('Gemini OCR error:', error);
+    console.error('Groq Vision OCR error:', error);
     return { 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error' 
@@ -152,14 +148,11 @@ export function classifyDocument(
     };
   }
   
-  // Since PDFJS doesn't work in Deno edge functions, we always use OCR for PDFs
-  // This ensures Gemini processes all documents consistently
+  // All PDFs need OCR since we can't extract text in edge functions
   return {
-    type: 'scanned', // Treat all PDFs as needing OCR
+    type: 'scanned',
     textDensity: 0,
     needsOCR: true,
     confidence: 1.0,
   };
 }
-
-// Note: extractTextWithPDFJS is removed as pdfjs-dist doesn't work in Deno edge functions
