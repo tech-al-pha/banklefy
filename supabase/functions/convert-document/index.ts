@@ -2,13 +2,13 @@
 // Main orchestrator that routes to specialized modules
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-import * as pdfjsLib from 'https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs';
+// Note: pdfjs-dist doesn't work in Deno edge functions due to worker requirements
+// We use Gemini OCR directly for PDF processing instead
 
 // Import modular processors
 import { 
   callGeminiFlashOCR, 
   classifyDocument, 
-  extractTextWithPDFJS,
   type RawTransaction 
 } from './ocr-processor.ts';
 import { 
@@ -371,66 +371,8 @@ Deno.serve(async (req) => {
     let rawTransactions: RawTransaction[] = [];
     let pageCount = 0;
     
-    // First, try to extract text directly (for password-protected PDFs)
-    if (lowerFileName.endsWith('.pdf')) {
-      try {
-        // Check if PDF needs a password
-        try {
-          const testResult = await extractTextWithPDFJS(bytes, pdfjsLib);
-          extractedText = testResult.text;
-          pageCount = testResult.pageCount;
-          console.log('PDF is not encrypted, extracted text length:', extractedText.length);
-        } catch (pdfError: unknown) {
-          const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError);
-          console.log('PDF check result:', errorMsg);
-          
-          const isPasswordError = 
-            errorMsg.includes('PasswordException') ||
-            errorMsg.includes('Incorrect Password') ||
-            errorMsg.includes('No password given') ||
-            (errorMsg.toLowerCase().includes('password') && errorMsg.toLowerCase().includes('required'));
-          
-          if (isPasswordError) {
-            if (!pdfPassword || !pdfPassword.trim()) {
-              return new Response(
-                JSON.stringify({ 
-                  error: 'This PDF is password-protected. Please enter the password and try again.',
-                  requiresPassword: true 
-                }),
-                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-              );
-            }
-            
-            // Try with password
-            try {
-              const result = await extractTextWithPDFJS(bytes, pdfjsLib, pdfPassword);
-              extractedText = result.text;
-              pageCount = result.pageCount;
-              console.log('PDF decrypted successfully, pages:', pageCount);
-            } catch (decryptError: unknown) {
-              const decryptMsg = decryptError instanceof Error ? decryptError.message : String(decryptError);
-              console.log('PDF decryption error:', decryptMsg);
-              
-              if (decryptMsg.toLowerCase().includes('incorrect password') || 
-                  decryptMsg.toLowerCase().includes('wrong password') ||
-                  decryptMsg.toLowerCase().includes('invalid password')) {
-                return new Response(
-                  JSON.stringify({ 
-                    error: 'Incorrect PDF password. Please check and try again.',
-                    requiresPassword: true,
-                    wrongPassword: true
-                  }),
-                  { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                );
-              }
-              throw decryptError;
-            }
-          }
-        }
-      } catch (outerError) {
-        console.log('PDF processing outer error, will try OCR:', outerError);
-      }
-    }
+    // Note: PDFJS doesn't work in Deno edge functions, so we skip text extraction 
+    // and rely on Gemini OCR for all PDF processing
 
     // ============= LAYER 2: INTELLIGENT PROCESSING ROUTER =============
     const classification = classifyDocument(extractedText, bytes, fileName);

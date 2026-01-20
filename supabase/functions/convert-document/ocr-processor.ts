@@ -61,7 +61,7 @@ export async function callGeminiFlashOCR(
     console.log('Calling Gemini 1.5 Flash for OCR...');
     
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,61 +152,14 @@ export function classifyDocument(
     };
   }
   
-  // Calculate text density for PDFs
-  const textLength = extractedText.length;
-  const textDensity = fileBytes.length > 0 ? textLength / fileBytes.length : 0;
-  
-  // If text density > 0.01 and text > 500 chars, it's a digital PDF
-  if (textDensity > 0.01 && textLength > 500) {
-    return {
-      type: 'digital',
-      textDensity,
-      needsOCR: false,
-      confidence: Math.min(1.0, textDensity * 10),
-    };
-  }
-  
-  // Otherwise it's likely scanned
+  // Since PDFJS doesn't work in Deno edge functions, we always use OCR for PDFs
+  // This ensures Gemini processes all documents consistently
   return {
-    type: 'scanned',
-    textDensity,
+    type: 'scanned', // Treat all PDFs as needing OCR
+    textDensity: 0,
     needsOCR: true,
-    confidence: 1.0 - Math.min(0.9, textDensity * 10),
+    confidence: 1.0,
   };
 }
 
-// ============= TEXT EXTRACTION FROM PDFJS =============
-export async function extractTextWithPDFJS(
-  bytes: Uint8Array,
-  pdfjsLib: any,
-  password?: string
-): Promise<{ text: string; pageCount: number }> {
-  try {
-    const loadingOptions: any = { data: bytes.slice() };
-    if (password) {
-      loadingOptions.password = password.trim();
-    }
-    
-    const loadingTask = pdfjsLib.getDocument(loadingOptions);
-    const pdfDocument = await loadingTask.promise;
-    
-    const textParts: string[] = [];
-    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-      const page = await pdfDocument.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .filter((item: any) => 'str' in item)
-        .map((item: any) => item.str || '')
-        .join(' ');
-      textParts.push(`--- Page ${pageNum} ---\n${pageText}`);
-    }
-    
-    return {
-      text: textParts.join('\n\n'),
-      pageCount: pdfDocument.numPages,
-    };
-  } catch (error) {
-    console.error('PDFJS extraction error:', error);
-    throw error;
-  }
-}
+// Note: extractTextWithPDFJS is removed as pdfjs-dist doesn't work in Deno edge functions
