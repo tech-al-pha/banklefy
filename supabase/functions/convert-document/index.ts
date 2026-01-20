@@ -403,17 +403,74 @@ Deno.serve(async (req) => {
         extractedText = ocrResult.text;
         console.log('Gemini OCR extracted text, will parse for transactions');
       } else {
-        console.log('Gemini OCR failed or returned no data, falling back to Lovable AI');
+        console.log('Gemini OCR failed or returned no data, will try Groq next');
       }
     }
 
-    // If we don't have transactions yet, use Lovable AI for extraction
+    // If Gemini failed, try Groq for text-based extraction
+    if (rawTransactions.length === 0 && extractedText && extractedText.trim().length > 100) {
+      console.log('Attempting Groq-based transaction extraction...');
+      
+      const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+      if (GROQ_API_KEY) {
+        try {
+          const groqExtractionResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${GROQ_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'llama-3.3-70b-versatile',
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are an expert bank statement data extraction specialist. Extract ALL transactions.
+
+UNIVERSAL SCHEMA (all fields required):
+- date: Normalized to YYYY-MM-DD format
+- description: Clean transaction description  
+- category: One of: ${CATEGORY_LIST.join(', ')}
+- debit: Amount debited (positive number, 0 if credit)
+- credit: Amount credited (positive number, 0 if debit)
+- balance: Running balance after transaction
+
+Return ONLY a valid JSON array, no markdown, no explanation.`
+                },
+                {
+                  role: 'user',
+                  content: `Extract ALL transactions from this bank statement:\n\n${extractedText.substring(0, 30000)}`
+                }
+              ],
+              temperature: 0.1,
+              max_tokens: 8000,
+            }),
+          });
+
+          if (groqExtractionResponse.ok) {
+            const groqData = await groqExtractionResponse.json();
+            const responseText = groqData.choices?.[0]?.message?.content || '';
+            const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              rawTransactions = JSON.parse(jsonMatch[0]);
+              console.log(`Groq extracted ${rawTransactions.length} transactions`);
+            }
+          } else {
+            console.error('Groq extraction error:', await groqExtractionResponse.text());
+          }
+        } catch (groqError) {
+          console.error('Groq extraction failed:', groqError);
+        }
+      }
+    }
+
+    // If still no transactions, try Lovable AI as final fallback
     if (rawTransactions.length === 0) {
-      console.log('Using Lovable AI for transaction extraction...');
+      console.log('Using Lovable AI for transaction extraction (final fallback)...');
       
       const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
       if (!LOVABLE_API_KEY) {
-        throw new Error('LOVABLE_API_KEY not configured');
+        throw new Error('No AI service available. Please configure GEMINI_API_KEY or GROQ_API_KEY.');
       }
 
       // Build AI request based on whether we have text or need image processing
@@ -497,6 +554,11 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
         const errorText = await aiResponse.text();
         console.error('AI API error:', aiResponse.status, errorText);
         
+        // If Lovable AI also fails, provide helpful error
+        if (aiResponse.status === 402) {
+          throw new Error('AI service credits exhausted. Please ensure your GEMINI_API_KEY is configured correctly.');
+        }
+        
         try {
           const errorData = JSON.parse(errorText);
           const rawError = errorData?.error?.metadata?.raw;
@@ -515,7 +577,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
           }
         } catch (parseErr) {
           if (parseErr instanceof Error && 
-              (parseErr.message.includes('document') || parseErr.message.includes('password'))) {
+              (parseErr.message.includes('document') || parseErr.message.includes('password') || parseErr.message.includes('credits'))) {
             throw parseErr;
           }
         }
