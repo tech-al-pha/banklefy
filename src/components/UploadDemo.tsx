@@ -210,6 +210,44 @@ export const UploadDemo = () => {
     });
   };
 
+  const pdfToPageImages = async (file: File, password?: string): Promise<string[]> => {
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({
+      data: arrayBuffer,
+      password: password || undefined,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
+
+    const pdf = await loadingTask.promise;
+    // Safety cap to prevent huge payloads/timeouts
+    const MAX_PAGES = 10;
+    const pageCount = Math.min(pdf.numPages, MAX_PAGES);
+
+    const images: string[] = [];
+    for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.6 });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // JPEG keeps payload smaller than PNG
+      images.push(canvas.toDataURL('image/jpeg', 0.82));
+    }
+
+    return images;
+  };
+
   const handleConvert = async () => {
     // Clear previous errors
     setLastError(null);
@@ -251,6 +289,7 @@ export const UploadDemo = () => {
 
     try {
       const timezone = getTimezone();
+      const isPdf = selectedFile.name.toLowerCase().endsWith('.pdf');
       let requestBody: any = {
         fileName: selectedFile.name,
         timezone,
@@ -264,6 +303,21 @@ export const UploadDemo = () => {
       // Add reCAPTCHA token for anonymous users
       if (!user && recaptchaToken) {
         requestBody.recaptchaToken = recaptchaToken;
+      }
+
+      // For PDFs: render page images client-side and send to backend (Groq Vision can't accept PDFs directly)
+      if (isPdf) {
+        try {
+          requestBody.pdfPageImages = await pdfToPageImages(selectedFile, pdfPassword.trim() || undefined);
+        } catch (err: any) {
+          // Surface password errors in existing UX
+          if (err?.name === 'PasswordException' || String(err?.message || '').toLowerCase().includes('password')) {
+            setPasswordError(true);
+            setShowPasswordInput(true);
+            throw new Error('This PDF is password-protected. Please enter the correct password.');
+          }
+          throw err;
+        }
       }
 
       if (user) {
@@ -284,9 +338,11 @@ export const UploadDemo = () => {
 
         requestBody.fileId = filePath;
       } else {
-        // Anonymous user - send file as base64
-        const base64Data = await fileToBase64(selectedFile);
-        requestBody.fileData = base64Data;
+        if (!isPdf) {
+          // Anonymous user - send file as base64 (images)
+          const base64Data = await fileToBase64(selectedFile);
+          requestBody.fileData = base64Data;
+        }
       }
 
       toast({
