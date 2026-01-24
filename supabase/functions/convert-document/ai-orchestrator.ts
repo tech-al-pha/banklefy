@@ -4,12 +4,13 @@
 
 import { callGroqVisionOCR, type RawTransaction } from './ocr-processor.ts';
 import { callMistralCategorizer, type ProcessedTransaction } from './mistral-processor.ts';
-import { callGroqCategorizer, applyPatternCategorization } from './categorizer.ts';
+import { callGroqCategorizer, applyPatternCategorization, CATEGORY_LIST } from './categorizer.ts';
 
 // ============= ERROR TRACKING =============
 export interface AIProcessingStatus {
   groqVision: { used: boolean; success: boolean; error?: string; time?: number };
   mistral: { used: boolean; success: boolean; error?: string; time?: number };
+  groqText: { used: boolean; success: boolean; error?: string; time?: number };
   patternFallback: { used: boolean; success: boolean };
 }
 
@@ -36,6 +37,7 @@ export async function performExtraction(
   const status: AIProcessingStatus = {
     groqVision: { used: false, success: false },
     mistral: { used: false, success: false },
+    groqText: { used: false, success: false },
     patternFallback: { used: false, success: false },
   };
   
@@ -50,17 +52,87 @@ export async function performExtraction(
   const ocrResult = await callGroqVisionOCR(base64Data, mimeType);
   status.groqVision.time = Date.now() - groqStartTime;
   
-  if (ocrResult.success) {
-    finalExtractedText = ocrResult.text || finalExtractedText;
-    transactions = ocrResult.transactions || [];
+  if (ocrResult.success && ocrResult.transactions && ocrResult.transactions.length > 0) {
+    transactions = ocrResult.transactions;
     status.groqVision.success = true;
-    console.log(`✅ Groq Vision OCR done in ${status.groqVision.time}ms (parsedTransactions=${transactions.length})`);
+    console.log(`✅ Groq Vision extracted ${transactions.length} transactions in ${status.groqVision.time}ms`);
+    return { transactions, status, extractedText: ocrResult.text };
+  } else if (ocrResult.success && ocrResult.text) {
+    finalExtractedText = ocrResult.text;
+    status.groqVision.success = true;
+    console.log(`✅ Groq Vision extracted text (${finalExtractedText.length} chars), will try Groq Text next`);
   } else {
     status.groqVision.error = ocrResult.error || 'No data extracted';
     console.log(`❌ Groq Vision failed: ${status.groqVision.error}`);
   }
-
-  // Deterministic pipeline: Groq Vision OCR (raw text) → regex parsing → categorization
+  
+  // ===== STEP 2: Groq Text (If we have text but no transactions) =====
+  if (transactions.length === 0 && finalExtractedText && finalExtractedText.trim().length > 100) {
+    console.log('🔹 LAYER 2: Groq Text Extraction...');
+    const groqTextStartTime = Date.now();
+    status.groqText.used = true;
+    
+    const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+    if (GROQ_API_KEY) {
+      try {
+        const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              {
+                role: 'system',
+                content: `Extract ALL transactions from this bank statement text.
+                
+Return JSON array with: date (YYYY-MM-DD), description, debit (number), credit (number), balance (number).
+Return ONLY the JSON array, no markdown.`,
+              },
+              {
+                role: 'user',
+                content: finalExtractedText.substring(0, 30000),
+              },
+            ],
+            temperature: 0.1,
+            max_tokens: 8000,
+          }),
+        });
+        
+        status.groqText.time = Date.now() - groqTextStartTime;
+        
+        if (groqResponse.ok) {
+          const groqData = await groqResponse.json();
+          const responseText = groqData.choices?.[0]?.message?.content || '';
+          const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            transactions = JSON.parse(jsonMatch[0]);
+            status.groqText.success = true;
+            console.log(`✅ Groq Text extracted ${transactions.length} transactions in ${status.groqText.time}ms`);
+            return { transactions, status, extractedText: finalExtractedText };
+          }
+        } else {
+          const errorText = await groqResponse.text();
+          status.groqText.error = `API error: ${groqResponse.status}`;
+          console.log(`❌ Groq Text failed: ${errorText}`);
+        }
+      } catch (error) {
+        status.groqText.error = error instanceof Error ? error.message : 'Unknown error';
+        console.log(`❌ Groq Text error: ${status.groqText.error}`);
+      }
+    } else {
+      status.groqText.error = 'API key not configured';
+    }
+  }
+  
+  // ===== NO GEMINI OR LOVABLE FALLBACK =====
+  // Pipeline is deterministic: Groq Vision → Groq Text → Done
+  // If both fail, return empty (pattern fallback happens in categorization)
+  
+  console.log('⚠️ Groq-only pipeline complete. No AI fallback used.');
+  
   return { transactions, status, extractedText: finalExtractedText };
 }
 
@@ -123,6 +195,10 @@ export function generateStatusReport(status: AIProcessingStatus): string {
   
   if (status.groqVision.used) {
     lines.push(`Groq Vision OCR: ${status.groqVision.success ? '✅ Success' : '❌ Failed'}${status.groqVision.time ? ` (${status.groqVision.time}ms)` : ''}${status.groqVision.error ? ` - ${status.groqVision.error}` : ''}`);
+  }
+  
+  if (status.groqText.used) {
+    lines.push(`Groq Text: ${status.groqText.success ? '✅ Success' : '❌ Failed'}${status.groqText.time ? ` (${status.groqText.time}ms)` : ''}${status.groqText.error ? ` - ${status.groqText.error}` : ''}`);
   }
   
   if (status.mistral.used) {
