@@ -402,8 +402,6 @@ Deno.serve(async (req) => {
       const status: AIProcessingStatus = {
         groqVision: { used: true, success: false },
         mistral: { used: false, success: false },
-        gemini: { used: false, success: false },
-        lovable: { used: false, success: false },
         groqText: { used: false, success: false },
         patternFallback: { used: false, success: false },
       };
@@ -481,12 +479,6 @@ Deno.serve(async (req) => {
       }
       if (status.groqText.used && !status.groqText.success) {
         errorDetails.push(`Groq Text: ${status.groqText.error}`);
-      }
-      if (status.gemini.used && !status.gemini.success) {
-        errorDetails.push(`Gemini: ${status.gemini.error}`);
-      }
-      if (status.lovable.used && !status.lovable.success) {
-        errorDetails.push(`Lovable AI: ${status.lovable.error}`);
       }
       
       console.error('All AI services failed:', errorDetails.join(' | '));
@@ -732,13 +724,11 @@ Deno.serve(async (req) => {
     console.log('=== Final AI Processing Report ===');
     console.log(generateStatusReport(categorizationResult.status));
 
-    // Build AI status for debugging (will be hidden from users later)
+    // Build AI status for debugging
     const aiStatus = {
       groqVision: categorizationResult.status.groqVision,
       groqText: categorizationResult.status.groqText,
-      gemini: categorizationResult.status.gemini,
       mistral: categorizationResult.status.mistral,
-      lovable: categorizationResult.status.lovable,
       patternFallback: categorizationResult.status.patternFallback,
     };
 

@@ -44,39 +44,34 @@ const CATEGORY_LIST = [
   'Other',
 ];
 
-const MISTRAL_CATEGORIZATION_PROMPT = `You are a financial transaction categorization expert. Your task is to:
-1. Clean and normalize transaction descriptions
-2. Categorize each transaction into the most appropriate category
-3. Ensure all amounts are positive numbers
-4. Validate and normalize dates to YYYY-MM-DD format
+const MISTRAL_CATEGORIZATION_PROMPT = `You are a financial transaction categorizer. Your ONLY job is to:
+1. Assign a category to each transaction
+2. Clean the description text
+3. PRESERVE ALL NUMERICAL VALUES EXACTLY AS PROVIDED (debit, credit, balance)
 
-Categories available: ${CATEGORY_LIST.join(', ')}
+CRITICAL: Do NOT change debit, credit, or balance values. Copy them exactly from input.
+
+Categories: ${CATEGORY_LIST.join(', ')}
 
 CATEGORIZATION RULES:
-- Salary/Income: Regular salary, wages, freelance income, bonuses
-- Transfer In: Money received from other accounts, P2P receipts
-- Transfer Out: Money sent to other accounts, P2P payments
-- Bills & Utilities: Electricity, water, gas, internet, phone bills
-- Shopping: Retail purchases, online shopping, Amazon, Flipkart
-- Food & Dining: Restaurants, Swiggy, Zomato, groceries
-- Transportation: Uber, Ola, fuel, parking, metro
-- Entertainment: Netflix, Spotify, movies, gaming
-- Healthcare: Hospitals, pharmacies, medical expenses
-- Education: School fees, courses, books
-- Insurance: Life, health, vehicle insurance premiums
-- Investments: Mutual funds, stocks, SIP
-- Loan/EMI: Home loan, car loan, personal loan EMIs
+- Salary/Income: salary, wages, income, bonus
+- Transfer In: money received, P2P receipts, incoming transfers
+- Transfer Out: money sent, P2P payments, outgoing transfers
+- Bills & Utilities: electricity, water, gas, internet, phone, rent
+- Shopping: retail, Amazon, Flipkart, stores
+- Food & Dining: restaurants, Swiggy, Zomato, groceries
+- Transportation: Uber, Ola, fuel, parking
+- Entertainment: Netflix, Spotify, movies
+- Healthcare: hospitals, pharmacies, medical
+- Education: school, courses, books
+- Insurance: premiums, policies
+- Investments: mutual funds, stocks, SIP
+- Loan/EMI: loan payments, EMIs
 - Cash: ATM withdrawals, cash deposits
-- Bank Fees: Service charges, transaction fees
-- Other: Anything that doesn't fit above
+- Bank Fees: charges, fees
+- Other: anything else
 
-DESCRIPTION CLEANING:
-- Remove excessive spaces and special characters
-- Preserve key identifiers (UPI IDs, reference numbers)
-- Title case for readability
-- Keep merchant names intact
-
-Return ONLY a valid JSON array with cleaned and categorized transactions.`;
+Return JSON with: date, description (cleaned), category, debit (SAME as input), credit (SAME as input), balance (SAME as input)`;
 
 export async function callMistralCategorizer(
   transactions: any[]
@@ -170,15 +165,36 @@ export async function callMistralCategorizer(
       };
     }
     
-    // Normalize transactions
-    const normalizedTransactions: ProcessedTransaction[] = parsedTransactions.map((t: any) => ({
-      date: normalizeDate(t.date),
-      description: cleanDescription(t.description || t.narration || ''),
-      category: validateCategory(t.category),
-      debit: Math.abs(parseFloat(t.debit) || 0),
-      credit: Math.abs(parseFloat(t.credit) || 0),
-      balance: parseFloat(t.balance) || 0,
-    }));
+    // Normalize transactions - PRESERVE original numerical values
+    const normalizedTransactions: ProcessedTransaction[] = parsedTransactions.map((t: any, index: number) => {
+      // Get original transaction to preserve amounts if Mistral changed them
+      const original = transactions[index] || {};
+      
+      // Parse amounts from either source, preferring original if Mistral returned 0
+      const parseAmount = (val: any): number => {
+        if (typeof val === 'number' && !isNaN(val)) return Math.abs(val);
+        if (typeof val === 'string') {
+          const cleaned = val.replace(/[,\s]/g, '').replace(/^-/, '');
+          const num = parseFloat(cleaned);
+          return isNaN(num) ? 0 : Math.abs(num);
+        }
+        return 0;
+      };
+      
+      // Use original values if Mistral returned 0 but original had a value
+      const debit = parseAmount(t.debit) || parseAmount(original.debit);
+      const credit = parseAmount(t.credit) || parseAmount(original.credit);
+      const balance = parseAmount(t.balance) || parseAmount(original.balance);
+      
+      return {
+        date: normalizeDate(t.date || original.date),
+        description: cleanDescription(t.description || t.narration || original.description || ''),
+        category: validateCategory(t.category),
+        debit,
+        credit,
+        balance,
+      };
+    });
     
     console.log(`✅ Mistral categorized ${normalizedTransactions.length} transactions in ${processingTime}ms`);
     
