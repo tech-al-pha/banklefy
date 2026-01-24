@@ -14,6 +14,9 @@ import { UsageLimitBanner } from "./UsageLimitBanner";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 import { FraudAlertPanel } from "./FraudAlertPanel";
 import { UnderwritingPanel } from "./UnderwritingPanel";
+import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
+import { AIStatusPanel } from "./AIStatusPanel";
+import amLogoImg from "@/assets/am-logo.png";
 import {
   Table,
   TableBody,
@@ -122,6 +125,14 @@ export const UploadDemo = () => {
   const [conversionResult, setConversionResult] = useState<{ id: string | null; resultPath: string | null; excelData?: string } | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [aiStatus, setAiStatus] = useState<{
+    groqVision?: { success: boolean; time?: number; error?: string };
+    groqText?: { success: boolean; time?: number; error?: string };
+    mistral?: { success: boolean; time?: number; error?: string };
+    gemini?: { success: boolean; time?: number; error?: string };
+    lovable?: { success: boolean; time?: number; error?: string };
+    patternFallback?: { success: boolean; time?: number; error?: string };
+  } | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
   const [pdfPassword, setPdfPassword] = useState('');
@@ -441,6 +452,11 @@ export const UploadDemo = () => {
         setAnalytics(data.analytics);
       }
 
+      // Store AI processing status for display
+      if (data.aiStatus) {
+        setAiStatus(data.aiStatus);
+      }
+
       // Refresh usage limit after successful conversion
       refreshUsageLimit();
 
@@ -621,19 +637,45 @@ export const UploadDemo = () => {
 
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-      let yPos = 20;
+      let yPos = 15;
 
-      // Title
-      doc.setFontSize(20);
-      doc.setTextColor(40, 40, 40);
-      doc.text('Bank Statement Analysis Report', pageWidth / 2, yPos, { align: 'center' });
-      yPos += 15;
+      // Add Akromeda Logo
+      try {
+        // Load logo as base64
+        const logoResponse = await fetch(amLogoImg);
+        const logoBlob = await logoResponse.blob();
+        const logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(logoBlob);
+        });
+        
+        // Add logo to PDF (left side)
+        doc.addImage(logoBase64, 'PNG', 14, yPos - 5, 25, 25);
+      } catch (logoErr) {
+        console.warn('Could not load logo for PDF:', logoErr);
+      }
 
-      // Date
+      // Title (next to logo)
+      doc.setFontSize(18);
+      doc.setTextColor(180, 120, 60); // Gold-ish color
+      doc.text('AKROMEDA', 45, yPos + 5);
       doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: 'center' });
-      yPos += 15;
+      doc.text('Financial Intelligence Report', 45, yPos + 12);
+      yPos += 30;
+
+      // Divider line
+      doc.setDrawColor(180, 120, 60);
+      doc.setLineWidth(0.5);
+      doc.line(14, yPos, pageWidth - 14, yPos);
+      yPos += 10;
+
+      // Date
+      doc.setFontSize(9);
+      doc.setTextColor(120);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, yPos);
+      yPos += 10;
 
       // Financial Summary Section
       if (analytics) {
@@ -672,13 +714,13 @@ export const UploadDemo = () => {
         yPos += 8;
 
         const foirData = [
-          ['Average Monthly Income', `₹${uw.summary.avgMonthlyIncome.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['Average Monthly EMI', `₹${uw.summary.avgMonthlyEMI.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['FOIR Score', `${uw.summary.foirScore.toFixed(2)}%`],
-          ['FOIR Status', uw.summary.foirStatus.toUpperCase()],
-          ['Eligibility Status', uw.eligibility.status.toUpperCase()],
-          ['Max New EMI Possible', `₹${uw.eligibility.maxNewEMI.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['Estimated Loan Eligibility', `₹${uw.eligibility.estimatedLoanEligibility.toLocaleString('en-IN', { minimumFractionDigits: 0 })}`],
+          ['Average Monthly Income', `₹${(uw.summary?.avgMonthlyIncome ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['Average Monthly EMI', `₹${(uw.summary?.avgMonthlyEMI ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['FOIR Score', `${(uw.summary?.foirScore ?? 0).toFixed(2)}%`],
+          ['FOIR Status', (uw.summary?.foirStatus ?? 'N/A').toUpperCase()],
+          ['Eligibility Status', (uw.eligibility?.status ?? 'N/A').toUpperCase()],
+          ['Max New EMI Possible', `₹${(uw.eligibility?.maxNewEMI ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['Estimated Loan Eligibility', `₹${(uw.eligibility?.estimatedLoanEligibility ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 0 })}`],
         ];
 
         autoTable(doc, {
@@ -692,7 +734,7 @@ export const UploadDemo = () => {
         yPos = (doc as any).lastAutoTable.finalY + 10;
 
         // Eligibility Factors
-        if (uw.eligibility.factors.length > 0) {
+        if (uw.eligibility?.factors && uw.eligibility.factors.length > 0) {
           doc.setFontSize(12);
           doc.text('Eligibility Factors:', 14, yPos);
           yPos += 6;
@@ -705,7 +747,7 @@ export const UploadDemo = () => {
         }
 
         // Salary Credits Detected
-        if (uw.salaryCredits.length > 0) {
+        if (uw.salaryCredits && uw.salaryCredits.length > 0) {
           doc.addPage();
           yPos = 20;
           doc.setFontSize(14);
@@ -714,9 +756,9 @@ export const UploadDemo = () => {
           yPos += 8;
 
           const salaryData = uw.salaryCredits.map(s => [
-            s.date,
-            `₹${s.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-            s.description.substring(0, 40),
+            s.date || 'N/A',
+            `₹${(s.amount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+            (s.description || '').substring(0, 40),
           ]);
 
           autoTable(doc, {
@@ -731,16 +773,16 @@ export const UploadDemo = () => {
         }
 
         // EMI Debits Detected
-        if (uw.emiDebits.length > 0) {
+        if (uw.emiDebits && uw.emiDebits.length > 0) {
           doc.setFontSize(14);
           doc.text('EMI/Loan Debits Detected', 14, yPos);
           yPos += 8;
 
           const emiData = uw.emiDebits.map(e => [
-            e.date,
-            `₹${e.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-            e.loanType,
-            e.description.substring(0, 30),
+            e.date || 'N/A',
+            `₹${(e.amount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+            e.loanType || 'Unknown',
+            (e.description || '').substring(0, 30),
           ]);
 
           autoTable(doc, {
@@ -767,11 +809,11 @@ export const UploadDemo = () => {
         yPos += 8;
 
         const riskData = [
-          ['Document Integrity Score', `${risk.integrityScore}%`],
-          ['Balance Mismatches', risk.balanceMismatches.toString()],
-          ['Average Daily Balance', `₹${risk.averageDailyBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['Max Dip Amount', `₹${risk.maxDip.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['Max Dip Date', risk.maxDip.date || 'N/A'],
+          ['Document Integrity Score', `${risk.integrityScore ?? 0}%`],
+          ['Balance Mismatches', (risk.balanceMismatches ?? 0).toString()],
+          ['Average Daily Balance', `₹${(risk.averageDailyBalance ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['Max Dip Amount', `₹${(risk.maxDip?.amount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
+          ['Max Dip Date', risk.maxDip?.date || 'N/A'],
         ];
 
         autoTable(doc, {
@@ -785,12 +827,12 @@ export const UploadDemo = () => {
         yPos = (doc as any).lastAutoTable.finalY + 10;
 
         // Risk Flags
-        if (risk.riskFlags.length > 0) {
+        if (risk.riskFlags && risk.riskFlags.length > 0) {
           doc.setFontSize(12);
           doc.text('Risk Flags Detected:', 14, yPos);
           yPos += 6;
 
-          const flagData = risk.riskFlags.map(f => [f.type, f.count.toString()]);
+          const flagData = risk.riskFlags.map(f => [f.type || 'Unknown', (f.count ?? 0).toString()]);
 
           autoTable(doc, {
             startY: yPos,
@@ -804,7 +846,7 @@ export const UploadDemo = () => {
         }
 
         // Fraud Alerts
-        if (risk.fraudAlerts.length > 0) {
+        if (risk.fraudAlerts && risk.fraudAlerts.length > 0) {
           doc.setFontSize(12);
           doc.text('Fraud Alerts:', 14, yPos);
           yPos += 6;
@@ -837,12 +879,12 @@ export const UploadDemo = () => {
         yPos += 8;
 
         const txnData = transactions.slice(0, 100).map(t => [
-          t.date,
-          t.description.substring(0, 25),
-          t.category,
-          t.debit > 0 ? `₹${t.debit.toLocaleString('en-IN')}` : '-',
-          t.credit > 0 ? `₹${t.credit.toLocaleString('en-IN')}` : '-',
-          `₹${t.balance.toLocaleString('en-IN')}`,
+          t.date || 'N/A',
+          (t.description || '').substring(0, 25),
+          t.category || 'Other',
+          (t.debit ?? 0) > 0 ? `₹${(t.debit ?? 0).toLocaleString('en-IN')}` : '-',
+          (t.credit ?? 0) > 0 ? `₹${(t.credit ?? 0).toLocaleString('en-IN')}` : '-',
+          `₹${(t.balance ?? 0).toLocaleString('en-IN')}`,
         ]);
 
         autoTable(doc, {
@@ -1158,8 +1200,14 @@ export const UploadDemo = () => {
                 </div>
               )}
 
-              {/* FOIR & Underwriting Analysis Panel */}
-              {analytics?.underwriting && (
+              {/* AI Processing Status Panel */}
+              {aiStatus && <AIStatusPanel aiStatus={aiStatus} />}
+
+              {/* FOIR & Underwriting Analysis Panel - with skeleton during conversion */}
+              {converting && (
+                <UnderwritingPanelSkeleton />
+              )}
+              {!converting && analytics?.underwriting && (
                 <UnderwritingPanel underwriting={analytics.underwriting} />
               )}
 
