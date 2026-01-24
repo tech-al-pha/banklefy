@@ -212,7 +212,12 @@ export const UploadDemo = () => {
 
   const pdfToPageImages = async (file: File, password?: string): Promise<string[]> => {
     const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    
+    // Disable the worker to avoid "workerSrc not specified" errors
+    // This runs PDF parsing on the main thread which is fine for our use case
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    }
 
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({
