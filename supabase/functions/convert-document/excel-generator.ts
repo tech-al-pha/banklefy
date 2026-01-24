@@ -30,14 +30,15 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   const sheets: string[] = [];
   
   // ============= SHEET 1: TRANSACTIONS =============
+  // FIX: Ensure debit/credit are numbers, not empty strings (fixes 0 values issue)
   const txData = config.transactions.map((t, i) => ({
     'Sr No': i + 1,
-    'Date': t.date,
-    'Description': t.description,
-    'Category': t.category,
-    'Debit': t.debit || '',
-    'Credit': t.credit || '',
-    'Balance': t.balance,
+    'Date': t.date || '',
+    'Description': t.description || '',
+    'Category': t.category || 'Other',
+    'Debit': typeof t.debit === 'number' ? t.debit : (parseFloat(String(t.debit)) || 0),
+    'Credit': typeof t.credit === 'number' ? t.credit : (parseFloat(String(t.credit)) || 0),
+    'Balance': typeof t.balance === 'number' ? t.balance : (parseFloat(String(t.balance)) || 0),
     'Flags': [
       t.isDuplicate ? '🔄 Duplicate' : '',
       t.balanceMismatch ? '⚠️ Balance Mismatch' : '',
