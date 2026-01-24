@@ -124,14 +124,35 @@ const loanTypeIcons: Record<string, React.ReactNode> = {
 };
 
 export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
-  const { summary, eligibility, salaryCredits, emiDebits, monthlyBreakdown } = underwriting;
-  const StatusIcon = statusConfig[eligibility.status].icon;
+  // Guard against undefined/partial data to prevent toLocaleString crashes
+  const summary = underwriting?.summary ?? {
+    avgMonthlyIncome: 0,
+    avgMonthlyEMI: 0,
+    foirScore: 0,
+    foirStatus: 'moderate' as const,
+    emiByLoanType: {},
+    totalSalaryDetected: 0,
+    totalEMIDetected: 0,
+  };
+  const eligibility = underwriting?.eligibility ?? {
+    status: 'moderate' as const,
+    message: 'Insufficient data to determine eligibility',
+    factors: [],
+    maxNewEMI: 0,
+    estimatedLoanEligibility: 0,
+  };
+  const salaryCredits = underwriting?.salaryCredits ?? [];
+  const emiDebits = underwriting?.emiDebits ?? [];
+  const monthlyBreakdown = underwriting?.monthlyBreakdown ?? [];
+
+  const StatusIcon = statusConfig[eligibility.status]?.icon ?? statusConfig.moderate.icon;
   
   // Calculate FOIR progress (0-100, where lower is better)
-  const foirProgress = Math.min(100, summary.foirScore);
-  const foirProgressColor = summary.foirScore <= 30 ? 'bg-emerald-500' : 
-                            summary.foirScore <= 50 ? 'bg-green-500' : 
-                            summary.foirScore <= 65 ? 'bg-yellow-500' : 'bg-red-500';
+  const foirScore = summary.foirScore ?? 0;
+  const foirProgress = Math.min(100, foirScore);
+  const foirProgressColor = foirScore <= 30 ? 'bg-emerald-500' : 
+                            foirScore <= 50 ? 'bg-green-500' : 
+                            foirScore <= 65 ? 'bg-yellow-500' : 'bg-red-500';
 
   return (
     <div className="space-y-4">
@@ -178,8 +199,8 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
                 FOIR Score
               </div>
               <div className="space-y-2">
-                <p className={`text-2xl font-bold ${foirColors[summary.foirStatus]}`}>
-                  {summary.foirScore.toFixed(1)}%
+                <p className={`text-2xl font-bold ${foirColors[summary.foirStatus] ?? ''}`}>
+                  {(foirScore ?? 0).toFixed(1)}%
                 </p>
                 <Progress 
                   value={foirProgress} 
@@ -206,10 +227,10 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
             Avg Monthly Income
           </div>
           <p className="text-lg font-bold text-green-500">
-            ₹{summary.avgMonthlyIncome.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            ₹{(summary.avgMonthlyIncome ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </p>
           <p className="text-xs text-muted-foreground">
-            {summary.totalSalaryDetected} salary credit(s)
+            {summary.totalSalaryDetected ?? 0} salary credit(s)
           </p>
         </Card>
 
@@ -220,10 +241,10 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
             Avg Monthly EMI
           </div>
           <p className="text-lg font-bold text-orange-500">
-            ₹{summary.avgMonthlyEMI.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            ₹{(summary.avgMonthlyEMI ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </p>
           <p className="text-xs text-muted-foreground">
-            {summary.totalEMIDetected} EMI debit(s)
+            {summary.totalEMIDetected ?? 0} EMI debit(s)
           </p>
         </Card>
 
@@ -234,10 +255,10 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
             Est. Loan Eligibility
           </div>
           <p className="text-lg font-bold text-primary">
-            ₹{eligibility.estimatedLoanEligibility.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            ₹{(eligibility.estimatedLoanEligibility ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </p>
           <p className="text-xs text-muted-foreground">
-            Max new EMI: ₹{eligibility.maxNewEMI.toLocaleString('en-IN')}
+            Max new EMI: ₹{(eligibility.maxNewEMI ?? 0).toLocaleString('en-IN')}
           </p>
         </Card>
       </div>
@@ -261,7 +282,7 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
                 <div className="flex-1">
                   <p className="text-sm font-medium">{type}</p>
                   <p className="text-xs text-muted-foreground">
-                    {data.count}x • ₹{data.totalAmount.toLocaleString('en-IN')}
+                    {data?.count ?? 0}x • ₹{(data?.totalAmount ?? 0).toLocaleString('en-IN')}
                   </p>
                 </div>
               </div>
@@ -290,7 +311,7 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
                       <p className="text-xs text-muted-foreground">{s.date}</p>
                     </div>
                     <p className="font-medium text-green-500">
-                      +₹{s.amount.toLocaleString('en-IN')}
+                      +₹{(s.amount ?? 0).toLocaleString('en-IN')}
                     </p>
                   </div>
                 ))}
@@ -322,7 +343,7 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
                       </div>
                     </div>
                     <p className="font-medium text-orange-500">
-                      -₹{e.amount.toLocaleString('en-IN')}
+                      -₹{(e.amount ?? 0).toLocaleString('en-IN')}
                     </p>
                   </div>
                 ))}
@@ -347,10 +368,10 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
                     <span className="font-medium">{m.month}</span>
                     <div className="flex items-center gap-4">
                       <span className="text-green-500">
-                        +₹{m.salaryIncome.toLocaleString('en-IN')}
+                        +₹{(m.salaryIncome ?? 0).toLocaleString('en-IN')}
                       </span>
                       <span className="text-orange-500">
-                        -₹{m.emiOutflow.toLocaleString('en-IN')}
+                        -₹{(m.emiOutflow ?? 0).toLocaleString('en-IN')}
                       </span>
                     </div>
                   </div>
