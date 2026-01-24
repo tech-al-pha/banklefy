@@ -1,6 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Clock, Zap, Brain, Sparkles, Bot } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Zap, Brain, Bot } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -13,8 +12,6 @@ interface AIStatusPanelProps {
     groqVision?: { success: boolean; time?: number; error?: string };
     groqText?: { success: boolean; time?: number; error?: string };
     mistral?: { success: boolean; time?: number; error?: string };
-    gemini?: { success: boolean; time?: number; error?: string };
-    lovable?: { success: boolean; time?: number; error?: string };
     patternFallback?: { success: boolean; time?: number; error?: string };
   };
 }
@@ -23,7 +20,7 @@ const serviceInfo = {
   groqVision: {
     name: 'Groq Vision',
     icon: Zap,
-    role: 'OCR & Image Extraction (Primary)',
+    role: 'OCR & Data Extraction',
     color: 'text-orange-500',
     bgColor: 'bg-orange-500/10',
     borderColor: 'border-orange-500/30',
@@ -31,7 +28,7 @@ const serviceInfo = {
   groqText: {
     name: 'Groq Text',
     icon: Zap,
-    role: 'Text-based Extraction (Backup)',
+    role: 'Text Extraction (Backup)',
     color: 'text-amber-500',
     bgColor: 'bg-amber-500/10',
     borderColor: 'border-amber-500/30',
@@ -39,31 +36,15 @@ const serviceInfo = {
   mistral: {
     name: 'Mistral AI',
     icon: Brain,
-    role: 'Categorization & Cleaning',
+    role: 'Categorization',
     color: 'text-blue-500',
     bgColor: 'bg-blue-500/10',
     borderColor: 'border-blue-500/30',
   },
-  gemini: {
-    name: 'Gemini',
-    icon: Sparkles,
-    role: 'Disabled (Groq-only)',
-    color: 'text-gray-400',
-    bgColor: 'bg-gray-500/10',
-    borderColor: 'border-gray-500/30',
-  },
-  lovable: {
-    name: 'Lovable AI',
-    icon: Bot,
-    role: 'Disabled (Groq-only)',
-    color: 'text-gray-400',
-    bgColor: 'bg-gray-500/10',
-    borderColor: 'border-gray-500/30',
-  },
   patternFallback: {
     name: 'Rule-Based',
     icon: Bot,
-    role: 'Pattern Matching (No AI)',
+    role: 'Financial Analysis',
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/10',
     borderColor: 'border-emerald-500/30',
@@ -73,43 +54,24 @@ const serviceInfo = {
 export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
   if (!aiStatus) return null;
 
-  const services = Object.entries(aiStatus).filter(([_, data]) => data !== undefined);
+  const activeServices = (['groqVision', 'groqText', 'mistral', 'patternFallback'] as const)
+    .filter((key) => aiStatus[key]);
   
-  if (services.length === 0) return null;
+  if (activeServices.length === 0) return null;
 
   return (
     <Card className="p-4 bg-muted/20 border-border/50">
       <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
         <Zap className="w-4 h-4 text-primary" />
-        AI Processing Pipeline
+        Processing Pipeline
       </h4>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        {(['groqVision', 'groqText', 'mistral', 'gemini', 'lovable', 'patternFallback'] as const).map((key) => {
+        {(['groqVision', 'groqText', 'mistral', 'patternFallback'] as const).map((key) => {
           const data = aiStatus[key];
           const info = serviceInfo[key];
           const Icon = info.icon;
           
-          // Skip if not used at all
-          if (!data) {
-            return (
-              <Tooltip key={key}>
-                <TooltipTrigger asChild>
-                  <div className="p-2 rounded-lg bg-muted/30 border border-border/30 opacity-50">
-                    <div className="flex items-center gap-2">
-                      <Icon className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{info.name}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Not used</p>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="font-medium">{info.name}</p>
-                  <p className="text-sm text-muted-foreground">{info.role}</p>
-                  <p className="text-xs mt-1">Not required for this conversion</p>
-                </TooltipContent>
-              </Tooltip>
-            );
-          }
+          if (!data) return null;
 
           return (
             <Tooltip key={key}>
@@ -143,7 +105,7 @@ export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
                   <p className="text-xs text-destructive mt-1">Error: {data.error}</p>
                 )}
                 {data.time && (
-                  <p className="text-xs mt-1">Processing time: {(data.time / 1000).toFixed(2)}s</p>
+                  <p className="text-xs mt-1">Time: {(data.time / 1000).toFixed(2)}s</p>
                 )}
               </TooltipContent>
             </Tooltip>
@@ -151,13 +113,13 @@ export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
         })}
       </div>
       
-      {/* Legend */}
+      {/* Pipeline Legend */}
       <div className="mt-3 pt-3 border-t border-border/30">
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium">Pipeline:</span> Groq Vision (OCR) → Mistral (Categorize) → Rule-Based Fallback
+          <span className="font-medium">Pipeline:</span> Groq (OCR) → Mistral (Categorize) → Rule-Based (FOIR/EMI)
         </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          <span className="text-emerald-400">✓ Deterministic:</span> FOIR, Salary & EMI detection use rule-based logic (no AI)
+        <p className="text-xs text-emerald-400 mt-1">
+          ✓ Deterministic: FOIR, Salary & EMI use mathematical formulas (no AI)
         </p>
       </div>
     </Card>

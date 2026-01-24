@@ -10,8 +10,6 @@ import { callGroqCategorizer, applyPatternCategorization, CATEGORY_LIST } from '
 export interface AIProcessingStatus {
   groqVision: { used: boolean; success: boolean; error?: string; time?: number };
   mistral: { used: boolean; success: boolean; error?: string; time?: number };
-  gemini: { used: boolean; success: boolean; error?: string; time?: number };
-  lovable: { used: boolean; success: boolean; error?: string; time?: number };
   groqText: { used: boolean; success: boolean; error?: string; time?: number };
   patternFallback: { used: boolean; success: boolean };
 }
@@ -39,8 +37,6 @@ export async function performExtraction(
   const status: AIProcessingStatus = {
     groqVision: { used: false, success: false },
     mistral: { used: false, success: false },
-    gemini: { used: false, success: false }, // Kept for interface compatibility but NOT used
-    lovable: { used: false, success: false }, // Kept for interface compatibility but NOT used
     groqText: { used: false, success: false },
     patternFallback: { used: false, success: false },
   };
@@ -205,18 +201,8 @@ export function generateStatusReport(status: AIProcessingStatus): string {
     lines.push(`Groq Text: ${status.groqText.success ? '✅ Success' : '❌ Failed'}${status.groqText.time ? ` (${status.groqText.time}ms)` : ''}${status.groqText.error ? ` - ${status.groqText.error}` : ''}`);
   }
   
-  // Gemini is no longer used - show as disabled
-  if (status.gemini.used) {
-    lines.push(`Gemini: ⏭️ Disabled (Groq-only pipeline)`);
-  }
-  
   if (status.mistral.used) {
     lines.push(`Mistral: ${status.mistral.success ? '✅ Success' : '❌ Failed'}${status.mistral.time ? ` (${status.mistral.time}ms)` : ''}${status.mistral.error ? ` - ${status.mistral.error}` : ''}`);
-  }
-  
-  // Lovable AI is no longer used - show as disabled
-  if (status.lovable.used) {
-    lines.push(`Lovable AI: ⏭️ Disabled (Groq-only pipeline)`);
   }
   
   if (status.patternFallback.used) {

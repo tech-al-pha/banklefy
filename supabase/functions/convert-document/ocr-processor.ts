@@ -19,32 +19,42 @@ export interface RawTransaction {
   type?: string;
 }
 
-const OCR_PROMPT = `You are an expert OCR and bank statement data extraction specialist with advanced image recognition capabilities.
+const OCR_PROMPT = `You are an expert OCR and bank statement data extraction specialist.
 
-CRITICAL OCR INSTRUCTIONS:
-1. Carefully examine EVERY pixel of the document for transaction data
-2. For scanned/image documents: Use OCR to read text even if slightly blurry or at an angle
-3. Look for transaction tables - columns for: Date, Description/Narration, Debit/Withdrawal, Credit/Deposit, Balance
-4. If image quality is poor, make best-effort extraction
-5. Process ALL pages of multi-page documents
-6. Handle watermarks, stamps, and overlapping text
-7. Recognize various fonts and handwritten annotations
+CRITICAL: Extract ALL transactions with their EXACT NUMERICAL amounts from the document.
 
-UNIVERSAL SCHEMA (all fields required):
-- date: Normalized to YYYY-MM-DD format (handle DD/MM/YYYY, MM/DD/YYYY, DD-Mon-YY, etc.)
-- description: Clean transaction description
-- category: Classify into: Salary/Income, Transfer In, Transfer Out, Bills & Utilities, Shopping, Food & Dining, Transportation, Entertainment, Healthcare, Education, Insurance, Investments, Loan/EMI, Cash, Bank Fees, Other
-- debit: Amount debited (positive number, 0 if credit)
-- credit: Amount credited (positive number, 0 if debit)
-- balance: Running balance after transaction
+OUTPUT FORMAT - Return JSON array with these exact fields:
+[
+  {
+    "date": "YYYY-MM-DD",
+    "description": "transaction narration/description", 
+    "debit": 1234.56,
+    "credit": 0,
+    "balance": 5678.90
+  }
+]
 
-BANK-SPECIFIC HANDLING:
-- Emirates Islamic/NBD: Handle Arabic text alongside English
-- HDFC/ICICI/SBI: Handle lakhs format (1,23,456)
-- US Banks: Handle MM/DD/YYYY dates, ACH/Wire transfers
-- UK Banks: Handle DD/MM/YYYY, Faster Payments/BACS
+AMOUNT EXTRACTION RULES:
+1. DEBIT = money going OUT (withdrawals, payments, fees) - MUST be a positive number
+2. CREDIT = money coming IN (deposits, salary, transfers received) - MUST be a positive number  
+3. BALANCE = running balance after transaction - MUST be the exact number shown
+4. If amount column is empty or "-", use 0
+5. Remove commas from numbers: "1,234.56" becomes 1234.56
+6. Handle Indian format: "1,23,456" becomes 123456
+7. Handle negative signs: "-500" for debit means debit: 500
 
-Return ONLY a valid JSON array, no markdown, no explanation.`;
+DATE FORMAT:
+- Convert any date format to YYYY-MM-DD
+- DD/MM/YYYY, DD-MM-YYYY, DD Mon YYYY → YYYY-MM-DD
+
+LOOK FOR TABLE COLUMNS:
+- Date/Value Date/Transaction Date
+- Particulars/Narration/Description/Details
+- Withdrawal/Debit/Dr/Out
+- Deposit/Credit/Cr/In  
+- Balance/Running Balance/Closing Balance
+
+Return ONLY valid JSON array. No markdown, no explanation, no code blocks.`;
 
 export async function callGroqVisionOCR(
   imageBase64: string, 
