@@ -1,21 +1,23 @@
 // ============= AKROMEDA MULTI-LAYERED INTELLIGENCE ENGINE =============
-// Main orchestrator that routes to specialized modules
+// Main orchestrator that routes to specialized AI modules
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
-// Note: Using Groq Vision for OCR instead of Gemini
 
 // Import modular processors
 import { 
-  callGroqVisionOCR, 
   classifyDocument, 
   type RawTransaction 
 } from './ocr-processor.ts';
 import { 
-  callGroqCategorizer, 
-  applyPatternCategorization,
   CATEGORY_LIST,
   type ProcessedTransaction,
 } from './categorizer.ts';
+import { 
+  performExtraction,
+  performCategorization,
+  generateStatusReport,
+  type AIProcessingStatus,
+} from './ai-orchestrator.ts';
 import { 
   reconcileBalances, 
   detectDuplicates, 
@@ -368,16 +370,12 @@ Deno.serve(async (req) => {
     
     let extractedText = '';
     let rawTransactions: RawTransaction[] = [];
-    let pageCount = 0;
     
-    // Note: PDFJS doesn't work in Deno edge functions, so we skip text extraction 
-    // and rely on Gemini OCR for all PDF processing
-
     // ============= LAYER 2: INTELLIGENT PROCESSING ROUTER =============
     const classification = classifyDocument(extractedText, bytes, fileName);
     console.log('Document classification:', classification);
 
-    // Convert bytes to base64 for OCR if needed
+    // Convert bytes to base64 for OCR
     const chunkSize = 8192;
     let base64Data = '';
     for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -389,233 +387,48 @@ Deno.serve(async (req) => {
     const mimeType = lowerFileName.endsWith('.pdf') ? 'application/pdf' : 
                      lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-    if (classification.needsOCR) {
-      // Use Groq Vision for OCR on all documents
-      console.log(`Document needs OCR (type: ${classification.type}), using Groq Vision...`);
-      
-      const ocrResult = await callGroqVisionOCR(base64Data, mimeType);
-      
-      if (ocrResult.success && ocrResult.transactions && ocrResult.transactions.length > 0) {
-        rawTransactions = ocrResult.transactions;
-        console.log(`Groq Vision OCR extracted ${rawTransactions.length} transactions`);
-      } else if (ocrResult.success && ocrResult.text) {
-        extractedText = ocrResult.text;
-        console.log('Groq Vision OCR extracted text, will parse for transactions');
-      } else {
-        console.log('Groq Vision OCR failed or returned no data, will try text extraction');
-      }
-    }
-
-    // If Gemini failed, try Groq for text-based extraction
-    if (rawTransactions.length === 0 && extractedText && extractedText.trim().length > 100) {
-      console.log('Attempting Groq-based transaction extraction...');
-      
-      const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
-      if (GROQ_API_KEY) {
-        try {
-          const groqExtractionResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${GROQ_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'llama-3.3-70b-versatile',
-              messages: [
-                {
-                  role: 'system',
-                  content: `You are an expert bank statement data extraction specialist. Extract ALL transactions.
-
-UNIVERSAL SCHEMA (all fields required):
-- date: Normalized to YYYY-MM-DD format
-- description: Clean transaction description  
-- category: One of: ${CATEGORY_LIST.join(', ')}
-- debit: Amount debited (positive number, 0 if credit)
-- credit: Amount credited (positive number, 0 if debit)
-- balance: Running balance after transaction
-
-Return ONLY a valid JSON array, no markdown, no explanation.`
-                },
-                {
-                  role: 'user',
-                  content: `Extract ALL transactions from this bank statement:\n\n${extractedText.substring(0, 30000)}`
-                }
-              ],
-              temperature: 0.1,
-              max_tokens: 8000,
-            }),
-          });
-
-          if (groqExtractionResponse.ok) {
-            const groqData = await groqExtractionResponse.json();
-            const responseText = groqData.choices?.[0]?.message?.content || '';
-            const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-            if (jsonMatch) {
-              rawTransactions = JSON.parse(jsonMatch[0]);
-              console.log(`Groq extracted ${rawTransactions.length} transactions`);
-            }
-          } else {
-            console.error('Groq extraction error:', await groqExtractionResponse.text());
-          }
-        } catch (groqError) {
-          console.error('Groq extraction failed:', groqError);
-        }
-      }
-    }
-
-    // If still no transactions, try Lovable AI as final fallback
-    if (rawTransactions.length === 0) {
-      console.log('Using Lovable AI for transaction extraction (final fallback)...');
-      
-      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-      if (!LOVABLE_API_KEY) {
-        throw new Error('No AI service available. Please configure GEMINI_API_KEY or GROQ_API_KEY.');
-      }
-
-      // Build AI request based on whether we have text or need image processing
-      let aiRequestBody;
-      
-      if (extractedText && extractedText.trim().length > 200) {
-        // Text-based extraction (digital PDF or already OCR'd)
-        console.log('Using text-based extraction');
-        aiRequestBody = {
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            {
-              role: 'system',
-              content: `You are an expert bank statement data extraction specialist. Extract ALL transactions.
-
-UNIVERSAL SCHEMA (all fields required):
-- date: Normalized to YYYY-MM-DD format
-- description: Clean transaction description
-- category: One of: ${CATEGORY_LIST.join(', ')}
-- debit: Amount debited (positive number, 0 if credit)
-- credit: Amount credited (positive number, 0 if debit)
-- balance: Running balance after transaction
-
-BANK-SPECIFIC HANDLING:
-- Emirates Islamic/NBD: Handle Arabic text alongside English
-- HDFC/ICICI/SBI: Handle lakhs format (1,23,456)
-- US Banks: Handle MM/DD/YYYY dates
-- UK Banks: Handle DD/MM/YYYY
-
-Return ONLY a valid JSON array, no markdown, no explanation.`
-            },
-            {
-              role: 'user',
-              content: `Extract ALL transactions from this bank statement:\n\n${extractedText}`
-            }
-          ],
-        };
-      } else {
-        // Image-based extraction
-        console.log('Using image-based extraction');
-        const dataUrl = `data:${mimeType};base64,${base64Data}`;
-        
-        aiRequestBody = {
-          model: 'google/gemini-2.5-pro',
-          messages: [
-            {
-              role: 'system',
-              content: `You are an expert OCR and bank statement data extraction specialist.
-
-UNIVERSAL SCHEMA (all fields required):
-- date: Normalized to YYYY-MM-DD format
-- description: Clean transaction description
-- category: One of: ${CATEGORY_LIST.join(', ')}
-- debit: Amount debited (positive number, 0 if credit)
-- credit: Amount credited (positive number, 0 if debit)
-- balance: Running balance after transaction
-
-Return ONLY a valid JSON array, no markdown, no explanation.`
-            },
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: 'Extract ALL transactions from this bank statement. Return only the JSON array.' },
-                { type: 'image_url', image_url: { url: dataUrl } }
-              ]
-            }
-          ],
-        };
-      }
-
-      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(aiRequestBody),
-      });
-
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text();
-        console.error('AI API error:', aiResponse.status, errorText);
-        
-        // If Lovable AI also fails, provide helpful error
-        if (aiResponse.status === 402) {
-          throw new Error('AI service credits exhausted. Please ensure your GEMINI_API_KEY is configured correctly.');
-        }
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          const rawError = errorData?.error?.metadata?.raw;
-          if (rawError) {
-            const parsedRaw = JSON.parse(rawError);
-            const errorMessage = parsedRaw?.error?.message;
-            if (errorMessage) {
-              if (errorMessage.toLowerCase().includes('no pages')) {
-                throw new Error('The document has no pages. Please upload a valid PDF with readable content.');
-              }
-              if (errorMessage.toLowerCase().includes('password') || 
-                  errorMessage.toLowerCase().includes('encrypted')) {
-                throw new Error('This PDF is password-protected. Please enter the correct password and try again.');
-              }
-            }
-          }
-        } catch (parseErr) {
-          if (parseErr instanceof Error && 
-              (parseErr.message.includes('document') || parseErr.message.includes('password') || parseErr.message.includes('credits'))) {
-            throw parseErr;
-          }
-        }
-        
-        throw new Error('Unable to read document content. Please ensure the file is not corrupted.');
-      }
-
-      const aiData = await aiResponse.json();
-      const responseText = aiData.choices?.[0]?.message?.content || '';
-      
-      // Parse JSON from response
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        rawTransactions = JSON.parse(jsonMatch[0]);
-        console.log(`Lovable AI extracted ${rawTransactions.length} transactions`);
-      } else {
-        throw new Error('No JSON array found in AI response');
-      }
-    }
+    // ============= SPECIALIZED AI EXTRACTION =============
+    // Each AI does what it's BEST at (not fallback chains)
+    console.log('=== Starting Specialized AI Pipeline ===');
+    
+    const extractionResult = await performExtraction(base64Data, mimeType, extractedText);
+    rawTransactions = extractionResult.transactions;
+    extractedText = extractionResult.extractedText || '';
+    
+    // Log extraction status
+    console.log(generateStatusReport(extractionResult.status));
 
     if (!rawTransactions || rawTransactions.length === 0) {
-      throw new Error('No transactions found in the document');
+      // Generate error report for debugging
+      const errorDetails = [];
+      const status = extractionResult.status;
+      
+      if (status.groqVision.used && !status.groqVision.success) {
+        errorDetails.push(`Groq Vision: ${status.groqVision.error}`);
+      }
+      if (status.groqText.used && !status.groqText.success) {
+        errorDetails.push(`Groq Text: ${status.groqText.error}`);
+      }
+      if (status.gemini.used && !status.gemini.success) {
+        errorDetails.push(`Gemini: ${status.gemini.error}`);
+      }
+      if (status.lovable.used && !status.lovable.success) {
+        errorDetails.push(`Lovable AI: ${status.lovable.error}`);
+      }
+      
+      console.error('All AI services failed:', errorDetails.join(' | '));
+      throw new Error(`No transactions found. AI Status: ${errorDetails.join(' | ')}`);
     }
 
-    // ============= LAYER 3: GROQ CATEGORIZATION (Lightning Fast) =============
-    console.log('Starting Groq categorization...');
+    // ============= LAYER 3: SPECIALIZED CATEGORIZATION =============
+    // Mistral is BEST for categorization, Groq as backup, Pattern as fallback
+    console.log('=== Starting Specialized Categorization ===');
     
-    let categorizedTransactions: ProcessedTransaction[];
+    const categorizationResult = await performCategorization(rawTransactions, extractionResult.status);
+    let categorizedTransactions = categorizationResult.transactions;
     
-    const groqResult = await callGroqCategorizer(rawTransactions);
-    
-    if (groqResult.success && groqResult.transactions) {
-      categorizedTransactions = groqResult.transactions;
-      console.log('Groq categorization successful');
-    } else {
-      // Fallback to pattern-based categorization
-      console.log('Using pattern-based categorization fallback');
-      categorizedTransactions = applyPatternCategorization(rawTransactions);
-    }
+    // Log final status
+    console.log(generateStatusReport(categorizationResult.status));
 
     // Convert to Transaction type for financial engine
     const transactions: Transaction[] = categorizedTransactions.map(t => ({
@@ -843,6 +656,18 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
     excelBase64 = btoa(excelBase64);
 
     console.log(`Conversion complete. ${transactions.length} transactions processed.`);
+    console.log('=== Final AI Processing Report ===');
+    console.log(generateStatusReport(categorizationResult.status));
+
+    // Build AI status for debugging (will be hidden from users later)
+    const aiStatus = {
+      groqVision: categorizationResult.status.groqVision,
+      groqText: categorizationResult.status.groqText,
+      gemini: categorizationResult.status.gemini,
+      mistral: categorizationResult.status.mistral,
+      lovable: categorizationResult.status.lovable,
+      patternFallback: categorizationResult.status.patternFallback,
+    };
 
     return new Response(
       JSON.stringify({
@@ -855,6 +680,7 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
         message: 'Conversion completed successfully',
         remaining: conversionsLimit - conversionsUsed - 1,
         isAuthenticated: !!user,
+        aiStatus, // For debugging - shows which AI did what
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
