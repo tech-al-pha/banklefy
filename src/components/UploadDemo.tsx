@@ -7,6 +7,7 @@ import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
+import { PDFJS_WORKER_SRC } from "@/lib/pdfWorker";
 import { useNavigate } from "react-router-dom";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { UsageLimitBanner } from "./UsageLimitBanner";
@@ -212,12 +213,9 @@ export const UploadDemo = () => {
 
   const pdfToPageImages = async (file: File, password?: string): Promise<string[]> => {
     const pdfjsLib = await import('pdfjs-dist');
-    
-    // Disable the worker to avoid "workerSrc not specified" errors
-    // This runs PDF parsing on the main thread which is fine for our use case
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-    }
+
+    // IMPORTANT: Use bundled worker (same-origin). CDN worker can fail due to CORS/dynamic import.
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
 
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({
