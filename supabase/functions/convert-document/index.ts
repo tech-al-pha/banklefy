@@ -402,7 +402,6 @@ Deno.serve(async (req) => {
       const status: AIProcessingStatus = {
         groqVision: { used: true, success: false },
         mistral: { used: false, success: false },
-        groqText: { used: false, success: false },
         patternFallback: { used: false, success: false },
       };
 
@@ -418,11 +417,15 @@ Deno.serve(async (req) => {
         const pageMime = match[1];
         const pageBase64 = match[2];
         const res = await callGroqVisionOCR(pageBase64, pageMime);
-        if (res.success && res.transactions && res.transactions.length > 0) {
-          collected.push(...res.transactions);
+        if (res.success) {
           if (res.text) combinedText += (combinedText ? '\n' : '') + res.text;
+          if (res.transactions && res.transactions.length > 0) {
+            collected.push(...res.transactions);
+          } else {
+            errors.push('No transactions parsed from OCR text');
+          }
         } else {
-          errors.push(res.error || 'No data extracted');
+          errors.push(res.error || 'OCR failed');
         }
       }
 
@@ -476,9 +479,6 @@ Deno.serve(async (req) => {
       
       if (status.groqVision.used && !status.groqVision.success) {
         errorDetails.push(`Groq Vision: ${status.groqVision.error}`);
-      }
-      if (status.groqText.used && !status.groqText.success) {
-        errorDetails.push(`Groq Text: ${status.groqText.error}`);
       }
       
       console.error('All AI services failed:', errorDetails.join(' | '));
@@ -727,7 +727,6 @@ Deno.serve(async (req) => {
     // Build AI status for debugging
     const aiStatus = {
       groqVision: categorizationResult.status.groqVision,
-      groqText: categorizationResult.status.groqText,
       mistral: categorizationResult.status.mistral,
       patternFallback: categorizationResult.status.patternFallback,
     };

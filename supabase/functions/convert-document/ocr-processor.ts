@@ -19,42 +19,165 @@ export interface RawTransaction {
   type?: string;
 }
 
-const OCR_PROMPT = `You are an expert OCR and bank statement data extraction specialist.
+// IMPORTANT (Deterministic pipeline): Groq Vision is used ONLY for OCR (image/PDF page → raw text).
+// We DO NOT ask the model to infer/compute debit/credit/balance.
+// After OCR, we parse transactions using rule-based + regex logic.
+const OCR_PROMPT = `You are an OCR engine. Transcribe the document EXACTLY as seen.
 
-CRITICAL: Extract ALL transactions with their EXACT NUMERICAL amounts from the document.
+CRITICAL:
+1) Output MUST be plain text (NOT JSON).
+2) Preserve line breaks and table row structure as much as possible.
+3) Do NOT summarize, do NOT categorize, do NOT calculate.
+4) Ensure all numbers (amounts/balances) are transcribed exactly.
 
-OUTPUT FORMAT - Return JSON array with these exact fields:
-[
-  {
-    "date": "YYYY-MM-DD",
-    "description": "transaction narration/description", 
-    "debit": 1234.56,
-    "credit": 0,
-    "balance": 5678.90
+Return only the plain text transcription.`;
+
+const monthMap: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
+};
+
+function pad2(n: number) {
+  return String(n).padStart(2, '0');
+}
+
+function normalizeDate(raw: string): string {
+  const s = (raw || '').trim();
+  if (!s) return '';
+
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmy = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+  if (dmy) {
+    const dd = Number(dmy[1]);
+    const mm = Number(dmy[2]);
+    let yyyy = Number(dmy[3]);
+    if (yyyy < 100) yyyy = 2000 + yyyy;
+    return `${yyyy}-${pad2(mm)}-${pad2(dd)}`;
   }
-]
 
-AMOUNT EXTRACTION RULES:
-1. DEBIT = money going OUT (withdrawals, payments, fees) - MUST be a positive number
-2. CREDIT = money coming IN (deposits, salary, transfers received) - MUST be a positive number  
-3. BALANCE = running balance after transaction - MUST be the exact number shown
-4. If amount column is empty or "-", use 0
-5. Remove commas from numbers: "1,234.56" becomes 1234.56
-6. Handle Indian format: "1,23,456" becomes 123456
-7. Handle negative signs: "-500" for debit means debit: 500
+  // DD Mon YYYY
+  const mon = s.match(/^(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{2,4})$/);
+  if (mon) {
+    const dd = Number(mon[1]);
+    const mKey = mon[2].toLowerCase();
+    const mm = monthMap[mKey] ?? monthMap[mKey.slice(0, 3)] ?? 0;
+    let yyyy = Number(mon[3]);
+    if (yyyy < 100) yyyy = 2000 + yyyy;
+    if (mm >= 1 && mm <= 12) {
+      return `${yyyy}-${pad2(mm)}-${pad2(dd)}`;
+    }
+  }
 
-DATE FORMAT:
-- Convert any date format to YYYY-MM-DD
-- DD/MM/YYYY, DD-MM-YYYY, DD Mon YYYY → YYYY-MM-DD
+  return s;
+}
 
-LOOK FOR TABLE COLUMNS:
-- Date/Value Date/Transaction Date
-- Particulars/Narration/Description/Details
-- Withdrawal/Debit/Dr/Out
-- Deposit/Credit/Cr/In  
-- Balance/Running Balance/Closing Balance
+function parseAmount(raw: string): number {
+  const s = (raw || '')
+    .replace(/[₹$,AEDa-zA-Z]/g, '')
+    .replace(/[\s]/g, '')
+    .replace(/,/g, '')
+    .trim();
 
-Return ONLY valid JSON array. No markdown, no explanation, no code blocks.`;
+  if (!s || s === '-' || s === '—') return 0;
+  const num = Number(String(s).replace(/^-/g, ''));
+  return Number.isFinite(num) ? Math.abs(num) : 0;
+}
+
+// Extract transactions from OCR text using deterministic regex.
+// Strategy: find lines starting with a date and ending with 2-3 numeric columns (amounts/balance).
+export function parseTransactionsFromOCRText(text: string): RawTransaction[] {
+  if (!text) return [];
+
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  // Heuristic: if we find a header line, start after it
+  let startAt = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].toLowerCase();
+    if (l.includes('date') && l.includes('balance') && (l.includes('debit') || l.includes('withdraw') || l.includes('credit') || l.includes('deposit'))) {
+      startAt = i + 1;
+      break;
+    }
+  }
+
+  const out: RawTransaction[] = [];
+  const datePrefix = /^(\d{4}-\d{2}-\d{2}|\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,}\s+\d{2,4})\b/;
+  const tail3 = /(-?\d[\d,]*\.?\d{0,2})\s+(-?\d[\d,]*\.?\d{0,2})\s+(-?\d[\d,]*\.?\d{0,2})\s*$/;
+  const tail2 = /(-?\d[\d,]*\.?\d{0,2})\s+(-?\d[\d,]*\.?\d{0,2})\s*$/;
+
+  for (let i = startAt; i < lines.length; i++) {
+    const line = lines[i];
+    const dm = line.match(datePrefix);
+    if (!dm) continue;
+
+    const dateRaw = dm[1];
+    const rest = line.slice(dm[0].length).trim();
+    if (!rest) continue;
+
+    // Try 3-column tail: debit credit balance (or withdrawal deposit balance)
+    const m3 = rest.match(tail3);
+    if (m3) {
+      const description = rest.replace(m3[0], '').trim();
+      out.push({
+        date: normalizeDate(dateRaw),
+        description: description || 'Unknown Transaction',
+        debit: parseAmount(m3[1]),
+        credit: parseAmount(m3[2]),
+        balance: parseAmount(m3[3]),
+      });
+      continue;
+    }
+
+    // Try 2-column tail: amount + balance
+    const m2 = rest.match(tail2);
+    if (m2) {
+      const description = rest.replace(m2[0], '').trim();
+      const amt = parseAmount(m2[1]);
+      const bal = parseAmount(m2[2]);
+      const hint = (description + ' ' + rest).toLowerCase();
+      const isCredit = /\b(cr|credit|deposit|received)\b/.test(hint);
+      const isDebit = /\b(dr|debit|withdraw|paid|purchase|fee|charge)\b/.test(hint);
+
+      out.push({
+        date: normalizeDate(dateRaw),
+        description: description || 'Unknown Transaction',
+        debit: isCredit && !isDebit ? 0 : amt,
+        credit: isCredit && !isDebit ? amt : 0,
+        balance: bal,
+      });
+    }
+  }
+
+  return out;
+}
 
 export async function callGroqVisionOCR(
   imageBase64: string, 
@@ -110,20 +233,9 @@ export async function callGroqVisionOCR(
       return { success: false, error: 'No content in Groq response' };
     }
     
-    // Parse JSON from response
-    const jsonMatch = textContent.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      try {
-        const transactions = JSON.parse(jsonMatch[0]);
-        console.log(`Groq Vision OCR extracted ${transactions.length} transactions`);
-        return { success: true, transactions, text: textContent };
-      } catch (parseError) {
-        console.error('Failed to parse Groq JSON:', parseError);
-        return { success: true, text: textContent };
-      }
-    }
-    
-    return { success: true, text: textContent };
+    const parsed = parseTransactionsFromOCRText(textContent);
+    console.log(`Groq Vision OCR text length=${textContent.length}, parsedTransactions=${parsed.length}`);
+    return { success: true, text: textContent, transactions: parsed };
   } catch (error) {
     console.error('Groq Vision OCR error:', error);
     return { 
