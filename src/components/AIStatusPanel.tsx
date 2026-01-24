@@ -23,7 +23,7 @@ const serviceInfo = {
   groqVision: {
     name: 'Groq Vision',
     icon: Zap,
-    role: 'OCR & Image Extraction',
+    role: 'OCR & Image Extraction (Primary)',
     color: 'text-orange-500',
     bgColor: 'bg-orange-500/10',
     borderColor: 'border-orange-500/30',
@@ -31,7 +31,7 @@ const serviceInfo = {
   groqText: {
     name: 'Groq Text',
     icon: Zap,
-    role: 'Text-based Extraction',
+    role: 'Text-based Extraction (Backup)',
     color: 'text-amber-500',
     bgColor: 'bg-amber-500/10',
     borderColor: 'border-amber-500/30',
@@ -45,28 +45,28 @@ const serviceInfo = {
     borderColor: 'border-blue-500/30',
   },
   gemini: {
-    name: 'Gemini 2.0',
+    name: 'Gemini',
     icon: Sparkles,
-    role: 'Complex Reasoning & Fallback',
-    color: 'text-purple-500',
-    bgColor: 'bg-purple-500/10',
-    borderColor: 'border-purple-500/30',
+    role: 'Disabled (Groq-only)',
+    color: 'text-gray-400',
+    bgColor: 'bg-gray-500/10',
+    borderColor: 'border-gray-500/30',
   },
   lovable: {
     name: 'Lovable AI',
     icon: Bot,
-    role: 'Ultimate Fallback Gateway',
-    color: 'text-pink-500',
-    bgColor: 'bg-pink-500/10',
-    borderColor: 'border-pink-500/30',
-  },
-  patternFallback: {
-    name: 'Pattern Match',
-    icon: Bot,
-    role: 'Rule-based Fallback',
+    role: 'Disabled (Groq-only)',
     color: 'text-gray-400',
     bgColor: 'bg-gray-500/10',
     borderColor: 'border-gray-500/30',
+  },
+  patternFallback: {
+    name: 'Rule-Based',
+    icon: Bot,
+    role: 'Pattern Matching (No AI)',
+    color: 'text-emerald-400',
+    bgColor: 'bg-emerald-500/10',
+    borderColor: 'border-emerald-500/30',
   },
 };
 
@@ -154,7 +154,10 @@ export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
       {/* Legend */}
       <div className="mt-3 pt-3 border-t border-border/30">
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium">Pipeline:</span> Groq Vision (OCR) → Mistral (Clean/Categorize) → Gemini (Fallback) → Lovable (Ultimate)
+          <span className="font-medium">Pipeline:</span> Groq Vision (OCR) → Mistral (Categorize) → Rule-Based Fallback
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          <span className="text-emerald-400">✓ Deterministic:</span> FOIR, Salary & EMI detection use rule-based logic (no AI)
         </p>
       </div>
     </Card>
