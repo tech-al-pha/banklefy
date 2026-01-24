@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 // Import modular processors
 import { 
   classifyDocument, 
+  callGroqVisionOCR,
   type RawTransaction 
 } from './ocr-processor.ts';
 import { 
@@ -64,6 +65,24 @@ const getCorsHeaders = (req: Request) => ({
 const sanitizeError = (error: unknown): string => {
   if (error instanceof Error) {
     const msg = error.message.toLowerCase();
+
+    // During debugging we WANT to surface which provider failed.
+    // These messages are already sanitized by us (no secrets) and help avoid wasting credits.
+    const debugPassThrough = [
+      'ai status:',
+      'groq vision:',
+      'groq text:',
+      'gemini:',
+      'mistral:',
+      'lovable ai:',
+      'credits exhausted',
+      'requires page images',
+      'pdf requires page images',
+    ];
+    if (debugPassThrough.some((s) => msg.includes(s))) {
+      return error.message;
+    }
+
     if (msg.includes('relation') || msg.includes('table') || msg.includes('column')) {
       return 'Database configuration error';
     }
@@ -146,7 +165,7 @@ Deno.serve(async (req) => {
 
   try {
     // Parse request
-    const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken, pdfPassword } = await req.json();
+    const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken, pdfPassword, pdfPageImages } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
     const ipAddress = getClientIp(req);
 
@@ -203,7 +222,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!user && !base64FileData) {
+    if (!user && !base64FileData && !(Array.isArray(pdfPageImages) && pdfPageImages.length > 0)) {
       return new Response(
         JSON.stringify({ error: 'File data required for anonymous users' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -243,11 +262,16 @@ Deno.serve(async (req) => {
       bytes = new Uint8Array(buffer);
     } else {
       try {
-        const base64Content = base64FileData.split(',')[1] || base64FileData;
+        // If PDF pages are provided as images, we may not have a PDF base64.
+        const base64Content = base64FileData?.split?.(',')?.[1] || base64FileData;
+        if (!base64Content) {
+          bytes = new Uint8Array();
+        } else {
         const binaryString = atob(base64Content);
         bytes = new Uint8Array(binaryString.length);
         for (let i = 0; i < binaryString.length; i++) {
           bytes[i] = binaryString.charCodeAt(i);
+        }
         }
       } catch {
         return new Response(
@@ -257,8 +281,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Validate file size (10MB limit)
-    if (bytes.length > 10 * 1024 * 1024) {
+    // Validate file size (10MB limit) when we actually have original bytes
+    if (bytes.length > 0 && bytes.length > 10 * 1024 * 1024) {
       return new Response(
         JSON.stringify({ error: 'File exceeds 10MB limit' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -268,7 +292,8 @@ Deno.serve(async (req) => {
     // Validate magic bytes
     const lowerFileName = fileName.toLowerCase();
     if (lowerFileName.endsWith('.pdf')) {
-      if (bytes[0] !== 0x25 || bytes[1] !== 0x50 || bytes[2] !== 0x44 || bytes[3] !== 0x46) {
+      // If client provided page images, we might not have original PDF bytes.
+      if (bytes.length > 0 && (bytes[0] !== 0x25 || bytes[1] !== 0x50 || bytes[2] !== 0x44 || bytes[3] !== 0x46)) {
         return new Response(
           JSON.stringify({ error: 'Invalid PDF file format' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -330,20 +355,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Increment usage count
-    const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
-      p_ip_address: user ? null : ipAddress,
-      p_user_id: user ? user.id : null
-    });
-
-    if (incrementError) {
-      console.error('Error incrementing usage:', incrementError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to update usage count' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Create conversion record for authenticated users
     let conversion = null;
     if (user) {
@@ -375,26 +386,88 @@ Deno.serve(async (req) => {
     const classification = classifyDocument(extractedText, bytes, fileName);
     console.log('Document classification:', classification);
 
-    // Convert bytes to base64 for OCR
-    const chunkSize = 8192;
-    let base64Data = '';
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      base64Data += String.fromCharCode(...chunk);
-    }
-    base64Data = btoa(base64Data);
-    
-    const mimeType = lowerFileName.endsWith('.pdf') ? 'application/pdf' : 
-                     lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
-
     // ============= SPECIALIZED AI EXTRACTION =============
-    // Each AI does what it's BEST at (not fallback chains)
+    // NOTE: Groq Vision models do NOT accept PDFs directly.
+    // For PDFs we require the client to send rendered page images (pdfPageImages) to avoid "invalid image data"
+    // and to prevent wasting credits on doomed fallbacks.
     console.log('=== Starting Specialized AI Pipeline ===');
-    
-    const extractionResult = await performExtraction(base64Data, mimeType, extractedText);
+
+    let extractionResult: Awaited<ReturnType<typeof performExtraction>>;
+
+    const isPdf = lowerFileName.endsWith('.pdf');
+    const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
+
+    if (isPdf && hasPdfPageImages) {
+      // Build a minimal status object consistent with ai-orchestrator
+      const status: AIProcessingStatus = {
+        groqVision: { used: true, success: false },
+        mistral: { used: false, success: false },
+        gemini: { used: false, success: false },
+        lovable: { used: false, success: false },
+        groqText: { used: false, success: false },
+        patternFallback: { used: false, success: false },
+      };
+
+      const errors: string[] = [];
+      const start = Date.now();
+      const collected: RawTransaction[] = [];
+      let combinedText = '';
+
+      for (const img of pdfPageImages as string[]) {
+        if (typeof img !== 'string') continue;
+        const match = img.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) continue;
+        const pageMime = match[1];
+        const pageBase64 = match[2];
+        const res = await callGroqVisionOCR(pageBase64, pageMime);
+        if (res.success && res.transactions && res.transactions.length > 0) {
+          collected.push(...res.transactions);
+          if (res.text) combinedText += (combinedText ? '\n' : '') + res.text;
+        } else {
+          errors.push(res.error || 'No data extracted');
+        }
+      }
+
+      status.groqVision.time = Date.now() - start;
+      status.groqVision.success = collected.length > 0;
+      if (!status.groqVision.success) {
+        status.groqVision.error = errors[0] || 'No data extracted from PDF page images';
+      }
+
+      extractionResult = {
+        transactions: collected,
+        status,
+        extractedText: combinedText,
+      };
+    } else {
+      // Convert bytes to base64 for OCR
+      const chunkSize = 8192;
+      let base64Data = '';
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        base64Data += String.fromCharCode(...chunk);
+      }
+      base64Data = btoa(base64Data);
+
+      const mimeType = isPdf ? 'application/pdf' :
+        lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+      if (isPdf) {
+        return new Response(
+          JSON.stringify({
+            error: 'PDF requires page images for processing. Please retry (the app will render pages) or upload JPG/PNG.',
+            requiresPageImages: true,
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      extractionResult = await performExtraction(base64Data, mimeType, extractedText);
+    }
+
     rawTransactions = extractionResult.transactions;
     extractedText = extractionResult.extractedText || '';
-    
+
     // Log extraction status
     console.log(generateStatusReport(extractionResult.status));
 
@@ -669,6 +742,18 @@ Deno.serve(async (req) => {
       patternFallback: categorizationResult.status.patternFallback,
     };
 
+    // Increment usage count ONLY after successful conversion (prevents wasting credits/limit on failures)
+    let remaining = conversionsLimit - conversionsUsed;
+    const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
+      p_ip_address: user ? null : ipAddress,
+      p_user_id: user ? user.id : null,
+    });
+    if (incrementError) {
+      console.error('Error incrementing usage after success:', incrementError);
+    } else {
+      remaining = conversionsLimit - conversionsUsed - 1;
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -678,7 +763,7 @@ Deno.serve(async (req) => {
         analytics: analytics,
         excelData: user ? null : excelBase64,
         message: 'Conversion completed successfully',
-        remaining: conversionsLimit - conversionsUsed - 1,
+        remaining,
         isAuthenticated: !!user,
         aiStatus, // For debugging - shows which AI did what
       }),
