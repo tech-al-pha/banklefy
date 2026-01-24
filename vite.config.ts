@@ -17,6 +17,18 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     target: "esnext",
+    // --- Naya Code Yahan Se ---
+    chunkSizeWarningLimit: 1000, 
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        },
+      },
+    },
+    // --- Naya Code Yahan Tak ---
   },
   optimizeDeps: {
     esbuildOptions: {
