@@ -15,6 +15,13 @@ export const Hero = () => {
 
       <div className="relative z-10 container mx-auto px-6 text-center">
         <div className="max-w-5xl mx-auto flex flex-col items-center space-y-10">
+          <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#1a120b]/90 backdrop-blur-xl border border-primary/30 shadow-lg mb-4 shrink-0">
+            <Zap className="w-4 h-4 text-primary fill-primary" />
+            <span className="text-sm text-foreground/90 font-bold tracking-tight">
+              AI-Powered Financial Intelligence
+            </span>
+          </div>
+
           <div className="flex flex-col items-center leading-tight">
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white/95">
               AI Bank Statement
@@ -26,14 +33,6 @@ export const Hero = () => {
 
           <div className="text-lg md:text-2xl font-bold text-primary tracking-[0.1em] uppercase pt-2">
             professional look | OCR-Powered | Instant Results
-          </div>
-
-          {/* AI Badge - moved below tagline */}
-          <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#1a120b]/90 backdrop-blur-xl border border-primary/30 shadow-lg">
-            <Zap className="w-4 h-4 text-primary fill-primary" />
-            <span className="text-sm text-foreground/90 font-bold tracking-tight">
-              AI-Powered Financial Intelligence
-            </span>
           </div>
 
           <p className="text-sm md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed opacity-70">

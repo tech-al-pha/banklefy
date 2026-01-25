@@ -6,11 +6,11 @@ const Logo = () => {
 
   return (
     <div 
-      className="flex items-center cursor-pointer group h-16 md:h-20" 
+      className="flex items-center cursor-pointer group h-14 md:h-16" 
       onClick={() => navigate("/")}
     >
       {/* Logo Container */}
-      <div className="relative w-16 h-16 md:w-20 md:h-20 flex items-center justify-center overflow-visible">
+      <div className="relative w-14 h-14 md:w-16 md:h-16 flex items-center justify-center overflow-visible">
         <img 
           src={akromedaLogo} 
           alt="Akromeda" 
@@ -18,8 +18,8 @@ const Logo = () => {
         />
       </div>
 
-      {/* Akromeda Text - closer to logo with ml-1 */}
-      <span className="ml-1 text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-white to-[#F59E0B] bg-clip-text text-transparent uppercase hidden sm:block">
+      {/* Akromeda Text */}
+      <span className="ml-3 text-xl md:text-2xl font-black tracking-tighter bg-gradient-to-r from-white via-white to-[#F59E0B] bg-clip-text text-transparent uppercase hidden sm:block">
         Akromeda
       </span>
     </div>
