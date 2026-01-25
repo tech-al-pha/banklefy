@@ -117,17 +117,17 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
+      <div className="min-h-screen bg-[#0A0502] flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-dark text-foreground">
+    <div className="min-h-screen bg-[#0A0502] text-foreground">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-6 py-4 bg-[#1a120b]/80">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button

@@ -16,7 +16,7 @@ import { FraudAlertPanel } from "./FraudAlertPanel";
 import { UnderwritingPanel } from "./UnderwritingPanel";
 import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
 import { AIStatusPanel } from "./AIStatusPanel";
-import amLogoImg from "@/assets/am-logo.png";
+import akromedaLogo from "@/assets/akromeda-logo.png";
 import {
   Table,
   TableBody,
@@ -642,7 +642,7 @@ export const UploadDemo = () => {
       // Add Akromeda Logo
       try {
         // Load logo as base64
-        const logoResponse = await fetch(amLogoImg);
+        const logoResponse = await fetch(akromedaLogo);
         const logoBlob = await logoResponse.blob();
         const logoBase64 = await new Promise<string>((resolve) => {
           const reader = new FileReader();
