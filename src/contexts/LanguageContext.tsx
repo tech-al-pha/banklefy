@@ -11,6 +11,7 @@ interface LanguageContextType {
 const translations: Record<Language, Record<string, string>> = {
   en: {
     // Navigation
+    'nav.features': 'Features',
     'nav.demo': 'Demo',
     'nav.chatAura': 'Chat Aura',
     'nav.settings': 'Settings',
@@ -82,6 +83,7 @@ const translations: Record<Language, Record<string, string>> = {
   },
   zh: {
     // Navigation
+    'nav.features': '功能',
     'nav.demo': '演示',
     'nav.chatAura': 'Chat Aura',
     'nav.settings': '设置',
@@ -153,6 +155,7 @@ const translations: Record<Language, Record<string, string>> = {
   },
   ja: {
     // Navigation
+    'nav.features': '機能',
     'nav.demo': 'デモ',
     'nav.chatAura': 'Chat Aura',
     'nav.settings': '設定',
@@ -224,6 +227,7 @@ const translations: Record<Language, Record<string, string>> = {
   },
   es: {
     // Navigation
+    'nav.features': 'Características',
     'nav.demo': 'Demo',
     'nav.chatAura': 'Chat Aura',
     'nav.settings': 'Ajustes',
@@ -295,6 +299,7 @@ const translations: Record<Language, Record<string, string>> = {
   },
   it: {
     // Navigation
+    'nav.features': 'Funzionalità',
     'nav.demo': 'Demo',
     'nav.chatAura': 'Chat Aura',
     'nav.settings': 'Impostazioni',

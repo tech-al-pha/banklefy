@@ -5,7 +5,7 @@ import { UploadDemo } from "@/components/UploadDemo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Shield, Settings, PlayCircle, MessageCircle } from "lucide-react";
+import { LogOut, Shield, Settings, PlayCircle, MessageCircle, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
@@ -50,6 +50,17 @@ const Index = () => {
             <Logo />
             <div className="hidden md:flex items-center gap-6">
               
+              {/* Features Button */}
+              <Button 
+                variant="ghost"
+                size="sm" 
+                onClick={() => navigate('/features')}
+                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium"
+              >
+                <Sparkles className="h-4 w-4" />
+                {t('nav.features')}
+              </Button>
+
               {/* Demo Button */}
               <Button 
                 variant="ghost"
@@ -63,7 +74,6 @@ const Index = () => {
                 <PlayCircle className="h-4 w-4" />
                 {t('nav.demo')}
               </Button>
-
 
               {/* Chat Aura Button */}
               <Button 
