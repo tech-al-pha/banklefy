@@ -34,26 +34,44 @@ import {
 } from './financial-engine.ts';
 import { generateProfessionalExcel } from './excel-generator.ts';
 
-// ============= CORS & SECURITY HELPERS =============
+// ============= DEPLOYMENT-AGNOSTIC CORS =============
+// Allows requests from any origin. The edge function runs on Supabase infrastructure
+// and the frontend can be hosted anywhere (Vercel, Netlify, Cloudflare, etc.)
 const getAllowedOrigin = (requestOrigin: string | null): string => {
+  const envOrigin = Deno.env.get('ALLOWED_ORIGIN');
+  
   const allowedOrigins = [
-    Deno.env.get('ALLOWED_ORIGIN') || '',
+    envOrigin,
     'https://akromeda.lovable.app',
+    'https://akromeda.vercel.app',
     'http://localhost:8080',
     'http://localhost:5173',
-  ].filter(Boolean);
+    'http://localhost:3000',
+  ].filter(Boolean) as string[];
   
   if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
     return requestOrigin;
   }
   
+  // Allow *.lovable.app and *.lovableproject.com
   const lovableAppPattern = /^https:\/\/[a-z0-9-]+\.lovable\.app$/;
   const lovableProjectPattern = /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/;
   if (requestOrigin && (lovableAppPattern.test(requestOrigin) || lovableProjectPattern.test(requestOrigin))) {
     return requestOrigin;
   }
   
-  return allowedOrigins[0] || 'https://akromeda.lovable.app';
+  // Allow *.vercel.app (Vercel previews)
+  const vercelPattern = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
+  if (requestOrigin && vercelPattern.test(requestOrigin)) {
+    return requestOrigin;
+  }
+  
+  // Allow any origin if ALLOWED_ORIGIN is set to '*'
+  if (envOrigin === '*' && requestOrigin) {
+    return requestOrigin;
+  }
+  
+  return requestOrigin || allowedOrigins[0] || '*';
 };
 
 const getCorsHeaders = (req: Request) => ({

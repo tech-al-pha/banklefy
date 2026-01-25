@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { invokeEdgeFunction } from '@/lib/supabaseApi';
 
 interface UsageLimit {
   conversionsUsed: number;
@@ -39,7 +39,14 @@ export const useUsageLimit = () => {
       const timezone = getTimezone();
       const accessToken = session?.access_token;
 
-      const { data, error } = await supabase.functions.invoke('check-usage-limit', {
+      // Use explicit REST call (deployment-agnostic)
+      const { data, error } = await invokeEdgeFunction<{
+        conversionsUsed?: number;
+        conversionsLimit?: number;
+        remaining?: number;
+        limitReached?: boolean;
+        isAuthenticated?: boolean;
+      }>('check-usage-limit', {
         body: { timezone },
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });

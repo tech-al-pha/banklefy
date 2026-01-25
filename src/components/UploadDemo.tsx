@@ -5,6 +5,7 @@ import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreads
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/supabaseApi";
 import { useAuth } from "@/hooks/useAuth";
 import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
 import { PDFJS_WORKER_SRC } from "@/lib/pdfWorker";
@@ -367,58 +368,28 @@ export const UploadDemo = () => {
       setUploading(false);
       setConverting(true);
 
-      // Call edge function to process conversion
-      // Explicitly pass the current access token to avoid being treated as anonymous.
+      // Call edge function to process conversion via explicit REST URL (deployment-agnostic)
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData.session?.access_token;
 
-      const { data, error: functionError } = await supabase.functions.invoke('convert-document', {
+      const { data, error: functionError, response } = await invokeEdgeFunction<any>('convert-document', {
         body: requestBody,
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
 
       if (functionError) {
-        // Supabase returns a generic message for non-2xx responses.
-        // Try to extract a useful message from the response body.
-        const ctx = (functionError as any).context;
         let message = functionError.message || 'Conversion failed';
-
-        try {
-          // context can be a Response, or an object holding a Response
-          const res: Response | undefined =
-            ctx instanceof Response
-              ? ctx
-              : ctx?.response instanceof Response
-                ? ctx.response
-                : undefined;
-
-          if (res) {
-            const payload = await res.clone().json().catch(() => null);
-            if (payload && typeof payload === 'object') {
-              if ((payload as any).limitReached) {
-                refreshUsageLimit();
-              }
-              if ((payload as any).requiresPassword) {
-                setPasswordError(true);
-                setShowPasswordInput(true);
-              }
-              message = (payload as any).message || (payload as any).error || message;
-            }
-          } else if (ctx && typeof ctx.json === 'function') {
-            const payload = await ctx.json().catch(() => null);
-            if (payload && typeof payload === 'object') {
-              if ((payload as any).limitReached) {
-                refreshUsageLimit();
-              }
-              if ((payload as any).requiresPassword) {
-                setPasswordError(true);
-                setShowPasswordInput(true);
-              }
-              message = (payload as any).message || (payload as any).error || message;
-            }
+        
+        // Check if we got structured error data
+        if (data && typeof data === 'object') {
+          if ((data as any).limitReached) {
+            refreshUsageLimit();
           }
-        } catch {
-          // ignore parsing issues
+          if ((data as any).requiresPassword) {
+            setPasswordError(true);
+            setShowPasswordInput(true);
+          }
+          message = (data as any).message || (data as any).error || message;
         }
 
         throw new Error(message);

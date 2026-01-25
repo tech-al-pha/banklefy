@@ -1,28 +1,47 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-// Get allowed origin from environment or use default
+// ============= DEPLOYMENT-AGNOSTIC CORS =============
+// Allows requests from any origin. The edge function runs on Supabase infrastructure
+// and the frontend can be hosted anywhere (Vercel, Netlify, Cloudflare, etc.)
 const getAllowedOrigin = (requestOrigin: string | null): string => {
+  // Read custom allowed origin from env (optional)
+  const envOrigin = Deno.env.get('ALLOWED_ORIGIN');
+  
+  // Explicit allow-list for known production domains
   const allowedOrigins = [
-    Deno.env.get('ALLOWED_ORIGIN') || '',
+    envOrigin,
     'https://akromeda.lovable.app',
+    'https://akromeda.vercel.app',
     'http://localhost:8080',
     'http://localhost:5173',
-  ].filter(Boolean);
+    'http://localhost:3000',
+  ].filter(Boolean) as string[];
   
-  // Check if the request origin is in our allowed list
+  // If origin matches allow-list, return it
   if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
     return requestOrigin;
   }
   
-  // For Lovable preview URLs - allow all .lovable.app and .lovableproject.com subdomains
+  // Allow any *.lovable.app or *.lovableproject.com (Lovable previews)
   const lovableAppPattern = /^https:\/\/[a-z0-9-]+\.lovable\.app$/;
   const lovableProjectPattern = /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/;
   if (requestOrigin && (lovableAppPattern.test(requestOrigin) || lovableProjectPattern.test(requestOrigin))) {
     return requestOrigin;
   }
   
-  // Default to first allowed origin
-  return allowedOrigins[0] || 'https://akromeda.lovable.app';
+  // Allow any *.vercel.app (Vercel previews)
+  const vercelPattern = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
+  if (requestOrigin && vercelPattern.test(requestOrigin)) {
+    return requestOrigin;
+  }
+  
+  // Allow any origin if ALLOWED_ORIGIN is set to '*' (development/testing)
+  if (envOrigin === '*' && requestOrigin) {
+    return requestOrigin;
+  }
+  
+  // Default fallback
+  return requestOrigin || allowedOrigins[0] || '*';
 };
 
 const getCorsHeaders = (req: Request) => ({
