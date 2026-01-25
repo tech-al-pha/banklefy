@@ -1,18 +1,28 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRequireAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { useSettings } from "@/hooks/useSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import Logo from "@/components/Logo";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
   ArrowLeft, 
   Search, 
@@ -20,7 +30,6 @@ import {
   Bell, 
   Shield, 
   Palette, 
-  Globe, 
   HelpCircle,
   FileText,
   BarChart3,
@@ -34,8 +43,11 @@ import {
   Volume2,
   Download,
   Trash2,
-  LogOut
+  LogOut,
+  Save,
+  Loader2
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface SettingItem {
   id: string;
@@ -47,16 +59,52 @@ interface SettingItem {
 }
 
 const Settings = () => {
-  const { user, loading } = useRequireAuth();
+  const { user, loading: authLoading } = useRequireAuth();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { toast } = useToast();
   const { conversionsUsed, conversionsLimit, remaining, isAuthenticated } = useUsageLimit();
+  const {
+    settings,
+    loading: settingsLoading,
+    saving,
+    updateSetting,
+    updateProfile,
+    sendPasswordReset,
+    exportUserData,
+    deleteAccount,
+  } = useSettings();
+  
   const [searchQuery, setSearchQuery] = useState("");
-  const [darkMode, setDarkMode] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [autoDownload, setAutoDownload] = useState(false);
+  const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || "");
+  const [nameChanged, setNameChanged] = useState(false);
+
+  // Handle display name change
+  const handleNameChange = useCallback((value: string) => {
+    setDisplayName(value);
+    setNameChanged(value !== (user?.user_metadata?.full_name || ""));
+  }, [user]);
+
+  const handleSaveName = useCallback(async () => {
+    await updateProfile(displayName);
+    setNameChanged(false);
+  }, [displayName, updateProfile]);
+
+  const handlePasswordReset = useCallback(async () => {
+    if (user?.email) {
+      await sendPasswordReset(user.email);
+    }
+  }, [user, sendPasswordReset]);
+
+  const handleExportData = useCallback(async () => {
+    if (user?.id) {
+      await exportUserData(user.id);
+    }
+  }, [user, exportUserData]);
+
+  const handleDeleteAccount = useCallback(async () => {
+    await deleteAccount();
+  }, [deleteAccount]);
 
   const settingItems: SettingItem[] = useMemo(() => [
     // Profile Settings
@@ -80,11 +128,23 @@ const Settings = () => {
       category: "profile",
       icon: <User className="h-5 w-5" />,
       component: (
-        <Input 
-          placeholder={t('settings.profile.namePlaceholder')}
-          className="max-w-xs bg-background/50"
-          defaultValue={user?.user_metadata?.full_name || ""}
-        />
+        <div className="flex items-center gap-2">
+          <Input 
+            placeholder={t('settings.profile.namePlaceholder')}
+            className="max-w-xs bg-background/50"
+            value={displayName}
+            onChange={(e) => handleNameChange(e.target.value)}
+          />
+          {nameChanged && (
+            <Button 
+              size="sm" 
+              onClick={handleSaveName}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            </Button>
+          )}
+        </div>
       )
     },
     {
@@ -94,7 +154,13 @@ const Settings = () => {
       category: "profile",
       icon: <Lock className="h-5 w-5" />,
       component: (
-        <Button variant="outline" size="sm">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handlePasswordReset}
+          disabled={saving}
+        >
+          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
           {t('settings.profile.changePassword')}
         </Button>
       )
@@ -131,7 +197,12 @@ const Settings = () => {
           <Badge className="bg-primary/20 text-primary border-primary/30">
             {isAuthenticated ? t('settings.usage.freeTier') : t('settings.usage.anonymous')}
           </Badge>
-          <Button variant="outline" size="sm" className="border-primary/50 text-primary">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-primary/50 text-primary"
+            onClick={() => toast({ title: "Coming Soon", description: "Premium plans will be available soon!" })}
+          >
             {t('settings.usage.upgrade')}
           </Button>
         </div>
@@ -145,7 +216,10 @@ const Settings = () => {
       category: "notifications",
       icon: <Mail className="h-5 w-5" />,
       component: (
-        <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
+        <Switch 
+          checked={settings.emailNotifications} 
+          onCheckedChange={(checked) => updateSetting('emailNotifications', checked)} 
+        />
       )
     },
     {
@@ -155,7 +229,10 @@ const Settings = () => {
       category: "notifications",
       icon: <Smartphone className="h-5 w-5" />,
       component: (
-        <Switch checked={pushNotifications} onCheckedChange={setPushNotifications} />
+        <Switch 
+          checked={settings.pushNotifications} 
+          onCheckedChange={(checked) => updateSetting('pushNotifications', checked)} 
+        />
       )
     },
     {
@@ -165,7 +242,10 @@ const Settings = () => {
       category: "notifications",
       icon: <Volume2 className="h-5 w-5" />,
       component: (
-        <Switch checked={soundEnabled} onCheckedChange={setSoundEnabled} />
+        <Switch 
+          checked={settings.soundEnabled} 
+          onCheckedChange={(checked) => updateSetting('soundEnabled', checked)} 
+        />
       )
     },
     // Appearance
@@ -174,11 +254,14 @@ const Settings = () => {
       title: t('settings.appearance.theme'),
       description: t('settings.appearance.themeDesc'),
       category: "appearance",
-      icon: darkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />,
+      icon: settings.darkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />,
       component: (
         <div className="flex items-center gap-2">
           <Sun className="h-4 w-4 text-muted-foreground" />
-          <Switch checked={darkMode} onCheckedChange={setDarkMode} />
+          <Switch 
+            checked={settings.darkMode} 
+            onCheckedChange={(checked) => updateSetting('darkMode', checked)} 
+          />
           <Moon className="h-4 w-4 text-muted-foreground" />
         </div>
       )
@@ -188,7 +271,7 @@ const Settings = () => {
       title: t('settings.appearance.language'),
       description: t('settings.appearance.languageDesc'),
       category: "appearance",
-      icon: <Globe className="h-5 w-5" />,
+      icon: <Eye className="h-5 w-5" />,
       component: <LanguageSelector />
     },
     // Privacy & Security
@@ -199,7 +282,11 @@ const Settings = () => {
       category: "privacy",
       icon: <Eye className="h-5 w-5" />,
       component: (
-        <Button variant="outline" size="sm">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => toast({ title: "Privacy Settings", description: "Your data is private by default and not shared with anyone." })}
+        >
           {t('settings.privacy.manage')}
         </Button>
       )
@@ -211,7 +298,13 @@ const Settings = () => {
       category: "privacy",
       icon: <Download className="h-5 w-5" />,
       component: (
-        <Button variant="outline" size="sm">
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={handleExportData}
+          disabled={saving}
+        >
+          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
           {t('settings.privacy.download')}
         </Button>
       )
@@ -223,9 +316,27 @@ const Settings = () => {
       category: "privacy",
       icon: <Trash2 className="h-5 w-5 text-destructive" />,
       component: (
-        <Button variant="destructive" size="sm">
-          {t('settings.privacy.deleteAccount')}
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="destructive" size="sm">
+              {t('settings.privacy.deleteAccount')}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="bg-background border-border">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground">
+                Delete Account
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )
     },
     // Advanced
@@ -236,10 +347,13 @@ const Settings = () => {
       category: "advanced",
       icon: <Download className="h-5 w-5" />,
       component: (
-        <Switch checked={autoDownload} onCheckedChange={setAutoDownload} />
+        <Switch 
+          checked={settings.autoDownload} 
+          onCheckedChange={(checked) => updateSetting('autoDownload', checked)} 
+        />
       )
     },
-  ], [user, conversionsUsed, conversionsLimit, remaining, isAuthenticated, darkMode, emailNotifications, pushNotifications, soundEnabled, autoDownload, t]);
+  ], [user, conversionsUsed, conversionsLimit, remaining, isAuthenticated, settings, displayName, nameChanged, saving, t, toast, handleNameChange, handleSaveName, handlePasswordReset, handleExportData, handleDeleteAccount, updateSetting]);
 
   const categories = [
     { id: "all", label: t('settings.categories.all'), icon: <SettingsIcon className="h-4 w-4" /> },
@@ -302,7 +416,7 @@ const Settings = () => {
     );
   };
 
-  if (loading) {
+  if (authLoading || settingsLoading) {
     return (
       <div className="min-h-screen bg-[#0A0502] flex items-center justify-center">
         <div className="animate-pulse text-primary">Loading...</div>
