@@ -2,35 +2,37 @@ import { Button } from "@/components/ui/button";
 import { Shield, Lock, Eye, Trash2, FileCheck, Globe, Brain, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Logo from "@/components/Logo";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Privacy = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const sections = [
     {
       icon: Trash2,
-      title: "Zero Data Retention",
-      content: "Your uploaded files are automatically deleted after conversion. We don't keep anything. Your data never stays on our servers beyond the processing time needed."
+      titleKey: "privacyPage.sections.zeroRetention.title",
+      contentKey: "privacyPage.sections.zeroRetention.desc",
     },
     {
       icon: Lock,
-      title: "End-to-End Encryption",
-      content: "All file transfers are encrypted using the latest TLS 1.4 protocols. Your documents are protected with military-grade security during upload, processing, and download."
+      titleKey: "privacyPage.sections.encryption.title",
+      contentKey: "privacyPage.sections.encryption.desc",
     },
     {
       icon: Eye,
-      title: "No Tracking",
-      content: "We don't use cookies to track you. No ads, no profiling, no hidden scripts. Your privacy is respected at every step."
+      titleKey: "privacyPage.sections.noTracking.title",
+      contentKey: "privacyPage.sections.noTracking.desc",
     },
     {
       icon: Brain,
-      title: "AI-Powered, Human-Free",
-      content: "Your data is processed by secure AI systems — no human ever sees your files. Everything is automated, private, and confidential."
+      titleKey: "privacyPage.sections.aiPowered.title",
+      contentKey: "privacyPage.sections.aiPowered.desc",
     },
     {
       icon: Globe,
-      title: "Compliance-Ready",
-      content: "Built with GDPR, CCPA, and future-forward privacy standards in mind. We're committed to protecting your rights and data in 2026 and beyond."
+      titleKey: "privacyPage.sections.compliance.title",
+      contentKey: "privacyPage.sections.compliance.desc",
     }
   ];
 
@@ -46,7 +48,7 @@ const Privacy = () => {
               onClick={() => navigate('/')} 
               className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter"
             >
-              <ArrowLeft size={18} /> Back to Home
+              <ArrowLeft size={18} /> {t('common.backToHome')}
             </Button>
           </div>
         </div>
@@ -57,17 +59,17 @@ const Privacy = () => {
         <div className="container mx-auto max-w-4xl text-center space-y-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card/60 backdrop-blur-lg border border-primary/30 mb-4">
             <Shield className="w-4 h-4 text-primary" />
-            <span className="text-sm text-foreground/80">Your Privacy Matters</span>
+            <span className="text-sm text-foreground/80">{t('privacyPage.badge')}</span>
           </div>
           
           <h1 className="text-5xl md:text-6xl font-bold">
-            Privacy Policy
+            {t('privacyPage.title')}
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Your data is treated like gold — private, secure, and never stored
+            {t('privacyPage.subtitle')}
           </p>
           <p className="text-sm text-muted-foreground">
-            Last updated: 2026
+            {t('privacyPage.lastUpdated')}
           </p>
         </div>
       </section>
@@ -86,10 +88,10 @@ const Privacy = () => {
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-2xl font-bold text-foreground">
-                    {section.title}
+                    {t(section.titleKey)}
                   </h2>
                   <p className="text-muted-foreground leading-relaxed">
-                    {section.content}
+                    {t(section.contentKey)}
                   </p>
                 </div>
               </div>
@@ -102,21 +104,21 @@ const Privacy = () => {
       <section className="py-16 px-6">
         <div className="container mx-auto max-w-4xl">
           <div className="bg-[#1a120b]/80 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-6">
-            <h2 className="text-3xl font-bold text-foreground">About Akromeda</h2>
+            <h2 className="text-3xl font-bold text-foreground">{t('privacyPage.aboutTitle')}</h2>
             <div className="space-y-4 text-muted-foreground">
               <p>
-                Akromeda is a smart, fast, and secure tool built to solve a very specific problem — converting bank statements from PDF to Excel with precision and ease.
+                {t('privacyPage.aboutP1')}
               </p>
               <p>
-                This platform was created by <strong className="text-foreground">Sayyed Faizan Rizvi</strong>, a cybersecurity student from Harvard University, based in Kota, Rajasthan, India. In 2026, at the age of 18, Faizan launched Akromeda to help individuals and businesses save time and effort when dealing with financial data.
+                {t('privacyPage.aboutP2Prefix')} <strong className="text-foreground">Sayyed Faizan Rizvi</strong>{t('privacyPage.aboutP2Suffix')}
               </p>
               <div className="pt-4 space-y-2">
-                <h3 className="text-xl font-bold text-foreground">What Akromeda Does</h3>
+                <h3 className="text-xl font-bold text-foreground">{t('privacyPage.whatTitle')}</h3>
                 <ul className="list-disc list-inside space-y-2">
-                  <li>Converts complex bank statement PDFs into clean, editable Excel sheets</li>
-                  <li>Maintains formatting, columns, and transaction clarity</li>
-                  <li>Works instantly — no software installation required</li>
-                  <li>Designed with data privacy and security at its core</li>
+                  <li>{t('privacyPage.whatItems.item1')}</li>
+                  <li>{t('privacyPage.whatItems.item2')}</li>
+                  <li>{t('privacyPage.whatItems.item3')}</li>
+                  <li>{t('privacyPage.whatItems.item4')}</li>
                 </ul>
               </div>
             </div>
@@ -127,16 +129,16 @@ const Privacy = () => {
       {/* Contact */}
       <section className="py-16 px-6 mb-16">
         <div className="container mx-auto max-w-4xl text-center space-y-6">
-          <h2 className="text-3xl font-bold">Questions or Concerns?</h2>
+          <h2 className="text-3xl font-bold">{t('privacyPage.contactTitle')}</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            You stay in control. Always. For any concerns, reach out at <a href="mailto:inspirexali@gmail.com" className="text-primary hover:underline">inspirexali@gmail.com</a>
+            {t('privacyPage.contactDescPrefix')} <a href="mailto:inspirexali@gmail.com" className="text-primary hover:underline">inspirexali@gmail.com</a>
           </p>
           <Button 
             size="lg" 
             className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
             onClick={() => navigate('/')}
           >
-            Back to Home
+            {t('common.backToHome')}
           </Button>
         </div>
       </section>
@@ -144,7 +146,7 @@ const Privacy = () => {
       {/* Footer */}
       <footer className="border-t border-primary/20 py-8 px-6">
         <div className="container mx-auto text-center text-xs text-muted-foreground tracking-[0.2em] uppercase">
-          <p>© 2026 Akromeda. All rights reserved.</p>
+          <p>{t('privacyPage.footer')}</p>
         </div>
       </footer>
     </div>
