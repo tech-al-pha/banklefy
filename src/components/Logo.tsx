@@ -10,7 +10,7 @@ const Logo = () => {
       onClick={() => navigate("/")}
     >
       {/* Logo Container */}
-      <div className="relative w-10 h-10 md:w-12 md:h-12 flex items-center justify-center overflow-visible">
+      <div className="relative w-12 h-12 md:w-14 md:h-14 flex items-center justify-center overflow-visible">
         <img 
           src={akromedaLogo} 
           alt="Akromeda" 
