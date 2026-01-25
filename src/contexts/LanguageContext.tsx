@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react'; // Akromeda Language System
 
 export type Language = 'en' | 'zh' | 'ja' | 'es' | 'it';
 
