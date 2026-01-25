@@ -50,7 +50,7 @@ export const useUsageLimit = () => {
 
       setUsageLimit({
         conversionsUsed: data.conversionsUsed ?? 0,
-        conversionsLimit: data.conversionsLimit ?? (user ? 6 : 100),
+        conversionsLimit: data.conversionsLimit ?? (user ? 6 : 2),
         remaining: data.remaining ?? 0,
         limitReached: data.limitReached ?? false,
         isAuthenticated: data.isAuthenticated ?? !!user,
