@@ -289,7 +289,7 @@ export default function Auth() {
       <Card className="w-full max-w-md bg-card/80 backdrop-blur-lg border-primary/20 relative z-10">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-2">
-            <img src={akromedaLogo} alt="Akromeda" className="h-14 w-14 object-contain" />
+				<img src={akromedaLogo} alt="Akromeda" className="h-16 w-16 md:h-20 md:w-20 object-contain" />
           </div>
           <CardTitle className="text-3xl font-bold text-center bg-gradient-primary bg-clip-text text-transparent">
             Akromeda

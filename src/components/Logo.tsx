@@ -6,11 +6,11 @@ const Logo = () => {
 
   return (
     <div 
-      className="flex items-center cursor-pointer group h-12" 
+      className="flex items-center cursor-pointer group h-14 md:h-16" 
       onClick={() => navigate("/")}
     >
       {/* Logo Container */}
-      <div className="relative w-12 h-12 md:w-14 md:h-14 flex items-center justify-center overflow-visible">
+      <div className="relative w-14 h-14 md:w-16 md:h-16 flex items-center justify-center overflow-visible">
         <img 
           src={akromedaLogo} 
           alt="Akromeda" 
