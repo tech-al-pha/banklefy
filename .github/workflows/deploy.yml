@@ -1,0 +1,84 @@
+name: Deploy to Vercel
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build project
+        run: bun run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel (Preview)
+        if: github.event_name == 'pull_request'
+        run: vercel deploy --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel (Production)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+  health-check:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Health Check - Supabase Connectivity
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/health-check")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Health check passed! Supabase is healthy."
+          else
+            echo "⚠️ Health check returned status: $response"
+            # Fetch full response for debugging
+            curl -s "${{ secrets.VITE_SUPABASE_URL }}/functions/v1/health-check" | jq .
+            exit 1
+          fi
+
+      - name: Verify Frontend Deployment
+        run: |
+          if [ -n "${{ secrets.VERCEL_PRODUCTION_URL }}" ]; then
+            response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.VERCEL_PRODUCTION_URL }}")
+            if [ "$response" = "200" ]; then
+              echo "✅ Frontend is accessible!"
+            else
+              echo "⚠️ Frontend returned status: $response"
+            fi
+          else
+            echo "ℹ️ VERCEL_PRODUCTION_URL not set, skipping frontend check"
+          fi
