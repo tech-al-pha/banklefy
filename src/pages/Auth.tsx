@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
-import amLogo from '@/assets/am-logo.png';
+import akromedaLogo from '@/assets/akromeda-logo.png';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const emailSchema = z.string().email('Invalid email address').max(255);
@@ -274,8 +274,8 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-dark flex items-center justify-center p-6 relative">
-      <div className="absolute inset-0 bg-gradient-glow opacity-30" />
+    <div className="min-h-screen bg-[#0A0502] flex items-center justify-center p-6 relative">
+      <div className="absolute inset-0 bg-gradient-glow opacity-20" />
       
       {/* Back button */}
       <button
@@ -289,7 +289,7 @@ export default function Auth() {
       <Card className="w-full max-w-md bg-card/80 backdrop-blur-lg border-primary/20 relative z-10">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-2">
-            <img src={amLogo} alt="Akromeda" className="h-16 w-auto" />
+            <img src={akromedaLogo} alt="Akromeda" className="h-14 w-14 object-contain" />
           </div>
           <CardTitle className="text-3xl font-bold text-center bg-gradient-primary bg-clip-text text-transparent">
             Akromeda

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Shield, Lock, Eye, Trash2, FileCheck, Globe, Brain } from "lucide-react";
+import { Shield, Lock, Eye, Trash2, FileCheck, Globe, Brain, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import Logo from "@/components/Logo";
 
 const Privacy = () => {
   const navigate = useNavigate();
@@ -34,24 +35,18 @@ const Privacy = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-dark text-foreground">
+    <div className="min-h-screen bg-[#0A0502] text-foreground">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div 
-              className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent cursor-pointer"
-              onClick={() => navigate('/')}
-            >
-              Akromeda
-            </div>
+            <Logo />
             <Button 
-              variant="outline" 
-              size="sm" 
-              className="border-primary/50 hover:bg-primary/10"
-              onClick={() => navigate('/')}
+              variant="ghost" 
+              onClick={() => navigate('/')} 
+              className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter"
             >
-              Back to Home
+              <ArrowLeft size={18} /> Back to Home
             </Button>
           </div>
         </div>
@@ -83,7 +78,7 @@ const Privacy = () => {
           {sections.map((section, index) => (
             <div 
               key={index}
-              className="bg-card/40 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-4 hover:border-primary/40 transition-all duration-300"
+              className="bg-[#1a120b]/80 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-4 hover:border-primary/40 transition-all duration-300"
             >
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-gradient-primary rounded-xl flex items-center justify-center flex-shrink-0">
@@ -106,7 +101,7 @@ const Privacy = () => {
       {/* About Section */}
       <section className="py-16 px-6">
         <div className="container mx-auto max-w-4xl">
-          <div className="bg-card/40 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-6">
+          <div className="bg-[#1a120b]/80 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-6">
             <h2 className="text-3xl font-bold text-foreground">About Akromeda</h2>
             <div className="space-y-4 text-muted-foreground">
               <p>
@@ -147,9 +142,9 @@ const Privacy = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-primary/10 py-8 px-6">
-        <div className="container mx-auto text-center text-sm text-muted-foreground">
-          <p>© 2025 Akromeda. All rights reserved.</p>
+      <footer className="border-t border-primary/20 py-8 px-6">
+        <div className="container mx-auto text-center text-xs text-muted-foreground tracking-[0.2em] uppercase">
+          <p>© 2026 Akromeda. All rights reserved.</p>
         </div>
       </footer>
     </div>
