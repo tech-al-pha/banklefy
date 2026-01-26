@@ -688,11 +688,10 @@ Deno.serve(async (req) => {
     // Upload for authenticated users
     if (user && conversion) {
       resultPath = `${user.id}/results/${conversion.id}.xlsx`;
-      // Use octet-stream to avoid storage MIME type restrictions
       const { error: uploadResultError } = await supabase.storage
         .from('bank-statements')
         .upload(resultPath, excelBuffer, {
-          contentType: 'application/octet-stream',
+          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           upsert: false,
         });
 
