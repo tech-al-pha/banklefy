@@ -667,7 +667,7 @@ Deno.serve(async (req) => {
     };
 
     // Generate Excel with ExcelJS
-    const excelResult = generateProfessionalExcel({
+    const excelResult = await generateProfessionalExcel({
       transactions,
       analytics: {
         totalCredits,
