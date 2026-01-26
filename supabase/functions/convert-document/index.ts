@@ -666,8 +666,8 @@ Deno.serve(async (req) => {
       underwriting: underwritingAnalysis,
     };
 
-    // Generate Excel with ExcelJS
-    const excelResult = await generateProfessionalExcel({
+    // Generate Excel (styled)
+    const excelResult = generateProfessionalExcel({
       transactions,
       analytics: {
         totalCredits,
