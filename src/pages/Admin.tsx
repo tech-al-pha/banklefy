@@ -100,29 +100,42 @@ export default function Admin() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Load users with their subscriptions
+      // Admins need access to all data - use service-level queries via edge function
+      // For now, load only data visible through RLS (admin can see their own)
+      // In production, create an admin edge function for full access
+      
+      // Load profiles - RLS will filter to what admin can see
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, email, full_name, created_at')
         .order('created_at', { ascending: false });
 
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.error('Profiles query error:', profilesError);
+        throw profilesError;
+      }
 
-      // Load subscriptions for all users
+      // Load subscriptions - RLS will filter appropriately  
       const { data: subscriptions, error: subsError } = await supabase
         .from('subscriptions')
-        .select('*');
+        .select('user_id, tier, conversions_used, conversions_limit');
 
-      if (subsError) throw subsError;
+      if (subsError) {
+        console.error('Subscriptions query error:', subsError);
+        throw subsError;
+      }
 
-      // Load user roles
+      // Load user roles - RLS will filter to what admin can see
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('*');
+        .select('user_id, role');
 
-      if (rolesError) throw rolesError;
+      if (rolesError) {
+        console.error('Roles query error:', rolesError);
+        throw rolesError;
+      }
 
-      // Combine data
+      // Combine data - match by user_id
       const enrichedUsers = profiles?.map(profile => ({
         ...profile,
         subscription: subscriptions?.find(s => s.user_id === profile.id),

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRequireAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -68,6 +68,7 @@ const Settings = () => {
     settings,
     loading: settingsLoading,
     saving,
+    profileData,
     updateSetting,
     updateProfile,
     sendPasswordReset,
@@ -76,8 +77,15 @@ const Settings = () => {
   } = useSettings();
   
   const [searchQuery, setSearchQuery] = useState("");
-  const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name || "");
+  // Use profileData from Supabase, fallback to auth metadata
+  const [displayName, setDisplayName] = useState("");
   const [nameChanged, setNameChanged] = useState(false);
+
+  // Initialize display name from Supabase profile or auth metadata
+  useEffect(() => {
+    const name = profileData?.full_name || user?.user_metadata?.full_name || "";
+    setDisplayName(name);
+  }, [profileData, user]);
 
   // Handle display name change
   const handleNameChange = useCallback((value: string) => {

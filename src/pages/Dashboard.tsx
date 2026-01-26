@@ -46,13 +46,20 @@ const Dashboard = () => {
   }, [user, navigate]);
 
   const fetchConversions = async () => {
+    if (!user) return;
+    
     try {
+      // Query conversions table - RLS ensures only user's own data is returned
       const { data, error } = await supabase
         .from("conversions")
-        .select("*")
+        .select("id, original_filename, status, created_at, completed_at, result_path, error_message, file_path")
+        .eq("user_id", user.id) // Explicit filter even though RLS handles it
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Conversions query error:", error);
+        throw error;
+      }
       setConversions(data || []);
     } catch (error: any) {
       console.error("Error fetching conversions:", error);
