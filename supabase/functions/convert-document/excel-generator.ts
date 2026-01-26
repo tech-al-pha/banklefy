@@ -1,5 +1,6 @@
 // ============= PROFESSIONAL EXCEL GENERATOR =============
 // Rich formatting with colors, borders, and multiple sheets
+// Uses xlsx with conditional formatting for red debits / green credits
 
 import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
 import type { Transaction, FraudAlert, UnderwritingResult, LiquidityAnalysis, ReconciliationResult } from './financial-engine.ts';
@@ -118,9 +119,45 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   
   txSheet['!cols'] = colWidths;
   
-  // ============= BOLD STYLING FOR HEADERS AND TOTALS =============
-  // Note: xlsx library has limited styling support, but we set cell types properly
+  // ============= CONDITIONAL FORMATTING: RED DEBITS, GREEN CREDITS =============
+  // xlsx library supports conditional formatting via '!condfmt' property
+  // Debit column (E) = index 4, Credit column (F) = index 5
+  const debitCol = 'E';
+  const creditCol = 'F';
+  const lastDataRow = dataEndRow + 2; // Include total rows
   
+  // Add conditional formatting rules
+  // Format: Red for negative values (debits), Green for positive values (credits)
+  txSheet['!condfmt'] = [
+    {
+      // Red for negative debits (column E)
+      ref: `${debitCol}${dataStartRow}:${debitCol}${lastDataRow}`,
+      rules: [{
+        type: 'cellIs',
+        operator: 'lessThan',
+        formula: ['0'],
+        style: {
+          font: { color: { rgb: 'FF0000' } }, // Red text
+          fill: { fgColor: { rgb: 'FFEEEE' } }, // Light red background
+        },
+      }],
+    },
+    {
+      // Green for positive credits (column F)
+      ref: `${creditCol}${dataStartRow}:${creditCol}${lastDataRow}`,
+      rules: [{
+        type: 'cellIs',
+        operator: 'greaterThan',
+        formula: ['0'],
+        style: {
+          font: { color: { rgb: '008000' } }, // Green text
+          fill: { fgColor: { rgb: 'EEFFEE' } }, // Light green background
+        },
+      }],
+    },
+  ];
+  
+  // ============= NUMBER FORMATTING & CELL TYPES =============
   // Set number format for Debit, Credit, Balance columns (columns E, F, G = indices 4, 5, 6)
   const numCols = [4, 5, 6]; // 0-indexed: Debit, Credit, Balance
   for (let rowIdx = 1; rowIdx <= rowCount + 2; rowIdx++) { // +2 for total rows
@@ -130,7 +167,16 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
         // Ensure numeric cells are typed as numbers
         if (typeof txSheet[cellRef].v === 'number') {
           txSheet[cellRef].t = 'n';
-          txSheet[cellRef].z = '#,##0.00'; // Number format with 2 decimals
+          // Use accounting format: red for negatives, green for positives
+          if (colIdx === 4) {
+            // Debit column - show as negative red
+            txSheet[cellRef].z = '[Red]-#,##0.00;[Red]-#,##0.00;-';
+          } else if (colIdx === 5) {
+            // Credit column - show as positive green  
+            txSheet[cellRef].z = '[Green]#,##0.00;[Red]-#,##0.00;-';
+          } else {
+            txSheet[cellRef].z = '#,##0.00'; // Balance - standard format
+          }
         }
       }
     });
