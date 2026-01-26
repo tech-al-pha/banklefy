@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface UserSettings {
   darkMode: boolean;
@@ -22,24 +23,46 @@ const STORAGE_KEY = 'akromeda_user_settings';
 
 export const useSettings = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [profileData, setProfileData] = useState<{ full_name: string | null } | null>(null);
 
-  // Load settings from localStorage on mount
+  // Load settings from localStorage and profile from Supabase
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+    const loadData = async () => {
+      try {
+        // Load UI preferences from localStorage (these don't need to be in DB)
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+        }
+
+        // Load profile data from Supabase if user is authenticated
+        if (user) {
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (error) {
+            console.error('Failed to load profile:', error);
+          } else if (profile) {
+            setProfileData(profile);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load settings:', e);
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      console.warn('Failed to load settings:', e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    };
+
+    loadData();
+  }, [user]);
 
   // Apply dark mode to document
   useEffect(() => {
@@ -67,13 +90,29 @@ export const useSettings = () => {
   }, []);
 
   const updateProfile = useCallback(async (fullName: string) => {
+    if (!user) return;
+    
     setSaving(true);
     try {
-      const { error } = await supabase.auth.updateUser({
+      // Update Supabase Auth metadata
+      const { error: authError } = await supabase.auth.updateUser({
         data: { full_name: fullName }
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
+
+      // Also update the profiles table in Supabase
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ full_name: fullName })
+        .eq('id', user.id);
+
+      if (profileError) {
+        console.error('Profile table update error:', profileError);
+        // Don't throw - auth update succeeded
+      }
+
+      setProfileData({ full_name: fullName });
 
       toast({
         title: "Profile updated",
@@ -88,7 +127,7 @@ export const useSettings = () => {
     } finally {
       setSaving(false);
     }
-  }, [toast]);
+  }, [user, toast]);
 
   const sendPasswordReset = useCallback(async (email: string) => {
     setSaving(true);
@@ -171,6 +210,7 @@ export const useSettings = () => {
     settings,
     loading,
     saving,
+    profileData,
     updateSetting,
     updateProfile,
     sendPasswordReset,
