@@ -36,7 +36,7 @@ export const UsageLimitBanner = ({
               className="bg-primary hover:bg-primary/90"
             >
               <User className="mr-2 h-4 w-4" />
-              Sign up for 6 free conversions/day
+              Sign up for 6 free conversions!
             </Button>
           )}
         </AlertDescription>

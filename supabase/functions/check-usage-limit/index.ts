@@ -111,23 +111,23 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Check if user is authenticated
+    // ============= AUTHENTICATION CHECK =============
+    // Use supabaseAdmin.auth.getUser(token) for secure server-side validation
     const authHeader = req.headers.get('Authorization');
     let user = null;
     
-    if (authHeader) {
-      const supabaseAuth = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        {
-          global: {
-            headers: { Authorization: authHeader },
-          },
-        }
-      );
+    if (authHeader && authHeader.startsWith('Bearer ') && authHeader !== 'Bearer null') {
+      const token = authHeader.replace('Bearer ', '');
       
-      const { data: { user: authUser } } = await supabaseAuth.auth.getUser();
-      user = authUser;
+      // Validate token using admin client for secure server-side verification
+      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      
+      if (!authError && authUser) {
+        user = authUser;
+        console.log('Authenticated user detected:', { userId: user.id, email: user.email });
+      } else {
+        console.log('Token validation failed:', authError?.message || 'Invalid token');
+      }
     }
 
     let conversionsUsed = 0;
