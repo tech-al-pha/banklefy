@@ -790,8 +790,7 @@ Deno.serve(async (req) => {
         resultPath: resultPath,
         transactions: transactions,
         analytics: analytics,
-        // Always return excelData - storage upload may fail due to MIME restrictions
-        excelData: excelBase64,
+        excelData: user ? null : excelBase64,
         message: 'Conversion completed successfully',
         remaining,
         isAuthenticated: !!user,
