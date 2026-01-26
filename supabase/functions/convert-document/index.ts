@@ -666,7 +666,7 @@ Deno.serve(async (req) => {
       underwriting: underwritingAnalysis,
     };
 
-    // Generate Excel (styled)
+    // Generate Excel with ExcelJS
     const excelResult = generateProfessionalExcel({
       transactions,
       analytics: {
@@ -688,11 +688,10 @@ Deno.serve(async (req) => {
     // Upload for authenticated users
     if (user && conversion) {
       resultPath = `${user.id}/results/${conversion.id}.xlsx`;
-      // Use octet-stream to avoid storage MIME type restrictions
       const { error: uploadResultError } = await supabase.storage
         .from('bank-statements')
         .upload(resultPath, excelBuffer, {
-          contentType: 'application/octet-stream',
+          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           upsert: false,
         });
 
@@ -790,8 +789,7 @@ Deno.serve(async (req) => {
         resultPath: resultPath,
         transactions: transactions,
         analytics: analytics,
-        // Always return excelData - storage upload may fail due to MIME restrictions
-        excelData: excelBase64,
+        excelData: user ? null : excelBase64,
         message: 'Conversion completed successfully',
         remaining,
         isAuthenticated: !!user,

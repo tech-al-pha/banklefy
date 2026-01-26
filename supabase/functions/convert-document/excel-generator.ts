@@ -1,15 +1,8 @@
 // ============= PROFESSIONAL EXCEL GENERATOR =============
-// Premium formatting + formulas + auto-fit columns.
-// Uses xlsx-js-style (SheetJS fork) for header/totals styling in Deno runtime.
+// Rich formatting with colors, borders, and multiple sheets
 
-import * as XLSX from 'https://esm.sh/xlsx-js-style@1.2.0?bundle&target=deno';
-import type {
-  Transaction,
-  FraudAlert,
-  UnderwritingResult,
-  LiquidityAnalysis,
-  ReconciliationResult,
-} from './financial-engine.ts';
+import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
+import type { Transaction, FraudAlert, UnderwritingResult, LiquidityAnalysis, ReconciliationResult } from './financial-engine.ts';
 
 export interface ExcelGenerationResult {
   buffer: ArrayBuffer;
@@ -32,215 +25,46 @@ interface ExcelConfig {
   fileName?: string;
 }
 
-const THEME = {
-  headerBg: '1E3A5F',
-  headerFg: 'FFFFFF',
-  border: 'D0D0D0',
-  totalBg: 'F2F2F2',
-  netBg: 'FFF3CD',
-};
-
-const headerStyle = {
-  font: { bold: true, color: { rgb: THEME.headerFg } },
-  fill: { fgColor: { rgb: THEME.headerBg } },
-  alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-  border: {
-    top: { style: 'thin', color: { rgb: THEME.border } },
-    bottom: { style: 'thin', color: { rgb: THEME.border } },
-    left: { style: 'thin', color: { rgb: THEME.border } },
-    right: { style: 'thin', color: { rgb: THEME.border } },
-  },
-} as const;
-
-const totalStyle = {
-  font: { bold: true },
-  fill: { fgColor: { rgb: THEME.totalBg } },
-  border: {
-    top: { style: 'medium', color: { rgb: THEME.headerBg } },
-    bottom: { style: 'medium', color: { rgb: THEME.headerBg } },
-  },
-} as const;
-
-const netStyle = {
-  font: { bold: true, color: { rgb: THEME.headerBg } },
-  fill: { fgColor: { rgb: THEME.netBg } },
-} as const;
-
-function formatCurrency(amount: number | string): string {
-  if (typeof amount === 'string') return amount;
-  return new Intl.NumberFormat('en-IN', {
-    style: 'decimal',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
-function setCellStyle(ws: any, addr: string, style: any) {
-  if (!ws[addr]) return;
-  ws[addr].s = { ...(ws[addr].s || {}), ...style };
-}
-
-function setRowStyle(ws: any, row: number, colCount: number, style: any) {
-  for (let c = 0; c < colCount; c++) {
-    const addr = XLSX.utils.encode_cell({ r: row, c });
-    setCellStyle(ws, addr, style);
-  }
-}
-
-function autoFitCols(allData: any[][], headers: string[]) {
-  return headers.map((_, colIdx) => {
-    let maxLen = headers[colIdx].length;
-    allData.forEach((row) => {
-      const cell = row[colIdx];
-      let len = 0;
-      if (cell === null || cell === undefined) {
-        len = 0;
-      } else if (typeof cell === 'object' && (cell as any).f) {
-        len = 14;
-      } else {
-        len = String(cell).length;
-      }
-      if (len > maxLen) maxLen = len;
-    });
-    return { wch: Math.min(Math.max(maxLen + 2, 8), 70) };
-  });
-}
-
 export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationResult {
   const workbook = XLSX.utils.book_new();
   const sheets: string[] = [];
-
+  
   // ============= SHEET 1: TRANSACTIONS =============
-  const headers = ['Sr No', 'Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Flags'];
-
-  const txRows = config.transactions.map((t, i) => {
-    const debitVal = typeof t.debit === 'number' ? t.debit : (parseFloat(String(t.debit)) || 0);
-    const creditVal = typeof t.credit === 'number' ? t.credit : (parseFloat(String(t.credit)) || 0);
-    const balanceVal = typeof t.balance === 'number' ? t.balance : (parseFloat(String(t.balance)) || 0);
-
-    return [
-      i + 1,
-      t.date || '',
-      t.description || '',
-      t.category || 'Other',
-      debitVal > 0 ? -Math.abs(debitVal) : (debitVal < 0 ? debitVal : null),
-      creditVal > 0 ? creditVal : null,
-      balanceVal,
-      [
-        t.isDuplicate ? '🔄 Duplicate' : '',
-        t.balanceMismatch ? '⚠️ Balance Mismatch' : '',
-        t.riskFlag ? `🚨 ${t.riskFlag}` : '',
-      ].filter(Boolean).join(', ') || '-',
-    ];
-  });
-
-  const rowCount = txRows.length;
-  const dataStartRow = 2; // 1-indexed in Excel
-  const dataEndRow = dataStartRow + rowCount - 1;
-
-  const grandTotalExcelRow = rowCount > 0 ? dataEndRow + 1 : 2;
-  const netBalanceExcelRow = grandTotalExcelRow + 1;
-
-  const lastBalance = rowCount > 0 ? Number(txRows[txRows.length - 1][6] || 0) : 0;
-
-  const grandTotalRow: any[] = [
-    '',
-    '',
-    'GRAND TOTAL',
-    '',
-    rowCount > 0 ? { f: `SUM(E${dataStartRow}:E${dataEndRow})` } : 0,
-    rowCount > 0 ? { f: `SUM(F${dataStartRow}:F${dataEndRow})` } : 0,
-    lastBalance,
-    '',
+  // FIX: Ensure debit/credit are numbers, not empty strings (fixes 0 values issue)
+  const txData = config.transactions.map((t, i) => ({
+    'Sr No': i + 1,
+    'Date': t.date || '',
+    'Description': t.description || '',
+    'Category': t.category || 'Other',
+    'Debit': typeof t.debit === 'number' ? t.debit : (parseFloat(String(t.debit)) || 0),
+    'Credit': typeof t.credit === 'number' ? t.credit : (parseFloat(String(t.credit)) || 0),
+    'Balance': typeof t.balance === 'number' ? t.balance : (parseFloat(String(t.balance)) || 0),
+    'Flags': [
+      t.isDuplicate ? '🔄 Duplicate' : '',
+      t.balanceMismatch ? '⚠️ Balance Mismatch' : '',
+      t.riskFlag ? `🚨 ${t.riskFlag}` : '',
+    ].filter(Boolean).join(', ') || '-',
+  }));
+  
+  const txSheet = XLSX.utils.json_to_sheet(txData);
+  
+  // Set column widths
+  txSheet['!cols'] = [
+    { wch: 6 },   // Sr No
+    { wch: 12 },  // Date
+    { wch: 45 },  // Description
+    { wch: 18 },  // Category
+    { wch: 14 },  // Debit
+    { wch: 14 },  // Credit
+    { wch: 14 },  // Balance
+    { wch: 25 },  // Flags
   ];
-
-  const netBalanceRow: any[] = [
-    '',
-    '',
-    'NET BALANCE (Credits + Debits)',
-    '',
-    '',
-    { f: `F${grandTotalExcelRow}+E${grandTotalExcelRow}` },
-    '',
-    '',
-  ];
-
-  const allData: any[][] = [headers, ...txRows, grandTotalRow, netBalanceRow];
-  const ws = XLSX.utils.aoa_to_sheet(allData);
-
-  // Row height for header (points)
-  ws['!rows'] = [{ hpt: 20 }];
-
-  // Auto-fit widths
-  ws['!cols'] = autoFitCols(allData, headers);
-
-  // Bold + premium header styling
-  setRowStyle(ws, 0, headers.length, headerStyle);
-
-  // Style Grand Total + Net Balance rows
-  const grandTotalRowIdx0 = grandTotalExcelRow - 1; // 0-indexed
-  const netRowIdx0 = netBalanceExcelRow - 1;
-  setRowStyle(ws, grandTotalRowIdx0, headers.length, totalStyle);
-  setRowStyle(ws, netRowIdx0, headers.length, netStyle);
-
-  // Conditional formatting (if supported by library build)
-  const debitCol = 'E';
-  const creditCol = 'F';
-  const lastDataRow = netBalanceExcelRow;
-  (ws as any)['!condfmt'] = [
-    {
-      ref: `${debitCol}${dataStartRow}:${debitCol}${lastDataRow}`,
-      rules: [
-        {
-          type: 'cellIs',
-          operator: 'lessThan',
-          formula: ['0'],
-          style: {
-            font: { color: { rgb: 'FF0000' } },
-            fill: { fgColor: { rgb: 'FFEEEE' } },
-          },
-        },
-      ],
-    },
-    {
-      ref: `${creditCol}${dataStartRow}:${creditCol}${lastDataRow}`,
-      rules: [
-        {
-          type: 'cellIs',
-          operator: 'greaterThan',
-          formula: ['0'],
-          style: {
-            font: { color: { rgb: '008000' } },
-            fill: { fgColor: { rgb: 'EEFFEE' } },
-          },
-        },
-      ],
-    },
-  ];
-
-  // Number typing + formats for Debit/Credit/Balance (E/F/G)
-  const numCols = [4, 5, 6];
-  for (let r = 1; r <= rowCount + 2; r++) {
-    for (const c of numCols) {
-      const ref = XLSX.utils.encode_cell({ r, c });
-      const cell = ws[ref];
-      if (!cell) continue;
-
-      // Mark formula totals as numeric too
-      if (typeof cell.v === 'number' || (cell as any).f) {
-        cell.t = 'n';
-        if (c === 4) cell.z = '[Red]-#,##0.00;[Red]-#,##0.00;"-"';
-        else if (c === 5) cell.z = '[Green]#,##0.00;[Red]-#,##0.00;"-"';
-        else cell.z = '#,##0.00';
-      }
-    }
-  }
-
-  XLSX.utils.book_append_sheet(workbook, ws, 'Transactions');
+  
+  XLSX.utils.book_append_sheet(workbook, txSheet, 'Transactions');
   sheets.push('Transactions');
-
+  
   // ============= SHEET 2: SUMMARY =============
-  const summaryData: any[][] = [
+  const summaryData = [
     ['BANK STATEMENT ANALYSIS SUMMARY', ''],
     ['', ''],
     ['FINANCIAL OVERVIEW', ''],
@@ -251,7 +75,8 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
     ['Duplicate Transactions', config.analytics.duplicateCount],
     ['', ''],
   ];
-
+  
+  // Add FOIR analysis if available
   if (config.underwriting) {
     summaryData.push(
       ['FOIR ANALYSIS', ''],
@@ -269,7 +94,8 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
       ['', ''],
     );
   }
-
+  
+  // Add liquidity info if available
   if (config.liquidity) {
     summaryData.push(
       ['LIQUIDITY ANALYSIS', ''],
@@ -281,7 +107,8 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
       ['', ''],
     );
   }
-
+  
+  // Add integrity info if available
   if (config.reconciliation) {
     summaryData.push(
       ['DOCUMENT INTEGRITY', ''],
@@ -290,49 +117,146 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
       ['Validation Status', config.reconciliation.isValid ? '✅ PASSED' : '⚠️ ISSUES FOUND'],
     );
   }
-
+  
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-  summarySheet['!cols'] = autoFitCols(summaryData, ['Field', 'Value']);
-  // Style first row like title
-  setCellStyle(summarySheet, 'A1', { font: { bold: true, sz: 14, color: { rgb: THEME.headerBg } } });
+  summarySheet['!cols'] = [{ wch: 25 }, { wch: 35 }];
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
   sheets.push('Summary');
-
+  
   // ============= SHEET 3: CATEGORY BREAKDOWN =============
-  const categoryData: any[][] = [['Category', 'Count', 'Total Debit', 'Total Credit', 'Net']];
+  const categoryData = [
+    ['Category', 'Count', 'Total Debit', 'Total Credit', 'Net'],
+  ];
+  
   Object.entries(config.analytics.categoryBreakdown).forEach(([category, data]) => {
     categoryData.push([
       category,
-      data.count,
-      data.totalDebit,
-      data.totalCredit,
-      data.totalCredit - data.totalDebit,
+      String(data.count),
+      formatCurrency(data.totalDebit),
+      formatCurrency(data.totalCredit),
+      formatCurrency(data.totalCredit - data.totalDebit),
     ]);
   });
+  
   const categorySheet = XLSX.utils.aoa_to_sheet(categoryData);
-  categorySheet['!cols'] = autoFitCols(categoryData, categoryData[0] as string[]);
-  setRowStyle(categorySheet, 0, 5, headerStyle);
+  categorySheet['!cols'] = [
+    { wch: 20 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+  ];
   XLSX.utils.book_append_sheet(workbook, categorySheet, 'Categories');
   sheets.push('Categories');
-
+  
+  // ============= SHEET 4: SALARY & EMI (if underwriting available) =============
+  if (config.underwriting && (config.underwriting.salaryCredits.length > 0 || config.underwriting.emiDebits.length > 0)) {
+    const salaryEmiData = [
+      ['SALARY CREDITS', '', ''],
+      ['Date', 'Amount', 'Description'],
+    ];
+    
+    config.underwriting.salaryCredits.forEach(s => {
+      salaryEmiData.push([s.date, formatCurrency(s.amount), s.description]);
+    });
+    
+    salaryEmiData.push(['', '', '']);
+    salaryEmiData.push(['EMI/LOAN DEBITS', '', '']);
+    salaryEmiData.push(['Date', 'Amount', 'Loan Type']);
+    
+    config.underwriting.emiDebits.forEach(e => {
+      salaryEmiData.push([e.date, formatCurrency(e.amount), e.loanType]);
+    });
+    
+    salaryEmiData.push(['', '', '']);
+    salaryEmiData.push(['MONTHLY BREAKDOWN', '', '']);
+    salaryEmiData.push(['Month', 'Salary Income', 'EMI Outflow']);
+    
+    config.underwriting.monthlyBreakdown.forEach(m => {
+      salaryEmiData.push([m.month, formatCurrency(m.salaryIncome), formatCurrency(m.emiOutflow)]);
+    });
+    
+    const salaryEmiSheet = XLSX.utils.aoa_to_sheet(salaryEmiData);
+    salaryEmiSheet['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(workbook, salaryEmiSheet, 'Salary & EMI');
+    sheets.push('Salary & EMI');
+  }
+  
+  // ============= SHEET 5: RISK FLAGS (if alerts available) =============
+  if (config.fraudAlerts && config.fraudAlerts.length > 0) {
+    const riskData = [
+      ['RISK ALERTS & FRAUD DETECTION', '', '', ''],
+      ['Type', 'Severity', 'Description', 'Affected Rows'],
+    ];
+    
+    config.fraudAlerts.forEach(alert => {
+      riskData.push([
+        alert.type,
+        alert.severity.toUpperCase(),
+        alert.description,
+        alert.affectedRows.length > 0 ? alert.affectedRows.slice(0, 10).join(', ') + (alert.affectedRows.length > 10 ? '...' : '') : 'N/A',
+      ]);
+    });
+    
+    const riskSheet = XLSX.utils.aoa_to_sheet(riskData);
+    riskSheet['!cols'] = [{ wch: 20 }, { wch: 10 }, { wch: 50 }, { wch: 25 }];
+    XLSX.utils.book_append_sheet(workbook, riskSheet, 'Risk Analysis');
+    sheets.push('Risk Analysis');
+  }
+  
+  // ============= SHEET 6: BALANCE MISMATCHES (if any) =============
+  if (config.reconciliation && config.reconciliation.mismatches.length > 0) {
+    const mismatchData = [
+      ['BALANCE RECONCILIATION ISSUES', '', '', '', ''],
+      ['Row #', 'Expected Balance', 'Actual Balance', 'Difference', 'Severity'],
+    ];
+    
+    config.reconciliation.mismatches.slice(0, 50).forEach(m => {
+      mismatchData.push([
+        String(m.rowIndex + 1),
+        formatCurrency(m.expected),
+        formatCurrency(m.actual),
+        formatCurrency(m.difference),
+        m.severity.toUpperCase(),
+      ]);
+    });
+    
+    if (config.reconciliation.mismatches.length > 50) {
+      mismatchData.push([`... and ${config.reconciliation.mismatches.length - 50} more`, '', '', '', '']);
+    }
+    
+    const mismatchSheet = XLSX.utils.aoa_to_sheet(mismatchData);
+    mismatchSheet['!cols'] = [{ wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 15 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(workbook, mismatchSheet, 'Balance Issues');
+    sheets.push('Balance Issues');
+  }
+  
   // Generate buffer
   const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  
   return { buffer, sheets };
+}
+
+function formatCurrency(amount: number | string): string {
+  if (typeof amount === 'string') return amount;
+  return new Intl.NumberFormat('en-IN', {
+    style: 'decimal',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 // ============= SIMPLE EXCEL EXPORT (Backward Compatible) =============
 export function generateSimpleExcel(transactions: Transaction[]): ArrayBuffer {
   const data = transactions.map((t, i) => ({
     'Sr No': i + 1,
-    Date: t.date,
-    Description: t.description,
-    Category: t.category,
-    Debit: t.debit || 0,
-    Credit: t.credit || 0,
-    Balance: t.balance,
+    'Date': t.date,
+    'Description': t.description,
+    'Category': t.category,
+    'Debit': t.debit || 0,
+    'Credit': t.credit || 0,
+    'Balance': t.balance,
   }));
+  
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
+  
   return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 }
