@@ -187,35 +187,53 @@ Deno.serve(async (req) => {
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
     const ipAddress = getClientIp(req);
 
-    // Create Supabase clients
+    // Create Supabase admin client (service role for privileged operations)
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Check authentication
+    // ============= AUTHENTICATION CHECK =============
+    // Detect authenticated users via Authorization: Bearer <token> header
+    // Use supabaseAdmin.auth.getUser(token) to validate the token server-side
     const authHeader = req.headers.get('Authorization');
     let user = null;
     let supabase = supabaseAdmin;
     
-    if (authHeader && authHeader !== 'Bearer null') {
-      supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      );
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      user = authUser;
+    if (authHeader && authHeader.startsWith('Bearer ') && authHeader !== 'Bearer null') {
+      const token = authHeader.replace('Bearer ', '');
+      
+      // Validate token using admin client for secure server-side verification
+      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      
+      if (!authError && authUser) {
+        user = authUser;
+        console.log('Authenticated user detected:', { userId: user.id, email: user.email });
+        
+        // Create user-scoped client for RLS-protected operations
+        supabase = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          { global: { headers: { Authorization: authHeader } } }
+        );
+      } else {
+        console.log('Token validation failed:', authError?.message || 'Invalid token');
+      }
     }
 
-    // Anonymous users require reCAPTCHA
+    // ============= reCAPTCHA ENFORCEMENT =============
+    // RULE: reCAPTCHA is ONLY required for anonymous (unauthenticated) users
+    // Authenticated users with valid tokens COMPLETELY SKIP reCAPTCHA
     if (!user) {
+      console.log('Anonymous user detected - reCAPTCHA required');
+      
       if (!recaptchaToken) {
         return new Response(
           JSON.stringify({ error: 'CAPTCHA verification required for anonymous users' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      
       const isValidCaptcha = await verifyRecaptcha(recaptchaToken);
       if (!isValidCaptcha) {
         return new Response(
@@ -224,6 +242,8 @@ Deno.serve(async (req) => {
         );
       }
       console.log('reCAPTCHA verified successfully for anonymous user');
+    } else {
+      console.log('Authenticated user - reCAPTCHA SKIPPED');
     }
 
     console.log('Processing conversion:', { 
