@@ -30,35 +30,111 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   const sheets: string[] = [];
   
   // ============= SHEET 1: TRANSACTIONS =============
-  // FIX: Ensure debit/credit are numbers, not empty strings (fixes 0 values issue)
-  const txData = config.transactions.map((t, i) => ({
-    'Sr No': i + 1,
-    'Date': t.date || '',
-    'Description': t.description || '',
-    'Category': t.category || 'Other',
-    'Debit': typeof t.debit === 'number' ? t.debit : (parseFloat(String(t.debit)) || 0),
-    'Credit': typeof t.credit === 'number' ? t.credit : (parseFloat(String(t.credit)) || 0),
-    'Balance': typeof t.balance === 'number' ? t.balance : (parseFloat(String(t.balance)) || 0),
-    'Flags': [
-      t.isDuplicate ? '🔄 Duplicate' : '',
-      t.balanceMismatch ? '⚠️ Balance Mismatch' : '',
-      t.riskFlag ? `🚨 ${t.riskFlag}` : '',
-    ].filter(Boolean).join(', ') || '-',
-  }));
+  // Headers for the transaction sheet
+  const headers = ['Sr No', 'Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Flags'];
   
-  const txSheet = XLSX.utils.json_to_sheet(txData);
+  // Build transaction rows - DEBITS ARE NEGATIVE
+  const txRows = config.transactions.map((t, i) => {
+    const debitVal = typeof t.debit === 'number' ? t.debit : (parseFloat(String(t.debit)) || 0);
+    const creditVal = typeof t.credit === 'number' ? t.credit : (parseFloat(String(t.credit)) || 0);
+    const balanceVal = typeof t.balance === 'number' ? t.balance : (parseFloat(String(t.balance)) || 0);
+    
+    return [
+      i + 1,
+      t.date || '',
+      t.description || '',
+      t.category || 'Other',
+      debitVal > 0 ? -Math.abs(debitVal) : (debitVal < 0 ? debitVal : null), // Negative debits, null if 0
+      creditVal > 0 ? creditVal : null, // Positive credits, null if 0
+      balanceVal,
+      [
+        t.isDuplicate ? '🔄 Duplicate' : '',
+        t.balanceMismatch ? '⚠️ Balance Mismatch' : '',
+        t.riskFlag ? `🚨 ${t.riskFlag}` : '',
+      ].filter(Boolean).join(', ') || '-',
+    ];
+  });
   
-  // Set column widths
-  txSheet['!cols'] = [
-    { wch: 6 },   // Sr No
-    { wch: 12 },  // Date
-    { wch: 45 },  // Description
-    { wch: 18 },  // Category
-    { wch: 14 },  // Debit
-    { wch: 14 },  // Credit
-    { wch: 14 },  // Balance
-    { wch: 25 },  // Flags
+  const rowCount = txRows.length;
+  const dataStartRow = 2; // Row 1 is header (1-indexed in Excel)
+  const dataEndRow = dataStartRow + rowCount - 1;
+  
+  // Add Grand Total row with EXCEL FORMULAS (real math, not AI!)
+  const grandTotalRow = [
+    '', // Sr No
+    '', // Date
+    'GRAND TOTAL', // Description
+    '', // Category
+    { f: `SUM(E${dataStartRow}:E${dataEndRow})` }, // Debit Total Formula
+    { f: `SUM(F${dataStartRow}:F${dataEndRow})` }, // Credit Total Formula
+    txRows.length > 0 ? txRows[txRows.length - 1][6] : 0, // Last Balance (Running Balance)
+    '', // Flags
   ];
+  
+  // Net Balance row
+  const netBalanceRow = [
+    '', // Sr No
+    '', // Date
+    'NET BALANCE (Credits + Debits)', // Description
+    '', // Category
+    '', // Debit
+    { f: `F${dataEndRow + 1}+E${dataEndRow + 1}` }, // Net = Credit Total + Debit Total (debit is negative)
+    '', // Balance
+    '', // Flags
+  ];
+  
+  // Combine all data: headers + transactions + totals
+  const allData = [headers, ...txRows, grandTotalRow, netBalanceRow];
+  
+  const txSheet = XLSX.utils.aoa_to_sheet(allData);
+  
+  // ============= AUTO-FIT COLUMN WIDTHS =============
+  // Calculate width based on longest string in each column (real calculation!)
+  const colWidths = headers.map((_, colIdx) => {
+    let maxLen = headers[colIdx].length; // Start with header length
+    
+    allData.forEach(row => {
+      const cell = row[colIdx];
+      let cellLen = 0;
+      
+      if (cell === null || cell === undefined) {
+        cellLen = 0;
+      } else if (typeof cell === 'object' && cell.f) {
+        // Formula cell - estimate based on typical result
+        cellLen = 15;
+      } else if (typeof cell === 'number') {
+        // Format number to get string length
+        cellLen = formatCurrency(cell).length;
+      } else {
+        cellLen = String(cell).length;
+      }
+      
+      if (cellLen > maxLen) maxLen = cellLen;
+    });
+    
+    // Add padding and cap at reasonable max
+    return { wch: Math.min(Math.max(maxLen + 2, 8), 60) };
+  });
+  
+  txSheet['!cols'] = colWidths;
+  
+  // ============= BOLD STYLING FOR HEADERS AND TOTALS =============
+  // Note: xlsx library has limited styling support, but we set cell types properly
+  
+  // Set number format for Debit, Credit, Balance columns (columns E, F, G = indices 4, 5, 6)
+  const numCols = [4, 5, 6]; // 0-indexed: Debit, Credit, Balance
+  for (let rowIdx = 1; rowIdx <= rowCount + 2; rowIdx++) { // +2 for total rows
+    numCols.forEach(colIdx => {
+      const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c: colIdx });
+      if (txSheet[cellRef]) {
+        // Ensure numeric cells are typed as numbers
+        if (typeof txSheet[cellRef].v === 'number') {
+          txSheet[cellRef].t = 'n';
+          txSheet[cellRef].z = '#,##0.00'; // Number format with 2 decimals
+        }
+      }
+    });
+  }
   
   XLSX.utils.book_append_sheet(workbook, txSheet, 'Transactions');
   sheets.push('Transactions');
