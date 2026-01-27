@@ -126,36 +126,75 @@ function autoFitCols(allData: any[][], headers: string[]) {
 }
 
 // Extract Reference ID from description (UTR, Cheque No, Ref No, etc.)
+// Enhanced to detect common Indian bank statement patterns
 function extractReferenceId(description: string, rowIndex: number): string {
   if (!description) return `ROW-${rowIndex + 1}`;
   
-  // UTR patterns
-  const utrMatch = description.match(/UTR[:\s]*([A-Z0-9]+)/i);
-  if (utrMatch) return `UTR:${utrMatch[1]}`;
+  const desc = description.toUpperCase();
   
-  // Cheque number patterns
-  const chequeMatch = description.match(/CHQ[:\s#]*([0-9]+)/i) || 
-                      description.match(/CHEQUE[:\s#]*([0-9]+)/i) ||
-                      description.match(/CQ[:\s#]*([0-9]+)/i);
+  // 1. UTR patterns (16-22 digit alphanumeric, most common)
+  const utrMatch = desc.match(/UTR[:\s\-\/]*([A-Z0-9]{12,22})/i) ||
+                   desc.match(/\b([A-Z]{4}[0-9]{10,16})\b/); // Standard UTR format: BANK + numbers
+  if (utrMatch) return `UTR:${utrMatch[1].substring(0, 16)}`;
+  
+  // 2. NEFT patterns (NEFTXXXXXXXXXXXXXX or N followed by digits)
+  const neftMatch = desc.match(/NEFT[:\s\-\/]*([A-Z0-9]{8,20})/i) ||
+                    desc.match(/\bN([0-9]{10,16})\b/);
+  if (neftMatch) return `NEFT:${neftMatch[1].substring(0, 14)}`;
+  
+  // 3. IMPS patterns (typically 12-digit)
+  const impsMatch = desc.match(/IMPS[:\s\-\/]*([A-Z0-9]{8,16})/i) ||
+                    desc.match(/\b([0-9]{12})\b/); // 12-digit transaction ID
+  if (impsMatch && desc.includes('IMPS')) return `IMPS:${impsMatch[1].substring(0, 12)}`;
+  
+  // 4. UPI patterns (upi@bank or UPI/XXXXXX)
+  const upiMatch = desc.match(/UPI[:\s\-\/]*([A-Z0-9@.]{6,30})/i) ||
+                   desc.match(/([A-Z0-9.]+@[A-Z]+)/i); // UPI ID format
+  if (upiMatch) return `UPI:${upiMatch[1].substring(0, 20)}`;
+  
+  // 5. Cheque number patterns (usually 6 digits)
+  const chequeMatch = desc.match(/CHQ[:\s#\-]*([0-9]{5,8})/i) || 
+                      desc.match(/CHEQUE[:\s#\-]*([0-9]{5,8})/i) ||
+                      desc.match(/CQ[:\s#\-]*([0-9]{5,8})/i) ||
+                      desc.match(/CLG[:\s#\-]*([0-9]{5,8})/i);
   if (chequeMatch) return `CHQ:${chequeMatch[1]}`;
   
-  // Reference number patterns
-  const refMatch = description.match(/REF[:\s#]*([A-Z0-9]+)/i) ||
-                   description.match(/REFNO[:\s#]*([A-Z0-9]+)/i) ||
-                   description.match(/TXN[:\s#]*([A-Z0-9]+)/i);
-  if (refMatch) return `REF:${refMatch[1]}`;
+  // 6. RTGS patterns
+  const rtgsMatch = desc.match(/RTGS[:\s\-\/]*([A-Z0-9]{8,20})/i);
+  if (rtgsMatch) return `RTGS:${rtgsMatch[1].substring(0, 14)}`;
   
-  // NEFT/IMPS/UPI patterns
-  const neftMatch = description.match(/NEFT[\/\-\s]*([A-Z0-9]+)/i);
-  if (neftMatch) return `NEFT:${neftMatch[1].substring(0, 12)}`;
+  // 7. Reference/Transaction number patterns
+  const refMatch = desc.match(/REF[:\s#\-]*([A-Z0-9]{6,20})/i) ||
+                   desc.match(/REFNO[:\s#\-]*([A-Z0-9]{6,20})/i) ||
+                   desc.match(/TXN[:\s#\-]*([A-Z0-9]{6,20})/i) ||
+                   desc.match(/TRANS[:\s#\-]*([A-Z0-9]{6,20})/i);
+  if (refMatch) return `REF:${refMatch[1].substring(0, 14)}`;
   
-  const impsMatch = description.match(/IMPS[\/\-\s]*([A-Z0-9]+)/i);
-  if (impsMatch) return `IMPS:${impsMatch[1].substring(0, 12)}`;
+  // 8. ATM/Card transaction patterns
+  const atmMatch = desc.match(/ATM[:\s\-\/]*([A-Z0-9]{6,16})/i) ||
+                   desc.match(/CARD[:\s\-\/]*([A-Z0-9]{6,16})/i);
+  if (atmMatch) return `ATM:${atmMatch[1].substring(0, 12)}`;
   
-  const upiMatch = description.match(/UPI[\/\-\s]*([A-Z0-9@]+)/i);
-  if (upiMatch) return `UPI:${upiMatch[1].substring(0, 12)}`;
+  // 9. Generic long alphanumeric sequence (likely a transaction ID)
+  // Look for sequences of 10+ alphanumeric chars that look like IDs
+  const genericIdMatch = desc.match(/\b([A-Z]{2,4}[0-9]{8,16})\b/) || // BANK + numbers
+                         desc.match(/\b([0-9]{2,4}[A-Z]{2,4}[0-9]{6,12})\b/) || // mixed format
+                         desc.match(/\b([A-Z0-9]{14,22})\b/); // long alphanumeric
+  if (genericIdMatch) {
+    const id = genericIdMatch[1];
+    // Exclude common words that might match
+    if (!['TRANSACTION', 'DESCRIPTION', 'BALANCE', 'TRANSFER'].includes(id)) {
+      return `ID:${id.substring(0, 14)}`;
+    }
+  }
   
-  // Fallback to row number
+  // 10. Fallback: Extract any number sequence of 8+ digits (could be a reference)
+  const numericMatch = desc.match(/\b([0-9]{8,16})\b/);
+  if (numericMatch) {
+    return `REF:${numericMatch[1]}`;
+  }
+  
+  // Final fallback to row number
   return `ROW-${rowIndex + 1}`;
 }
 
