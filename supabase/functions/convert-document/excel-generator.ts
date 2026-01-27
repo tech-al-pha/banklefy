@@ -1,5 +1,5 @@
 // ============= PROFESSIONAL EXCEL GENERATOR =============
-// Premium formatting + formulas + auto-fit columns.
+// Premium formatting + formulas + auto-fit columns + Audit sheet + Reference IDs.
 // Uses xlsx-js-style (SheetJS fork) for header/totals styling in Deno runtime.
 
 import * as XLSX from 'https://esm.sh/xlsx-js-style@1.2.0?bundle&target=deno';
@@ -16,7 +16,7 @@ export interface ExcelGenerationResult {
   sheets: string[];
 }
 
-interface ExcelConfig {
+export interface ExcelConfig {
   transactions: Transaction[];
   analytics: {
     totalCredits: number;
@@ -30,6 +30,7 @@ interface ExcelConfig {
   liquidity?: LiquidityAnalysis;
   reconciliation?: ReconciliationResult;
   fileName?: string;
+  premiumExport?: boolean; // Toggle for premium vs simple export
 }
 
 const THEME = {
@@ -38,9 +39,16 @@ const THEME = {
   border: 'D0D0D0',
   totalBg: 'F2F2F2',
   netBg: 'FFF3CD',
+  summaryBg: 'E8F4FD',
+  alertHigh: 'FFCDD2',
+  alertMedium: 'FFE0B2',
+  alertLow: 'FFF9C4',
+  creditGreen: '4CAF50',
+  debitRed: 'F44336',
 };
 
-const headerStyle = {
+// Style constants for testing/validation
+export const headerStyle = {
   font: { bold: true, color: { rgb: THEME.headerFg } },
   fill: { fgColor: { rgb: THEME.headerBg } },
   alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
@@ -52,7 +60,7 @@ const headerStyle = {
   },
 } as const;
 
-const totalStyle = {
+export const totalStyle = {
   font: { bold: true },
   fill: { fgColor: { rgb: THEME.totalBg } },
   border: {
@@ -61,9 +69,20 @@ const totalStyle = {
   },
 } as const;
 
-const netStyle = {
+export const netStyle = {
   font: { bold: true, color: { rgb: THEME.headerBg } },
   fill: { fgColor: { rgb: THEME.netBg } },
+} as const;
+
+const summaryCardStyle = {
+  font: { bold: true, sz: 12 },
+  fill: { fgColor: { rgb: THEME.summaryBg } },
+  border: {
+    top: { style: 'medium', color: { rgb: THEME.headerBg } },
+    bottom: { style: 'medium', color: { rgb: THEME.headerBg } },
+    left: { style: 'medium', color: { rgb: THEME.headerBg } },
+    right: { style: 'medium', color: { rgb: THEME.headerBg } },
+  },
 } as const;
 
 function formatCurrency(amount: number | string): string {
@@ -89,7 +108,7 @@ function setRowStyle(ws: any, row: number, colCount: number, style: any) {
 
 function autoFitCols(allData: any[][], headers: string[]) {
   return headers.map((_, colIdx) => {
-    let maxLen = headers[colIdx].length;
+    let maxLen = headers[colIdx]?.length || 10;
     allData.forEach((row) => {
       const cell = row[colIdx];
       let len = 0;
@@ -106,20 +125,79 @@ function autoFitCols(allData: any[][], headers: string[]) {
   });
 }
 
+// Extract Reference ID from description (UTR, Cheque No, Ref No, etc.)
+function extractReferenceId(description: string, rowIndex: number): string {
+  if (!description) return `ROW-${rowIndex + 1}`;
+  
+  // UTR patterns
+  const utrMatch = description.match(/UTR[:\s]*([A-Z0-9]+)/i);
+  if (utrMatch) return `UTR:${utrMatch[1]}`;
+  
+  // Cheque number patterns
+  const chequeMatch = description.match(/CHQ[:\s#]*([0-9]+)/i) || 
+                      description.match(/CHEQUE[:\s#]*([0-9]+)/i) ||
+                      description.match(/CQ[:\s#]*([0-9]+)/i);
+  if (chequeMatch) return `CHQ:${chequeMatch[1]}`;
+  
+  // Reference number patterns
+  const refMatch = description.match(/REF[:\s#]*([A-Z0-9]+)/i) ||
+                   description.match(/REFNO[:\s#]*([A-Z0-9]+)/i) ||
+                   description.match(/TXN[:\s#]*([A-Z0-9]+)/i);
+  if (refMatch) return `REF:${refMatch[1]}`;
+  
+  // NEFT/IMPS/UPI patterns
+  const neftMatch = description.match(/NEFT[\/\-\s]*([A-Z0-9]+)/i);
+  if (neftMatch) return `NEFT:${neftMatch[1].substring(0, 12)}`;
+  
+  const impsMatch = description.match(/IMPS[\/\-\s]*([A-Z0-9]+)/i);
+  if (impsMatch) return `IMPS:${impsMatch[1].substring(0, 12)}`;
+  
+  const upiMatch = description.match(/UPI[\/\-\s]*([A-Z0-9@]+)/i);
+  if (upiMatch) return `UPI:${upiMatch[1].substring(0, 12)}`;
+  
+  // Fallback to row number
+  return `ROW-${rowIndex + 1}`;
+}
+
 export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationResult {
   const workbook = XLSX.utils.book_new();
   const sheets: string[] = [];
+  const isPremium = config.premiumExport !== false; // Default to premium
 
   // ============= SHEET 1: TRANSACTIONS =============
-  const headers = ['Sr No', 'Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Flags'];
+  const headers = ['Sr No', 'Ref ID', 'Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Flags'];
+  
+  // Calculate totals for Summary Box
+  const totalCredits = config.analytics.totalCredits || 0;
+  const totalDebits = config.analytics.totalDebits || 0;
+  const netBalance = totalCredits - Math.abs(totalDebits);
+  const closingBalance = config.transactions.length > 0 
+    ? (typeof config.transactions[config.transactions.length - 1].balance === 'number' 
+        ? config.transactions[config.transactions.length - 1].balance 
+        : parseFloat(String(config.transactions[config.transactions.length - 1].balance)) || 0)
+    : 0;
+
+  // Build Summary Box rows (rows 1-6 in premium mode)
+  const summaryBox: any[][] = isPremium ? [
+    ['📊 FINANCIAL SUMMARY', '', '', '', '', '', '', '', ''],
+    ['', 'Total Credits:', formatCurrency(totalCredits), '', 'Total Debits:', formatCurrency(Math.abs(totalDebits)), '', '', ''],
+    ['', 'Net Balance:', formatCurrency(netBalance), '', 'Closing Balance:', formatCurrency(closingBalance), '', '', ''],
+    ['', '', '', '', '', '', '', '', ''],
+  ] : [];
+
+  const summaryRowCount = summaryBox.length;
+  const headerRowIndex = summaryRowCount; // 0-indexed row for headers
+  const dataStartRow = headerRowIndex + 2; // 1-indexed Excel row (after summary + header)
 
   const txRows = config.transactions.map((t, i) => {
     const debitVal = typeof t.debit === 'number' ? t.debit : (parseFloat(String(t.debit)) || 0);
     const creditVal = typeof t.credit === 'number' ? t.credit : (parseFloat(String(t.credit)) || 0);
     const balanceVal = typeof t.balance === 'number' ? t.balance : (parseFloat(String(t.balance)) || 0);
+    const refId = extractReferenceId(t.description || '', i);
 
     return [
       i + 1,
+      refId,
       t.date || '',
       t.description || '',
       t.category || 'Other',
@@ -135,21 +213,21 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   });
 
   const rowCount = txRows.length;
-  const dataStartRow = 2; // 1-indexed in Excel
   const dataEndRow = dataStartRow + rowCount - 1;
 
-  const grandTotalExcelRow = rowCount > 0 ? dataEndRow + 1 : 2;
+  const grandTotalExcelRow = rowCount > 0 ? dataEndRow + 1 : dataStartRow;
   const netBalanceExcelRow = grandTotalExcelRow + 1;
 
-  const lastBalance = rowCount > 0 ? Number(txRows[txRows.length - 1][6] || 0) : 0;
+  const lastBalance = rowCount > 0 ? Number(txRows[txRows.length - 1][7] || 0) : 0;
 
   const grandTotalRow: any[] = [
     '',
     '',
+    '',
     'GRAND TOTAL',
     '',
-    rowCount > 0 ? { f: `SUM(E${dataStartRow}:E${dataEndRow})` } : 0,
     rowCount > 0 ? { f: `SUM(F${dataStartRow}:F${dataEndRow})` } : 0,
+    rowCount > 0 ? { f: `SUM(G${dataStartRow}:G${dataEndRow})` } : 0,
     lastBalance,
     '',
   ];
@@ -157,80 +235,64 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   const netBalanceRow: any[] = [
     '',
     '',
+    '',
     'NET BALANCE (Credits + Debits)',
     '',
     '',
-    { f: `F${grandTotalExcelRow}+E${grandTotalExcelRow}` },
+    { f: `G${grandTotalExcelRow}+F${grandTotalExcelRow}` },
     '',
     '',
   ];
 
-  const allData: any[][] = [headers, ...txRows, grandTotalRow, netBalanceRow];
+  const allData: any[][] = [...summaryBox, headers, ...txRows, grandTotalRow, netBalanceRow];
   const ws = XLSX.utils.aoa_to_sheet(allData);
 
-  // Row height for header (points)
-  ws['!rows'] = [{ hpt: 20 }];
+  // Row heights
+  ws['!rows'] = [];
+  if (isPremium) {
+    ws['!rows'][0] = { hpt: 24 }; // Summary title
+    ws['!rows'][1] = { hpt: 20 };
+    ws['!rows'][2] = { hpt: 20 };
+  }
+  ws['!rows'][headerRowIndex] = { hpt: 22 };
 
   // Auto-fit widths
   ws['!cols'] = autoFitCols(allData, headers);
 
+  // Style Summary Box (premium only)
+  if (isPremium && summaryRowCount > 0) {
+    // Title row
+    setCellStyle(ws, 'A1', { font: { bold: true, sz: 14, color: { rgb: THEME.headerBg } } });
+    // Summary data rows
+    for (let r = 1; r < summaryRowCount - 1; r++) {
+      for (let c = 0; c < headers.length; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        setCellStyle(ws, addr, summaryCardStyle);
+      }
+    }
+  }
+
   // Bold + premium header styling
-  setRowStyle(ws, 0, headers.length, headerStyle);
+  setRowStyle(ws, headerRowIndex, headers.length, headerStyle);
 
   // Style Grand Total + Net Balance rows
-  const grandTotalRowIdx0 = grandTotalExcelRow - 1; // 0-indexed
-  const netRowIdx0 = netBalanceExcelRow - 1;
+  const grandTotalRowIdx0 = grandTotalExcelRow - 1 + summaryRowCount;
+  const netRowIdx0 = netBalanceExcelRow - 1 + summaryRowCount;
   setRowStyle(ws, grandTotalRowIdx0, headers.length, totalStyle);
   setRowStyle(ws, netRowIdx0, headers.length, netStyle);
 
-  // Conditional formatting (if supported by library build)
-  const debitCol = 'E';
-  const creditCol = 'F';
-  const lastDataRow = netBalanceExcelRow;
-  (ws as any)['!condfmt'] = [
-    {
-      ref: `${debitCol}${dataStartRow}:${debitCol}${lastDataRow}`,
-      rules: [
-        {
-          type: 'cellIs',
-          operator: 'lessThan',
-          formula: ['0'],
-          style: {
-            font: { color: { rgb: 'FF0000' } },
-            fill: { fgColor: { rgb: 'FFEEEE' } },
-          },
-        },
-      ],
-    },
-    {
-      ref: `${creditCol}${dataStartRow}:${creditCol}${lastDataRow}`,
-      rules: [
-        {
-          type: 'cellIs',
-          operator: 'greaterThan',
-          formula: ['0'],
-          style: {
-            font: { color: { rgb: '008000' } },
-            fill: { fgColor: { rgb: 'EEFFEE' } },
-          },
-        },
-      ],
-    },
-  ];
-
-  // Number typing + formats for Debit/Credit/Balance (E/F/G)
-  const numCols = [4, 5, 6];
-  for (let r = 1; r <= rowCount + 2; r++) {
+  // Number typing + formats for Debit/Credit/Balance (F/G/H = cols 5/6/7)
+  const numCols = [5, 6, 7];
+  for (let r = headerRowIndex + 1; r <= headerRowIndex + rowCount + 2; r++) {
     for (const c of numCols) {
       const ref = XLSX.utils.encode_cell({ r, c });
       const cell = ws[ref];
       if (!cell) continue;
 
-      // Mark formula totals as numeric too
       if (typeof cell.v === 'number' || (cell as any).f) {
         cell.t = 'n';
-        if (c === 4) cell.z = '[Red]-#,##0.00;[Red]-#,##0.00;"-"';
-        else if (c === 5) cell.z = '[Green]#,##0.00;[Red]-#,##0.00;"-"';
+        if (c === 5) cell.z = '[Red]-#,##0.00;[Red]-#,##0.00;"-"';
+        else if (c === 6) cell.z = '[Green]#,##0.00;[Red]-#,##0.00;"-"';
         else cell.z = '#,##0.00';
       }
     }
@@ -239,7 +301,113 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   XLSX.utils.book_append_sheet(workbook, ws, 'Transactions');
   sheets.push('Transactions');
 
-  // ============= SHEET 2: SUMMARY =============
+  // ============= SHEET 2: AUDIT (Premium Only) =============
+  if (isPremium) {
+    const auditData: any[][] = [
+      ['🔍 AUDIT REPORT', '', '', '', ''],
+      [''],
+      ['Type', 'Row #', 'Ref ID', 'Description', 'Details'],
+    ];
+
+    // Collect audit items
+    const duplicates = config.transactions
+      .map((t, i) => ({ ...t, rowNum: i + 1, refId: extractReferenceId(t.description || '', i) }))
+      .filter(t => t.isDuplicate);
+    
+    const mismatches = config.transactions
+      .map((t, i) => ({ ...t, rowNum: i + 1, refId: extractReferenceId(t.description || '', i) }))
+      .filter(t => t.balanceMismatch);
+    
+    const highRisk = config.transactions
+      .map((t, i) => ({ ...t, rowNum: i + 1, refId: extractReferenceId(t.description || '', i) }))
+      .filter(t => t.riskFlag);
+
+    // Add duplicates
+    if (duplicates.length > 0) {
+      auditData.push(['', '', '', '', '']);
+      auditData.push(['📋 DUPLICATE TRANSACTIONS', '', '', '', `Total: ${duplicates.length}`]);
+      duplicates.forEach(d => {
+        // Create clickable reference to Transactions sheet
+        const cellRef = `Transactions!A${d.rowNum + (isPremium ? summaryRowCount : 0) + 1}`;
+        auditData.push([
+          '🔄 Duplicate',
+          { f: `HYPERLINK("#${cellRef}","Row ${d.rowNum}")` },
+          d.refId,
+          (d.description || '').substring(0, 50),
+          `Amount: ${formatCurrency(d.debit || d.credit || 0)}`,
+        ]);
+      });
+    }
+
+    // Add balance mismatches
+    if (mismatches.length > 0) {
+      auditData.push(['', '', '', '', '']);
+      auditData.push(['⚠️ BALANCE MISMATCHES', '', '', '', `Total: ${mismatches.length}`]);
+      mismatches.forEach(m => {
+        const cellRef = `Transactions!A${m.rowNum + (isPremium ? summaryRowCount : 0) + 1}`;
+        auditData.push([
+          '⚠️ Mismatch',
+          { f: `HYPERLINK("#${cellRef}","Row ${m.rowNum}")` },
+          m.refId,
+          (m.description || '').substring(0, 50),
+          `Balance: ${formatCurrency(m.balance || 0)}`,
+        ]);
+      });
+    }
+
+    // Add high-risk flags
+    if (highRisk.length > 0) {
+      auditData.push(['', '', '', '', '']);
+      auditData.push(['🚨 HIGH-RISK FLAGS', '', '', '', `Total: ${highRisk.length}`]);
+      highRisk.forEach(r => {
+        const cellRef = `Transactions!A${r.rowNum + (isPremium ? summaryRowCount : 0) + 1}`;
+        auditData.push([
+          '🚨 Risk',
+          { f: `HYPERLINK("#${cellRef}","Row ${r.rowNum}")` },
+          r.refId,
+          (r.description || '').substring(0, 50),
+          r.riskFlag || 'Flagged',
+        ]);
+      });
+    }
+
+    // Add fraud alerts if present
+    if (config.fraudAlerts && config.fraudAlerts.length > 0) {
+      auditData.push(['', '', '', '', '']);
+      auditData.push(['🛡️ FRAUD ALERTS', '', '', '', `Total: ${config.fraudAlerts.length}`]);
+      config.fraudAlerts.forEach((alert, i) => {
+        auditData.push([
+          `🛡️ ${alert.severity?.toUpperCase() || 'MEDIUM'}`,
+          i + 1,
+          alert.type || 'Alert',
+          (alert.description || '').substring(0, 50),
+          `Rows: ${alert.affectedRows?.join(', ') || 'N/A'}`,
+        ]);
+      });
+    }
+
+    // Summary row
+    auditData.push(['', '', '', '', '']);
+    auditData.push([
+      '📊 AUDIT SUMMARY',
+      '',
+      '',
+      '',
+      `Duplicates: ${duplicates.length} | Mismatches: ${mismatches.length} | Risk Flags: ${highRisk.length}`,
+    ]);
+
+    const auditSheet = XLSX.utils.aoa_to_sheet(auditData);
+    auditSheet['!cols'] = autoFitCols(auditData, ['Type', 'Row #', 'Ref ID', 'Description', 'Details']);
+    
+    // Style header
+    setCellStyle(auditSheet, 'A1', { font: { bold: true, sz: 14, color: { rgb: THEME.headerBg } } });
+    setRowStyle(auditSheet, 2, 5, headerStyle);
+    
+    XLSX.utils.book_append_sheet(workbook, auditSheet, 'Audit');
+    sheets.push('Audit');
+  }
+
+  // ============= SHEET 3: SUMMARY =============
   const summaryData: any[][] = [
     ['BANK STATEMENT ANALYSIS SUMMARY', ''],
     ['', ''],
@@ -293,12 +461,11 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
 
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
   summarySheet['!cols'] = autoFitCols(summaryData, ['Field', 'Value']);
-  // Style first row like title
   setCellStyle(summarySheet, 'A1', { font: { bold: true, sz: 14, color: { rgb: THEME.headerBg } } });
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
   sheets.push('Summary');
 
-  // ============= SHEET 3: CATEGORY BREAKDOWN =============
+  // ============= SHEET 4: CATEGORY BREAKDOWN =============
   const categoryData: any[][] = [['Category', 'Count', 'Total Debit', 'Total Credit', 'Net']];
   Object.entries(config.analytics.categoryBreakdown).forEach(([category, data]) => {
     categoryData.push([
@@ -324,6 +491,7 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
 export function generateSimpleExcel(transactions: Transaction[]): ArrayBuffer {
   const data = transactions.map((t, i) => ({
     'Sr No': i + 1,
+    'Ref ID': extractReferenceId(t.description || '', i),
     Date: t.date,
     Description: t.description,
     Category: t.category,
@@ -335,4 +503,67 @@ export function generateSimpleExcel(transactions: Transaction[]): ArrayBuffer {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
   return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+}
+
+// ============= VALIDATION HELPERS FOR TESTING =============
+export function validateExcelStructure(buffer: ArrayBuffer): {
+  valid: boolean;
+  hasTransactions: boolean;
+  hasAudit: boolean;
+  hasSummary: boolean;
+  headersBold: boolean;
+  hasFormulas: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+  let hasTransactions = false;
+  let hasAudit = false;
+  let hasSummary = false;
+  let headersBold = false;
+  let hasFormulas = false;
+
+  try {
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    
+    hasTransactions = workbook.SheetNames.includes('Transactions');
+    hasAudit = workbook.SheetNames.includes('Audit');
+    hasSummary = workbook.SheetNames.includes('Summary');
+    
+    if (hasTransactions) {
+      const ws = workbook.Sheets['Transactions'];
+      
+      // Check for bold headers (look for style on header row)
+      // Note: xlsx-js-style preserves styles on read
+      const headerCells = ['A5', 'B5', 'C5', 'D5', 'E5', 'F5', 'G5', 'H5', 'I5'];
+      headersBold = headerCells.some(addr => {
+        const cell = ws[addr];
+        return cell?.s?.font?.bold === true;
+      });
+      
+      // Check for SUM formulas
+      for (const addr in ws) {
+        const cell = ws[addr];
+        if (cell?.f && (cell.f.includes('SUM') || cell.f.includes('HYPERLINK'))) {
+          hasFormulas = true;
+          break;
+        }
+      }
+    }
+    
+    if (!hasTransactions) errors.push('Missing Transactions sheet');
+    if (!hasSummary) errors.push('Missing Summary sheet');
+    
+  } catch (e) {
+    errors.push(`Parse error: ${e instanceof Error ? e.message : 'Unknown'}`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    hasTransactions,
+    hasAudit,
+    hasSummary,
+    headersBold,
+    hasFormulas,
+    errors,
+  };
 }
