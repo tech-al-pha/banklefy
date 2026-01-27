@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Crown, User } from "lucide-react";
+import { AlertCircle, Crown, User, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface UsageLimitBannerProps {
@@ -8,6 +8,9 @@ interface UsageLimitBannerProps {
   limit: number;
   isAuthenticated: boolean;
   limitReached: boolean;
+  status?: string; // Status code from backend
+  pagesDetected?: number;
+  maxPagesAllowed?: number;
 }
 
 export const UsageLimitBanner = ({
@@ -15,10 +18,37 @@ export const UsageLimitBanner = ({
   limit,
   isAuthenticated,
   limitReached,
+  status,
+  pagesDetected,
+  maxPagesAllowed,
 }: UsageLimitBannerProps) => {
   const navigate = useNavigate();
 
-  if (limitReached) {
+  // PDF too complex / page limit exceeded
+  if (status === 'pdf_too_complex') {
+    return (
+      <Alert variant="destructive" className="mb-6">
+        <Lock className="h-4 w-4" />
+        <AlertTitle>Premium Required</AlertTitle>
+        <AlertDescription className="mt-2">
+          <p className="mb-3">
+            This PDF has {pagesDetected} pages and requires a Premium plan for accurate conversion.
+            {maxPagesAllowed && ` Free users can convert PDFs with up to ${maxPagesAllowed} pages.`}
+          </p>
+          <Button
+            size="sm"
+            onClick={() => navigate('/pricing')}
+            className="bg-primary hover:bg-primary/90"
+          >
+            <Crown className="mr-2 h-4 w-4" />
+            Upgrade to Premium
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (limitReached || status === 'anonymous_limit_reached') {
     return (
       <Alert variant="destructive" className="mb-6">
         <AlertCircle className="h-4 w-4" />
@@ -27,7 +57,7 @@ export const UsageLimitBanner = ({
           <p className="mb-3">
             {isAuthenticated
               ? `You've used all ${limit} of your daily conversions. Your limit resets at midnight.`
-              : `You've used your ${limit} free conversions for today.`}
+              : 'Free limit reached. Please sign up to continue.'}
           </p>
           {!isAuthenticated && (
             <Button

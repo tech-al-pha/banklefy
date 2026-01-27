@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     }
 
     let conversionsUsed = 0;
-    let conversionsLimit = 2; // Default for anonymous (2 free conversions)
+    let conversionsLimit = 2; // Default for anonymous (2 free conversions per IP)
     let isAuthenticated = false;
 
     if (user) {
@@ -154,7 +154,8 @@ Deno.serve(async (req) => {
         conversionsLimit = result[0].conversions_limit;
       }
     } else {
-      // Anonymous user - check by IP
+      // Anonymous user - STRICT IP-based tracking
+      // This prevents abuse via multiple emails/browsers on same IP
       const { data: result, error } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
         p_ip_address: ipAddress,
         p_user_id: null,
@@ -168,7 +169,7 @@ Deno.serve(async (req) => {
 
       if (result && result.length > 0) {
         conversionsUsed = result[0].conversions_used;
-        conversionsLimit = result[0].conversions_limit;
+        conversionsLimit = result[0].conversions_limit; // Should be 2 for anonymous
       }
     }
 
