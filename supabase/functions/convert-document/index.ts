@@ -1,5 +1,6 @@
 // ============= AKROMEDA MULTI-LAYERED INTELLIGENCE ENGINE =============
 // Main orchestrator that routes to specialized AI modules
+// STRICT USAGE CONTROL: IP-based limits, page limits, admin whitelist
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
@@ -34,6 +35,10 @@ import {
   type Transaction,
 } from './financial-engine.ts';
 import { generateProfessionalExcel } from './excel-generator.ts';
+
+// ============= ADMIN WHITELIST (Server-Side Only) =============
+const ADMIN_EMAILS = ['inspirexali@gmail.com'];
+const MAX_PAGES_FREE = 6; // Max pages for free/normal users
 
 // ============= DEPLOYMENT-AGNOSTIC CORS =============
 // Allows requests from any origin. The edge function runs on Supabase infrastructure
@@ -359,7 +364,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check usage limits
+    // ============= USAGE LIMITS ENFORCEMENT =============
+    // Check usage limits - IP-based for anonymous, user-based for authenticated
     const { data: limitResult, error: limitError } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
       p_ip_address: user ? null : ipAddress,
       p_user_id: user ? user.id : null,
@@ -369,28 +375,54 @@ Deno.serve(async (req) => {
     if (limitError) {
       console.error('Error checking limit:', limitError);
       return new Response(
-        JSON.stringify({ error: 'Failed to check usage limit' }),
+        JSON.stringify({ error: 'Failed to check usage limit', status: 'error' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
     const conversionsUsed = usageInfo?.conversions_used ?? 0;
-    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 6 : 100);
+    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 6 : 2); // Default: 6 for users, 2 for anon
 
     console.log('Usage info:', { conversionsUsed, conversionsLimit, user: !!user });
 
-    if (conversionsUsed >= conversionsLimit) {
+    // Check if admin (bypass limits for simple PDFs)
+    const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
+    console.log('Admin check:', { isAdmin, email: user?.email });
+
+    // Enforce limits (admin bypasses for simple PDFs)
+    if (!isAdmin && conversionsUsed >= conversionsLimit) {
       return new Response(
         JSON.stringify({
-          error: 'Conversion limit reached',
+          error: user 
+            ? `You have reached your daily limit of ${conversionsLimit} conversions.`
+            : 'Free limit reached. Please sign up to continue.',
+          status: 'anonymous_limit_reached',
           limitReached: true,
           isAuthenticated: !!user,
-          message: user 
-            ? `You have reached your daily limit of ${conversionsLimit} conversions.`
-            : `You have reached your daily limit of ${conversionsLimit} free conversions. Sign up for a free account to get 6 conversions per day!`,
+          signupRequired: !user,
         }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ============= PAGE LIMIT ENFORCEMENT =============
+    // Check PDF page count for non-admin users
+    const isPdf = lowerFileName.endsWith('.pdf');
+    const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
+    const pageCount = hasPdfPageImages ? (pdfPageImages as string[]).length : 1;
+    console.log('Page count:', { pageCount, isAdmin, maxPages: MAX_PAGES_FREE, isPdf });
+
+    if (!isAdmin && pageCount > MAX_PAGES_FREE) {
+      return new Response(
+        JSON.stringify({
+          error: 'This PDF is complex and requires a Premium plan for accurate conversion.',
+          status: 'pdf_too_complex',
+          pagesDetected: pageCount,
+          maxPagesAllowed: MAX_PAGES_FREE,
+          paidRequired: true,
+        }),
+        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -433,9 +465,7 @@ Deno.serve(async (req) => {
 
     let extractionResult: Awaited<ReturnType<typeof performExtraction>>;
 
-    const isPdf = lowerFileName.endsWith('.pdf');
-    const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
-
+    // isPdf and hasPdfPageImages already defined above for page limit check
     // Track bank metadata across pages
     let collectedBankMetadata: BankMetadata | undefined;
 

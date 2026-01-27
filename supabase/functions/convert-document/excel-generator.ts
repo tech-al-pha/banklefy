@@ -154,24 +154,86 @@ function autoFitCols(allData: any[][], headers: string[]) {
 }
 
 // Extract Reference ID from description or use provided refNumber
-// Enhanced to support global bank patterns
+// Enhanced to support global bank patterns including GCC banks
 function extractReferenceId(description: string, rowIndex: number, refNumber?: string): string {
   // If OCR extracted a refNumber, use it directly
   if (refNumber && refNumber.trim()) {
     return refNumber.trim().substring(0, 20);
   }
   
-  if (!description) return `ROW-${rowIndex + 1}`;
+  if (!description) return '';
   
   const desc = description.toUpperCase();
   
   // ========= GLOBAL BANK PATTERNS =========
   
-  // 1. UAE Banks (Wio, Emirates NBD, ADCB, FAB, Mashreq)
-  const uaeRef = desc.match(/\bP([0-9]{6,12})\b/) || // Wio format: P049462226
-                 desc.match(/\bTXN([0-9]{8,16})\b/) || // Transaction ID
-                 desc.match(/\bFT([0-9]{10,16})\b/);   // Fund Transfer
-  if (uaeRef) return `REF:${uaeRef[0]}`;
+  // 1. UAE/GCC Banks (Wio, Emirates NBD, ADCB, FAB, Mashreq, RAKBANK, CBD, NBF)
+  // Wio Bank format: P049462226
+  const wioRef = desc.match(/\bP([0-9]{6,12})\b/);
+  if (wioRef) return `WIO:${wioRef[0]}`;
+  
+  // Emirates NBD specific patterns
+  const enbdRef = desc.match(/ENBD[:\s\-\/]*([A-Z0-9]{8,16})/i) ||
+                  desc.match(/\b(MB[0-9]{10,14})\b/) ||  // Mobile banking: MB12345678901
+                  desc.match(/\b(IB[0-9]{10,14})\b/) ||  // Internet banking: IB12345678901
+                  desc.match(/\b(AT[0-9]{10,14})\b/);    // ATM: AT12345678901
+  if (enbdRef) return `ENBD:${enbdRef[1]}`;
+  
+  // ADCB (Abu Dhabi Commercial Bank) patterns
+  const adcbRef = desc.match(/ADCB[:\s\-\/]*([A-Z0-9]{8,16})/i) ||
+                  desc.match(/\b(ADC[0-9]{10,14})\b/) ||
+                  desc.match(/\b(CR[0-9]{10,14})\b/);    // Credit reference
+  if (adcbRef) return `ADCB:${adcbRef[1]}`;
+  
+  // FAB (First Abu Dhabi Bank) patterns
+  const fabRef = desc.match(/FAB[:\s\-\/]*([A-Z0-9]{8,16})/i) ||
+                 desc.match(/NBAD[:\s\-\/]*([A-Z0-9]{8,16})/i) ||  // Old NBAD
+                 desc.match(/FGB[:\s\-\/]*([A-Z0-9]{8,16})/i) ||   // Old FGB
+                 desc.match(/\b(FAB[0-9]{10,14})\b/);
+  if (fabRef) return `FAB:${fabRef[1]}`;
+  
+  // Mashreq Bank patterns
+  const mashreqRef = desc.match(/MASHREQ[:\s\-\/]*([A-Z0-9]{8,16})/i) ||
+                     desc.match(/\b(MSQ[0-9]{10,14})\b/) ||
+                     desc.match(/\b(MBK[0-9]{10,14})\b/);
+  if (mashreqRef) return `MSHQ:${mashreqRef[1]}`;
+  
+  // RAKBANK patterns
+  const rakRef = desc.match(/RAKBANK[:\s\-\/]*([A-Z0-9]{8,16})/i) ||
+                 desc.match(/\b(RAK[0-9]{10,14})\b/);
+  if (rakRef) return `RAK:${rakRef[1]}`;
+  
+  // Generic UAE patterns (FT = Fund Transfer, TXN = Transaction)
+  const uaeRef = desc.match(/\bFT([0-9]{10,16})\b/) ||
+                 desc.match(/\bTXN([0-9]{8,16})\b/) ||
+                 desc.match(/\bIPT([0-9]{8,14})\b/);   // Internal Payment Transfer
+  if (uaeRef) return `UAE:${uaeRef[0]}`;
+  
+  // Saudi Banks (NCB/SNB, Rajhi, Riyad, SABB, ANB)
+  const saudiRef = desc.match(/\b(NCB[0-9]{10,16})\b/) ||
+                   desc.match(/\b(SNB[0-9]{10,16})\b/) ||
+                   desc.match(/\b(RAJ[0-9]{10,16})\b/) ||
+                   desc.match(/\b(SABB[0-9]{8,14})\b/) ||
+                   desc.match(/\b(RIY[0-9]{10,16})\b/);
+  if (saudiRef) return `KSA:${saudiRef[1]}`;
+  
+  // Qatar Banks (QNB, CBQ, Doha Bank)
+  const qatarRef = desc.match(/\b(QNB[0-9]{10,16})\b/) ||
+                   desc.match(/\b(CBQ[0-9]{10,16})\b/) ||
+                   desc.match(/\b(DB[0-9]{12,16})\b/);
+  if (qatarRef) return `QAT:${qatarRef[1]}`;
+  
+  // Kuwait Banks (NBK, KFH, Burgan)
+  const kuwaitRef = desc.match(/\b(NBK[0-9]{10,16})\b/) ||
+                    desc.match(/\b(KFH[0-9]{10,16})\b/) ||
+                    desc.match(/\b(BRG[0-9]{10,16})\b/);
+  if (kuwaitRef) return `KWT:${kuwaitRef[1]}`;
+  
+  // Bahrain & Oman Banks
+  const gccRef = desc.match(/\b(BBK[0-9]{10,16})\b/) ||   // BBK Bahrain
+                 desc.match(/\b(BNM[0-9]{10,16})\b/) ||   // Bank Muscat
+                 desc.match(/\b(OAB[0-9]{10,16})\b/);     // Oman Arab Bank
+  if (gccRef) return `GCC:${gccRef[1]}`;
   
   // 2. India - UTR patterns (16-22 digit alphanumeric)
   const utrMatch = desc.match(/UTR[:\s\-\/]*([A-Z0-9]{12,22})/i) ||
@@ -251,8 +313,8 @@ function extractReferenceId(description: string, rowIndex: number, refNumber?: s
     return `REF:${numericMatch[1]}`;
   }
   
-  // Final fallback to row number
-  return `ROW-${rowIndex + 1}`;
+  // Return empty string instead of row number - cleaner exports
+  return '';
 }
 
 export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationResult {
@@ -263,7 +325,8 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   const currencySymbol = getCurrencySymbol(currency);
 
   // ============= SHEET 1: TRANSACTIONS =============
-  const headers = ['Sr No', 'Ref ID', 'Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Flags'];
+  // Removed Sr No column - cleaner export without row numbers
+  const headers = ['Ref ID', 'Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Flags'];
   
   // Calculate totals for Summary Box
   const totalCredits = config.analytics.totalCredits || 0;
@@ -277,19 +340,19 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
 
   // Build Bank Info + Summary Box rows (premium mode)
   const bankInfoRows: any[][] = isPremium && config.bankInfo ? [
-    ['🏦 BANK STATEMENT ANALYSIS', '', '', '', '', '', '', '', ''],
-    ['', '', '', '', '', '', '', '', ''],
-    ['Bank:', config.bankInfo.bankName || 'Unknown Bank', '', 'Account Holder:', config.bankInfo.accountHolder || 'N/A', '', '', '', ''],
-    ['Account No:', config.bankInfo.accountNumber || 'N/A', '', 'IBAN:', config.bankInfo.iban || 'N/A', '', '', '', ''],
-    ['Currency:', currency, '', 'Statement Period:', config.bankInfo.statementPeriod || 'N/A', '', '', '', ''],
-    ['', '', '', '', '', '', '', '', ''],
+    ['🏦 BANK STATEMENT ANALYSIS', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
+    ['Bank:', config.bankInfo.bankName || 'Unknown Bank', '', 'Account Holder:', config.bankInfo.accountHolder || 'N/A', '', '', ''],
+    ['Account No:', config.bankInfo.accountNumber || 'N/A', '', 'IBAN:', config.bankInfo.iban || 'N/A', '', '', ''],
+    ['Currency:', currency, '', 'Statement Period:', config.bankInfo.statementPeriod || 'N/A', '', '', ''],
+    ['', '', '', '', '', '', '', ''],
   ] : [];
 
   const summaryBox: any[][] = isPremium ? [
-    ['📊 FINANCIAL SUMMARY', '', '', '', '', '', '', '', ''],
-    ['', 'Total Credits:', formatCurrency(totalCredits, currency), '', 'Total Debits:', formatCurrency(Math.abs(totalDebits), currency), '', '', ''],
-    ['', 'Net Balance:', formatCurrency(netBalance, currency), '', 'Closing Balance:', formatCurrency(closingBalance, currency), '', '', ''],
-    ['', '', '', '', '', '', '', '', ''],
+    ['📊 FINANCIAL SUMMARY', '', '', '', '', '', '', ''],
+    ['', 'Total Credits:', formatCurrency(totalCredits, currency), '', 'Total Debits:', formatCurrency(Math.abs(totalDebits), currency), '', ''],
+    ['', 'Net Balance:', formatCurrency(netBalance, currency), '', 'Closing Balance:', formatCurrency(closingBalance, currency), '', ''],
+    ['', '', '', '', '', '', '', ''],
   ] : [];
 
   const headerSection = [...bankInfoRows, ...summaryBox];
@@ -305,8 +368,7 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
     const refId = extractReferenceId(t.description || '', i, (t as any).refNumber);
 
     return [
-      i + 1,
-      refId,
+      refId || '-', // Use dash if no ref ID found
       t.date || '',
       t.description || '',
       t.category || 'Other',
@@ -327,16 +389,16 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   const grandTotalExcelRow = rowCount > 0 ? dataEndRow + 1 : dataStartRow;
   const netBalanceExcelRow = grandTotalExcelRow + 1;
 
-  const lastBalance = rowCount > 0 ? Number(txRows[txRows.length - 1][7] || 0) : 0;
+  const lastBalance = rowCount > 0 ? Number(txRows[txRows.length - 1][6] || 0) : 0; // Balance is now col index 6
 
+  // Updated formulas: Debit=E, Credit=F, Balance=G (after removing Sr No)
   const grandTotalRow: any[] = [
-    '',
     '',
     '',
     'GRAND TOTAL',
     '',
+    rowCount > 0 ? { f: `SUM(E${dataStartRow}:E${dataEndRow})` } : 0,
     rowCount > 0 ? { f: `SUM(F${dataStartRow}:F${dataEndRow})` } : 0,
-    rowCount > 0 ? { f: `SUM(G${dataStartRow}:G${dataEndRow})` } : 0,
     lastBalance,
     '',
   ];
@@ -344,11 +406,10 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   const netBalanceRow: any[] = [
     '',
     '',
-    '',
     'NET BALANCE (Credits + Debits)',
     '',
     '',
-    { f: `G${grandTotalExcelRow}+F${grandTotalExcelRow}` },
+    { f: `F${grandTotalExcelRow}+E${grandTotalExcelRow}` },
     '',
     '',
   ];
@@ -390,8 +451,8 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   setRowStyle(ws, grandTotalRowIdx0, headers.length, totalStyle);
   setRowStyle(ws, netRowIdx0, headers.length, netStyle);
 
-  // Number typing + formats for Debit/Credit/Balance (F/G/H = cols 5/6/7)
-  const numCols = [5, 6, 7];
+  // Number typing + formats for Debit/Credit/Balance (E/F/G = cols 4/5/6 after removing Sr No)
+  const numCols = [4, 5, 6];
   for (let r = headerRowIndex + 1; r <= headerRowIndex + rowCount + 2; r++) {
     for (const c of numCols) {
       const ref = XLSX.utils.encode_cell({ r, c });
@@ -400,9 +461,9 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
 
       if (typeof cell.v === 'number' || (cell as any).f) {
         cell.t = 'n';
-        if (c === 5) cell.z = '[Red]-#,##0.00;[Red]-#,##0.00;"-"';
-        else if (c === 6) cell.z = '[Green]#,##0.00;[Red]-#,##0.00;"-"';
-        else cell.z = '#,##0.00';
+        if (c === 4) cell.z = '[Red]-#,##0.00;[Red]-#,##0.00;"-"';      // Debit
+        else if (c === 5) cell.z = '[Green]#,##0.00;[Red]-#,##0.00;"-"'; // Credit
+        else cell.z = '#,##0.00';                                        // Balance
       }
     }
   }
