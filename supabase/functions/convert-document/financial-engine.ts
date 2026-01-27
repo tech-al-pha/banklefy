@@ -15,6 +15,7 @@ export interface Transaction {
   riskFlag?: string | null;
   amount?: number;
   type?: string;
+  refNumber?: string; // Reference number extracted from OCR
 }
 
 export interface BalanceMismatch {

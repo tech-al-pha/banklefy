@@ -7,7 +7,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { 
   classifyDocument, 
   callGroqVisionOCR,
-  type RawTransaction 
+  type RawTransaction,
+  type BankMetadata,
 } from './ocr-processor.ts';
 import { 
   CATEGORY_LIST,
@@ -435,6 +436,9 @@ Deno.serve(async (req) => {
     const isPdf = lowerFileName.endsWith('.pdf');
     const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
 
+    // Track bank metadata across pages
+    let collectedBankMetadata: BankMetadata | undefined;
+
     if (isPdf && hasPdfPageImages) {
       // Build a minimal status object consistent with ai-orchestrator
       const status: AIProcessingStatus = {
@@ -459,6 +463,11 @@ Deno.serve(async (req) => {
         if (res.success && res.transactions && res.transactions.length > 0) {
           collected.push(...res.transactions);
           if (res.text) combinedText += (combinedText ? '\n' : '') + res.text;
+          // Capture bank metadata from first page that has it
+          if (!collectedBankMetadata && res.bankMetadata) {
+            collectedBankMetadata = res.bankMetadata;
+            console.log('Bank metadata detected:', collectedBankMetadata);
+          }
         } else {
           errors.push(res.error || 'No data extracted');
         }
@@ -474,6 +483,7 @@ Deno.serve(async (req) => {
         transactions: collected,
         status,
         extractedText: combinedText,
+        bankMetadata: collectedBankMetadata,
       };
     } else {
       // Convert bytes to base64 for OCR
@@ -680,6 +690,7 @@ Deno.serve(async (req) => {
       fraudAlerts,
       liquidity: liquidityMetrics,
       reconciliation,
+      bankInfo: collectedBankMetadata, // NEW: Pass bank metadata
     });
     const excelBuffer = excelResult.buffer;
     

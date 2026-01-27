@@ -16,6 +16,17 @@ export interface ExcelGenerationResult {
   sheets: string[];
 }
 
+export interface BankInfo {
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  currency: string;
+  iban?: string;
+  statementPeriod?: string;
+  openingBalance?: number;
+  closingBalance?: number;
+}
+
 export interface ExcelConfig {
   transactions: Transaction[];
   analytics: {
@@ -30,7 +41,8 @@ export interface ExcelConfig {
   liquidity?: LiquidityAnalysis;
   reconciliation?: ReconciliationResult;
   fileName?: string;
-  premiumExport?: boolean; // Toggle for premium vs simple export
+  premiumExport?: boolean;
+  bankInfo?: BankInfo; // NEW: Bank metadata
 }
 
 const THEME = {
@@ -85,13 +97,29 @@ const summaryCardStyle = {
   },
 } as const;
 
-function formatCurrency(amount: number | string): string {
+// Currency symbols map
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£', 'AED': 'د.إ',
+  'SAR': '﷼', 'SGD': 'S$', 'AUD': 'A$', 'CAD': 'C$', 'JPY': '¥',
+  'CNY': '¥', 'CHF': 'CHF', 'HKD': 'HK$', 'NZD': 'NZ$', 'MYR': 'RM',
+  'THB': '฿', 'PHP': '₱', 'KRW': '₩', 'ZAR': 'R', 'BRL': 'R$',
+  'MXN': '$', 'QAR': '﷼', 'KWD': 'د.ك', 'BHD': '.د.ب', 'OMR': '﷼',
+};
+
+function getCurrencySymbol(currency?: string): string {
+  if (!currency) return '';
+  return CURRENCY_SYMBOLS[currency.toUpperCase()] || currency + ' ';
+}
+
+function formatCurrency(amount: number | string, currency?: string): string {
   if (typeof amount === 'string') return amount;
-  return new Intl.NumberFormat('en-IN', {
+  const symbol = getCurrencySymbol(currency);
+  const formatted = new Intl.NumberFormat('en-US', {
     style: 'decimal',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+  return symbol ? `${symbol}${formatted}` : formatted;
 }
 
 function setCellStyle(ws: any, addr: string, style: any) {
@@ -125,70 +153,99 @@ function autoFitCols(allData: any[][], headers: string[]) {
   });
 }
 
-// Extract Reference ID from description (UTR, Cheque No, Ref No, etc.)
-// Enhanced to detect common Indian bank statement patterns
-function extractReferenceId(description: string, rowIndex: number): string {
+// Extract Reference ID from description or use provided refNumber
+// Enhanced to support global bank patterns
+function extractReferenceId(description: string, rowIndex: number, refNumber?: string): string {
+  // If OCR extracted a refNumber, use it directly
+  if (refNumber && refNumber.trim()) {
+    return refNumber.trim().substring(0, 20);
+  }
+  
   if (!description) return `ROW-${rowIndex + 1}`;
   
   const desc = description.toUpperCase();
   
-  // 1. UTR patterns (16-22 digit alphanumeric, most common)
+  // ========= GLOBAL BANK PATTERNS =========
+  
+  // 1. UAE Banks (Wio, Emirates NBD, ADCB, FAB, Mashreq)
+  const uaeRef = desc.match(/\bP([0-9]{6,12})\b/) || // Wio format: P049462226
+                 desc.match(/\bTXN([0-9]{8,16})\b/) || // Transaction ID
+                 desc.match(/\bFT([0-9]{10,16})\b/);   // Fund Transfer
+  if (uaeRef) return `REF:${uaeRef[0]}`;
+  
+  // 2. India - UTR patterns (16-22 digit alphanumeric)
   const utrMatch = desc.match(/UTR[:\s\-\/]*([A-Z0-9]{12,22})/i) ||
-                   desc.match(/\b([A-Z]{4}[0-9]{10,16})\b/); // Standard UTR format: BANK + numbers
+                   desc.match(/\b([A-Z]{4}[0-9]{10,16})\b/);
   if (utrMatch) return `UTR:${utrMatch[1].substring(0, 16)}`;
   
-  // 2. NEFT patterns (NEFTXXXXXXXXXXXXXX or N followed by digits)
+  // 3. NEFT/RTGS patterns (India, UAE, etc.)
   const neftMatch = desc.match(/NEFT[:\s\-\/]*([A-Z0-9]{8,20})/i) ||
+                    desc.match(/RTGS[:\s\-\/]*([A-Z0-9]{8,20})/i) ||
                     desc.match(/\bN([0-9]{10,16})\b/);
   if (neftMatch) return `NEFT:${neftMatch[1].substring(0, 14)}`;
   
-  // 3. IMPS patterns (typically 12-digit)
-  const impsMatch = desc.match(/IMPS[:\s\-\/]*([A-Z0-9]{8,16})/i) ||
-                    desc.match(/\b([0-9]{12})\b/); // 12-digit transaction ID
-  if (impsMatch && desc.includes('IMPS')) return `IMPS:${impsMatch[1].substring(0, 12)}`;
+  // 4. IMPS patterns (typically 12-digit)
+  const impsMatch = desc.match(/IMPS[:\s\-\/]*([A-Z0-9]{8,16})/i);
+  if (impsMatch) return `IMPS:${impsMatch[1].substring(0, 12)}`;
   
-  // 4. UPI patterns (upi@bank or UPI/XXXXXX)
+  // 5. UPI patterns (upi@bank or UPI/XXXXXX)
   const upiMatch = desc.match(/UPI[:\s\-\/]*([A-Z0-9@.]{6,30})/i) ||
-                   desc.match(/([A-Z0-9.]+@[A-Z]+)/i); // UPI ID format
+                   desc.match(/([A-Z0-9.]+@[A-Z]+)/i);
   if (upiMatch) return `UPI:${upiMatch[1].substring(0, 20)}`;
   
-  // 5. Cheque number patterns (usually 6 digits)
+  // 6. Cheque/Check patterns (global)
   const chequeMatch = desc.match(/CHQ[:\s#\-]*([0-9]{5,8})/i) || 
                       desc.match(/CHEQUE[:\s#\-]*([0-9]{5,8})/i) ||
+                      desc.match(/CHECK[:\s#\-]*([0-9]{5,8})/i) ||
                       desc.match(/CQ[:\s#\-]*([0-9]{5,8})/i) ||
                       desc.match(/CLG[:\s#\-]*([0-9]{5,8})/i);
   if (chequeMatch) return `CHQ:${chequeMatch[1]}`;
   
-  // 6. RTGS patterns
-  const rtgsMatch = desc.match(/RTGS[:\s\-\/]*([A-Z0-9]{8,20})/i);
-  if (rtgsMatch) return `RTGS:${rtgsMatch[1].substring(0, 14)}`;
+  // 7. US/UK/EU Banks - ACH, BACS, SEPA
+  const achMatch = desc.match(/ACH[:\s\-\/]*([A-Z0-9]{6,16})/i);
+  if (achMatch) return `ACH:${achMatch[1].substring(0, 12)}`;
   
-  // 7. Reference/Transaction number patterns
+  const bacsMatch = desc.match(/BACS[:\s\-\/]*([A-Z0-9]{6,16})/i);
+  if (bacsMatch) return `BACS:${bacsMatch[1].substring(0, 12)}`;
+  
+  const sepaMatch = desc.match(/SEPA[:\s\-\/]*([A-Z0-9]{6,20})/i);
+  if (sepaMatch) return `SEPA:${sepaMatch[1].substring(0, 14)}`;
+  
+  // 8. Wire Transfer patterns
+  const wireMatch = desc.match(/WIRE[:\s\-\/]*([A-Z0-9]{6,16})/i) ||
+                    desc.match(/SWIFT[:\s\-\/]*([A-Z0-9]{6,16})/i);
+  if (wireMatch) return `WIRE:${wireMatch[1].substring(0, 12)}`;
+  
+  // 9. Reference/Transaction number patterns
   const refMatch = desc.match(/REF[:\s#\-]*([A-Z0-9]{6,20})/i) ||
                    desc.match(/REFNO[:\s#\-]*([A-Z0-9]{6,20})/i) ||
                    desc.match(/TXN[:\s#\-]*([A-Z0-9]{6,20})/i) ||
-                   desc.match(/TRANS[:\s#\-]*([A-Z0-9]{6,20})/i);
+                   desc.match(/TRANS[:\s#\-]*([A-Z0-9]{6,20})/i) ||
+                   desc.match(/ID[:\s#\-]*([A-Z0-9]{8,20})/i);
   if (refMatch) return `REF:${refMatch[1].substring(0, 14)}`;
   
-  // 8. ATM/Card transaction patterns
+  // 10. ATM/Card transaction patterns
   const atmMatch = desc.match(/ATM[:\s\-\/]*([A-Z0-9]{6,16})/i) ||
-                   desc.match(/CARD[:\s\-\/]*([A-Z0-9]{6,16})/i);
+                   desc.match(/CARD[:\s\-\/]*([A-Z0-9]{6,16})/i) ||
+                   desc.match(/POS[:\s\-\/]*([A-Z0-9]{6,16})/i);
   if (atmMatch) return `ATM:${atmMatch[1].substring(0, 12)}`;
   
-  // 9. Generic long alphanumeric sequence (likely a transaction ID)
-  // Look for sequences of 10+ alphanumeric chars that look like IDs
-  const genericIdMatch = desc.match(/\b([A-Z]{2,4}[0-9]{8,16})\b/) || // BANK + numbers
-                         desc.match(/\b([0-9]{2,4}[A-Z]{2,4}[0-9]{6,12})\b/) || // mixed format
-                         desc.match(/\b([A-Z0-9]{14,22})\b/); // long alphanumeric
+  // 11. Generic alphanumeric patterns (P123456, N789012 format)
+  const genericPrefix = desc.match(/\b([A-Z][0-9]{6,12})\b/);
+  if (genericPrefix) return genericPrefix[1];
+  
+  // 12. Long alphanumeric sequence (likely a transaction ID)
+  const genericIdMatch = desc.match(/\b([A-Z]{2,4}[0-9]{8,16})\b/) ||
+                         desc.match(/\b([0-9]{2,4}[A-Z]{2,4}[0-9]{6,12})\b/) ||
+                         desc.match(/\b([A-Z0-9]{14,22})\b/);
   if (genericIdMatch) {
     const id = genericIdMatch[1];
-    // Exclude common words that might match
-    if (!['TRANSACTION', 'DESCRIPTION', 'BALANCE', 'TRANSFER'].includes(id)) {
+    if (!['TRANSACTION', 'DESCRIPTION', 'BALANCE', 'TRANSFER', 'STATEMENT'].includes(id)) {
       return `ID:${id.substring(0, 14)}`;
     }
   }
   
-  // 10. Fallback: Extract any number sequence of 8+ digits (could be a reference)
+  // 13. Fallback: Extract any number sequence of 8+ digits
   const numericMatch = desc.match(/\b([0-9]{8,16})\b/);
   if (numericMatch) {
     return `REF:${numericMatch[1]}`;
@@ -202,6 +259,8 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   const workbook = XLSX.utils.book_new();
   const sheets: string[] = [];
   const isPremium = config.premiumExport !== false; // Default to premium
+  const currency = config.bankInfo?.currency || 'USD';
+  const currencySymbol = getCurrencySymbol(currency);
 
   // ============= SHEET 1: TRANSACTIONS =============
   const headers = ['Sr No', 'Ref ID', 'Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Flags'];
@@ -216,15 +275,25 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
         : parseFloat(String(config.transactions[config.transactions.length - 1].balance)) || 0)
     : 0;
 
-  // Build Summary Box rows (rows 1-6 in premium mode)
-  const summaryBox: any[][] = isPremium ? [
-    ['📊 FINANCIAL SUMMARY', '', '', '', '', '', '', '', ''],
-    ['', 'Total Credits:', formatCurrency(totalCredits), '', 'Total Debits:', formatCurrency(Math.abs(totalDebits)), '', '', ''],
-    ['', 'Net Balance:', formatCurrency(netBalance), '', 'Closing Balance:', formatCurrency(closingBalance), '', '', ''],
+  // Build Bank Info + Summary Box rows (premium mode)
+  const bankInfoRows: any[][] = isPremium && config.bankInfo ? [
+    ['🏦 BANK STATEMENT ANALYSIS', '', '', '', '', '', '', '', ''],
+    ['', '', '', '', '', '', '', '', ''],
+    ['Bank:', config.bankInfo.bankName || 'Unknown Bank', '', 'Account Holder:', config.bankInfo.accountHolder || 'N/A', '', '', '', ''],
+    ['Account No:', config.bankInfo.accountNumber || 'N/A', '', 'IBAN:', config.bankInfo.iban || 'N/A', '', '', '', ''],
+    ['Currency:', currency, '', 'Statement Period:', config.bankInfo.statementPeriod || 'N/A', '', '', '', ''],
     ['', '', '', '', '', '', '', '', ''],
   ] : [];
 
-  const summaryRowCount = summaryBox.length;
+  const summaryBox: any[][] = isPremium ? [
+    ['📊 FINANCIAL SUMMARY', '', '', '', '', '', '', '', ''],
+    ['', 'Total Credits:', formatCurrency(totalCredits, currency), '', 'Total Debits:', formatCurrency(Math.abs(totalDebits), currency), '', '', ''],
+    ['', 'Net Balance:', formatCurrency(netBalance, currency), '', 'Closing Balance:', formatCurrency(closingBalance, currency), '', '', ''],
+    ['', '', '', '', '', '', '', '', ''],
+  ] : [];
+
+  const headerSection = [...bankInfoRows, ...summaryBox];
+  const summaryRowCount = headerSection.length;
   const headerRowIndex = summaryRowCount; // 0-indexed row for headers
   const dataStartRow = headerRowIndex + 2; // 1-indexed Excel row (after summary + header)
 
@@ -232,7 +301,8 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
     const debitVal = typeof t.debit === 'number' ? t.debit : (parseFloat(String(t.debit)) || 0);
     const creditVal = typeof t.credit === 'number' ? t.credit : (parseFloat(String(t.credit)) || 0);
     const balanceVal = typeof t.balance === 'number' ? t.balance : (parseFloat(String(t.balance)) || 0);
-    const refId = extractReferenceId(t.description || '', i);
+    // Pass the refNumber from transaction if available (from OCR)
+    const refId = extractReferenceId(t.description || '', i, (t as any).refNumber);
 
     return [
       i + 1,
@@ -283,7 +353,7 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
     '',
   ];
 
-  const allData: any[][] = [...summaryBox, headers, ...txRows, grandTotalRow, netBalanceRow];
+  const allData: any[][] = [...headerSection, headers, ...txRows, grandTotalRow, netBalanceRow];
   const ws = XLSX.utils.aoa_to_sheet(allData);
 
   // Row heights

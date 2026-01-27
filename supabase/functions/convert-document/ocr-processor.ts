@@ -1,10 +1,22 @@
 // ============= GROQ VISION OCR PROCESSOR =============
 // Using Groq's Llama Vision model for OCR
 
+export interface BankMetadata {
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  currency: string;
+  iban?: string;
+  statementPeriod?: string;
+  openingBalance?: number;
+  closingBalance?: number;
+}
+
 export interface OCRResult {
   success: boolean;
   text?: string;
   transactions?: RawTransaction[];
+  bankMetadata?: BankMetadata;
   error?: string;
 }
 
@@ -17,44 +29,63 @@ export interface RawTransaction {
   balance?: number;
   amount?: number;
   type?: string;
+  refNumber?: string;
 }
 
-const OCR_PROMPT = `You are an expert OCR and bank statement data extraction specialist.
+const OCR_PROMPT = `You are an expert OCR and bank statement data extraction specialist for GLOBAL banks.
 
-CRITICAL: Extract ALL transactions with their EXACT NUMERICAL amounts from the document.
+CRITICAL: Extract ALL data including bank details and transactions.
 
-OUTPUT FORMAT - Return JSON array with these exact fields:
-[
-  {
-    "date": "YYYY-MM-DD",
-    "description": "transaction narration/description", 
-    "debit": 1234.56,
-    "credit": 0,
-    "balance": 5678.90
-  }
-]
+OUTPUT FORMAT - Return a JSON object with TWO parts:
 
-AMOUNT EXTRACTION RULES:
-1. DEBIT = money going OUT (withdrawals, payments, fees) - MUST be a positive number
-2. CREDIT = money coming IN (deposits, salary, transfers received) - MUST be a positive number  
-3. BALANCE = running balance after transaction - MUST be the exact number shown
-4. If amount column is empty or "-", use 0
-5. Remove commas from numbers: "1,234.56" becomes 1234.56
-6. Handle Indian format: "1,23,456" becomes 123456
-7. Handle negative signs: "-500" for debit means debit: 500
+{
+  "bankMetadata": {
+    "bankName": "Bank name (e.g., HDFC Bank, Wio Bank, Chase, HSBC, Barclays)",
+    "accountNumber": "Account number found in statement",
+    "accountHolder": "Account holder name",
+    "currency": "3-letter code: USD, AED, INR, EUR, GBP, SGD, etc.",
+    "iban": "IBAN if present",
+    "statementPeriod": "e.g., 01/01/2025 - 31/01/2025",
+    "openingBalance": 1000.00,
+    "closingBalance": 5000.00
+  },
+  "transactions": [
+    {
+      "date": "YYYY-MM-DD",
+      "refNumber": "Reference/Transaction ID from the document (P123456, UTR123, TXN789, etc.)",
+      "description": "transaction narration/description", 
+      "debit": 1234.56,
+      "credit": 0,
+      "balance": 5678.90
+    }
+  ]
+}
 
-DATE FORMAT:
-- Convert any date format to YYYY-MM-DD
-- DD/MM/YYYY, DD-MM-YYYY, DD Mon YYYY → YYYY-MM-DD
+BANK DETECTION - Look for these patterns:
+- UAE: Wio Bank, Emirates NBD, ADCB, FAB, Mashreq, RAKBank
+- India: HDFC, ICICI, SBI, Axis, Kotak, IndusInd, Yes Bank
+- USA: Chase, Bank of America, Wells Fargo, Citi, Capital One
+- UK: Barclays, HSBC, Lloyds, NatWest, Santander, Monzo
+- Singapore: DBS, OCBC, UOB, Standard Chartered
+- Europe: Deutsche Bank, BNP Paribas, ING, Revolut, N26
 
-LOOK FOR TABLE COLUMNS:
-- Date/Value Date/Transaction Date
-- Particulars/Narration/Description/Details
-- Withdrawal/Debit/Dr/Out
-- Deposit/Credit/Cr/In  
-- Balance/Running Balance/Closing Balance
+CURRENCY DETECTION - Look at:
+- Currency symbol: ₹ = INR, $ = USD, € = EUR, £ = GBP, د.إ = AED
+- Column headers: "Amount (AED)", "Balance (INR)", "USD"
+- Text mentions: "AED", "USD", "Rupees", "Dollars", "Euros"
 
-Return ONLY valid JSON array. No markdown, no explanation, no code blocks.`;
+REFERENCE NUMBER - Extract from:
+- "Ref. Number", "Reference", "Txn ID", "UTR", "NEFT Ref", "IMPS Ref"
+- Transaction codes like P123456, N789012, IMPS/456/...
+
+AMOUNT RULES:
+1. DEBIT = money OUT - positive number
+2. CREDIT = money IN - positive number  
+3. BALANCE = running balance after transaction
+4. Remove currency symbols and commas
+5. Handle formats: "1,234.56", "1,23,456", "-500"
+
+Return ONLY valid JSON. No markdown, no code blocks.`;
 
 export async function callGroqVisionOCR(
   imageBase64: string, 
@@ -84,7 +115,7 @@ export async function callGroqVisionOCR(
           {
             role: 'user',
             content: [
-              { type: 'text', text: OCR_PROMPT + '\n\nExtract ALL transactions from this bank statement. Return only JSON array.' },
+              { type: 'text', text: OCR_PROMPT + '\n\nExtract bank metadata and ALL transactions from this bank statement. Return only JSON object.' },
               { 
                 type: 'image_url', 
                 image_url: { url: dataUrl } 
@@ -110,12 +141,38 @@ export async function callGroqVisionOCR(
       return { success: false, error: 'No content in Groq response' };
     }
     
-    // Parse JSON from response
+    // Try to parse as new format (object with bankMetadata and transactions)
+    const objectMatch = textContent.match(/\{[\s\S]*\}/);
+    if (objectMatch) {
+      try {
+        const parsed = JSON.parse(objectMatch[0]);
+        
+        // Check if it's the new format with bankMetadata
+        if (parsed.bankMetadata && parsed.transactions) {
+          console.log(`Groq Vision OCR extracted ${parsed.transactions.length} transactions with bank metadata`);
+          return { 
+            success: true, 
+            transactions: parsed.transactions, 
+            bankMetadata: parsed.bankMetadata,
+            text: textContent 
+          };
+        }
+        
+        // If it's just an object but has date/description, it might be a single transaction
+        if (parsed.date && parsed.description) {
+          return { success: true, transactions: [parsed], text: textContent };
+        }
+      } catch (parseError) {
+        console.log('Object parse failed, trying array format...');
+      }
+    }
+    
+    // Fallback: Try to parse as array (old format)
     const jsonMatch = textContent.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       try {
         const transactions = JSON.parse(jsonMatch[0]);
-        console.log(`Groq Vision OCR extracted ${transactions.length} transactions`);
+        console.log(`Groq Vision OCR extracted ${transactions.length} transactions (legacy format)`);
         return { success: true, transactions, text: textContent };
       } catch (parseError) {
         console.error('Failed to parse Groq JSON:', parseError);
