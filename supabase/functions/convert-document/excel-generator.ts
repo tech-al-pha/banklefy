@@ -1,8 +1,8 @@
 // ============= PROFESSIONAL EXCEL GENERATOR =============
 // Premium formatting + formulas + auto-fit columns + Audit sheet + Reference IDs.
-// Uses xlsx-js-style (SheetJS fork) for header/totals styling in Deno runtime.
+// Uses xlsx package via npm: specifier for Deno edge runtime compatibility.
 
-import * as XLSX from 'https://esm.sh/xlsx-js-style@1.2.0?bundle&target=deno';
+import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
 import type {
   Transaction,
   FraudAlert,
