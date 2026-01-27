@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, Users, FileText, TrendingUp, Calendar, Shield } from 'lucide-react';
+import { Loader2, ArrowLeft, Users, FileText, TrendingUp, Calendar, Shield, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import akromedaLogo from '@/assets/akromeda-logo.png';
+import { getEdgeFunctionUrl } from '@/lib/supabaseApi';
 
 interface UserProfile {
   id: string;
@@ -20,7 +21,7 @@ interface UserProfile {
     tier: string;
     conversions_used: number;
     conversions_limit: number;
-  };
+  } | null;
   role?: string;
 }
 
@@ -37,6 +38,11 @@ interface DailyStats {
   count: number;
 }
 
+interface AnonymousSummary {
+  totalIPs: number;
+  totalConversions: number;
+}
+
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -44,6 +50,7 @@ export default function Admin() {
   
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [stats, setStats] = useState<ConversionStats>({
     total: 0,
@@ -53,6 +60,10 @@ export default function Admin() {
     todayCount: 0,
   });
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
+  const [anonymousSummary, setAnonymousSummary] = useState<AnonymousSummary>({
+    totalIPs: 0,
+    totalConversions: 0,
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -100,88 +111,64 @@ export default function Admin() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      // Admins need access to all data - use service-level queries via edge function
-      // For now, load only data visible through RLS (admin can see their own)
-      // In production, create an admin edge function for full access
+      // Get the current session token
+      const { data: { session } } = await supabase.auth.getSession();
       
-      // Load profiles - RLS will filter to what admin can see
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, created_at')
-        .order('created_at', { ascending: false });
-
-      if (profilesError) {
-        console.error('Profiles query error:', profilesError);
-        throw profilesError;
+      if (!session?.access_token) {
+        throw new Error('No valid session');
       }
 
-      // Load subscriptions - RLS will filter appropriately  
-      const { data: subscriptions, error: subsError } = await supabase
-        .from('subscriptions')
-        .select('user_id, tier, conversions_used, conversions_limit');
+      // Call the admin-dashboard edge function with service_role access
+      const response = await fetch(getEdgeFunctionUrl('admin-dashboard'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
 
-      if (subsError) {
-        console.error('Subscriptions query error:', subsError);
-        throw subsError;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
       }
 
-      // Load user roles - RLS will filter to what admin can see
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
+      const data = await response.json();
 
-      if (rolesError) {
-        console.error('Roles query error:', rolesError);
-        throw rolesError;
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load dashboard data');
       }
 
-      // Combine data - match by user_id
-      const enrichedUsers = profiles?.map(profile => ({
-        ...profile,
-        subscription: subscriptions?.find(s => s.user_id === profile.id),
-        role: roles?.find(r => r.user_id === profile.id)?.role || 'user',
-      })) || [];
-
-      setUsers(enrichedUsers);
-
-      // Load conversion stats
-      const { data: conversions, error: convError } = await supabase
-        .from('conversions')
-        .select('*');
-
-      if (convError) throw convError;
-
-      const today = new Date().toISOString().split('T')[0];
-      const conversionStats: ConversionStats = {
-        total: conversions?.length || 0,
-        completed: conversions?.filter(c => c.status === 'completed').length || 0,
-        processing: conversions?.filter(c => c.status === 'processing').length || 0,
-        failed: conversions?.filter(c => c.status === 'failed').length || 0,
-        todayCount: conversions?.filter(c => c.created_at.startsWith(today)).length || 0,
-      };
-      setStats(conversionStats);
-
-      // Calculate daily stats for last 7 days
-      const last7Days: DailyStats[] = [];
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        const count = conversions?.filter(c => c.created_at.startsWith(dateStr)).length || 0;
-        last7Days.push({ date: dateStr, count });
-      }
-      setDailyStats(last7Days);
+      setUsers(data.users || []);
+      setStats(data.stats || {
+        total: 0,
+        completed: 0,
+        processing: 0,
+        failed: 0,
+        todayCount: 0,
+      });
+      setDailyStats(data.dailyStats || []);
+      setAnonymousSummary(data.anonymousSummary || { totalIPs: 0, totalConversions: 0 });
 
     } catch (error: any) {
       console.error('Load data error:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to load dashboard data.',
+        description: error.message || 'Failed to load dashboard data.',
       });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadDashboardData();
+    setRefreshing(false);
+    toast({
+      title: 'Refreshed',
+      description: 'Dashboard data has been updated.',
+    });
   };
 
   if (authLoading || loading) {
@@ -219,17 +206,29 @@ export default function Admin() {
                 </span>
               </div>
             </div>
-            <Badge variant="outline" className="border-primary/50 text-primary">
-              <Shield className="h-3 w-3 mr-1" />
-              Admin
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Badge variant="outline" className="border-primary/50 text-primary">
+                <Shield className="h-3 w-3 mr-1" />
+                Admin
+              </Badge>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-6 py-8 space-y-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -288,6 +287,21 @@ export default function Admin() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Completion rate
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Anonymous Usage
+              </CardTitle>
+              <Users className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-foreground">{anonymousSummary.totalIPs}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {anonymousSummary.totalConversions} total conversions
               </p>
             </CardContent>
           </Card>
