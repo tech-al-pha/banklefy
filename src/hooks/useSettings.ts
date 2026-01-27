@@ -9,6 +9,7 @@ export interface UserSettings {
   pushNotifications: boolean;
   soundEnabled: boolean;
   autoDownload: boolean;
+  premiumExcelExport: boolean; // Toggle for Premium vs Simple Excel
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   pushNotifications: false,
   soundEnabled: true,
   autoDownload: false,
+  premiumExcelExport: true, // Default to premium
 };
 
 const STORAGE_KEY = 'akromeda_user_settings';

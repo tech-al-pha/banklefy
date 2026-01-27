@@ -361,6 +361,23 @@ const Settings = () => {
         />
       )
     },
+    {
+      id: "advanced-excel-format",
+      title: "Premium Excel Export",
+      description: "Enable premium formatting with Summary Box, Audit sheet, and Reference IDs",
+      category: "advanced",
+      icon: <FileText className="h-5 w-5" />,
+      component: (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Simple</span>
+          <Switch 
+            checked={settings.premiumExcelExport} 
+            onCheckedChange={(checked) => updateSetting('premiumExcelExport', checked)} 
+          />
+          <span className="text-xs text-muted-foreground">Premium</span>
+        </div>
+      )
+    },
   ], [user, conversionsUsed, conversionsLimit, remaining, isAuthenticated, settings, displayName, nameChanged, saving, t, toast, handleNameChange, handleSaveName, handlePasswordReset, handleExportData, handleDeleteAccount, updateSetting]);
 
   const categories = [
