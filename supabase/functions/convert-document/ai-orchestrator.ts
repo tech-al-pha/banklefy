@@ -2,7 +2,7 @@
 // Routes tasks to the best AI for each job, with error tracking
 // IMPORTANT: Gemini removed - Groq Vision only for OCR, rule-based for everything else
 
-import { callGroqVisionOCR, type RawTransaction } from './ocr-processor.ts';
+import { callGroqVisionOCR, type RawTransaction, type BankMetadata } from './ocr-processor.ts';
 import { callMistralCategorizer, type ProcessedTransaction } from './mistral-processor.ts';
 import { callGroqCategorizer, applyPatternCategorization, CATEGORY_LIST } from './categorizer.ts';
 
@@ -18,6 +18,7 @@ export interface ExtractionResult {
   transactions: RawTransaction[];
   status: AIProcessingStatus;
   extractedText?: string;
+  bankMetadata?: BankMetadata;
 }
 
 export interface CategorizationResult {
