@@ -5,7 +5,7 @@ import { UploadDemo } from "@/components/UploadDemo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Shield, Settings, PlayCircle, MessageCircle, Sparkles } from "lucide-react";
+import { LogOut, Shield, Settings, PlayCircle, MessageCircle, Sparkles, CircleDollarSign } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
@@ -47,9 +47,20 @@ const Index = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <Logo />
-            <div className="hidden md:flex items-center gap-6">
+          <Logo />
+          <div className="hidden md:flex items-center gap-6">
               
+              {/* Pricing Button */}
+              <Button 
+                variant="ghost"
+                size="sm" 
+                onClick={() => navigate('/pricing')}
+                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium"
+              >
+                <CircleDollarSign className="h-4 w-4 translate-y-[1px]" />
+                <span>Pricing</span>
+              </Button>
+
               {/* Features Button */}
               <Button 
                 variant="ghost"
@@ -59,20 +70,6 @@ const Index = () => {
               >
                 <Sparkles className="h-4 w-4" />
                 {t('nav.features')}
-              </Button>
-
-              {/* Demo Button */}
-              <Button 
-                variant="ghost"
-                size="sm" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium"
-              >
-                <PlayCircle className="h-4 w-4" />
-                {t('nav.demo')}
               </Button>
 
               {/* Chat Aura Button */}
