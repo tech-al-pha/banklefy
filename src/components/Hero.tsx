@@ -26,7 +26,7 @@ export const Hero = () => {
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white/95">
               AI Bank Statement
             </h1>
-            <h2 className="text-6xl md:text-[8rem] lg:text-[8rem] font-black uppercase tracking-tighter bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-200 bg-clip-text text-transparent leading-[0.99]">
+            <h2 className="text-7xl md:text-[8rem] lg:text-[8rem] font-black uppercase tracking-tighter bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-200 bg-clip-text text-transparent leading-[0.99]">
               Converter
             </h2>
           </div>

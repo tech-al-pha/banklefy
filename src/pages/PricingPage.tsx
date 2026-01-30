@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Check } from "lucide-react";
 import Logo from "@/components/Logo";
 
 type Plan = {
@@ -9,116 +10,96 @@ type Plan = {
   price: string;
   unit: string;
   description: string;
+  statements: string;
+  features: string[];
+  savings?: string;
   highlighted?: boolean;
 };
 
-const dailyPlans: Plan[] = [
-  {
-    name: "Daily Lite",
-    price: "₹99",
-    unit: "/day",
-    description: "Quick checks and one-off analyses",
-  },
-  {
-    name: "Daily Pro",
-    price: "₹199",
-    unit: "/day",
-    description: "For underwriters and CA firms",
-    highlighted: true,
-  },
-  {
-    name: "Daily Team",
-    price: "₹399",
-    unit: "/day",
-    description: "Short-term, high-volume reviews",
-  },
-];
-
-const weeklyPlans: Plan[] = [
-  {
-    name: "Weekly Lite",
-    price: "₹399",
-    unit: "/week",
-    description: "For small teams and pilots",
-  },
-  {
-    name: "Weekly Pro",
-    price: "₹799",
-    unit: "/week",
-    description: "For lending teams and NBFCs",
-    highlighted: true,
-  },
-  {
-    name: "Weekly Team",
-    price: "₹1,499",
-    unit: "/week",
-    description: "High‑volume weekly underwriting",
-  },
-];
-
 const monthlyPlans: Plan[] = [
   {
-    name: "Starter",
-    price: "₹1,499",
+    name: "Monthly Basic",
+    price: "$9",
     unit: "/month",
-    description: "Freelancers and independent CAs",
+    description: "Perfect for regular analysis",
+    statements: "300 Pages/month",
+    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
   },
   {
-    name: "Growth",
-    price: "₹3,499",
+    name: "Monthly Pro",
+    price: "$19",
     unit: "/month",
-    description: "Most popular for small teams",
+    description: "Most popular for professionals",
+    statements: "1000 Pages/month",
+    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
     highlighted: true,
   },
   {
-    name: "Scale",
-    price: "₹7,499",
+    name: "Monthly Enterprise",
+    price: "$39",
     unit: "/month",
-    description: "Banks, NBFCs and fin‑techs",
+    description: "For heavy users and teams",
+    statements: "4500 Pages/month",
+    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
   },
 ];
 
 const yearlyPlans: Plan[] = [
   {
-    name: "Starter Yearly",
-    price: "₹14,990",
+    name: "Yearly Lite",
+    price: "$99",
     unit: "/year",
-    description: "Save vs monthly Starter",
+    description: "Great for regular users",
+    statements: "5000 Pages/year",
+    savings: "Save 8% vs Monthly",
+    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
   },
   {
-    name: "Growth Yearly",
-    price: "₹34,990",
+    name: "Yearly Full",
+    price: "$199",
     unit: "/year",
-    description: "Best value for growing teams",
+    description: "Best value for professionals",
+    statements: "15,000 Pages/year",
+    savings: "Save 13% vs Monthly",
+    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
     highlighted: true,
   },
   {
-    name: "Scale Yearly",
-    price: "₹74,990",
+    name: "Yearly Pro",
+    price: "$399",
     unit: "/year",
-    description: "Predictable cost for enterprises",
+    description: "Maximum savings for power users",
+    statements: "65,000 Pages/year",
+    savings: "Save 15% vs Monthly",
+    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
   },
 ];
 
 const perPagePlans: Plan[] = [
   {
-    name: "Pay‑as‑you‑go",
-    price: "₹5",
-    unit: "/page",
-    description: "No commitment, perfect for trials",
+    name: "Lite",
+    price: "$1",
+    unit: "/conversion",
+    description: "Quick single conversion",
+    statements: "10 Pages",
+    features: ["Analyzed PDF Report", "Download in 4 Formats"],
   },
   {
-    name: "Volume",
-    price: "₹3",
-    unit: "/page",
-    description: "Prepay for better per‑page rates",
+    name: "Standard",
+    price: "$2",
+    unit: "/conversion",
+    description: "Popular for small batches",
+    statements: "25 Pages",
+    features: ["Analyzed PDF Report", "Download in 4 Formats"],
     highlighted: true,
   },
   {
-    name: "Bulk",
-    price: "Custom",
-    unit: "",
-    description: "Large‑volume, negotiated pricing",
+    name: "Power",
+    price: "$3",
+    unit: "/conversion",
+    description: "For larger batches",
+    statements: "50 Pages",
+    features: ["Analyzed PDF Report", "Download in 4 Formats"],
   },
 ];
 
@@ -153,6 +134,29 @@ const renderPlanCard = (plan: Plan) => (
           )}
         </div>
       </div>
+
+      {plan.statements && (
+        <div className="py-3 px-4 bg-primary/10 border border-primary/20 rounded-lg">
+          <p className="text-sm font-semibold text-primary">{plan.statements}</p>
+        </div>
+      )}
+
+      {plan.savings && (
+        <div className="py-2 px-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+          <p className="text-sm font-bold text-green-400">{plan.savings}</p>
+        </div>
+      )}
+
+      {plan.features && plan.features.length > 0 && (
+        <ul className="space-y-2">
+          {plan.features.map((feature, idx) => (
+            <li key={idx} className="flex items-start gap-2">
+              <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-muted-foreground">{feature}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Button
         className={`w-full h-12 text-base font-bold uppercase tracking-wider rounded-lg ${
@@ -196,30 +200,18 @@ const PricingPage = () => {
             </span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Choose how you want to use Akromeda: per‑day, per‑week, monthly, yearly or pure
-            pay‑per‑page. Upgrade anytime as your volume grows.
+            Choose your perfect plan. One-time conversions, monthly subscriptions, or yearly savings.
           </p>
         </section>
 
-        {/* Daily plans */}
+        {/* One-time plans */}
         <section className="mb-12 space-y-4">
-          <h2 className="text-xl md:text-2xl font-bold text-white">Daily plans</h2>
+          <h2 className="text-xl md:text-2xl font-bold text-white">One-time plans</h2>
           <p className="text-sm text-muted-foreground">
-            Perfect for short projects, pilots, or urgent underwriting bursts.
+            Quick conversion with no commitments.
           </p>
           <div className="grid md:grid-cols-3 gap-8">
-            {dailyPlans.map(renderPlanCard)}
-          </div>
-        </section>
-
-        {/* Weekly plans */}
-        <section className="mb-12 space-y-4">
-          <h2 className="text-xl md:text-2xl font-bold text-white">Weekly plans</h2>
-          <p className="text-sm text-muted-foreground">
-            For teams who want predictable access during busy weeks.
-          </p>
-          <div className="grid md:grid-cols-3 gap-8">
-            {weeklyPlans.map(renderPlanCard)}
+            {perPagePlans.map(renderPlanCard)}
           </div>
         </section>
 
@@ -227,7 +219,7 @@ const PricingPage = () => {
         <section className="mb-12 space-y-4">
           <h2 className="text-xl md:text-2xl font-bold text-white">Monthly plans</h2>
           <p className="text-sm text-muted-foreground">
-            Best for CAs, lenders, and teams using Akromeda every day.
+            Perfect for regular analysis with AI power.
           </p>
           <div className="grid md:grid-cols-3 gap-8">
             {monthlyPlans.map(renderPlanCard)}
@@ -238,21 +230,10 @@ const PricingPage = () => {
         <section className="mb-12 space-y-4">
           <h2 className="text-xl md:text-2xl font-bold text-white">Yearly plans</h2>
           <p className="text-sm text-muted-foreground">
-            Lock in savings for long‑term underwriting and credit operations.
+            Maximum savings for heavy users.
           </p>
           <div className="grid md:grid-cols-3 gap-8">
             {yearlyPlans.map(renderPlanCard)}
-          </div>
-        </section>
-
-        {/* Per page plans */}
-        <section className="mb-12 space-y-4">
-          <h2 className="text-xl md:text-2xl font-bold text-white">Per page</h2>
-          <p className="text-sm text-muted-foreground">
-            Ultimate flexibility – only pay for the pages you convert.
-          </p>
-          <div className="grid md:grid-cols-3 gap-8">
-            {perPagePlans.map(renderPlanCard)}
           </div>
         </section>
 
