@@ -907,9 +907,9 @@ export const UploadDemo = () => {
   };
 
   return (
-    <section className="relative py-24 px-6 overflow-hidden bg-[#0A0502]">
+    <section className="relative py-16 px-6 overflow-hidden bg-[#0A0502]">
       <div className="container mx-auto relative z-10">
-        <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+        <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold">
             See It In
             <span className="bg-gradient-primary bg-clip-text text-transparent"> Action</span>
@@ -1379,7 +1379,7 @@ export const UploadDemo = () => {
 
               {/* Process Steps */}
               <div className="grid md:grid-cols-3 gap-6">
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/20">
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-[#0A0502]/40 backdrop-blur-lg border border-primary/20">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <FileText className="w-4 h-4 text-primary" />
                   </div>
@@ -1391,7 +1391,7 @@ export const UploadDemo = () => {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/20">
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-[#0A0502]/40 backdrop-blur-lg border border-secondary/20">
                   <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
                     <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
                   </div>
@@ -1403,7 +1403,7 @@ export const UploadDemo = () => {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/20">
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-[#0A0502]/40 backdrop-blur-lg border border-green-500/20">
                   <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
                     <CheckCircle className="w-4 h-4 text-green-500" />
                   </div>

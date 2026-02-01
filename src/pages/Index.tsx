@@ -1,6 +1,5 @@
 import { Hero } from "@/components/Hero";
 import { HowItWorks } from "@/components/HowItWorks";
-import { Pricing } from "@/components/Pricing";
 import { UploadDemo } from "@/components/UploadDemo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,7 +43,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[#0A0502] text-foreground">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/80 backdrop-blur-xl border-b border-primary/20">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/60 backdrop-blur-lg border-b border-primary/20">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
           <Logo />
@@ -59,6 +58,17 @@ const Index = () => {
               >
                 <CircleDollarSign className="h-4 w-4 translate-y-[1px]" />
                 <span>Pricing</span>
+              </Button>
+
+              {/* Benefits Button */}
+              <Button 
+                variant="ghost"
+                size="sm" 
+                onClick={() => navigate('/benefits')}
+                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>Benefits</span>
               </Button>
 
               {/* Features Button */}
@@ -141,16 +151,12 @@ const Index = () => {
       <Hero />
       <HowItWorks />
 
-      <div id="pricing">
-        <Pricing />
-      </div>
-
       <div id="demo">
         <UploadDemo />
       </div>
 
       {/* Footer CTA */}
-      <section className="relative py-24 px-6 overflow-hidden bg-[#0A0502]">
+      <section className="relative py-12 px-6 overflow-hidden bg-[#0A0502]">
         <div className="container mx-auto text-center relative z-10 space-y-6">
           <h2 className="text-4xl md:text-5xl font-bold italic">
             {t('footer.cta.title')}

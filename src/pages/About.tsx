@@ -42,7 +42,7 @@ const AboutPage = () => {
             <div className="p-8 bg-gradient-to-r from-primary/10 to-transparent border-l-4 border-primary rounded-r-[2rem] space-y-4">
               <p className="text-white font-medium text-xl not-italic">
                 {t('aboutPage.brainchildPrefix')}{" "}
-                <span className="text-primary underline decoration-2 underline-offset-4">Sayyed Faizan Rizvi</span>
+                <span className="text-primary underline decoration-2 underline-offset-4">Mr. Faizan Rizvi</span>
               </p>
               <p className="text-muted-foreground">
                 {t('aboutPage.brainchildP1')}
