@@ -143,22 +143,25 @@ export const UploadDemo = () => {
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
   const [lastError, setLastError] = useState<{ message: string; canRetry: boolean } | null>(null);
+  const [editedPdfWarning, setEditedPdfWarning] = useState<{ fileName: string; reason: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const dismissedEditedWarningsRef = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { 
-    remaining, 
-    conversionsLimit, 
-    limitReached, 
-    isAuthenticated, 
-    loading: usageLimitLoading,
-    refresh: refreshUsageLimit,
-    getTimezone
-  } = useUsageLimit();
+    const { 
+      remaining, 
+      conversionsLimit, 
+      limitReached, 
+      isAuthenticated, 
+      loading: usageLimitLoading,
+      refresh: refreshUsageLimit,
+      getTimezone,
+      planType
+    } = useUsageLimit();
   
   // reCAPTCHA v3 for anonymous users - runs invisibly in background
-  const { isLoaded: recaptchaLoaded, executeRecaptcha } = useRecaptcha();
+  const { executeRecaptcha } = useRecaptcha();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -188,6 +191,7 @@ export const UploadDemo = () => {
       setPdfPassword('');
       setShowPasswordInput(false);
       setShowPassword(false);
+      setEditedPdfWarning(null);
       
       toast({
         title: "Files Selected",
@@ -220,6 +224,23 @@ export const UploadDemo = () => {
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = error => reject(error);
     });
+  };
+
+  const detectEditedPdf = async (file: File): Promise<{ suspected: boolean; reason: string }> => {
+    const buffer = await file.arrayBuffer();
+    const text = new TextDecoder('latin1').decode(new Uint8Array(buffer));
+    const eofMatches = text.match(/%%EOF/g) || [];
+    const hasPrev = /\/Prev\s+\d+/i.test(text);
+    const hasIncremental = eofMatches.length > 1 || hasPrev;
+
+    const reasons: string[] = [];
+    if (eofMatches.length > 1) reasons.push('Multiple EOF markers (incremental updates)');
+    if (hasPrev) reasons.push('Incremental update reference found');
+
+    return {
+      suspected: hasIncremental,
+      reason: reasons.join(', ') || 'Heuristic indicator found',
+    };
   };
 
   const pdfToPageImages = async (file: File, password?: string): Promise<string[]> => {
@@ -262,11 +283,13 @@ export const UploadDemo = () => {
     return images;
   };
 
-  const handleConvert = async () => {
+  const handleConvert = async (fileOverride?: File) => {
     // Clear previous errors
     setLastError(null);
     
-    if (!selectedFile) {
+    const fileToConvert = fileOverride ?? selectedFile;
+
+    if (!fileToConvert) {
       toast({
         title: "No File Selected",
         description: "Please select a bank statement to convert",
@@ -292,13 +315,25 @@ export const UploadDemo = () => {
     // IMPORTANT: Authenticated users SKIP reCAPTCHA completely
     // For anonymous users, reCAPTCHA v3 runs in background - token generated at conversion time
 
+    const isPdf = fileToConvert.name.toLowerCase().endsWith('.pdf');
+    if (isPdf && !dismissedEditedWarningsRef.current.has(fileToConvert.name)) {
+      try {
+        const detection = await detectEditedPdf(fileToConvert);
+        if (detection.suspected) {
+          setEditedPdfWarning({ fileName: fileToConvert.name, reason: detection.reason });
+          return;
+        }
+      } catch {
+        // If detection fails, allow conversion to proceed
+      }
+    }
+
     setUploading(true);
 
     try {
       const timezone = getTimezone();
-      const isPdf = selectedFile.name.toLowerCase().endsWith('.pdf');
       let requestBody: any = {
-        fileName: selectedFile.name,
+        fileName: fileToConvert.name,
         timezone,
       };
 
@@ -307,18 +342,19 @@ export const UploadDemo = () => {
         requestBody.pdfPassword = pdfPassword.trim();
       }
 
-      // For anonymous users, execute reCAPTCHA v3 in background
-      if (!user && recaptchaLoaded) {
-        const token = await executeRecaptcha('convert');
-        if (token) {
+        // For anonymous users, require reCAPTCHA v3 token
+        if (!user) {
+          const token = await executeRecaptcha('convert');
+          if (!token) {
+            throw new Error('CAPTCHA not ready');
+          }
           requestBody.recaptchaToken = token;
         }
-      }
 
       // For PDFs: render page images client-side and send to backend (Groq Vision can't accept PDFs directly)
       if (isPdf) {
         try {
-          requestBody.pdfPageImages = await pdfToPageImages(selectedFile, pdfPassword.trim() || undefined);
+          requestBody.pdfPageImages = await pdfToPageImages(fileToConvert, pdfPassword.trim() || undefined);
         } catch (err: any) {
           // Surface password errors in existing UX
           if (err?.name === 'PasswordException' || String(err?.message || '').toLowerCase().includes('password')) {
@@ -332,12 +368,12 @@ export const UploadDemo = () => {
 
       if (user) {
         // Authenticated user - upload file to storage first
-        const sanitized = sanitizeFilename(selectedFile.name);
+        const sanitized = sanitizeFilename(fileToConvert.name);
         const filePath = `${Date.now()}_${sanitized}`;
 
         const { error: uploadError } = await supabase.storage
           .from('bank-statements')
-          .upload(`${user.id}/${filePath}`, selectedFile, {
+          .upload(`${user.id}/${filePath}`, fileToConvert, {
             cacheControl: '3600',
             upsert: false,
           });
@@ -350,7 +386,7 @@ export const UploadDemo = () => {
       } else {
         if (!isPdf) {
           // Anonymous user - send file as base64 (images)
-          const base64Data = await fileToBase64(selectedFile);
+          const base64Data = await fileToBase64(fileToConvert);
           requestBody.fileData = base64Data;
         }
       }
@@ -689,9 +725,18 @@ Analytics Summary:
       const { jsPDF } = await import('jspdf');
       const { default: autoTable } = await import('jspdf-autotable');
 
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      let yPos = 15;
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        let yPos = 15;
+        const isPremiumReport = !!planType && planType !== 'free';
+
+        const ensureSpace = (needed: number) => {
+          if (yPos + needed > pageHeight - 20) {
+            doc.addPage();
+            yPos = 20;
+          }
+        };
 
       // Add Akromeda Logo
       try {
@@ -728,8 +773,34 @@ Analytics Summary:
       // Date
       doc.setFontSize(9);
       doc.setTextColor(120);
-      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, yPos);
-      yPos += 10;
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, yPos);
+        yPos += 10;
+
+        // Report Type
+        doc.setFontSize(9);
+        doc.setTextColor(90);
+        doc.text(`Report Type: ${isPremiumReport ? 'Premium Analysis' : 'Standard Analysis'}`, 14, yPos);
+        yPos += 8;
+
+        // Executive Summary (Premium only)
+        if (isPremiumReport) {
+          ensureSpace(24);
+          doc.setFontSize(12);
+          doc.setTextColor(40);
+          doc.text('Executive Summary', 14, yPos);
+          yPos += 6;
+          doc.setFontSize(9);
+          doc.setTextColor(80);
+          const summaryLines = [
+            'Premium report with enhanced underwriting insights and risk signals.',
+            'Ideal for credit evaluation, audit, and internal review.',
+          ];
+          summaryLines.forEach((line) => {
+            doc.text(`• ${line}`, 16, yPos);
+            yPos += 5;
+          });
+          yPos += 4;
+        }
 
       // Financial Summary Section
       if (analytics) {
@@ -802,8 +873,7 @@ Analytics Summary:
 
         // Salary Credits Detected
         if (uw.salaryCredits && uw.salaryCredits.length > 0) {
-          doc.addPage();
-          yPos = 20;
+          ensureSpace(24);
           doc.setFontSize(14);
           doc.setTextColor(40);
           doc.text('Salary Credits Detected', 14, yPos);
@@ -828,6 +898,7 @@ Analytics Summary:
 
         // EMI Debits Detected
         if (uw.emiDebits && uw.emiDebits.length > 0) {
+          ensureSpace(24);
           doc.setFontSize(14);
           doc.text('EMI/Loan Debits Detected', 14, yPos);
           yPos += 8;
@@ -851,12 +922,61 @@ Analytics Summary:
         }
       }
 
-      // Risk Analysis Section
+        // Recommendations & Improvements
+        {
+          const recommendations: string[] = [];
+          const risk = analytics?.riskAnalysis;
+          const uw = analytics?.underwriting;
+
+          if (risk?.integrityScore !== undefined && risk.integrityScore < 70) {
+            recommendations.push('Improve statement integrity: avoid edited PDFs and provide original bank exports.');
+          }
+          if ((risk?.balanceMismatches ?? 0) > 0) {
+            recommendations.push('Resolve balance mismatches to strengthen accuracy and trust.');
+          }
+          if (analytics && analytics.netFlow < 0) {
+            recommendations.push('Improve net cash flow by reducing debits or increasing credits.');
+          }
+          if (uw?.summary?.foirScore !== undefined && uw.summary.foirScore > 50) {
+            recommendations.push('Reduce EMI obligations or increase income to improve FOIR.');
+          }
+          if (uw?.salaryCredits && uw.salaryCredits.length === 0) {
+            recommendations.push('Maintain consistent salary credits to improve eligibility signals.');
+          }
+
+          if (recommendations.length === 0) {
+            recommendations.push('Maintain consistent inflows and avoid abrupt balance dips for best results.');
+          }
+
+          ensureSpace(30);
+          doc.setFontSize(14);
+          doc.setTextColor(40);
+          doc.text(isPremiumReport ? 'Recommendations & Next Steps' : 'Suggested Improvements', 14, yPos);
+          yPos += 8;
+
+          doc.setFontSize(9);
+          doc.setTextColor(70);
+          recommendations.slice(0, isPremiumReport ? 6 : 3).forEach((item) => {
+            ensureSpace(6);
+            doc.text(`• ${item}`, 16, yPos);
+            yPos += 5;
+          });
+
+          if (isPremiumReport) {
+            ensureSpace(10);
+            doc.setTextColor(90);
+            doc.text('Premium tip: use 6–12 months statements for stronger underwriting accuracy.', 16, yPos);
+            yPos += 6;
+          }
+
+          yPos += 4;
+        }
+
+        // Risk Analysis Section
       if (analytics?.riskAnalysis) {
         const risk = analytics.riskAnalysis;
 
-        doc.addPage();
-        yPos = 20;
+        ensureSpace(24);
         doc.setFontSize(14);
         doc.setTextColor(40);
         doc.text('Risk & Fraud Analysis', 14, yPos);
@@ -923,41 +1043,31 @@ Analytics Summary:
         }
       }
 
-      // Transactions Table
-      if (transactions.length > 0) {
-        doc.addPage();
-        yPos = 20;
-        doc.setFontSize(14);
-        doc.setTextColor(40);
-        doc.text('Transaction Details', 14, yPos);
-        yPos += 8;
+      // Glossary / Definitions
+      ensureSpace(24);
+      doc.setFontSize(14);
+      doc.setTextColor(40);
+      doc.text('Glossary (What these terms mean)', 14, yPos);
+      yPos += 8;
 
-        const txnData = transactions.slice(0, 100).map(t => [
-          t.date || 'N/A',
-          (t.description || '').substring(0, 25),
-          t.category || 'Other',
-          (t.debit ?? 0) > 0 ? `₹${(t.debit ?? 0).toLocaleString('en-IN')}` : '-',
-          (t.credit ?? 0) > 0 ? `₹${(t.credit ?? 0).toLocaleString('en-IN')}` : '-',
-          `₹${(t.balance ?? 0).toLocaleString('en-IN')}`,
-        ]);
+      doc.setFontSize(9);
+      doc.setTextColor(70);
+      const glossary = [
+        ['Total Credits', 'Sum of all incoming amounts in the statement period.'],
+        ['Total Debits', 'Sum of all outgoing amounts in the statement period.'],
+        ['Net Cash Flow', 'Credits minus Debits for the period.'],
+        ['FOIR', 'Fixed Obligation to Income Ratio — EMI as % of income.'],
+        ['Integrity Score', 'Confidence in statement consistency and reliability.'],
+        ['Balance Mismatch', 'When running balance does not reconcile with transactions.'],
+        ['EMI Debits', 'Detected loan/EMI payments from the statement.'],
+        ['Risk Flags', 'Signals indicating potential anomalies or concerns.'],
+      ];
 
-        autoTable(doc, {
-          startY: yPos,
-          head: [['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance']],
-          body: txnData,
-          theme: 'grid',
-          headStyles: { fillColor: [99, 102, 241] },
-          styles: { fontSize: 8 },
-          margin: { left: 14, right: 14 },
-        });
-
-        if (transactions.length > 100) {
-          yPos = (doc as any).lastAutoTable.finalY + 5;
-          doc.setFontSize(9);
-          doc.setTextColor(100);
-          doc.text(`... and ${transactions.length - 100} more transactions`, 14, yPos);
-        }
-      }
+      glossary.forEach(([term, desc]) => {
+        ensureSpace(6);
+        doc.text(`${term}: ${desc}`, 14, yPos);
+        yPos += 5;
+      });
 
       // Footer
       const pageCount = doc.getNumberOfPages();
@@ -1157,6 +1267,44 @@ Analytics Summary:
                 </div>
               )}
 
+              {/* Edited PDF Warning */}
+              {editedPdfWarning && selectedFile && !converting && !uploading && (
+                <div className="p-4 bg-amber-500/10 border-2 border-amber-500/30 rounded-xl space-y-3">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-amber-500">Possible Edited PDF Detected</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        This statement looks like it may have been edited. Reason: {editedPdfWarning.reason}.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button
+                      variant="outline"
+                      className="w-full border-amber-500/50 hover:bg-amber-500/10 text-amber-500"
+                      onClick={() => {
+                        dismissedEditedWarningsRef.current.add(editedPdfWarning.fileName);
+                        setEditedPdfWarning(null);
+                        if (selectedFile) {
+                          handleConvert(selectedFile);
+                        }
+                      }}
+                      disabled={false}
+                    >
+                      Proceed Anyway
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full text-muted-foreground hover:text-foreground"
+                      onClick={() => setEditedPdfWarning(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* reCAPTCHA v3 runs invisibly - no UI needed */}
 
               {/* Error Panel with Retry */}
@@ -1197,8 +1345,9 @@ Analytics Summary:
                         onClick={() => {
                           // Process first file from batch
                           if (selectedFiles.length > 0) {
-                            setSelectedFile(selectedFiles[0]);
-                            handleConvert();
+                            const firstFile = selectedFiles[0];
+                            setSelectedFile(firstFile);
+                            handleConvert(firstFile);
                           }
                         }}
                         disabled={uploading || converting}

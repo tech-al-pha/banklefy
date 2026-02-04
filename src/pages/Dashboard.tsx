@@ -131,9 +131,16 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0502] text-foreground">
+    <div className="min-h-screen bg-[#0A0502] text-foreground relative overflow-hidden">
+      {/* 3D Background */}
+      <div className="dashboard-3d" aria-hidden="true">
+        <div className="dashboard-3d-layer layer-1" />
+        <div className="dashboard-3d-layer layer-2" />
+        <div className="dashboard-3d-layer layer-3" />
+      </div>
+
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10 relative">
         <div className="container mx-auto px-6 py-4 bg-[#1a120b]/80">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -176,8 +183,8 @@ const Dashboard = () => {
       </nav>
 
       {/* Main Content */}
-      <div className="container mx-auto px-6 pt-24 pb-12">
-        <div className="max-w-7xl mx-auto space-y-8">
+      <div className="container mx-auto px-6 pt-28 pb-16 relative z-10">
+        <div className="max-w-7xl mx-auto space-y-10">
           <div>
             <h1 className="text-4xl font-bold mb-2">Conversion History</h1>
             <p className="text-muted-foreground">

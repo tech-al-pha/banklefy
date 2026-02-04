@@ -16,6 +16,8 @@ import {
   Loader2
 } from "lucide-react";
 import { invokeEdgeFunction } from "@/lib/supabaseApi";
+import { useRecaptcha } from "@/hooks/useRecaptcha";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -45,6 +47,7 @@ const incrementChatUsage = () => {
 export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) => {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { executeRecaptcha } = useRecaptcha();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -97,12 +100,28 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
     setIsLoading(true);
 
     try {
+      const sessionToken = user
+        ? (await supabase.auth.getSession()).data.session?.access_token
+        : null;
+
+      let recaptchaToken: string | null = null;
+      if (!sessionToken) {
+        recaptchaToken = await executeRecaptcha('chat_aura');
+        if (!recaptchaToken) {
+          throw new Error('CAPTCHA not ready');
+        }
+      }
+
       const { data, error } = await invokeEdgeFunction<{ response: string }>("chat-aura", {
         body: {
           message: userMessage.content,
           pdfContext: effectivePdfContext || null,
-          conversationHistory: messages.map(m => ({ role: m.role, content: m.content }))
-        }
+          conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
+          recaptchaToken: sessionToken ? null : recaptchaToken
+        },
+        headers: sessionToken
+          ? { Authorization: `Bearer ${sessionToken}` }
+          : undefined,
       });
 
       if (error) throw error;

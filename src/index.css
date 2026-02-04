@@ -230,3 +230,62 @@
 .btn-premium:hover {
   box-shadow: 0 0 30px hsl(42 85% 55% / 0.4);
 }
+
+/* reCAPTCHA v3 badge - hidden (notice shown in footer) */
+.grecaptcha-badge {
+  visibility: hidden !important;
+}
+
+/* Dashboard 3D background */
+.dashboard-3d {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  perspective: 1200px;
+  overflow: hidden;
+  background: radial-gradient(circle at 20% 10%, hsl(42 85% 55% / 0.08), transparent 35%),
+    radial-gradient(circle at 80% 20%, hsl(195 100% 50% / 0.08), transparent 40%),
+    radial-gradient(circle at 50% 80%, hsl(338 15% 56% / 0.08), transparent 45%);
+}
+
+.dashboard-3d-layer {
+  position: absolute;
+  inset: -20%;
+  transform-style: preserve-3d;
+  opacity: 0.7;
+  filter: blur(10px);
+}
+
+.dashboard-3d-layer.layer-1 {
+  background: radial-gradient(circle at 30% 30%, hsl(42 85% 55% / 0.25), transparent 35%);
+  animation: dashboard-float-1 18s ease-in-out infinite;
+  transform: translateZ(-80px) rotateX(6deg);
+}
+
+.dashboard-3d-layer.layer-2 {
+  background: radial-gradient(circle at 70% 40%, hsl(195 100% 50% / 0.22), transparent 35%);
+  animation: dashboard-float-2 22s ease-in-out infinite;
+  transform: translateZ(-120px) rotateY(-8deg);
+}
+
+.dashboard-3d-layer.layer-3 {
+  background: radial-gradient(circle at 50% 70%, hsl(338 15% 56% / 0.2), transparent 40%);
+  animation: dashboard-float-3 26s ease-in-out infinite;
+  transform: translateZ(-160px) rotateX(-6deg);
+}
+
+@keyframes dashboard-float-1 {
+  0%, 100% { transform: translate3d(0, 0, -80px) rotateX(6deg); }
+  50% { transform: translate3d(30px, -20px, -80px) rotateX(10deg); }
+}
+
+@keyframes dashboard-float-2 {
+  0%, 100% { transform: translate3d(0, 0, -120px) rotateY(-8deg); }
+  50% { transform: translate3d(-20px, 25px, -120px) rotateY(-2deg); }
+}
+
+@keyframes dashboard-float-3 {
+  0%, 100% { transform: translate3d(0, 0, -160px) rotateX(-6deg); }
+  50% { transform: translate3d(20px, 15px, -160px) rotateX(-10deg); }
+}

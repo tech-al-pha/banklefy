@@ -202,7 +202,6 @@ const Index = () => {
                       {t('footer.features')}
                     </button>
                   </li>
-                  <li><a href="#pricing" className="hover:text-primary transition-colors">{t('footer.pricing')}</a></li>
                   <li><a href="#demo" className="hover:text-primary transition-colors">{t('footer.howItWorks')}</a></li>
                 </ul>
               </div>
@@ -243,6 +242,27 @@ const Index = () => {
           
           <div className="pt-8 border-t border-primary/10 text-center text-xs text-muted-foreground tracking-[0.2em] uppercase">
             <p>{t('footer.copyright')}</p>
+          </div>
+          <div className="mt-4 text-center text-xs text-muted-foreground">
+            This site is protected by reCAPTCHA and the Google{" "}
+            <a
+              href="https://policies.google.com/privacy"
+              className="underline underline-offset-2 hover:text-primary transition-colors"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Privacy Policy
+            </a>{" "}
+            and{" "}
+            <a
+              href="https://policies.google.com/terms"
+              className="underline underline-offset-2 hover:text-primary transition-colors"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Terms of Service
+            </a>{" "}
+            apply.
           </div>
         </div>
       </footer>

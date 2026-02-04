@@ -247,13 +247,19 @@ const PricingPage = () => {
             </div>
           </div>
           <br />
-          <Button
-            variant="outline"
-            size="lg"
-            className="border-primary/40 text-white hover:bg-primary/10 backdrop-blur-lg px-10 h-14 font-black uppercase tracking-widest"
+          <a
+            href="https://mail.google.com/mail/?view=cm&fs=1&to=inspirexali@gmail.com&su=Akromeda%20Enterprise%20Pricing"
+            target="_blank"
+            rel="noreferrer"
           >
-            Contact Sales
-          </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="border-primary/40 text-white hover:bg-primary/10 backdrop-blur-lg px-10 h-14 font-black uppercase tracking-widest"
+            >
+              Contact Sales
+            </Button>
+          </a>
         </section>
       </main>
     </div>

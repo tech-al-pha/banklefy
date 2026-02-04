@@ -1,31 +1,125 @@
 // Chat Aura Edge Function
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+
+// ============= DEPLOYMENT-AGNOSTIC CORS =============
+const getAllowedOrigin = (requestOrigin: string | null): string => {
+  const envOrigin = Deno.env.get('ALLOWED_ORIGIN');
+
+  const allowedOrigins = [
+    envOrigin,
+    'https://akromeda.lovable.app',
+    'https://akromeda.vercel.app',
+    'http://localhost:8080',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ].filter(Boolean) as string[];
+
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  const lovableAppPattern = /^https:\/\/[a-z0-9-]+\.lovable\.app$/;
+  const lovableProjectPattern = /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/;
+  if (requestOrigin && (lovableAppPattern.test(requestOrigin) || lovableProjectPattern.test(requestOrigin))) {
+    return requestOrigin;
+  }
+
+  const vercelPattern = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
+  if (requestOrigin && vercelPattern.test(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  if (envOrigin === '*' && requestOrigin) {
+    return requestOrigin;
+  }
+
+  return requestOrigin || allowedOrigins[0] || '*';
+};
+
+const getCorsHeaders = (req: Request) => ({
+  'Access-Control-Allow-Origin': getAllowedOrigin(req.headers.get('origin')),
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+});
+
+async function verifyRecaptcha(token: string): Promise<boolean> {
+  const secretKey = Deno.env.get('RECAPTCHA_SECRET_KEY');
+  if (!secretKey) {
+    console.error('RECAPTCHA_SECRET_KEY not configured');
+    return false;
+  }
+
+  try {
+    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `secret=${secretKey}&response=${token}`,
+    });
+    const data = await response.json();
+    return data.success === true;
+  } catch (error) {
+    console.error('reCAPTCHA verification error:', error);
+    return false;
+  }
+}
 
 interface ChatRequest {
   message: string;
   pdfContext?: string | null;
   conversationHistory?: Array<{ role: string; content: string }>;
+  recaptchaToken?: string | null;
 }
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: getCorsHeaders(req) });
   }
 
   try {
-    const { message, pdfContext, conversationHistory = [] } = await req.json() as ChatRequest;
+    const { message, pdfContext, conversationHistory = [], recaptchaToken } = await req.json() as ChatRequest;
 
     if (!message) {
       return new Response(
         JSON.stringify({ error: 'Message is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
       );
+    }
+
+    // ============= AUTHENTICATION / CAPTCHA =============
+    // Allow authenticated users OR anonymous users who pass reCAPTCHA
+    const authHeader = req.headers.get('Authorization');
+    let isAuthenticated = false;
+
+    if (authHeader && authHeader.startsWith('Bearer ') && authHeader !== 'Bearer null') {
+      const token = authHeader.replace('Bearer ', '');
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && user) {
+        isAuthenticated = true;
+      }
+    }
+
+    if (!isAuthenticated) {
+      if (!recaptchaToken) {
+        return new Response(
+          JSON.stringify({ error: 'CAPTCHA verification required for anonymous users' }),
+          { status: 400, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const isValidCaptcha = await verifyRecaptcha(recaptchaToken);
+      if (!isValidCaptcha) {
+        return new Response(
+          JSON.stringify({ error: 'CAPTCHA verification failed. Please try again.' }),
+          { status: 403, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Build system prompt
@@ -94,7 +188,7 @@ When answering questions about an uploaded document, ALWAYS include precise loca
         console.log('✅ Groq response received');
         return new Response(
           JSON.stringify({ response: responseText }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
         );
       } catch (groqError) {
         console.error('❌ Groq error caught:', groqError);
@@ -110,11 +204,11 @@ When answering questions about an uploaded document, ALWAYS include precise loca
     console.error('❌ Chat Aura error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: errorMessage,
         response: `Error: ${errorMessage}`
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
     );
   }
 });

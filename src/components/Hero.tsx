@@ -16,15 +16,21 @@ export const Hero = () => {
       <div className="relative z-10 container mx-auto px-6 text-center">
         <div className="max-w-5xl mx-auto flex flex-col items-center space-y-7 pt-20">
           <div className="flex flex-col items-center leading-tight">
-            <h1 className="text-4xl md:text-5xl lg:text-8xl font-bold tracking-tight text-white/95">
+            <h1
+              className="font-bold tracking-tight text-white/95 max-w-[18ch]"
+              style={{ fontSize: "clamp(2.25rem, 4.2vw, 4.5rem)", textWrap: "balance" }}
+            >
               AI Bank Statement
             </h1>
-            <h2 className="text-7xl md:text-[8rem] lg:text-[9rem] font-black uppercase tracking-tighter bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-200 bg-clip-text text-transparent leading-[0.99]">
+            <h2
+              className="font-black uppercase tracking-tight bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-200 bg-clip-text text-transparent leading-[0.95]"
+              style={{ fontSize: "clamp(3.5rem, 9vw, 9rem)", textWrap: "balance" }}
+            >
               Converter
             </h2>
           </div>
 
-          <div className="text-lg md:text-2xl font-bold text-primary tracking-[0.1em] uppercase pt-2">
+          <div className="text-xs sm:text-sm md:text-2xl font-bold text-primary tracking-[0.08em] md:tracking-[0.12em] uppercase pt-2">
             professional look | OCR-Powered | Instant Results
           </div>
 

@@ -39,6 +39,9 @@ import { generateProfessionalExcel } from './excel-generator.ts';
 // ============= ADMIN WHITELIST (Server-Side Only) =============
 const ADMIN_EMAILS = ['inspirexali@gmail.com'];
 const MAX_PAGES_FREE = 6; // Max pages for free/normal users
+const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '60');
+const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
+const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${30 * 1024 * 1024}`); // 30MB
 
 // ============= DEPLOYMENT-AGNOSTIC CORS =============
 // Allows requests from any origin. The edge function runs on Supabase infrastructure
@@ -179,6 +182,12 @@ const isValidTimezone = (tz: string): boolean => {
   return validPattern.test(tz);
 };
 
+const estimateBase64Bytes = (base64: string): number => {
+  const cleaned = base64.trim();
+  const padding = cleaned.endsWith('==') ? 2 : cleaned.endsWith('=') ? 1 : 0;
+  return Math.floor((cleaned.length * 3) / 4) - padding;
+};
+
 // ============= MAIN HANDLER =============
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -285,6 +294,37 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Invalid file name' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Validate PDF page images payload size to avoid memory/time blowups
+    if (Array.isArray(pdfPageImages) && pdfPageImages.length > 0) {
+      if (pdfPageImages.length > MAX_PDF_PAGE_IMAGES) {
+        return new Response(
+          JSON.stringify({ error: `Too many page images (max ${MAX_PDF_PAGE_IMAGES})` }),
+          { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      let totalBytes = 0;
+      for (const img of pdfPageImages) {
+        if (typeof img !== 'string') continue;
+        const match = img.match(/^data:([^;]+);base64,(.+)$/);
+        const base64Payload = match ? match[2] : img;
+        const sizeBytes = estimateBase64Bytes(base64Payload);
+        totalBytes += sizeBytes;
+        if (sizeBytes > MAX_PDF_PAGE_IMAGE_BYTES) {
+          return new Response(
+            JSON.stringify({ error: `A page image exceeds ${Math.round(MAX_PDF_PAGE_IMAGE_BYTES / (1024 * 1024))}MB` }),
+            { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        if (totalBytes > MAX_PDF_PAGE_IMAGES_TOTAL_BYTES) {
+          return new Response(
+            JSON.stringify({ error: `Total page images exceed ${Math.round(MAX_PDF_PAGE_IMAGES_TOTAL_BYTES / (1024 * 1024))}MB` }),
+            { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
     }
 
     // Get file bytes

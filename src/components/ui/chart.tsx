@@ -65,6 +65,17 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null;
   }
 
+  const sanitizeColor = (value: string | undefined): string | null => {
+    if (!value) return null;
+    const v = value.trim();
+    // Allow hex, rgb/rgba, hsl/hsla, and CSS variables.
+    if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v)) return v;
+    if (/^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(\s*,\s*(0|1|0?\.\d+))?\s*\)$/.test(v)) return v;
+    if (/^hsla?\(\s*\d+\s*,\s*\d+%\s*,\s*\d+%(\s*,\s*(0|1|0?\.\d+))?\s*\)$/.test(v)) return v;
+    if (/^var\(--[a-zA-Z0-9-_]+\)$/.test(v)) return v;
+    return null;
+  };
+
   return (
     <style
       dangerouslySetInnerHTML={{
@@ -74,7 +85,8 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 ${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
-    const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+    const rawColor = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+    const color = sanitizeColor(rawColor);
     return color ? `  --color-${key}: ${color};` : null;
   })
   .join("\n")}
