@@ -4,26 +4,16 @@ declare global {
   interface Window {
     grecaptcha: {
       ready: (callback: () => void) => void;
-      render: (container: string | HTMLElement, options: {
-        sitekey: string;
-        callback: (token: string) => void;
-        'expired-callback': () => void;
-        'error-callback': () => void;
-        theme?: 'light' | 'dark';
-        size?: 'compact' | 'normal';
-      }) => number;
-      reset: (widgetId?: number) => void;
+      execute: (siteKey: string, options: { action: string }) => Promise<string>;
     };
-    onRecaptchaLoad?: () => void;
   }
 }
 
+// reCAPTCHA v3 site key - runs invisibly in background
 const RECAPTCHA_SITE_KEY = '6LddTDssAAAAAIZSSRGVJTOq__hjo4AiGAxC0x_U';
 
 export const useRecaptcha = () => {
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [widgetId, setWidgetId] = useState<number | null>(null);
 
   useEffect(() => {
     // Check if already loaded
@@ -32,70 +22,42 @@ export const useRecaptcha = () => {
       return;
     }
 
-    // Set up callback
-    window.onRecaptchaLoad = () => {
-      setIsLoaded(true);
-    };
-
-    // Load the script if not present
+    // Load reCAPTCHA v3 script
     if (!document.querySelector('script[src*="recaptcha"]')) {
       const script = document.createElement('script');
-      script.src = `https://www.google.com/recaptcha/api.js?onload=onRecaptchaLoad&render=explicit`;
+      script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
       script.async = true;
       script.defer = true;
+      script.onload = () => {
+        if (window.grecaptcha) {
+          window.grecaptcha.ready(() => {
+            setIsLoaded(true);
+          });
+        }
+      };
       document.head.appendChild(script);
     }
-
-    return () => {
-      window.onRecaptchaLoad = undefined;
-    };
   }, []);
 
-  const renderRecaptcha = useCallback((containerId: string) => {
-    if (!isLoaded || !window.grecaptcha) return;
-
-    window.grecaptcha.ready(() => {
-      // Don't render if already rendered
-      if (widgetId !== null) return;
-      
-      const container = document.getElementById(containerId);
-      if (!container || container.hasChildNodes()) return;
-
-      try {
-        const id = window.grecaptcha.render(containerId, {
-          sitekey: RECAPTCHA_SITE_KEY,
-          callback: (token: string) => {
-            setRecaptchaToken(token);
-          },
-          'expired-callback': () => {
-            setRecaptchaToken(null);
-          },
-          'error-callback': () => {
-            setRecaptchaToken(null);
-          },
-          theme: 'dark',
-          size: 'normal',
-        });
-        setWidgetId(id);
-      } catch (e) {
-        // Widget might already be rendered
-        console.warn('reCAPTCHA render warning:', e);
-      }
-    });
-  }, [isLoaded, widgetId]);
-
-  const resetRecaptcha = useCallback(() => {
-    if (window.grecaptcha && widgetId !== null) {
-      window.grecaptcha.reset(widgetId);
+  // Execute reCAPTCHA v3 and get token - call this right before form submission
+  const executeRecaptcha = useCallback(async (action: string = 'convert'): Promise<string | null> => {
+    if (!isLoaded || !window.grecaptcha) {
+      console.warn('reCAPTCHA not loaded yet');
+      return null;
     }
-    setRecaptchaToken(null);
-  }, [widgetId]);
+
+    try {
+      const token = await window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action });
+      return token;
+    } catch (error) {
+      console.error('reCAPTCHA execution failed:', error);
+      return null;
+    }
+  }, [isLoaded]);
 
   return {
-    recaptchaToken,
     isLoaded,
-    renderRecaptcha,
-    resetRecaptcha,
+    executeRecaptcha,
     siteKey: RECAPTCHA_SITE_KEY,
   };
 };

@@ -157,16 +157,8 @@ export const UploadDemo = () => {
     getTimezone
   } = useUsageLimit();
   
-  // reCAPTCHA for anonymous users
-  const { recaptchaToken, isLoaded: recaptchaLoaded, renderRecaptcha, resetRecaptcha } = useRecaptcha();
-  const [showRecaptcha, setShowRecaptcha] = useState(false);
-
-  // Render reCAPTCHA when needed for anonymous users
-  useEffect(() => {
-    if (showRecaptcha && !user && recaptchaLoaded) {
-      renderRecaptcha('recaptcha-container');
-    }
-  }, [showRecaptcha, user, recaptchaLoaded, renderRecaptcha]);
+  // reCAPTCHA v3 for anonymous users - runs invisibly in background
+  const { isLoaded: recaptchaLoaded, executeRecaptcha } = useRecaptcha();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -196,11 +188,6 @@ export const UploadDemo = () => {
       setPdfPassword('');
       setShowPasswordInput(false);
       setShowPassword(false);
-      
-      // Show reCAPTCHA for anonymous users
-      if (!user) {
-        setShowRecaptcha(true);
-      }
       
       toast({
         title: "Files Selected",
@@ -303,15 +290,7 @@ export const UploadDemo = () => {
     }
 
     // IMPORTANT: Authenticated users SKIP reCAPTCHA completely
-    // Only require reCAPTCHA for anonymous/unauthenticated users
-    if (!user && !recaptchaToken) {
-      toast({
-        variant: "destructive",
-        title: "Verification required",
-        description: "Please complete the CAPTCHA verification below.",
-      });
-      return;
-    }
+    // For anonymous users, reCAPTCHA v3 runs in background - token generated at conversion time
 
     setUploading(true);
 
@@ -328,9 +307,12 @@ export const UploadDemo = () => {
         requestBody.pdfPassword = pdfPassword.trim();
       }
 
-      // Add reCAPTCHA token for anonymous users
-      if (!user && recaptchaToken) {
-        requestBody.recaptchaToken = recaptchaToken;
+      // For anonymous users, execute reCAPTCHA v3 in background
+      if (!user && recaptchaLoaded) {
+        const token = await executeRecaptcha('convert');
+        if (token) {
+          requestBody.recaptchaToken = token;
+        }
       }
 
       // For PDFs: render page images client-side and send to backend (Groq Vision can't accept PDFs directly)
@@ -497,11 +479,9 @@ Analytics Summary:
       });
 
       setSelectedFile(null);
-      setShowRecaptcha(false);
       setShowPasswordInput(false);
       setPdfPassword('');
       setPasswordError(false);
-      resetRecaptcha();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -529,17 +509,15 @@ Analytics Summary:
           description: errorMessage,
         });
       } else if (errorMessage.toLowerCase().includes('captcha') || errorMessage.toLowerCase().includes('verification')) {
-        // CAPTCHA error - can retry after completing verification
-        resetRecaptcha();
-        setLastError({ message: 'Verification failed. Please complete the CAPTCHA again.', canRetry: true });
+        // CAPTCHA error - can retry (v3 will auto-generate new token)
+        setLastError({ message: 'Verification failed. Please try again.', canRetry: true });
         toast({
           variant: "destructive",
           title: "Verification Failed",
-          description: "Please complete the CAPTCHA verification again.",
+          description: "Please try again.",
         });
       } else {
         // General error - can retry
-        resetRecaptcha();
         setLastError({ message: errorMessage, canRetry: true });
         toast({
           variant: "destructive",
@@ -1179,26 +1157,7 @@ Analytics Summary:
                 </div>
               )}
 
-
-              {/* reCAPTCHA for anonymous users - hide after verification */}
-              {showRecaptcha && !user && selectedFile && !limitReached && !recaptchaToken && (
-                <div className="flex flex-col items-center gap-3">
-                  <p className="text-sm text-muted-foreground">
-                    Please verify you're human to continue
-                  </p>
-                  <div id="recaptcha-container" className="flex justify-center" />
-                </div>
-              )}
-              
-              {/* Show verified badge briefly */}
-              {showRecaptcha && !user && selectedFile && !limitReached && recaptchaToken && (
-                <div className="flex justify-center">
-                  <p className="text-sm text-green-500 flex items-center gap-2 bg-green-500/10 px-4 py-2 rounded-full">
-                    <CheckCircle className="h-4 w-4" />
-                    Verified - Ready to convert
-                  </p>
-                </div>
-              )}
+              {/* reCAPTCHA v3 runs invisibly - no UI needed */}
 
               {/* Error Panel with Retry */}
               {lastError && selectedFile && !converting && !uploading && (
@@ -1218,7 +1177,7 @@ Analytics Summary:
                         setLastError(null);
                         handleConvert();
                       }}
-                      disabled={!user && !recaptchaToken}
+                      disabled={false}
                     >
                       <RefreshCw className="mr-2 h-4 w-4" />
                       Try Again
@@ -1242,7 +1201,7 @@ Analytics Summary:
                             handleConvert();
                           }
                         }}
-                        disabled={uploading || converting || (!user && !recaptchaToken)}
+                        disabled={uploading || converting}
                       >
                         {uploading || converting ? (
                           <>
