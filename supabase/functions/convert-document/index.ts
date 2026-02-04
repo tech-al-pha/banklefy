@@ -408,22 +408,72 @@ Deno.serve(async (req) => {
 
     // ============= PAGE LIMIT ENFORCEMENT =============
     // Check PDF page count for non-admin users
+    // Each plan has specific page limits
     const isPdf = lowerFileName.endsWith('.pdf');
     const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
     const pageCount = hasPdfPageImages ? (pdfPageImages as string[]).length : 1;
-    console.log('Page count:', { pageCount, isAdmin, maxPages: MAX_PAGES_FREE, isPdf });
+    
+    // Plan page limits
+    const planLimits: Record<string, number> = {
+      'monthly_basic': 300,
+      'monthly_pro': 1000,
+      'monthly_enterprise': 4500,
+      'yearly_lite': 5000,
+      'yearly_full': 15000,
+      'yearly_pro': 65000,
+      'per_page': 1, // per page plan users
+    };
+    
+    // Check if user is special admin user (no limits)
+    const isSpecialUser = user?.email === 'inspirexali@gmail.com';
+    
+    if (isSpecialUser) {
+      console.log('Special user detected - unlimited pages allowed:', user.email);
+    } else {
+      // Check user's plan and page limit
+      let userPlanLimit = MAX_PAGES_FREE; // Default to free user limit
+      let userPlanType = 'free';
+      let pagesUsedThisMonth = 0;
+      
+      if (user) {
+        const { data: subData, error: subError } = await supabase
+          .from('subscriptions')
+          .select('plan_type, pages_used_this_month')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (!subError && subData && subData.plan_type) {
+          userPlanType = subData.plan_type;
+          pagesUsedThisMonth = subData.pages_used_this_month || 0;
+          userPlanLimit = planLimits[subData.plan_type] || MAX_PAGES_FREE;
+        }
+      }
+      
+      console.log('Page limit check:', { 
+        pageCount, 
+        isAdmin, 
+        userPlanType, 
+        userPlanLimit,
+        pagesUsedThisMonth,
+        totalAfterThisConversion: pagesUsedThisMonth + pageCount,
+        isPdf 
+      });
 
-    if (!isAdmin && pageCount > MAX_PAGES_FREE) {
-      return new Response(
-        JSON.stringify({
-          error: 'This PDF is complex and requires a Premium plan for accurate conversion.',
-          status: 'pdf_too_complex',
-          pagesDetected: pageCount,
-          maxPagesAllowed: MAX_PAGES_FREE,
-          paidRequired: true,
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // Check if pages exceed the plan limit
+      const totalPagesAfterConversion = pagesUsedThisMonth + pageCount;
+      if (!isAdmin && totalPagesAfterConversion > userPlanLimit) {
+        return new Response(
+          JSON.stringify({
+            error: `Your ${userPlanType} plan allows ${userPlanLimit} pages per month. You have ${pagesUsedThisMonth} pages used and this PDF has ${pageCount} pages.`,
+            status: 'page_limit_exceeded',
+            pagesDetected: pageCount,
+            pagesUsed: pagesUsedThisMonth,
+            planLimit: userPlanLimit,
+            planType: userPlanType,
+          }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Create conversion record for authenticated users
@@ -436,6 +486,7 @@ Deno.serve(async (req) => {
           original_filename: fileName,
           file_path: fileId,
           status: 'processing',
+          pages_processed: pageCount,
         })
         .select()
         .single();
@@ -444,6 +495,18 @@ Deno.serve(async (req) => {
         console.error('Failed to create conversion record:', convError);
       } else {
         conversion = convData;
+        
+        // Update subscription pages_used_this_month
+        const { error: updateError } = await supabase
+          .from('subscriptions')
+          .update({ pages_used_this_month: totalPagesAfterConversion })
+          .eq('user_id', user.id);
+        
+        if (updateError) {
+          console.error('Failed to update pages used:', updateError);
+        } else {
+          console.log(`Updated pages used for user ${user.id}: ${totalPagesAfterConversion}/${userPlanLimit}`);
+        }
       }
     }
 

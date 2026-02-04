@@ -29,10 +29,12 @@ Deno.serve(async (req) => {
     }
 
     // Build system prompt
-    let systemPrompt = `You are Chat Aura, an intelligent financial assistant for Akromeda. 
-You help users understand their bank statements and financial documents.
+    let systemPrompt = `You are Chat Aura, an intelligent financial assistant for Akromeda.
+You help users understand bank statements and financial documents.
 Be concise, helpful, and professional. Use simple language.
-If asked about features, explain Akromeda converts bank statement PDFs to Excel with AI-powered categorization.`;
+If asked about features, explain Akromeda converts bank statement PDFs to Excel with AI-powered categorization.
+
+When answering questions about an uploaded document, ALWAYS include precise location hints (page numbers, table names, row/column or cell references, or section/heading names) where the information can be found. When possible, quote a short excerpt (1-2 lines) and then provide the location hint, e.g. "(Page 3, Table: Transactions)". Keep the answer actionable and point the user to where to look in the converted Excel or original PDF.`;}
 
     if (pdfContext) {
       systemPrompt += `\n\nThe user has uploaded a document. Here is the extracted content:\n\n${pdfContext}\n\nUse this context to answer questions about the document.`;
@@ -47,61 +49,70 @@ If asked about features, explain Akromeda converts bank statement PDFs to Excel 
       { role: 'user' as const, content: message }
     ];
 
-    // Use Gemini via Lovable AI (no API key needed)
+    // Prefer Groq/OpenAI-compatible API if configured, otherwise fall back to Gemini
+    const GROQ_OPENAI_API_KEY = Deno.env.get('GROQ_OPENAI_API_KEY');
+    const GROQ_OPENAI_URL = Deno.env.get('GROQ_OPENAI_URL') || 'https://api.groq.com/openai/v1/chat/completions';
+    const GROQ_OPENAI_MODEL = Deno.env.get('GROQ_OPENAI_MODEL') || 'mixtral-8x7b-32768';
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-    
-    if (!GEMINI_API_KEY) {
-      // Fallback response if no API key
-      return new Response(
-        JSON.stringify({ 
-          response: "I'm Chat Aura, your financial assistant! I can help you understand bank statements and answer questions about your documents. How can I assist you today?" 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
-    // Call Gemini API
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: systemPrompt + '\n\n' + messages.map(m => `${m.role}: ${m.content}`).join('\n') }]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1024,
-          }
-        })
+    // Create messages for OpenAI-style chat endpoints (system first)
+    const openaiMessages = [
+      { role: 'system', content: systemPrompt },
+      ...messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
+    ];
+
+    if (GROQ_OPENAI_API_KEY) {
+      // Call Groq / OpenAI-compatible chat completions endpoint
+      console.log('🔹 Calling Groq API with model:', GROQ_OPENAI_MODEL);
+      
+      try {
+        const openaiResp = await fetch(GROQ_OPENAI_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: GROQ_OPENAI_MODEL,
+            messages: openaiMessages,
+            temperature: 0.3,
+            max_tokens: 1024,
+            top_p: 0.95
+          })
+        });
+
+        if (!openaiResp.ok) {
+          const errorText = await openaiResp.text();
+          console.error('❌ Groq API error:', openaiResp.status, errorText);
+          throw new Error(`Groq API ${openaiResp.status}: ${errorText}`);
+        }
+
+        const openaiData = await openaiResp.json();
+        // Support Chat Completions response format
+        const responseText = openaiData.choices?.[0]?.message?.content || "I'm sorry, I couldn't process your request. Please try again.";
+
+        console.log('✅ Groq response received');
+        return new Response(
+          JSON.stringify({ response: responseText }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (groqError) {
+        console.error('❌ Groq error caught:', groqError);
+        throw groqError;
       }
-    );
-
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error('Gemini API error:', errorText);
-      throw new Error('Failed to get AI response');
     }
 
-    const geminiData = await geminiResponse.json();
-    const responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 
-      "I'm sorry, I couldn't process your request. Please try again.";
-
-    return new Response(
-      JSON.stringify({ response: responseText }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // If we reach here, Groq API key was not configured
+    console.error('❌ GROQ_OPENAI_API_KEY not configured in environment');
+    throw new Error('Chat Aura requires GROQ_OPENAI_API_KEY to be configured. Please set the environment variable in Supabase project settings.');
 
   } catch (error) {
-    console.error('Chat Aura error:', error);
+    console.error('❌ Chat Aura error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
       JSON.stringify({ 
-        error: 'An error occurred processing your request',
-        response: "I apologize, but I encountered an error. Please try again."
+        error: errorMessage,
+        response: `Error: ${errorMessage}`
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

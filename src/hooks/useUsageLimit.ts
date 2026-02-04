@@ -10,6 +10,7 @@ interface UsageLimit {
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
+  planType?: string;
 }
 
 export const useUsageLimit = () => {
@@ -46,6 +47,7 @@ export const useUsageLimit = () => {
         remaining?: number;
         limitReached?: boolean;
         isAuthenticated?: boolean;
+        planType?: string;
       }>('check-usage-limit', {
         body: { timezone },
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -63,6 +65,7 @@ export const useUsageLimit = () => {
         isAuthenticated: data.isAuthenticated ?? !!user,
         loading: false,
         error: null,
+        planType: data.planType ?? 'free',
       });
     } catch (err: any) {
       console.error('Error checking usage limit:', err);

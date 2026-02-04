@@ -4,7 +4,7 @@ import { UploadDemo } from "@/components/UploadDemo";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Shield, Settings, PlayCircle, MessageCircle, Sparkles, CircleDollarSign } from "lucide-react";
+import { LogOut, Shield, Settings, PlayCircle, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
@@ -47,16 +47,16 @@ const Index = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
           <Logo />
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-3">
               
               {/* Pricing Button */}
               <Button 
                 variant="ghost"
                 size="sm" 
                 onClick={() => navigate('/pricing')}
-                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium"
+                className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium px-2 py-1"
               >
-                <CircleDollarSign className="h-4 w-4 translate-y-[1px]" />
+                <CircleDollarSign className="h-3 w-3" />
                 <span>Pricing</span>
               </Button>
 
@@ -65,9 +65,9 @@ const Index = () => {
                 variant="ghost"
                 size="sm" 
                 onClick={() => navigate('/benefits')}
-                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium"
+                className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium px-2 py-1"
               >
-                <Sparkles className="h-4 w-4" />
+                <Gift className="h-3 w-3" />
                 <span>Benefits</span>
               </Button>
 
@@ -76,9 +76,9 @@ const Index = () => {
                 variant="ghost"
                 size="sm" 
                 onClick={() => navigate('/features')}
-                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium"
+                className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium px-2 py-1"
               >
-                <Sparkles className="h-4 w-4" />
+                <Sparkles className="h-3 w-3" />
                 {t('nav.features')}
               </Button>
 
@@ -86,10 +86,10 @@ const Index = () => {
               <Button 
                 variant="ghost"
                 size="sm" 
-                onClick={() => navigate('/dashboard')}
-                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
+                onClick={() => navigate('/chat')}
+                className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 px-2 py-1"
               >
-                <MessageCircle className="h-4 w-4" />
+                <MessageCircle className="h-3 w-3" />
                 {t('nav.chatAura')}
               </Button>
 
@@ -97,9 +97,9 @@ const Index = () => {
                 variant="ghost"
                 size="sm" 
                 onClick={() => navigate('/settings')}
-                className="text-sm gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
+                className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 px-2 py-1"
               >
-                <Settings className="h-4 w-4" />
+                <Settings className="h-3 w-3" />
                 {t('nav.settings')}
               </Button>
 
@@ -108,9 +108,9 @@ const Index = () => {
                   variant="ghost"
                   size="sm" 
                   onClick={() => navigate('/admin')}
-                  className="text-sm gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all"
+                  className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all px-2 py-1"
                 >
-                  <Shield className="h-4 w-4" />
+                  <Shield className="h-3 w-3" />
                   {t('nav.admin')}
                 </Button>
               )}
@@ -226,6 +226,14 @@ const Index = () => {
                       className="hover:text-primary transition-colors text-left font-medium"
                     >
                       {t('footer.privacy')}
+                    </button>
+                  </li>
+                  <li>
+                    <button 
+                      onClick={() => navigate('/terms')}
+                      className="hover:text-primary transition-colors text-left font-medium"
+                    >
+                      Terms & Conditions
                     </button>
                   </li>
                 </ul>

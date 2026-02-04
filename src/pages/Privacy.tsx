@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Shield, Lock, Eye, Trash2, FileCheck, Globe, Brain, ArrowLeft } from "lucide-react";
+import { Shield, Lock, Eye, Trash2, FileCheck, Globe, Brain, ArrowLeft, CheckCircle, Database, AlertCircle, Users, Server, LockOpen, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -33,7 +33,42 @@ const Privacy = () => {
       icon: Globe,
       titleKey: "privacyPage.sections.compliance.title",
       contentKey: "privacyPage.sections.compliance.desc",
-    }
+    },
+    {
+      icon: Database,
+      title: "Data We Collect",
+      content: "We only collect essential information: your email, account preferences, and file metadata (filename, upload date). We never store financial data from your documents.",
+    },
+    {
+      icon: Users,
+      title: "Third-Party Services",
+      content: "We use Supabase for authentication and storage. All data is encrypted in transit and at rest. We do not sell your data to any third party.",
+    },
+    {
+      icon: Server,
+      title: "Server Security",
+      content: "Our servers are hosted on Supabase infrastructure with 99.9% uptime guarantee. All communications use HTTPS/TLS encryption. Regular security audits ensure compliance.",
+    },
+    {
+      icon: AlertCircle,
+      title: "Data Breach Notification",
+      content: "In the unlikely event of a data breach, we will notify all affected users within 24 hours via email with details and recommended actions.",
+    },
+    {
+      icon: LockOpen,
+      title: "Your Rights",
+      content: "You have the right to access, modify, or delete your personal data at any time. Request these actions by emailing us, and we'll comply within 7 business days.",
+    },
+    {
+      icon: CheckCircle,
+      title: "Cookie Policy",
+      content: "We use minimal cookies only for session management and user preference storage. No tracking cookies or third-party advertising cookies are used.",
+    },
+    {
+      icon: Mail,
+      title: "Contact & Data Requests",
+      content: "For privacy concerns, data access requests, or deletion requests, contact inspirexali@gmail.com. We respond to all inquiries within 48 hours.",
+    },
   ];
 
   return (
@@ -80,7 +115,8 @@ const Privacy = () => {
           {sections.map((section, index) => (
             <div 
               key={index}
-              className="bg-[#1a120b]/80 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-4 hover:border-primary/40 transition-all duration-300"
+              className="bg-[#1a120b]/80 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-4 hover:border-primary/40 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 duration-700"
+              style={{ animationDelay: `${index * 50}ms` }}
             >
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-gradient-primary rounded-xl flex items-center justify-center flex-shrink-0">
@@ -88,41 +124,15 @@ const Privacy = () => {
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-2xl font-bold text-foreground">
-                    {t(section.titleKey)}
+                    {(section as any).titleKey ? t((section as any).titleKey) : (section as any).title}
                   </h2>
                   <p className="text-muted-foreground leading-relaxed">
-                    {t(section.contentKey)}
+                    {(section as any).contentKey ? t((section as any).contentKey) : (section as any).content}
                   </p>
                 </div>
               </div>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* About Section */}
-      <section className="py-16 px-6">
-        <div className="container mx-auto max-w-4xl">
-          <div className="bg-[#1a120b]/80 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-6">
-            <h2 className="text-3xl font-bold text-foreground">{t('privacyPage.aboutTitle')}</h2>
-            <div className="space-y-4 text-muted-foreground">
-              <p>
-                {t('privacyPage.aboutP1')}
-              </p>
-              <p>
-                {t('privacyPage.aboutP2Prefix')} <strong className="text-foreground">Sayyed Faizan Rizvi</strong>{t('privacyPage.aboutP2Suffix')}
-              </p>
-              <div className="pt-4 space-y-2">
-                <h3 className="text-xl font-bold text-foreground">{t('privacyPage.whatTitle')}</h3>
-                <ul className="list-disc list-inside space-y-2">
-                  <li>{t('privacyPage.whatItems.item1')}</li>
-                  <li>{t('privacyPage.whatItems.item2')}</li>
-                  <li>{t('privacyPage.whatItems.item3')}</li>
-                  <li>{t('privacyPage.whatItems.item4')}</li>
-                </ul>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 

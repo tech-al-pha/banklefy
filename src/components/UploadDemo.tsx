@@ -120,10 +120,12 @@ const categoryColors: Record<string, string> = {
 
 export const UploadDemo = () => {
   const { toast } = useToast();
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [converting, setConverting] = useState(false);
   const [conversionResult, setConversionResult] = useState<{ id: string | null; resultPath: string | null; excelData?: string } | null>(null);
+  const [batchResults, setBatchResults] = useState<Array<{ fileName: string; status: 'success' | 'error'; data?: any; error?: string }>>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [aiStatus, setAiStatus] = useState<{
@@ -135,6 +137,7 @@ export const UploadDemo = () => {
     patternFallback?: { success: boolean; time?: number; error?: string };
   } | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [batchDownloading, setBatchDownloading] = useState(false);
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
   const [pdfPassword, setPdfPassword] = useState('');
   const [showPasswordInput, setShowPasswordInput] = useState(false);
@@ -166,35 +169,44 @@ export const UploadDemo = () => {
   }, [showRecaptcha, user, recaptchaLoaded, renderRecaptcha]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    // Validate file
-    const validation = validateFile(file);
-    if (!validation.success) {
+    const newFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Validate each file
+      const validation = validateFile(file);
+      if (!validation.success) {
+        toast({
+          variant: "destructive",
+          title: "Invalid file",
+          description: `${file.name}: ${validation.error}`,
+        });
+        continue;
+      }
+      
+      newFiles.push(file);
+    }
+
+    if (newFiles.length > 0) {
+      setSelectedFiles([...selectedFiles, ...newFiles]);
+      setPasswordError(false);
+      setPdfPassword('');
+      setShowPasswordInput(false);
+      setShowPassword(false);
+      
+      // Show reCAPTCHA for anonymous users
+      if (!user) {
+        setShowRecaptcha(true);
+      }
+      
       toast({
-        variant: "destructive",
-        title: "Invalid file",
-        description: validation.error,
+        title: "Files Selected",
+        description: `${newFiles.length} file(s) added - Ready to convert`,
       });
-      return;
     }
-
-    setSelectedFile(file);
-    setPasswordError(false);
-    setPdfPassword('');
-    setShowPasswordInput(false); // Don't show password field by default - only when backend says it's needed
-    setShowPassword(false);
-    
-    // Show reCAPTCHA for anonymous users
-    if (!user) {
-      setShowRecaptcha(true);
-    }
-    
-    toast({
-      title: "File Selected",
-      description: `${file.name} - Ready to convert`,
-    });
   };
 
   const handleUploadClick = () => {
@@ -428,6 +440,31 @@ export const UploadDemo = () => {
         setAiStatus(data.aiStatus);
       }
 
+      // Store extracted PDF context in sessionStorage for Chat Aura access
+      // This allows Chat Aura to provide context-aware responses about the PDF
+      if (data.transactions && Array.isArray(data.transactions)) {
+        // Create a concise text representation of the extracted data
+        const extractedSummary = `Bank Statement Extracted Data:
+        
+Total Transactions: ${data.transactions.length}
+
+Transactions:
+${data.transactions.map((t: any, i: number) => 
+  i < 50 ? `${t.date} | ${t.description} | Category: ${t.category} | Debit: ${t.debit} | Credit: ${t.credit} | Balance: ${t.balance}` : ''
+).filter(Boolean).join('\n')}
+${data.transactions.length > 50 ? `\n... and ${data.transactions.length - 50} more transactions` : ''}
+
+${data.analytics ? `
+Analytics Summary:
+- Total Credits: ₹${data.analytics.totalCredits}
+- Total Debits: ₹${data.analytics.totalDebits}
+- Net Flow: ₹${data.analytics.netFlow}
+` : ''}`;
+        
+        sessionStorage.setItem('chatAuraContext', extractedSummary);
+        sessionStorage.setItem('chatAuraFileName', selectedFile?.name || 'Bank Statement');
+      }
+
       // Refresh usage limit after successful conversion
       refreshUsageLimit();
 
@@ -450,7 +487,7 @@ export const UploadDemo = () => {
       const errorMessage = error.message || 'An unexpected error occurred';
       
       // Check if it's a password-related error
-      if (errorMessage.toLowerCase().includes('password') || 
+      if (errorMessage.toLowerCase().includes('password') ||
           errorMessage.toLowerCase().includes('encrypted') ||
           errorMessage.toLowerCase().includes('protected')) {
         setPasswordError(true);
@@ -543,6 +580,51 @@ export const UploadDemo = () => {
       });
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleBatchDownload = async () => {
+    if (batchResults.length === 0) return;
+
+    setBatchDownloading(true);
+    try {
+      // Download each file individually
+      for (const result of batchResults) {
+        if (result.status === 'success' && result.data?.excelData) {
+          const binaryString = atob(result.data.excelData);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          
+          const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${result.fileName}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          // Small delay between downloads
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      toast({
+        title: "Downloaded!",
+        description: `${batchResults.filter(r => r.status === 'success').length} file(s) downloaded.`,
+      });
+    } catch (error: any) {
+      console.error('Batch download error:', error);
+      toast({
+        variant: "destructive",
+        title: "Download failed",
+        description: error.message || "Failed to download the files.",
+      });
+    } finally {
+      setBatchDownloading(false);
     }
   };
 
@@ -932,12 +1014,13 @@ export const UploadDemo = () => {
             )}
 
             <div className="space-y-8">
-              {/* Hidden File Input */}
+              {/* Hidden File Input - Multiple Files */}
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".pdf,.png,.jpg,.jpeg"
                 onChange={handleFileSelect}
+                multiple
                 className="hidden"
               />
 
@@ -970,17 +1053,42 @@ export const UploadDemo = () => {
                   
                   <div className="space-y-3">
                     <p className="text-xl font-semibold tracking-wide text-white">
-                      {selectedFile ? selectedFile.name : "Drop your bank statement here"}
+                      {selectedFiles.length > 0 
+                        ? `${selectedFiles.length} file(s) selected` 
+                        : "Drop your bank statements here"}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {limitReached 
                         ? "Daily limit reached" 
-                        : "or click to browse files • Supports PDF, PNG, JPG"}
+                        : "or click to browse files • Supports PDF, PNG, JPG • Upload multiple files"}
                     </p>
                   </div>
 
+                  {/* Display selected files list */}
+                  {selectedFiles.length > 0 && (
+                    <div className="mt-6 space-y-2 max-h-48 overflow-y-auto">
+                      {selectedFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-primary/10 p-3 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-primary" />
+                            <span className="text-sm text-white">{file.name}</span>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
+                            }}
+                            className="text-destructive hover:text-destructive/80"
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Choose File button - Orange circle removed */}
-                  <div className="flex items-center justify-center">
+                  <div className="flex items-center justify-center gap-3">
                     <Button 
                       className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-3 rounded-lg"
                       onClick={(e) => {
@@ -989,8 +1097,19 @@ export const UploadDemo = () => {
                       }}
                       disabled={uploading || converting || limitReached}
                     >
-                      {limitReached ? "Limit Reached" : "Choose File"}
+                      {limitReached ? "Limit Reached" : "Add Files"}
                     </Button>
+                    {selectedFiles.length > 0 && (
+                      <Button 
+                        className="bg-accent hover:bg-accent/90 text-accent-foreground font-medium px-8 py-3 rounded-lg"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFiles([]);
+                        }}
+                      >
+                        Clear All
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1085,32 +1204,73 @@ export const UploadDemo = () => {
                 </div>
               )}
 
-              {/* Convert Button */}
-              {selectedFile && !limitReached && !lastError && (
-                <div className="text-center">
-                  <Button
-                    size="lg"
-                    className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-neon w-full md:w-auto"
-                    onClick={handleConvert}
-                    disabled={uploading || converting || (!user && !recaptchaToken)}
-                  >
-                    {uploading || converting ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        {uploading ? 'Uploading...' : 'Converting...'}
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="mr-2 h-5 w-5" />
-                        Convert to Excel
-                      </>
-                    )}
-                  </Button>
+              {/* Convert Buttons */}
+              {(selectedFile || selectedFiles.length > 0) && !limitReached && !lastError && (
+                <div className="text-center space-y-3">
+                  {selectedFiles.length > 0 && (
+                    <div className="space-y-3">
+                      <Button
+                        size="lg"
+                        className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-neon w-full md:w-auto"
+                        onClick={() => {
+                          // Process first file from batch
+                          if (selectedFiles.length > 0) {
+                            setSelectedFile(selectedFiles[0]);
+                            handleConvert();
+                          }
+                        }}
+                        disabled={uploading || converting || (!user && !recaptchaToken)}
+                      >
+                        {uploading || converting ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            {uploading ? 'Uploading...' : 'Converting...'}
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="mr-2 h-5 w-5" />
+                            Convert All Statements
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">{selectedFiles.length} file(s) ready to convert</p>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Download Buttons - Show after conversion */}
-              {conversionResult && (
+              {/* Batch Results and Download */}
+              {batchResults.length > 0 && (
+                <div className="text-center space-y-3">
+                  <div className="flex items-center justify-center gap-2 text-green-500">
+                    <CheckCircle className="h-5 w-5" />
+                    <span className="font-medium">Batch Conversion Complete!</span>
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Download all files:</p>
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white"
+                    onClick={handleBatchDownload}
+                    disabled={batchDownloading}
+                  >
+                    {batchDownloading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Downloading...
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="mr-2 h-5 w-5" />
+                        Download All ({batchResults.filter(r => r.status === 'success').length} files)
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">Successfully converted: {batchResults.filter(r => r.status === 'success').length}/{batchResults.length}</p>
+                </div>
+              )}
+
+              {/* Single File Download Buttons - Show after conversion */}
+              {conversionResult && batchResults.length === 0 && (
                 <div className="text-center space-y-3">
                   <div className="flex items-center justify-center gap-2 text-green-500">
                     <CheckCircle className="h-5 w-5" />
@@ -1416,18 +1576,18 @@ export const UploadDemo = () => {
                 </div>
               </div>
 
-              {/* Supported Languages */}
+              {/* Supported Banks */}
               <div className="text-center pt-8 border-t border-muted">
                 <p className="text-sm text-muted-foreground mb-4">
-                  Supports 50+ banks worldwide
+                  Supports 1000+ banks worldwide
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {["English", "Spanish", "French", "German", "Arabic", "Hindi", "Chinese"].map((lang) => (
+                  {["HDFC Bank", "ICICI Bank", "Axis Bank", "State Bank of India", "IDBI Bank", "Yes Bank", "Kotak Bank", "Union Bank", "Bank of Baroda", "Punjab National Bank", "HSBC", "Citibank", "Deutsche Bank", "Chase Bank", "Bank of America", "Wells Fargo", "Santander", "BNP Paribas", "ING", "Barclays", "DBS Bank", "OCBC", "UOB", "China Construction Bank", "Agricultural Bank of China", "Bank of China", "ICBC", "Mitsubishi UFJ", "Sumitomo Mitsui", "Nomura"].map((bank) => (
                     <span 
-                      key={lang}
-                      className="px-3 py-1 text-xs rounded-full bg-muted/50 text-muted-foreground"
+                      key={bank}
+                      className="px-3 py-1 text-xs rounded-full bg-muted/50 text-muted-foreground hover:bg-primary/20 hover:text-primary transition-all"
                     >
-                      {lang}
+                      {bank}
                     </span>
                   ))}
                 </div>

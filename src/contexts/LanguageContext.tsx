@@ -194,7 +194,7 @@ const translations: Record<Language, Record<string, string>> = {
     'aboutPage.contact.mail': 'Direct Mail',
     'aboutPage.contact.social': 'Social',
     'aboutPage.contact.hq': 'HQ',
-    'aboutPage.contact.hqValue': 'Kota, Rajasthan, India',
+    'aboutPage.contact.hqValue': 'Prem Nagar 1st, Kota, Rajasthan 324004',
     'aboutPage.footer': '© 2026 Akromeda | Engineered for Excellence',
 
     // Privacy Page
@@ -482,7 +482,7 @@ const translations: Record<Language, Record<string, string>> = {
     'aboutPage.contact.mail': '邮箱',
     'aboutPage.contact.social': '社交',
     'aboutPage.contact.hq': '总部',
-    'aboutPage.contact.hqValue': '印度 拉贾斯坦邦 科塔',
+    'aboutPage.contact.hqValue': '普雷姆纳加尔1号 科塔 拉贾斯坦邦 324004',
     'aboutPage.footer': '© 2026 Akromeda | Engineered for Excellence',
 
     // Privacy Page
@@ -686,7 +686,7 @@ const translations: Record<Language, Record<string, string>> = {
     'aboutPage.contact.mail': 'メール',
     'aboutPage.contact.social': 'SNS',
     'aboutPage.contact.hq': '拠点',
-    'aboutPage.contact.hqValue': 'インド・ラジャスタン州 コタ',
+    'aboutPage.contact.hqValue': 'プレムナガル1 コタ ラジャスタン州 324004',
     'aboutPage.footer': '© 2026 Akromeda | Engineered for Excellence',
 
     // Privacy Page
@@ -894,7 +894,7 @@ const translations: Record<Language, Record<string, string>> = {
     'aboutPage.contact.mail': 'Correo',
     'aboutPage.contact.social': 'Social',
     'aboutPage.contact.hq': 'Sede',
-    'aboutPage.contact.hqValue': 'Kota, Rajasthan, India',
+    'aboutPage.contact.hqValue': 'Prem Nagar 1st, Kota, Rajasthan 324004',
     'aboutPage.footer': '© 2026 Akromeda | Engineered for Excellence',
 
     // Privacy Page
@@ -1101,7 +1101,7 @@ const translations: Record<Language, Record<string, string>> = {
     'aboutPage.contact.mail': 'Email',
     'aboutPage.contact.social': 'Social',
     'aboutPage.contact.hq': 'Sede',
-    'aboutPage.contact.hqValue': 'Kota, Rajasthan, India',
+    'aboutPage.contact.hqValue': 'Prem Nagar 1st, Kota, Rajasthan 324004',
     'aboutPage.footer': '© 2026 Akromeda | Engineered for Excellence',
 
     // Privacy Page

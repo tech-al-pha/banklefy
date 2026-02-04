@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Phone, Mail, Instagram, MapPin, ArrowLeft, ShieldCheck, Zap, Award } from "lucide-react";
+import { Mail, Instagram, MapPin, ArrowLeft, ShieldCheck, Zap, Award, MessageCircle, X } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -80,11 +80,19 @@ const AboutPage = () => {
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <a href="tel:+917240233173" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
-              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><Phone size={24} /></div>
+            <a href="https://t.me/n3x4z" target="_blank" rel="noopener noreferrer" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><MessageCircle size={24} /></div>
               <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.hotline')}</p>
-                <p className="text-xl font-bold">+91 7240233173</p>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Telegram</p>
+                <p className="text-xl font-bold">@n3x4z</p>
+              </div>
+            </a>
+
+            <a href="https://x.com/inspirexali" target="_blank" rel="noopener noreferrer" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><X size={24} /></div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">X (Twitter)</p>
+                <p className="text-xl font-bold">@inspirexali</p>
               </div>
             </a>
 
@@ -96,7 +104,7 @@ const AboutPage = () => {
               </div>
             </a>
 
-            <a href="https://instagram.com/inspirexali" target="_blank" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+            <a href="https://instagram.com/inspirexali" target="_blank" rel="noopener noreferrer" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
               <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><Instagram size={24} /></div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.social')}</p>
@@ -104,7 +112,7 @@ const AboutPage = () => {
               </div>
             </a>
 
-            <div className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6">
+            <div className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 md:col-span-2">
               <div className="bg-primary/10 p-4 rounded-full text-primary"><MapPin size={24} /></div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.hq')}</p>

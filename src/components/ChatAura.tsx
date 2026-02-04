@@ -51,6 +51,13 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
   const [chatUsed, setChatUsed] = useState(getChatUsage());
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Load context from sessionStorage if props not provided (for cross-page access)
+  const storedContext = sessionStorage.getItem('chatAuraContext');
+  const storedFileName = sessionStorage.getItem('chatAuraFileName');
+  
+  const effectivePdfContext = pdfContext || storedContext;
+  const effectiveFileName = pdfFileName || storedFileName;
+
   // Free users: 1 interaction lifetime (until refresh)
   // Authenticated users: unlimited (until refresh)
   const isLimitReached = !user && chatUsed >= 1;
@@ -67,13 +74,13 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
     const greeting: Message = {
       id: "greeting",
       role: "assistant",
-      content: pdfContext 
-        ? t('chatAura.greetingWithPdf').replace('{fileName}', pdfFileName || 'document')
+      content: effectivePdfContext 
+        ? t('chatAura.greetingWithPdf').replace('{fileName}', effectiveFileName || 'document')
         : t('chatAura.greeting'),
       timestamp: new Date()
     };
     setMessages([greeting]);
-  }, [pdfContext, pdfFileName, t]);
+  }, [effectivePdfContext, effectiveFileName, t]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading || isLimitReached) return;
@@ -93,7 +100,7 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
       const { data, error } = await invokeEdgeFunction<{ response: string }>("chat-aura", {
         body: {
           message: userMessage.content,
-          pdfContext: pdfContext || null,
+          pdfContext: effectivePdfContext || null,
           conversationHistory: messages.map(m => ({ role: m.role, content: m.content }))
         }
       });
@@ -149,10 +156,10 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {pdfContext && (
+            {effectivePdfContext && (
               <Badge variant="secondary" className="gap-1 bg-primary/10 text-primary border-primary/20">
                 <FileText className="h-3 w-3" />
-                {pdfFileName || "PDF"}
+                {effectiveFileName || "PDF"}
               </Badge>
             )}
             <Badge variant="outline" className="border-primary/30">

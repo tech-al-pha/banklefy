@@ -133,10 +133,27 @@ Deno.serve(async (req) => {
     let conversionsUsed = 0;
     let conversionsLimit = 2; // Default for anonymous (2 free conversions per IP)
     let isAuthenticated = false;
+    let planType = 'free';
 
     if (user) {
       // Registered user - check subscription
       isAuthenticated = true;
+      
+      // Check if user is admin/special user (no limits)
+      if (user.email === 'inspirexali@gmail.com') {
+        console.log('Special user detected - unlimited access:', user.email);
+        return new Response(
+          JSON.stringify({
+            conversionsUsed: 0,
+            conversionsLimit: 999999, // Unlimited
+            remaining: 999999,
+            limitReached: false,
+            isAuthenticated: true,
+            planType: 'unlimited',
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       
       const { data: result, error } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
         p_ip_address: null,
@@ -152,6 +169,17 @@ Deno.serve(async (req) => {
       if (result && result.length > 0) {
         conversionsUsed = result[0].conversions_used;
         conversionsLimit = result[0].conversions_limit;
+      }
+
+      // Get user's plan type
+      const { data: subData } = await supabaseAdmin
+        .from('subscriptions')
+        .select('plan_type')
+        .eq('user_id', user.id)
+        .single();
+
+      if (subData?.plan_type) {
+        planType = subData.plan_type;
       }
     } else {
       // Anonymous user - STRICT IP-based tracking
@@ -176,7 +204,7 @@ Deno.serve(async (req) => {
     const remaining = Math.max(0, conversionsLimit - conversionsUsed);
     const limitReached = remaining === 0;
 
-    console.log('Usage check result:', { conversionsUsed, conversionsLimit, remaining, limitReached, isAuthenticated });
+    console.log('Usage check result:', { conversionsUsed, conversionsLimit, remaining, limitReached, isAuthenticated, planType });
 
     return new Response(
       JSON.stringify({
@@ -185,6 +213,7 @@ Deno.serve(async (req) => {
         remaining,
         limitReached,
         isAuthenticated,
+        planType,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

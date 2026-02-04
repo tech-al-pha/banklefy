@@ -11,6 +11,8 @@ interface UsageLimitBannerProps {
   status?: string; // Status code from backend
   pagesDetected?: number;
   maxPagesAllowed?: number;
+  used?: number; // Pages/conversions used
+  planType?: string; // User's plan type
 }
 
 export const UsageLimitBanner = ({
@@ -21,6 +23,8 @@ export const UsageLimitBanner = ({
   status,
   pagesDetected,
   maxPagesAllowed,
+  used = 0,
+  planType = 'free',
 }: UsageLimitBannerProps) => {
   const navigate = useNavigate();
 
@@ -80,7 +84,7 @@ export const UsageLimitBanner = ({
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Crown className="h-4 w-4 text-primary" />
         <span>
-          <strong className="text-primary">{remaining}</strong> of {limit} conversions remaining today
+          <strong className="text-primary">{remaining}</strong> of {limit} {planType && planType !== 'free' ? `${planType}` : 'free'} conversions remaining
         </span>
       </div>
       {!isAuthenticated && (

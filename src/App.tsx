@@ -10,9 +10,12 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
+import ChatPage from "./pages/ChatPage";
 import Admin from "./pages/Admin";
 import About from "./pages/About";
 import FeaturesPage from "./pages/FeaturesPage";
+import BenefitsPage from "./pages/BenefitsPage";
 import Settings from "./pages/Settings";
 import PricingPage from "./pages/PricingPage";
 import NotFound from "./pages/NotFound";
@@ -32,10 +35,13 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/chat" element={<ChatPage />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/about" element={<About />} />
               <Route path="/features" element={<FeaturesPage />} />
+              <Route path="/benefits" element={<BenefitsPage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/settings" element={<Settings />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

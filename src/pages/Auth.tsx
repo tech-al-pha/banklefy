@@ -34,6 +34,7 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [recoverySessionReady, setRecoverySessionReady] = useState(false);
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
@@ -218,37 +219,56 @@ export default function Auth() {
           description: t('auth.signedIn'),
         });
         navigate('/');
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-          },
-        });
-
-        if (error) {
-          if (error.message.includes('already registered')) {
+        } else {
+          // require terms acceptance on signup
+          if (!termsAccepted) {
             toast({
               variant: 'destructive',
-              title: 'Signup Failed',
-              description: 'An account with this email already exists',
+              title: 'Please accept Terms',
+              description: 'You must accept the Terms & Conditions to create an account.',
             });
-          } else {
-            throw error;
+            setLoading(false);
+            return;
           }
-          return;
+
+          const { error, data } = await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/`,
+            },
+          });
+
+          if (error) {
+            if (error.message.includes('already registered')) {
+              toast({
+                variant: 'destructive',
+                title: 'Signup Failed',
+                description: 'An account with this email already exists',
+              });
+            } else {
+              throw error;
+            }
+            return;
+          }
+
+          // Try to persist consent flag if possible
+          try {
+            // If user is signed in immediately, update user metadata
+            await supabase.auth.updateUser({ data: { terms_accepted: 'true' } });
+          } catch (e) {
+            // ignore errors - not critical
+          }
+
+          // Remember this email for next time
+          localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim());
+
+          toast({
+            title: t('auth.accountCreated'),
+            description: t('auth.canUse'),
+          });
+          navigate('/');
         }
-
-        // Remember this email for next time
-        localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim());
-
-        toast({
-          title: t('auth.accountCreated'),
-          description: t('auth.canUse'),
-        });
-        navigate('/');
-      }
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -481,10 +501,34 @@ export default function Auth() {
                     {t('auth.forgotPassword')}
                   </button>
                 )}
+                {mode === 'signup' && (
+                  <div className="flex items-start gap-2">
+                    <input
+                      id="termsAccepted"
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      disabled={loading}
+                      className="mt-1 h-4 w-4 text-primary rounded border-muted-foreground"
+                    />
+                    <label htmlFor="termsAccepted" className="text-sm text-muted-foreground">
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={() => navigate('/terms')}
+                        className="text-primary hover:underline"
+                        disabled={loading}
+                      >
+                        Terms &amp; Conditions
+                      </button>
+                    </label>
+                  </div>
+                )}
+
                 <Button
                   type="submit"
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                  disabled={loading}
+                  className={`w-full bg-primary hover:bg-primary/90 text-primary-foreground ${loading || (mode === 'signup' && !termsAccepted) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  disabled={loading || (mode === 'signup' && !termsAccepted)}
                 >
                   {loading ? (
                     <>
