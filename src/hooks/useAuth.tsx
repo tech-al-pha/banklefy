@@ -23,18 +23,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state change:', event, session?.user?.email || 'no user');
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+    // Then check for existing session
+    // Use getSession() for initial check, but the listener above will handle updates
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Error getting session:', error);
+        // Session might be stale, try to refresh
+        supabase.auth.refreshSession().then(({ data: refreshData, error: refreshError }) => {
+          if (refreshError || !refreshData.session) {
+            console.log('Session refresh failed, clearing auth state');
+            setSession(null);
+            setUser(null);
+          } else {
+            setSession(refreshData.session);
+            setUser(refreshData.session.user);
+          }
+          setLoading(false);
+        });
+      } else {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
