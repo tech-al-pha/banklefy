@@ -302,7 +302,8 @@ export const UploadDemo = () => {
       return;
     }
 
-    // For anonymous users, require reCAPTCHA verification
+    // IMPORTANT: Authenticated users SKIP reCAPTCHA completely
+    // Only require reCAPTCHA for anonymous/unauthenticated users
     if (!user && !recaptchaToken) {
       toast({
         variant: "destructive",
@@ -381,8 +382,30 @@ export const UploadDemo = () => {
       setConverting(true);
 
       // Call edge function to process conversion via explicit REST URL (deployment-agnostic)
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
+      // IMPORTANT: Get fresh session to avoid stale token issues
+      // If user is logged in but session is stale, refresh it first
+      let accessToken: string | undefined;
+      
+      if (user) {
+        // User is authenticated - get fresh token
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError || !sessionData.session) {
+          // Session might be stale, try to refresh
+          console.log('Session stale or missing, attempting refresh...');
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError || !refreshData.session) {
+            console.error('Failed to refresh session:', refreshError);
+            // User appears logged in but session is invalid - still allow conversion
+            // Edge function will treat as anonymous but that's OK
+          } else {
+            accessToken = refreshData.session.access_token;
+          }
+        } else {
+          accessToken = sessionData.session.access_token;
+        }
+      }
 
       const { data, error: functionError, response } = await invokeEdgeFunction<any>('convert-document', {
         body: requestBody,
