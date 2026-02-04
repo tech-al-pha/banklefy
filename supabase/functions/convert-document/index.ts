@@ -427,14 +427,16 @@ Deno.serve(async (req) => {
     // Check if user is special admin user (no limits)
     const isSpecialUser = user?.email === 'inspirexali@gmail.com';
     
+    // Variables for plan tracking (defined outside block for scope access)
+    let userPlanLimit = MAX_PAGES_FREE;
+    let userPlanType = 'free';
+    let pagesUsedThisMonth = 0;
+    let totalPagesAfterConversion = pageCount;
+    
     if (isSpecialUser) {
-      console.log('Special user detected - unlimited pages allowed:', user.email);
+      console.log('Special user detected - unlimited pages allowed:', user?.email);
     } else {
       // Check user's plan and page limit
-      let userPlanLimit = MAX_PAGES_FREE; // Default to free user limit
-      let userPlanType = 'free';
-      let pagesUsedThisMonth = 0;
-      
       if (user) {
         const { data: subData, error: subError } = await supabase
           .from('subscriptions')
@@ -449,18 +451,19 @@ Deno.serve(async (req) => {
         }
       }
       
+      totalPagesAfterConversion = pagesUsedThisMonth + pageCount;
+      
       console.log('Page limit check:', { 
         pageCount, 
         isAdmin, 
         userPlanType, 
         userPlanLimit,
         pagesUsedThisMonth,
-        totalAfterThisConversion: pagesUsedThisMonth + pageCount,
+        totalAfterThisConversion: totalPagesAfterConversion,
         isPdf 
       });
 
       // Check if pages exceed the plan limit
-      const totalPagesAfterConversion = pagesUsedThisMonth + pageCount;
       if (!isAdmin && totalPagesAfterConversion > userPlanLimit) {
         return new Response(
           JSON.stringify({
@@ -496,16 +499,18 @@ Deno.serve(async (req) => {
       } else {
         conversion = convData;
         
-        // Update subscription pages_used_this_month
-        const { error: updateError } = await supabase
-          .from('subscriptions')
-          .update({ pages_used_this_month: totalPagesAfterConversion })
-          .eq('user_id', user.id);
-        
-        if (updateError) {
-          console.error('Failed to update pages used:', updateError);
-        } else {
-          console.log(`Updated pages used for user ${user.id}: ${totalPagesAfterConversion}/${userPlanLimit}`);
+        // Update subscription pages_used_this_month (only if not special user)
+        if (!isSpecialUser) {
+          const { error: updateError } = await supabase
+            .from('subscriptions')
+            .update({ pages_used_this_month: totalPagesAfterConversion })
+            .eq('user_id', user.id);
+          
+          if (updateError) {
+            console.error('Failed to update pages used:', updateError);
+          } else {
+            console.log(`Updated pages used for user ${user.id}: ${totalPagesAfterConversion}/${userPlanLimit}`);
+          }
         }
       }
     }
