@@ -1686,53 +1686,85 @@ Analytics Summary:
                     <span className="font-medium">Batch Conversion Complete!</span>
                   </div>
                   <p className="text-sm font-medium text-muted-foreground">Download options:</p>
-                  <Button
-                    size="lg"
-                    className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white"
-                    onClick={handleBatchDownload}
-                    disabled={batchDownloading}
-                  >
-                    {batchDownloading ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Downloading...
-                      </>
-                    ) : (
-                      <>
-                        <FileDown className="mr-2 h-5 w-5" />
-                        Download All Separately ({batchResults.filter(r => r.status === 'success').length} files)
-                      </>
-                    )}
-                  </Button>
-                  {mergeInfo && (
-                    mergeInfo.available && mergeResult ? (
-                      <Button
-                        size="lg"
-                        className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white"
-                        onClick={handleMergedDownload}
-                        disabled={mergeDownloading}
-                      >
-                        {mergeDownloading ? (
-                          <>
-                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            Preparing...
-                          </>
-                        ) : (
-                          <>
-                            <FileSpreadsheet className="mr-2 h-5 w-5" />
-                            Merge All into One Excel
-                          </>
-                        )}
-                      </Button>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Merge disabled: {mergeInfo.reasons?.join('; ') || 'Conditions not met'}
-                      </p>
-                    )
-                  )}
-                  <p className="text-xs text-muted-foreground">Successfully converted: {batchResults.filter(r => r.status === 'success').length}/{batchResults.length}</p>
-                </div>
-              )}
+                   <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                     <Button
+                       size="lg"
+                       className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                       onClick={handleBatchDownload}
+                       disabled={batchDownloading}
+                     >
+                       {batchDownloading ? (
+                         <>
+                           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                           Downloading...
+                         </>
+                       ) : (
+                         <>
+                           <FileDown className="mr-2 h-5 w-5" />
+                           Separate Excel
+                         </>
+                       )}
+                     </Button>
+                     {mergeInfo && mergeInfo.available && mergeResult && (
+                       <Button
+                         size="lg"
+                         className="bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                         onClick={handleMergedDownload}
+                         disabled={mergeDownloading}
+                       >
+                         {mergeDownloading ? (
+                           <>
+                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                             Preparing...
+                           </>
+                         ) : (
+                           <>
+                             <FileSpreadsheet className="mr-2 h-5 w-5" />
+                             Merge Excel
+                           </>
+                         )}
+                       </Button>
+                     )}
+                   </div>
+                   {mergeInfo && !mergeInfo.available && (
+                     <p className="text-xs text-muted-foreground">
+                       Merge disabled: {mergeInfo.reasons?.join('; ') || 'Conditions not met'}
+                     </p>
+                   )}
+                   <p className="text-xs text-muted-foreground">Successfully converted: {batchResults.filter(r => r.status === 'success').length}/{batchResults.length}</p>
+                   
+                   {/* Additional Export Options for Batch */}
+                   <div className="flex flex-wrap gap-2 justify-center pt-2">
+                     <Button
+                       size="sm"
+                       className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white"
+                       onClick={exportAsPDF}
+                       disabled={!analytics}
+                     >
+                       <FileDown className="mr-2 h-4 w-4" />
+                       PDF Report
+                     </Button>
+                     <Button
+                       size="sm"
+                       variant="outline"
+                       onClick={exportAsCSV}
+                       disabled={transactions.length === 0}
+                     >
+                       <FileText className="mr-2 h-4 w-4" />
+                       CSV
+                     </Button>
+                     <Button
+                       size="sm"
+                       variant="outline"
+                       onClick={exportAsJSON}
+                       disabled={transactions.length === 0}
+                     >
+                       <FileJson className="mr-2 h-4 w-4" />
+                       JSON
+                     </Button>
+                   </div>
+                 </div>
+               )}
 
               {/* Single File Download Buttons - Show after conversion */}
               {conversionResult && batchResults.length === 0 && (
