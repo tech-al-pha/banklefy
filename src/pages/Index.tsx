@@ -2,9 +2,10 @@ import { Hero } from "@/components/Hero";
 import { HowItWorks } from "@/components/HowItWorks";
 import { UploadDemo } from "@/components/UploadDemo";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Shield, Settings, PlayCircle, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
+import { LogOut, Shield, Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
@@ -44,10 +45,10 @@ const Index = () => {
     <div className="min-h-screen bg-[#0A0502] text-foreground">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/60 backdrop-blur-lg border-b border-primary/20">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
           <Logo />
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
               
               {/* Pricing Button */}
               <Button 
@@ -144,6 +145,130 @@ const Index = () => {
                 {t('nav.getStarted')}
               </Button>
             </div>
+
+            {/* Mobile / Tablet Menu */}
+            <div className="lg:hidden">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-primary hover:bg-primary/5"
+                    aria-label="Open menu"
+                  >
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="bg-[#1a120b]/95 border-primary/20 w-[320px]">
+                  <div className="mt-10 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                        Menu
+                      </span>
+                      <LanguageSelector />
+                    </div>
+
+                    <SheetClose asChild>
+                      <Button
+                        variant="ghost"
+                        className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                        onClick={() => navigate('/pricing')}
+                      >
+                        <CircleDollarSign className="h-4 w-4" />
+                        Pricing
+                      </Button>
+                    </SheetClose>
+
+                    <SheetClose asChild>
+                      <Button
+                        variant="ghost"
+                        className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                        onClick={() => navigate('/benefits')}
+                      >
+                        <Gift className="h-4 w-4" />
+                        Benefits
+                      </Button>
+                    </SheetClose>
+
+                    <SheetClose asChild>
+                      <Button
+                        variant="ghost"
+                        className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                        onClick={() => navigate('/features')}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        {t('nav.features')}
+                      </Button>
+                    </SheetClose>
+
+                    <SheetClose asChild>
+                      <Button
+                        variant="ghost"
+                        className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                        onClick={() => navigate('/chat')}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        {t('nav.chatAura')}
+                      </Button>
+                    </SheetClose>
+
+                    <SheetClose asChild>
+                      <Button
+                        variant="ghost"
+                        className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                        onClick={() => navigate('/settings')}
+                      >
+                        <Settings className="h-4 w-4" />
+                        {t('nav.settings')}
+                      </Button>
+                    </SheetClose>
+
+                    {isAdmin && (
+                      <SheetClose asChild>
+                        <Button
+                          variant="ghost"
+                          className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                          onClick={() => navigate('/admin')}
+                        >
+                          <Shield className="h-4 w-4" />
+                          {t('nav.admin')}
+                        </Button>
+                      </SheetClose>
+                    )}
+
+                    <div className="border-t border-primary/10 pt-3 flex flex-col gap-3">
+                      <SheetClose asChild>
+                        <Button
+                          variant="outline"
+                          className="border-primary/40 text-foreground hover:bg-primary/10"
+                          onClick={handleAuthClick}
+                        >
+                          {user ? (
+                            <>
+                              <LogOut className="mr-2 h-4 w-4" />
+                              {t('nav.signOut')}
+                            </>
+                          ) : (
+                            t('nav.signIn')
+                          )}
+                        </Button>
+                      </SheetClose>
+
+                      <SheetClose asChild>
+                        <Button
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
+                          onClick={() => {
+                            document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
+                          }}
+                        >
+                          {t('nav.getStarted')}
+                        </Button>
+                      </SheetClose>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
         </div>
       </nav>
@@ -156,7 +281,7 @@ const Index = () => {
       </div>
 
       {/* Footer CTA */}
-      <section className="relative py-12 px-6 overflow-hidden bg-[#0A0502]">
+      <section className="relative py-12 px-4 sm:px-6 overflow-hidden bg-[#0A0502]">
         <div className="container mx-auto text-center relative z-10 space-y-6">
           <h2 className="text-4xl md:text-5xl font-bold italic">
             {t('footer.cta.title')}
@@ -180,7 +305,7 @@ const Index = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-primary/20 py-16 px-6 bg-[#0A0502]">
+      <footer className="border-t border-primary/20 py-16 px-4 sm:px-6 bg-[#0A0502]">
         <div className="container mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
             <div className="space-y-4">

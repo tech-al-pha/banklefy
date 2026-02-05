@@ -1100,7 +1100,7 @@ Analytics Summary:
   };
 
   return (
-    <section className="relative py-16 px-6 overflow-hidden bg-[#0A0502]">
+    <section className="relative py-16 px-4 sm:px-6 overflow-hidden bg-[#0A0502]">
       <div className="container mx-auto relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold">
@@ -1113,7 +1113,7 @@ Analytics Summary:
         </div>
 
         <div className="max-w-4xl mx-auto">
-          <Card className="p-8 md:p-12 bg-[#1a120b]/80 backdrop-blur-xl border border-primary/20 rounded-2xl">
+          <Card className="p-6 sm:p-8 md:p-12 bg-[#1a120b]/80 backdrop-blur-xl border border-primary/20 rounded-2xl">
             {/* Usage Limit Banner */}
             {!usageLimitLoading && (
               <UsageLimitBanner
@@ -1139,7 +1139,7 @@ Analytics Summary:
               <div 
                 onClick={handleUploadClick}
                 data-hover
-                className={`bg-[#0f0906]/80 border-2 border-primary/20 hover:border-primary/40 rounded-xl p-12 text-center transition-all duration-500 cursor-pointer group relative ${
+                className={`bg-[#0f0906]/80 border-2 border-primary/20 hover:border-primary/40 rounded-xl p-6 sm:p-10 md:p-12 text-center transition-all duration-500 cursor-pointer group relative ${
                   limitReached 
                     ? 'opacity-50 cursor-not-allowed' 
                     : ''
@@ -1180,9 +1180,9 @@ Analytics Summary:
                     <div className="mt-6 space-y-2 max-h-48 overflow-y-auto">
                       {selectedFiles.map((file, idx) => (
                         <div key={idx} className="flex items-center justify-between bg-primary/10 p-3 rounded-lg">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <FileText className="h-4 w-4 text-primary" />
-                            <span className="text-sm text-white">{file.name}</span>
+                            <span className="flex-1 min-w-0 text-sm text-white truncate">{file.name}</span>
                           </div>
                           <button
                             onClick={(e) => {
@@ -1199,9 +1199,9 @@ Analytics Summary:
                   )}
 
                   {/* Choose File button - Orange circle removed */}
-                  <div className="flex items-center justify-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <Button 
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-3 rounded-lg"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleUploadClick();
@@ -1212,7 +1212,7 @@ Analytics Summary:
                     </Button>
                     {selectedFiles.length > 0 && (
                       <Button 
-                        className="bg-accent hover:bg-accent/90 text-accent-foreground font-medium px-8 py-3 rounded-lg"
+                        className="bg-accent hover:bg-accent/90 text-accent-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedFiles([]);
@@ -1571,8 +1571,9 @@ Analytics Summary:
                   </div>
                   
                   <Card className="overflow-hidden border-primary/20">
-                    <ScrollArea className="h-[400px]">
-                      <Table>
+                    <div className="overflow-x-auto">
+                      <ScrollArea className="h-[400px] min-w-[720px]">
+                        <Table className="min-w-[720px]">
                         <TableHeader>
                           <TableRow className="bg-muted/50">
                             <TableHead className="font-semibold">Date</TableHead>
@@ -1662,8 +1663,9 @@ Analytics Summary:
                             </TableRow>
                           ))}
                         </TableBody>
-                      </Table>
-                    </ScrollArea>
+                        </Table>
+                      </ScrollArea>
+                    </div>
                   </Card>
                 </div>
               )}

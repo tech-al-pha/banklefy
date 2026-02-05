@@ -23,7 +23,7 @@ export const HowItWorks = () => {
   ];
 
   return (
-    <section className="py-16 px-6 relative overflow-hidden bg-[#0A0502]">
+    <section className="py-16 px-4 sm:px-6 relative overflow-hidden bg-[#0A0502]">
       <div className="container mx-auto relative z-10">
         <div className="text-center mb-12 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold italic text-white">

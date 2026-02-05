@@ -6,14 +6,14 @@ export const Hero = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-visible pt-24 pb-6">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-24 pb-6">
       <div className="absolute inset-0 bg-gradient-dark -z-10">
         <div className="absolute inset-0 bg-gradient-glow opacity-50 animate-pulse" />
-        <div className="absolute top-20 left-20 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-20 w-96 h-96 bg-secondary/20 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-10 left-6 sm:top-20 sm:left-20 w-72 h-72 sm:w-96 sm:h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-10 right-6 sm:bottom-20 sm:right-20 w-72 h-72 sm:w-96 sm:h-96 bg-secondary/20 rounded-full blur-3xl animate-pulse delay-1000" />
       </div>
 
-      <div className="relative z-10 container mx-auto px-6 text-center">
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 text-center">
         <div className="max-w-5xl mx-auto flex flex-col items-center space-y-7 pt-20">
           <div className="flex flex-col items-center leading-tight">
             <h1

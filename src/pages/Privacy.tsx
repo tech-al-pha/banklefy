@@ -76,12 +76,12 @@ const Privacy = () => {
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Logo />
             <Button 
               variant="ghost" 
               onClick={() => navigate('/')} 
-              className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter"
+              className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
             >
               <ArrowLeft size={18} /> {t('common.backToHome')}
             </Button>

@@ -31,19 +31,19 @@ const FeaturesPage = () => {
     <div className="min-h-screen bg-[#0A0502] text-white font-sans selection:bg-primary/30">
       {/* Header Area */}
       <nav className="border-b border-primary/10 bg-black/40 backdrop-blur-md p-4 sticky top-0 z-50">
-        <div className="container mx-auto flex items-center justify-between">
+        <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <Button 
             variant="ghost" 
             onClick={() => navigate('/')} 
-            className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter"
+            className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
           >
             <ArrowLeft size={18} /> Back to Home
           </Button>
         </div>
       </nav>
 
-      <main className="container mx-auto px-6 py-16 max-w-6xl">
+      <main className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 max-w-6xl">
         {/* Header Section */}
         <section className="text-center mb-20 animate-in fade-in slide-in-from-bottom-5 duration-700">
           <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter text-primary uppercase mb-6">
@@ -102,7 +102,7 @@ const FeaturesPage = () => {
         ))}
 
         {/* CTA Section */}
-        <section className="mt-20 text-center p-12 bg-[#1A100B] border border-primary/20 rounded-3xl">
+        <section className="mt-20 text-center p-6 sm:p-8 md:p-12 bg-[#1A100B] border border-primary/20 rounded-3xl">
           <h2 className="text-3xl font-black text-primary uppercase mb-4">
             {t('featuresPage.cta.title')}
           </h2>
@@ -112,14 +112,14 @@ const FeaturesPage = () => {
           <div className="flex gap-4 justify-center flex-wrap">
             <Button 
               onClick={() => navigate('/')}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-8 py-6 text-lg"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 py-4 sm:px-8 sm:py-6 text-base sm:text-lg"
             >
               {t('featuresPage.cta.tryDemo')}
             </Button>
             <Button 
               variant="outline"
               onClick={() => navigate('/auth')}
-              className="border-primary/50 text-primary hover:bg-primary/10 font-bold px-8 py-6 text-lg"
+              className="border-primary/50 text-primary hover:bg-primary/10 font-bold px-6 py-4 sm:px-8 sm:py-6 text-base sm:text-lg"
             >
               {t('featuresPage.cta.signUp')}
             </Button>

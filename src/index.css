@@ -83,6 +83,19 @@
   body {
     @apply bg-background text-foreground;
     cursor: none;
+    overflow-x: hidden;
+  }
+
+  #root {
+    min-height: 100%;
+    overflow-x: hidden;
+  }
+
+  img,
+  video,
+  canvas {
+    max-width: 100%;
+    height: auto;
   }
 
   /* Custom Rolls-Royce Style Cursor - Optimized for performance */
@@ -122,6 +135,16 @@
   .luxury-cursor.hover::before {
     transform: translate(-50%, -50%) scale(0.8);
     background: hsl(42 100% 60%);
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  body {
+    cursor: auto;
+  }
+
+  .luxury-cursor {
+    display: none;
   }
 }
 

@@ -420,7 +420,7 @@ const Settings = () => {
         {items.map((item) => (
           <Card key={item.id} className="bg-[#1a120b]/60 border-primary/20 backdrop-blur-sm">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="p-2 rounded-lg bg-primary/10 text-primary">
                     {item.icon}
@@ -454,7 +454,7 @@ const Settings = () => {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
@@ -466,21 +466,21 @@ const Settings = () => {
               </Button>
               <Logo />
             </div>
-            <div className="flex items-center gap-4">
-              <div className="relative">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
+              <div className="relative w-full sm:w-auto">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder={t('settings.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64 bg-background/50 border-primary/20"
+                  className="pl-10 w-full sm:w-64 bg-background/50 border-primary/20"
                 />
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => navigate('/')}
-                className="border-primary/50 text-foreground hover:bg-primary/10"
+                className="border-primary/50 text-foreground hover:bg-primary/10 w-full sm:w-auto"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 {t('settings.backToHome')}

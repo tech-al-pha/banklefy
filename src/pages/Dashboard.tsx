@@ -141,9 +141,9 @@ const Dashboard = () => {
 
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10 relative">
-        <div className="container mx-auto px-6 py-4 bg-[#1a120b]/80">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 bg-[#1a120b]/80">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
               <Button
                 variant="ghost"
                 size="sm"
@@ -160,11 +160,12 @@ const Dashboard = () => {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate("/")}
+                className="w-full sm:w-auto"
               >
                 <Home className="mr-2 h-4 w-4" />
                 Home
@@ -173,7 +174,7 @@ const Dashboard = () => {
                 variant="outline"
                 size="sm"
                 onClick={signOut}
-                className="border-primary/50 hover:bg-primary/10"
+                className="border-primary/50 hover:bg-primary/10 w-full sm:w-auto"
               >
                 Sign Out
               </Button>
@@ -183,7 +184,7 @@ const Dashboard = () => {
       </nav>
 
       {/* Main Content */}
-      <div className="container mx-auto px-6 pt-28 pb-16 relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 pt-28 pb-16 relative z-10">
         <div className="max-w-7xl mx-auto space-y-10">
           <div>
             <h1 className="text-4xl font-bold mb-2">Conversion History</h1>
@@ -202,58 +203,60 @@ const Dashboard = () => {
                 </Button>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>File Name</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Completed</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {conversions.map((conversion) => (
-                    <TableRow key={conversion.id}>
-                      <TableCell className="font-medium">
-                        {conversion.original_filename}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(conversion.status)}</TableCell>
-                      <TableCell>
-                        {format(new Date(conversion.created_at), "MMM d, yyyy HH:mm")}
-                      </TableCell>
-                      <TableCell>
-                        {conversion.completed_at
-                          ? format(new Date(conversion.completed_at), "MMM d, yyyy HH:mm")
-                          : "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {conversion.status === "completed" && conversion.result_path ? (
-                          <Button
-                            size="sm"
-                            onClick={() => downloadExcel(conversion)}
-                            disabled={downloadingId === conversion.id}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            {downloadingId === conversion.id ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <FileSpreadsheet className="mr-2 h-4 w-4" />
-                            )}
-                            Download Excel
-                          </Button>
-                        ) : conversion.status === "failed" ? (
-                          <span className="text-sm text-destructive">
-                            {conversion.error_message || "Conversion failed"}
-                          </span>
-                        ) : (
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        )}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[720px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>File Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Completed</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {conversions.map((conversion) => (
+                      <TableRow key={conversion.id}>
+                        <TableCell className="font-medium">
+                          {conversion.original_filename}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(conversion.status)}</TableCell>
+                        <TableCell>
+                          {format(new Date(conversion.created_at), "MMM d, yyyy HH:mm")}
+                        </TableCell>
+                        <TableCell>
+                          {conversion.completed_at
+                            ? format(new Date(conversion.completed_at), "MMM d, yyyy HH:mm")
+                            : "-"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {conversion.status === "completed" && conversion.result_path ? (
+                            <Button
+                              size="sm"
+                              onClick={() => downloadExcel(conversion)}
+                              disabled={downloadingId === conversion.id}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              {downloadingId === conversion.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                              )}
+                              Download Excel
+                            </Button>
+                          ) : conversion.status === "failed" ? (
+                            <span className="text-sm text-destructive">
+                              {conversion.error_message || "Conversion failed"}
+                            </span>
+                          ) : (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </Card>
         </div>

@@ -12,19 +12,19 @@ const AboutPage = () => {
     <div className="min-h-screen bg-[#0A0502] text-white font-sans selection:bg-primary/30">
       {/* Header Area */}
       <nav className="border-b border-primary/10 bg-black/40 backdrop-blur-md p-4 sticky top-0 z-50">
-        <div className="container mx-auto flex items-center justify-between">
+        <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <Button 
             variant="ghost" 
             onClick={() => navigate('/')} 
-            className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter"
+            className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
           >
             <ArrowLeft size={18} /> {t('common.backToHome')}
           </Button>
         </div>
       </nav>
 
-      <main className="container mx-auto px-6 py-16 max-w-4xl">
+      <main className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 max-w-4xl">
         {/* About Section - Upgraded with Harvard/Cybersecurity details */}
         <section className="space-y-8 mb-20 animate-in fade-in slide-in-from-bottom-5 duration-700">
           <div className="space-y-2">

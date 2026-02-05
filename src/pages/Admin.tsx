@@ -188,8 +188,8 @@ export default function Admin() {
       {/* Header */}
       <header className="border-b border-primary/10 bg-background/80 backdrop-blur-lg">
         <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
               <Button
                 variant="ghost"
                 size="sm"
@@ -206,13 +206,13 @@ export default function Admin() {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="gap-2"
+                className="gap-2 w-full sm:w-auto"
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 Refresh
@@ -342,8 +342,9 @@ export default function Admin() {
             <CardDescription>All registered users and their subscription status</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[400px]">
-              <Table>
+            <div className="overflow-x-auto">
+              <ScrollArea className="h-[400px] min-w-[720px]">
+                <Table className="min-w-[720px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Email</TableHead>
@@ -388,8 +389,9 @@ export default function Admin() {
                     ))
                   )}
                 </TableBody>
-              </Table>
-            </ScrollArea>
+                </Table>
+              </ScrollArea>
+            </div>
           </CardContent>
         </Card>
       </main>
