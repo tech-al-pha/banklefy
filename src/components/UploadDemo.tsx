@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, FileDown } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, FileDown, FileCode, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,13 @@ import { UnderwritingPanel } from "./UnderwritingPanel";
 import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
 import { AIStatusPanel } from "./AIStatusPanel";
 import akromedaLogo from "@/assets/akromeda-logo.png";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -128,6 +135,9 @@ interface MultiConversionResponse {
   };
   merge: MergeInfo;
   remaining?: number;
+  analytics?: Analytics;
+  transactions?: Transaction[];
+  planType?: string;
 }
 
 // Category color mapping
@@ -180,6 +190,7 @@ export const UploadDemo = () => {
   const [lastError, setLastError] = useState<{ message: string; canRetry: boolean } | null>(null);
   const [editedPdfWarning, setEditedPdfWarning] = useState<{ fileName: string; reason: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const dismissedEditedWarningsRef = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
@@ -772,6 +783,16 @@ Analytics Summary:
         });
       }
 
+      // Parse aggregated analytics from batch response for panels
+      if (data?.analytics) {
+        setAnalytics(data.analytics);
+      }
+
+      // Store transactions for export options
+      if (data?.transactions && Array.isArray(data.transactions)) {
+        setTransactions(data.transactions);
+      }
+
       refreshUsageLimit();
 
       toast({
@@ -1015,6 +1036,169 @@ Analytics Summary:
       title: "JSON Downloaded",
       description: "Your transaction data has been exported to JSON.",
     });
+  };
+
+  // Check if user has premium access
+  const isPaidUser = planType && planType !== 'free';
+
+  const exportAsXML = () => {
+    if (transactions.length === 0) return;
+
+    // Build XML structure
+    const xmlTransactions = transactions.map(t => `    <Transaction>
+      <Date>${t.date || ''}</Date>
+      <Description><![CDATA[${t.description || ''}]]></Description>
+      <Category>${t.category || 'Other'}</Category>
+      <Debit>${t.debit || 0}</Debit>
+      <Credit>${t.credit || 0}</Credit>
+      <Balance>${t.balance || 0}</Balance>
+    </Transaction>`).join('\n');
+
+    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<BankStatement>
+  <Metadata>
+    <GeneratedAt>${new Date().toISOString()}</GeneratedAt>
+    <TotalTransactions>${transactions.length}</TotalTransactions>
+    <TotalCredits>${analytics?.totalCredits || 0}</TotalCredits>
+    <TotalDebits>${analytics?.totalDebits || 0}</TotalDebits>
+    <NetFlow>${analytics?.netFlow || 0}</NetFlow>
+  </Metadata>
+  <Transactions>
+${xmlTransactions}
+  </Transactions>
+</BankStatement>`;
+
+    const blob = new Blob([xmlContent], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transactions_${Date.now()}.xml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "XML Downloaded",
+      description: "Your transaction data has been exported to XML.",
+    });
+  };
+
+  const exportAsDOCX = async () => {
+    if (transactions.length === 0) return;
+
+    try {
+      const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel, WidthType, BorderStyle, AlignmentType } = await import('docx');
+
+      // Create header rows for transaction table
+      const headerRow = new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Date', bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Description', bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Category', bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Debit', bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Credit', bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Balance', bold: true })] })] }),
+        ],
+      });
+
+      // Create data rows (limit to first 100 for performance)
+      const dataRows = transactions.slice(0, 100).map(t => new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph(t.date || '')] }),
+          new TableCell({ children: [new Paragraph((t.description || '').substring(0, 50))] }),
+          new TableCell({ children: [new Paragraph(t.category || 'Other')] }),
+          new TableCell({ children: [new Paragraph(`${t.debit || 0}`)] }),
+          new TableCell({ children: [new Paragraph(`${t.credit || 0}`)] }),
+          new TableCell({ children: [new Paragraph(`${t.balance || 0}`)] }),
+        ],
+      }));
+
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            new Paragraph({
+              text: 'AKROMEDA',
+              heading: HeadingLevel.TITLE,
+              alignment: AlignmentType.CENTER,
+            }),
+            new Paragraph({
+              text: 'Financial Intelligence Report',
+              heading: HeadingLevel.HEADING_2,
+              alignment: AlignmentType.CENTER,
+            }),
+            new Paragraph({
+              text: `Generated: ${new Date().toLocaleString()}`,
+              alignment: AlignmentType.CENTER,
+            }),
+            new Paragraph({ text: '' }),
+            new Paragraph({
+              text: 'Financial Summary',
+              heading: HeadingLevel.HEADING_1,
+            }),
+            new Paragraph({ text: `Total Transactions: ${transactions.length}` }),
+            new Paragraph({ text: `Total Credits: ₹${(analytics?.totalCredits || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` }),
+            new Paragraph({ text: `Total Debits: ₹${(analytics?.totalDebits || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` }),
+            new Paragraph({ text: `Net Flow: ₹${(analytics?.netFlow || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` }),
+            new Paragraph({ text: '' }),
+            ...(analytics?.underwriting ? [
+              new Paragraph({
+                text: 'FOIR Analysis',
+                heading: HeadingLevel.HEADING_1,
+              }),
+              new Paragraph({ text: `FOIR Score: ${analytics.underwriting.summary?.foirScore?.toFixed(2) || 0}%` }),
+              new Paragraph({ text: `Status: ${(analytics.underwriting.summary?.foirStatus || 'N/A').toUpperCase()}` }),
+              new Paragraph({ text: `Avg Monthly Income: ₹${(analytics.underwriting.summary?.avgMonthlyIncome || 0).toLocaleString('en-IN')}` }),
+              new Paragraph({ text: `Avg Monthly EMI: ₹${(analytics.underwriting.summary?.avgMonthlyEMI || 0).toLocaleString('en-IN')}` }),
+              new Paragraph({ text: '' }),
+            ] : []),
+            new Paragraph({
+              text: `Transaction Details (${Math.min(transactions.length, 100)} of ${transactions.length})`,
+              heading: HeadingLevel.HEADING_1,
+            }),
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              rows: [headerRow, ...dataRows],
+            }),
+          ],
+        }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bank_statement_report_${Date.now()}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "DOCX Downloaded",
+        description: "Your professional Word document has been exported.",
+      });
+    } catch (error) {
+      console.error('DOCX export error:', error);
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: "Failed to generate Word document.",
+      });
+    }
+  };
+
+  const handlePremiumExport = (format: 'docx' | 'xml') => {
+    if (!isPaidUser) {
+      setShowUpgradeDialog(true);
+      return;
+    }
+    if (format === 'docx') {
+      exportAsDOCX();
+    } else {
+      exportAsXML();
+    }
   };
 
   const exportAsPDF = async () => {
@@ -1737,15 +1921,6 @@ Analytics Summary:
                    <div className="flex flex-wrap gap-2 justify-center pt-2">
                      <Button
                        size="sm"
-                       className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white"
-                       onClick={exportAsPDF}
-                       disabled={!analytics}
-                     >
-                       <FileDown className="mr-2 h-4 w-4" />
-                       PDF Report
-                     </Button>
-                     <Button
-                       size="sm"
                        variant="outline"
                        onClick={exportAsCSV}
                        disabled={transactions.length === 0}
@@ -1756,13 +1931,32 @@ Analytics Summary:
                      <Button
                        size="sm"
                        variant="outline"
-                       onClick={exportAsJSON}
+                       onClick={() => handlePremiumExport('xml')}
                        disabled={transactions.length === 0}
+                       className={!isPaidUser ? 'opacity-70' : ''}
                      >
-                       <FileJson className="mr-2 h-4 w-4" />
-                       JSON
+                       <FileCode className="mr-2 h-4 w-4" />
+                       XML
+                       {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
+                     </Button>
+                     <Button
+                       size="sm"
+                       variant="outline"
+                       onClick={() => handlePremiumExport('docx')}
+                       disabled={transactions.length === 0}
+                       className={!isPaidUser ? 'opacity-70' : ''}
+                     >
+                       <FileText className="mr-2 h-4 w-4" />
+                       DOCX
+                       {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
                      </Button>
                    </div>
+                   {!isPaidUser && (
+                     <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                       <Crown className="h-3 w-3 text-amber-500" />
+                       XML & DOCX are premium formats
+                     </p>
+                   )}
                  </div>
                )}
 
@@ -1820,7 +2014,35 @@ Analytics Summary:
                       <FileJson className="mr-2 h-5 w-5" />
                       JSON
                     </Button>
+                     <Button
+                       size="lg"
+                       variant="outline"
+                       onClick={() => handlePremiumExport('xml')}
+                       disabled={transactions.length === 0}
+                       className={!isPaidUser ? 'opacity-70' : ''}
+                     >
+                       <FileCode className="mr-2 h-5 w-5" />
+                       XML
+                       {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
+                     </Button>
+                     <Button
+                       size="lg"
+                       variant="outline"
+                       onClick={() => handlePremiumExport('docx')}
+                       disabled={transactions.length === 0}
+                       className={!isPaidUser ? 'opacity-70' : ''}
+                     >
+                       <FileText className="mr-2 h-5 w-5" />
+                       DOCX
+                       {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
+                     </Button>
                   </div>
+                   {!isPaidUser && (
+                     <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                       <Crown className="h-3 w-3 text-amber-500" />
+                       XML & DOCX are premium formats
+                     </p>
+                   )}
                 </div>
               )}
 
@@ -2095,6 +2317,42 @@ Analytics Summary:
           </Card>
         </div>
       </div>
+
+      {/* Premium Upgrade Dialog */}
+      <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+        <DialogContent className="bg-card border-primary/20">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-amber-500" />
+              Premium Feature
+            </DialogTitle>
+            <DialogDescription className="space-y-4 pt-4">
+              <p>XML and DOCX exports are available for premium users.</p>
+              <p className="text-sm text-muted-foreground">
+                Upgrade to unlock professional Word documents and structured XML exports for your financial data.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 pt-4">
+                <Button 
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  onClick={() => {
+                    setShowUpgradeDialog(false);
+                    navigate('/pricing');
+                  }}
+                >
+                  <Crown className="mr-2 h-4 w-4" />
+                  View Plans
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowUpgradeDialog(false)}
+                >
+                  Maybe Later
+                </Button>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 };
