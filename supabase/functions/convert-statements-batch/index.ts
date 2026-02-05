@@ -227,6 +227,147 @@ type ProcessedStatement = {
   };
 };
 
+// Aggregated analytics for batch mode
+interface AggregatedAnalytics {
+  totalTransactions: number;
+  totalCredits: number;
+  totalDebits: number;
+  netFlow: number;
+  duplicateCount: number;
+  categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }>;
+  riskAnalysis: {
+    integrityScore: number;
+    balanceMismatches: number;
+    averageDailyBalance: number;
+    maxDip: { amount: number; date: string | null };
+    maxPeak: number;
+    riskFlags: { type: string; count: number }[];
+    fraudAlerts: any[];
+  };
+  underwriting: {
+    salaryCredits: { date: string; amount: number; description: string }[];
+    emiDebits: { date: string; amount: number; description: string; loanType: string }[];
+    monthlyBreakdown: { month: string; salaryIncome: number; emiOutflow: number }[];
+    summary: {
+      avgMonthlyIncome: number;
+      avgMonthlyEMI: number;
+      foirScore: number;
+      foirStatus: 'excellent' | 'good' | 'moderate' | 'high';
+      emiByLoanType: Record<string, { count: number; totalAmount: number }>;
+      totalSalaryDetected: number;
+      totalEMIDetected: number;
+    };
+    eligibility: {
+      status: 'excellent' | 'good' | 'moderate' | 'poor' | 'ineligible';
+      message: string;
+      factors: string[];
+      maxNewEMI: number;
+      estimatedLoanEligibility: number;
+    };
+  };
+}
+
+// Function to aggregate analytics from multiple statements
+function aggregateBatchAnalytics(statements: ProcessedStatement[]): AggregatedAnalytics {
+  // Combine all transactions from all statements
+  const allTransactions: Transaction[] = [];
+  statements.forEach(s => {
+    allTransactions.push(...s.transactions);
+  });
+
+  // Sort by date
+  allTransactions.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Run financial analysis on combined transactions
+  const reconciliation = reconcileBalances(allTransactions);
+  const duplicateCount = detectDuplicates(allTransactions);
+  const riskTransactions = detectHighRiskTransactions(allTransactions);
+  const circularResult = detectCircularTrading(allTransactions);
+  if (circularResult) {
+    riskTransactions.push(circularResult);
+  }
+
+  const underwritingResult = performUnderwritingAnalysis(allTransactions);
+  const liquidityMetrics = analyzeLiquidity(allTransactions);
+  const fraudAlerts = generateFraudAlerts(
+    reconciliation,
+    riskTransactions,
+    liquidityMetrics,
+    allTransactions.length,
+  );
+  const integrityScore = calculateIntegrityScore(reconciliation, riskTransactions, liquidityMetrics);
+
+  // Calculate totals
+  const totalCredits = allTransactions.reduce((sum, t) => sum + (t.credit || 0), 0);
+  const totalDebits = allTransactions.reduce((sum, t) => sum + (t.debit || 0), 0);
+
+  // Build category breakdown
+  const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
+  allTransactions.forEach(t => {
+    if (!categoryBreakdown[t.category]) {
+      categoryBreakdown[t.category] = { count: 0, totalDebit: 0, totalCredit: 0 };
+    }
+    categoryBreakdown[t.category].count++;
+    categoryBreakdown[t.category].totalDebit += t.debit || 0;
+    categoryBreakdown[t.category].totalCredit += t.credit || 0;
+  });
+
+  // Build risk flags summary
+  const riskFlagCounts: Record<string, number> = {};
+  riskTransactions.forEach(rt => {
+    riskFlagCounts[rt.type] = (riskFlagCounts[rt.type] || 0) + rt.indices.length;
+  });
+  const riskFlags = Object.entries(riskFlagCounts).map(([type, count]) => ({ type, count }));
+
+  return {
+    totalTransactions: allTransactions.length,
+    totalCredits,
+    totalDebits,
+    netFlow: totalCredits - totalDebits,
+    duplicateCount,
+    categoryBreakdown,
+    riskAnalysis: {
+      integrityScore,
+      balanceMismatches: reconciliation.totalMismatches,
+      averageDailyBalance: liquidityMetrics.avgBalance,
+      maxDip: { amount: liquidityMetrics.minBalance, date: liquidityMetrics.maxDipDate },
+      maxPeak: liquidityMetrics.maxBalance,
+      riskFlags,
+      fraudAlerts,
+    },
+    underwriting: {
+      salaryCredits: underwritingResult.salaryCredits.map(s => ({
+        date: s.date,
+        amount: s.amount,
+        description: s.description,
+      })),
+      emiDebits: underwritingResult.emiDebits.map(e => ({
+        date: e.date,
+        amount: e.amount,
+        description: e.description,
+        loanType: e.loanType,
+      })),
+      monthlyBreakdown: underwritingResult.monthlyBreakdown,
+      summary: {
+        avgMonthlyIncome: underwritingResult.foir.avgMonthlyIncome,
+        avgMonthlyEMI: underwritingResult.foir.avgMonthlyEMI,
+        foirScore: underwritingResult.foir.score,
+        foirStatus: underwritingResult.foir.status,
+        emiByLoanType: underwritingResult.emiByLoanType,
+        totalSalaryDetected: underwritingResult.salaryCredits.reduce((sum, s) => sum + s.amount, 0),
+        totalEMIDetected: underwritingResult.emiDebits.reduce((sum, e) => sum + e.amount, 0),
+      },
+      eligibility: {
+        status: underwritingResult.eligibility.status,
+        message: underwritingResult.eligibility.message,
+        factors: underwritingResult.eligibility.factors,
+        maxNewEMI: underwritingResult.foir.maxNewEMI,
+        estimatedLoanEligibility: underwritingResult.foir.loanEligibility,
+      },
+    },
+  };
+}
+
 const validatePdfPageImages = (images: string[], fileName: string): string | null => {
   if (images.length > MAX_PDF_PAGE_IMAGES) {
     return `Too many page images for ${fileName} (max ${MAX_PDF_PAGE_IMAGES})`;
@@ -835,6 +976,11 @@ const categoryCorrections = await buildCategoryCorrections(supabaseAdmin as Retu
         merge: mergePayload,
         remaining,
         isAuthenticated: !!user,
+        // Include aggregated analytics for batch mode panels
+        analytics: successes.length > 0 ? aggregateBatchAnalytics(successes) : null,
+        // Include all transactions for export options
+        transactions: successes.flatMap(s => s.transactions),
+        planType: userPlanType,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
