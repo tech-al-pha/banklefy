@@ -191,7 +191,7 @@ const bufferToBase64 = (buffer: ArrayBuffer): string => {
 const sanitizeFileName = (fileName: string): string =>
   fileName.replace(/[\\\/]/g, '').substring(0, 255);
 
-const buildCategoryCorrections = async (supabaseAdmin: ReturnType<typeof createClient>, userId?: string) => {
+const buildCategoryCorrections = async (supabaseAdmin: ReturnType<typeof createClient<unknown>>, userId?: string) => {
   if (!userId) return undefined;
   const { data: corrections } = await supabaseAdmin
     .from('category_corrections')
@@ -629,7 +629,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const categoryCorrections = await buildCategoryCorrections(supabaseAdmin, user?.id);
+const categoryCorrections = await buildCategoryCorrections(supabaseAdmin as ReturnType<typeof createClient<unknown>>, user?.id);
     const successes: ProcessedStatement[] = [];
     const failures: Array<{ fileName: string; error: string }> = [];
     const statementData: StatementData[] = [];
@@ -654,7 +654,7 @@ Deno.serve(async (req) => {
           const buffer = await fileData.arrayBuffer();
           bytes = new Uint8Array(buffer);
         } else {
-          bytes = bytesFromBase64(file.fileData);
+          bytes = bytesFromBase64(file.fileData) as Uint8Array<ArrayBuffer>;
         }
 
         if (bytes.length > 0 && bytes.length > 10 * 1024 * 1024) {
