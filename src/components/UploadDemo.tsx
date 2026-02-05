@@ -98,6 +98,38 @@ interface Analytics {
   underwriting?: UnderwritingAnalysis;
 }
 
+interface MultiStatementResult {
+  fileName: string;
+  excelData: string;
+  totals?: { totalCredits: number; totalDebits: number };
+}
+
+interface MergeTotals {
+  totalDebit: number;
+  totalCredit: number;
+  finalBalance: number | null;
+}
+
+interface MergeInfo {
+  available: boolean;
+  reasons: string[];
+  statementPeriod?: string;
+  duplicatesRemoved?: number;
+  totals?: MergeTotals;
+  excelData?: string;
+  fileName?: string;
+}
+
+interface MultiConversionResponse {
+  success: boolean;
+  separate: {
+    results: MultiStatementResult[];
+    failures?: Array<{ fileName: string; error: string }>;
+  };
+  merge: MergeInfo;
+  remaining?: number;
+}
+
 // Category color mapping
 const categoryColors: Record<string, string> = {
   "Salary/Income": "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -126,6 +158,8 @@ export const UploadDemo = () => {
   const [converting, setConverting] = useState(false);
   const [conversionResult, setConversionResult] = useState<{ id: string | null; resultPath: string | null; excelData?: string } | null>(null);
   const [batchResults, setBatchResults] = useState<Array<{ fileName: string; status: 'success' | 'error'; data?: any; error?: string }>>([]);
+  const [mergeInfo, setMergeInfo] = useState<MergeInfo | null>(null);
+  const [mergeResult, setMergeResult] = useState<{ excelData: string; fileName: string } | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [aiStatus, setAiStatus] = useState<{
@@ -138,6 +172,7 @@ export const UploadDemo = () => {
   } | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [batchDownloading, setBatchDownloading] = useState(false);
+  const [mergeDownloading, setMergeDownloading] = useState(false);
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
   const [pdfPassword, setPdfPassword] = useState('');
   const [showPasswordInput, setShowPasswordInput] = useState(false);
@@ -286,6 +321,9 @@ export const UploadDemo = () => {
   const handleConvert = async (fileOverride?: File) => {
     // Clear previous errors
     setLastError(null);
+    setBatchResults([]);
+    setMergeInfo(null);
+    setMergeResult(null);
     
     const fileToConvert = fileOverride ?? selectedFile;
 
@@ -567,6 +605,230 @@ Analytics Summary:
     }
   };
 
+  const handleConvertMultiple = async () => {
+    setLastError(null);
+
+    if (selectedFiles.length === 0) {
+      toast({
+        title: "No Files Selected",
+        description: "Please select bank statements to convert",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (limitReached) {
+      toast({
+        variant: "destructive",
+        title: "Limit reached",
+        description: isAuthenticated
+          ? "You've reached your daily limit. Try again tomorrow!"
+          : "Sign up for a free account to get more conversions!",
+      });
+      if (!isAuthenticated) {
+        navigate('/auth');
+      }
+      return;
+    }
+
+    setUploading(true);
+    setBatchResults([]);
+    setMergeInfo(null);
+    setMergeResult(null);
+    setConversionResult(null);
+    setTransactions([]);
+    setAnalytics(null);
+    setAiStatus(null);
+
+    try {
+      const timezone = getTimezone();
+      const requestBody: any = {
+        files: [],
+        timezone,
+      };
+
+      if (pdfPassword.trim()) {
+        requestBody.pdfPassword = pdfPassword.trim();
+      }
+
+      if (!user) {
+        const token = await executeRecaptcha('convert');
+        if (!token) {
+          throw new Error('CAPTCHA not ready');
+        }
+        requestBody.recaptchaToken = token;
+      }
+
+      for (const [index, file] of selectedFiles.entries()) {
+        const isPdf = file.name.toLowerCase().endsWith('.pdf');
+        const payload: any = { fileName: file.name };
+
+        if (pdfPassword.trim()) {
+          payload.pdfPassword = pdfPassword.trim();
+        }
+
+        if (isPdf) {
+          try {
+            payload.pdfPageImages = await pdfToPageImages(file, pdfPassword.trim() || undefined);
+          } catch (err: any) {
+            if (err?.name === 'PasswordException' || String(err?.message || '').toLowerCase().includes('password')) {
+              setPasswordError(true);
+              setShowPasswordInput(true);
+              throw new Error('This PDF is password-protected. Please enter the correct password.');
+            }
+            throw err;
+          }
+        }
+
+        if (user) {
+          const sanitized = sanitizeFilename(file.name);
+          const filePath = `${Date.now()}_${index}_${sanitized}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('bank-statements')
+            .upload(`${user.id}/${filePath}`, file, {
+              cacheControl: '3600',
+              upsert: false,
+            });
+
+          if (uploadError) {
+            throw uploadError;
+          }
+
+          payload.fileId = filePath;
+        } else if (!isPdf) {
+          payload.fileData = await fileToBase64(file);
+        }
+
+        requestBody.files.push(payload);
+      }
+
+      toast({
+        title: user ? "Files uploaded" : "Processing files",
+        description: "Starting batch conversion...",
+      });
+
+      setUploading(false);
+      setConverting(true);
+
+      let accessToken: string | undefined;
+      if (user) {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !sessionData.session) {
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          if (!refreshError && refreshData.session) {
+            accessToken = refreshData.session.access_token;
+          }
+        } else {
+          accessToken = sessionData.session.access_token;
+        }
+      }
+
+      const { data, error: functionError } = await invokeEdgeFunction<MultiConversionResponse>('convert-statements-batch', {
+        body: requestBody,
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+
+      if (functionError) {
+        let message = functionError.message || 'Batch conversion failed';
+        const payload = data as any;
+        if (payload?.limitReached) {
+          refreshUsageLimit();
+        }
+        if (payload?.requiresPassword) {
+          setPasswordError(true);
+          setShowPasswordInput(true);
+        }
+        message = payload?.message || payload?.error || message;
+        throw new Error(message);
+      }
+
+      if ((data as any)?.error) {
+        const payload = data as any;
+        if (payload?.limitReached) {
+          refreshUsageLimit();
+          throw new Error(payload.message || 'Conversion limit reached');
+        }
+        if (payload?.requiresPassword) {
+          setPasswordError(true);
+          setShowPasswordInput(true);
+          throw new Error(payload.error);
+        }
+        throw new Error(payload.error);
+      }
+
+      const results = data?.separate?.results || [];
+      const failures = data?.separate?.failures || [];
+      setBatchResults([
+        ...results.map((result) => ({ fileName: result.fileName, status: 'success' as const, data: { excelData: result.excelData } })),
+        ...failures.map((failure) => ({ fileName: failure.fileName, status: 'error' as const, error: failure.error })),
+      ]);
+
+      setMergeInfo(data?.merge || null);
+      if (data?.merge?.available && data?.merge?.excelData) {
+        setMergeResult({
+          excelData: data.merge.excelData,
+          fileName: data.merge.fileName || `merged_${Date.now()}.xlsx`,
+        });
+      }
+
+      refreshUsageLimit();
+
+      toast({
+        title: "Batch conversion complete!",
+        description: `${results.length} statement(s) converted. ${data?.remaining ?? ''}`.trim(),
+      });
+
+      setSelectedFiles([]);
+      setSelectedFile(null);
+      setShowPasswordInput(false);
+      setPdfPassword('');
+      setPasswordError(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error: any) {
+      console.error('Batch conversion error:', error);
+      const errorMessage = error.message || 'An unexpected error occurred';
+
+      if (errorMessage.toLowerCase().includes('password') ||
+          errorMessage.toLowerCase().includes('encrypted') ||
+          errorMessage.toLowerCase().includes('protected')) {
+        setPasswordError(true);
+        setLastError({ message: 'This PDF is password-protected. Please enter the correct password.', canRetry: true });
+        toast({
+          variant: "destructive",
+          title: "Password Required",
+          description: "This PDF is password-protected. Please enter the correct password.",
+        });
+      } else if (errorMessage.toLowerCase().includes('limit')) {
+        setLastError({ message: errorMessage, canRetry: false });
+        toast({
+          variant: "destructive",
+          title: "Limit Reached",
+          description: errorMessage,
+        });
+      } else if (errorMessage.toLowerCase().includes('captcha') || errorMessage.toLowerCase().includes('verification')) {
+        setLastError({ message: 'Verification failed. Please try again.', canRetry: true });
+        toast({
+          variant: "destructive",
+          title: "Verification Failed",
+          description: "Please try again.",
+        });
+      } else {
+        setLastError({ message: errorMessage, canRetry: true });
+        toast({
+          variant: "destructive",
+          title: "Batch Conversion Failed",
+          description: errorMessage,
+        });
+      }
+    } finally {
+      setUploading(false);
+      setConverting(false);
+    }
+  };
+
   const handleDownload = async () => {
     if (!conversionResult) return;
 
@@ -662,6 +924,43 @@ Analytics Summary:
       });
     } finally {
       setBatchDownloading(false);
+    }
+  };
+
+  const handleMergedDownload = async () => {
+    if (!mergeResult) return;
+
+    setMergeDownloading(true);
+    try {
+      const binaryString = atob(mergeResult.excelData);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = mergeResult.fileName || `merged_${Date.now()}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Downloaded!",
+        description: "Your merged Excel file has been downloaded.",
+      });
+    } catch (error: any) {
+      console.error('Merge download error:', error);
+      toast({
+        variant: "destructive",
+        title: "Download failed",
+        description: error.message || "Failed to download the merged file.",
+      });
+    } finally {
+      setMergeDownloading(false);
     }
   };
 
@@ -1323,7 +1622,15 @@ Analytics Summary:
                       className="w-full border-destructive/50 hover:bg-destructive/10 text-destructive"
                       onClick={() => {
                         setLastError(null);
-                        handleConvert();
+                        if (selectedFiles.length === 1) {
+                          const firstFile = selectedFiles[0];
+                          setSelectedFile(firstFile);
+                          handleConvert(firstFile);
+                        } else if (selectedFiles.length > 1) {
+                          handleConvertMultiple();
+                        } else {
+                          handleConvert();
+                        }
                       }}
                       disabled={false}
                     >
@@ -1343,11 +1650,12 @@ Analytics Summary:
                         size="lg"
                         className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-neon w-full md:w-auto"
                         onClick={() => {
-                          // Process first file from batch
-                          if (selectedFiles.length > 0) {
+                          if (selectedFiles.length === 1) {
                             const firstFile = selectedFiles[0];
                             setSelectedFile(firstFile);
                             handleConvert(firstFile);
+                          } else if (selectedFiles.length > 1) {
+                            handleConvertMultiple();
                           }
                         }}
                         disabled={uploading || converting}
@@ -1377,7 +1685,7 @@ Analytics Summary:
                     <CheckCircle className="h-5 w-5" />
                     <span className="font-medium">Batch Conversion Complete!</span>
                   </div>
-                  <p className="text-sm font-medium text-muted-foreground">Download all files:</p>
+                  <p className="text-sm font-medium text-muted-foreground">Download options:</p>
                   <Button
                     size="lg"
                     className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white"
@@ -1392,10 +1700,36 @@ Analytics Summary:
                     ) : (
                       <>
                         <FileDown className="mr-2 h-5 w-5" />
-                        Download All ({batchResults.filter(r => r.status === 'success').length} files)
+                        Download All Separately ({batchResults.filter(r => r.status === 'success').length} files)
                       </>
                     )}
                   </Button>
+                  {mergeInfo && (
+                    mergeInfo.available && mergeResult ? (
+                      <Button
+                        size="lg"
+                        className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white"
+                        onClick={handleMergedDownload}
+                        disabled={mergeDownloading}
+                      >
+                        {mergeDownloading ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Preparing...
+                          </>
+                        ) : (
+                          <>
+                            <FileSpreadsheet className="mr-2 h-5 w-5" />
+                            Merge All into One Excel
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Merge disabled: {mergeInfo.reasons?.join('; ') || 'Conditions not met'}
+                      </p>
+                    )
+                  )}
                   <p className="text-xs text-muted-foreground">Successfully converted: {batchResults.filter(r => r.status === 'success').length}/{batchResults.length}</p>
                 </div>
               )}

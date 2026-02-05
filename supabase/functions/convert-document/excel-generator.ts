@@ -675,6 +675,102 @@ export function generateSimpleExcel(transactions: Transaction[]): ArrayBuffer {
   return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 }
 
+// ============= MERGED STATEMENTS EXPORT (Multi-PDF) =============
+export interface MergedExcelConfig {
+  bankInfo: BankInfo;
+  statementPeriod?: string;
+  transactions: Transaction[];
+  totals: {
+    totalDebit: number;
+    totalCredit: number;
+    finalBalance: number | null;
+  };
+}
+
+function formatMonthLabel(dateValue: string): string {
+  if (!dateValue) return '';
+  const parsed = new Date(dateValue);
+  if (!Number.isNaN(parsed.getTime())) {
+    return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(parsed);
+  }
+
+  const match = dateValue.match(/^(\d{1,4})[\/\-](\d{1,2})[\/\-](\d{1,4})/);
+  if (!match) return '';
+  const part1 = Number(match[1]);
+  const part2 = Number(match[2]);
+  const part3 = Number(match[3]);
+
+  if (match[1].length === 4) {
+    const date = new Date(Date.UTC(part1, part2 - 1, part3));
+    if (!Number.isNaN(date.getTime())) {
+      return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date);
+    }
+  } else if (match[3].length === 4) {
+    let day = part1;
+    let month = part2;
+    if (part1 <= 12 && part2 > 12) {
+      month = part1;
+      day = part2;
+    }
+    const date = new Date(Date.UTC(part3, month - 1, day));
+    if (!Number.isNaN(date.getTime())) {
+      return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date);
+    }
+  }
+
+  return '';
+}
+
+export function generateMergedStatementsExcel(config: MergedExcelConfig): ExcelGenerationResult {
+  const workbook = XLSX.utils.book_new();
+  const rows: any[][] = [];
+
+  rows.push(['Bank Name', config.bankInfo.bankName || '']);
+  rows.push(['Account Number', config.bankInfo.accountNumber || '']);
+  rows.push(['Currency', config.bankInfo.currency || '']);
+  if (config.bankInfo.accountHolder) {
+    rows.push(['Account Holder Name', config.bankInfo.accountHolder]);
+  }
+  rows.push(['Statement Period', config.statementPeriod || config.bankInfo.statementPeriod || 'N/A']);
+  rows.push([]);
+
+  const tableHeaders = ['Date', 'Month', 'Description', 'Debit', 'Credit', 'Balance'];
+  const headerRowIndex = rows.length;
+  rows.push(tableHeaders);
+
+  const txRows = config.transactions.map((t) => ([
+    t.date || '',
+    formatMonthLabel(t.date || ''),
+    t.description || '',
+    typeof t.debit === 'number' ? t.debit : (parseFloat(String(t.debit)) || 0),
+    typeof t.credit === 'number' ? t.credit : (parseFloat(String(t.credit)) || 0),
+    typeof t.balance === 'number' ? t.balance : (parseFloat(String(t.balance)) || 0),
+  ]));
+
+  rows.push(...txRows);
+  rows.push([]);
+
+  const totalsStartRow = rows.length;
+  rows.push(['Total Debit', '', '', config.totals.totalDebit, '', '']);
+  rows.push(['Total Credit', '', '', '', config.totals.totalCredit, '']);
+  rows.push(['Final Balance (Last Statement)', '', '', '', '', config.totals.finalBalance ?? '']);
+
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  worksheet['!cols'] = autoFitCols(rows, tableHeaders);
+
+  // Style table header
+  setRowStyle(worksheet, headerRowIndex, tableHeaders.length, headerStyle);
+
+  // Style totals section
+  setRowStyle(worksheet, totalsStartRow, tableHeaders.length, totalStyle);
+  setRowStyle(worksheet, totalsStartRow + 1, tableHeaders.length, totalStyle);
+  setRowStyle(worksheet, totalsStartRow + 2, tableHeaders.length, totalStyle);
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Merged Statement');
+  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  return { buffer, sheets: ['Merged Statement'] };
+}
+
 // ============= VALIDATION HELPERS FOR TESTING =============
 export function validateExcelStructure(buffer: ArrayBuffer): {
   valid: boolean;
