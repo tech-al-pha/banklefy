@@ -7,13 +7,13 @@ import {
   callGroqVisionOCR,
   type RawTransaction,
   type BankMetadata,
-} from '../convert-document/ocr-processor.ts';
+} from '../_shared/ocr-processor.ts';
 import {
   performExtraction,
   performCategorization,
   generateStatusReport,
   type AIProcessingStatus,
-} from '../convert-document/ai-orchestrator.ts';
+} from '../_shared/ai-orchestrator.ts';
 import {
   reconcileBalances,
   detectDuplicates,
@@ -24,16 +24,16 @@ import {
   generateFraudAlerts,
   calculateIntegrityScore,
   type Transaction,
-} from '../convert-document/financial-engine.ts';
+} from '../_shared/financial-engine.ts';
 import {
   generateProfessionalExcel,
   generateMergedStatementsExcel,
-} from '../convert-document/excel-generator.ts';
+} from '../_shared/excel-generator.ts';
 import {
   buildMergedStatement,
   validateStatementsForMerge,
   type StatementData,
-} from '../convert-document/multi-statement.ts';
+} from '../_shared/multi-statement.ts';
 
 // ============= ADMIN WHITELIST (Server-Side Only) =============
 const ADMIN_EMAILS = ['inspirexali@gmail.com'];
