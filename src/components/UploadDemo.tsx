@@ -1,9 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, FileJson, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, FileDown, FileCode, Crown } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, FileCode, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeFunction } from "@/lib/supabaseApi";
 import { useAuth } from "@/hooks/useAuth";
@@ -40,9 +40,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-// Lazy load PDF preview for performance
-const PdfPreview = lazy(() => import('./PdfPreview').then(m => ({ default: m.PdfPreview })));
 
 // Enhanced Transaction interface with Universal Schema
 interface Transaction {
@@ -209,6 +206,19 @@ export const UploadDemo = () => {
   // reCAPTCHA v3 for anonymous users - runs invisibly in background
   const { executeRecaptcha } = useRecaptcha();
 
+  useEffect(() => {
+    if (selectedFiles.length === 1) {
+      setSelectedFile(selectedFiles[0]);
+      return;
+    }
+
+    if (selectedFiles.length === 0) {
+      setSelectedFile(null);
+    } else {
+      setSelectedFile(null);
+    }
+  }, [selectedFiles]);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -232,7 +242,7 @@ export const UploadDemo = () => {
     }
 
     if (newFiles.length > 0) {
-      setSelectedFiles([...selectedFiles, ...newFiles]);
+      setSelectedFiles((prev) => [...prev, ...newFiles]);
       setPasswordError(false);
       setPdfPassword('');
       setShowPasswordInput(false);
@@ -564,6 +574,7 @@ Analytics Summary:
       });
 
       setSelectedFile(null);
+      setSelectedFiles([]);
       setShowPasswordInput(false);
       setPdfPassword('');
       setPasswordError(false);
@@ -1015,29 +1026,6 @@ Analytics Summary:
     });
   };
 
-  const exportAsJSON = () => {
-    if (transactions.length === 0) return;
-
-    // Convert transactions to JSON
-    const jsonContent = JSON.stringify(transactions, null, 2);
-
-    // Create and download JSON file
-    const blob = new Blob([jsonContent], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `transactions_${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "JSON Downloaded",
-      description: "Your transaction data has been exported to JSON.",
-    });
-  };
-
   // Check if user has premium access
   const isPaidUser = planType && planType !== 'free';
 
@@ -1201,387 +1189,6 @@ ${xmlTransactions}
     }
   };
 
-  const exportAsPDF = async () => {
-    if (transactions.length === 0 && !analytics) return;
-
-    try {
-      const { jsPDF } = await import('jspdf');
-      const { default: autoTable } = await import('jspdf-autotable');
-
-        const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        let yPos = 15;
-        const isPremiumReport = !!planType && planType !== 'free';
-
-        const ensureSpace = (needed: number) => {
-          if (yPos + needed > pageHeight - 20) {
-            doc.addPage();
-            yPos = 20;
-          }
-        };
-
-      // Add Akromeda Logo
-      try {
-        // Load logo as base64
-        const logoResponse = await fetch(akromedaLogo);
-        const logoBlob = await logoResponse.blob();
-        const logoBase64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(logoBlob);
-        });
-        
-        // Add logo to PDF (left side)
-        doc.addImage(logoBase64, 'PNG', 14, yPos - 5, 25, 25);
-      } catch (logoErr) {
-        console.warn('Could not load logo for PDF:', logoErr);
-      }
-
-      // Title (next to logo)
-      doc.setFontSize(18);
-      doc.setTextColor(180, 120, 60); // Gold-ish color
-      doc.text('AKROMEDA', 45, yPos + 5);
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      doc.text('Financial Intelligence Report', 45, yPos + 12);
-      yPos += 30;
-
-      // Divider line
-      doc.setDrawColor(180, 120, 60);
-      doc.setLineWidth(0.5);
-      doc.line(14, yPos, pageWidth - 14, yPos);
-      yPos += 10;
-
-      // Date
-      doc.setFontSize(9);
-      doc.setTextColor(120);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, yPos);
-        yPos += 10;
-
-        // Report Type
-        doc.setFontSize(9);
-        doc.setTextColor(90);
-        doc.text(`Report Type: ${isPremiumReport ? 'Premium Analysis' : 'Standard Analysis'}`, 14, yPos);
-        yPos += 8;
-
-        // Executive Summary (Premium only)
-        if (isPremiumReport) {
-          ensureSpace(24);
-          doc.setFontSize(12);
-          doc.setTextColor(40);
-          doc.text('Executive Summary', 14, yPos);
-          yPos += 6;
-          doc.setFontSize(9);
-          doc.setTextColor(80);
-          const summaryLines = [
-            'Premium report with enhanced underwriting insights and risk signals.',
-            'Ideal for credit evaluation, audit, and internal review.',
-          ];
-          summaryLines.forEach((line) => {
-            doc.text(`• ${line}`, 16, yPos);
-            yPos += 5;
-          });
-          yPos += 4;
-        }
-
-      // Financial Summary Section
-      if (analytics) {
-        doc.setFontSize(14);
-        doc.setTextColor(40);
-        doc.text('Financial Summary', 14, yPos);
-        yPos += 8;
-
-        doc.setFontSize(10);
-        doc.setTextColor(60);
-        const summaryData = [
-          ['Total Transactions', analytics.totalTransactions.toString()],
-          ['Total Credits', `₹${analytics.totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['Total Debits', `₹${analytics.totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['Net Cash Flow', `₹${analytics.netFlow.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-        ];
-
-        autoTable(doc, {
-          startY: yPos,
-          head: [['Metric', 'Value']],
-          body: summaryData,
-          theme: 'grid',
-          headStyles: { fillColor: [59, 130, 246] },
-          margin: { left: 14, right: 14 },
-        });
-        yPos = (doc as any).lastAutoTable.finalY + 10;
-      }
-
-      // FOIR & Loan Eligibility Section
-      if (analytics?.underwriting) {
-        const uw = analytics.underwriting;
-
-        doc.setFontSize(14);
-        doc.setTextColor(40);
-        doc.text('FOIR & Loan Eligibility Analysis', 14, yPos);
-        yPos += 8;
-
-        const foirData = [
-          ['Average Monthly Income', `₹${(uw.summary?.avgMonthlyIncome ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['Average Monthly EMI', `₹${(uw.summary?.avgMonthlyEMI ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['FOIR Score', `${(uw.summary?.foirScore ?? 0).toFixed(2)}%`],
-          ['FOIR Status', (uw.summary?.foirStatus ?? 'N/A').toUpperCase()],
-          ['Eligibility Status', (uw.eligibility?.status ?? 'N/A').toUpperCase()],
-          ['Max New EMI Possible', `₹${(uw.eligibility?.maxNewEMI ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['Estimated Loan Eligibility', `₹${(uw.eligibility?.estimatedLoanEligibility ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 0 })}`],
-        ];
-
-        autoTable(doc, {
-          startY: yPos,
-          head: [['Parameter', 'Value']],
-          body: foirData,
-          theme: 'grid',
-          headStyles: { fillColor: [16, 185, 129] },
-          margin: { left: 14, right: 14 },
-        });
-        yPos = (doc as any).lastAutoTable.finalY + 10;
-
-        // Eligibility Factors
-        if (uw.eligibility?.factors && uw.eligibility.factors.length > 0) {
-          doc.setFontSize(12);
-          doc.text('Eligibility Factors:', 14, yPos);
-          yPos += 6;
-          doc.setFontSize(9);
-          uw.eligibility.factors.forEach((factor) => {
-            doc.text(`• ${factor}`, 18, yPos);
-            yPos += 5;
-          });
-          yPos += 5;
-        }
-
-        // Salary Credits Detected
-        if (uw.salaryCredits && uw.salaryCredits.length > 0) {
-          ensureSpace(24);
-          doc.setFontSize(14);
-          doc.setTextColor(40);
-          doc.text('Salary Credits Detected', 14, yPos);
-          yPos += 8;
-
-          const salaryData = uw.salaryCredits.map(s => [
-            s.date || 'N/A',
-            `₹${(s.amount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-            (s.description || '').substring(0, 40),
-          ]);
-
-          autoTable(doc, {
-            startY: yPos,
-            head: [['Date', 'Amount', 'Description']],
-            body: salaryData,
-            theme: 'grid',
-            headStyles: { fillColor: [34, 197, 94] },
-            margin: { left: 14, right: 14 },
-          });
-          yPos = (doc as any).lastAutoTable.finalY + 10;
-        }
-
-        // EMI Debits Detected
-        if (uw.emiDebits && uw.emiDebits.length > 0) {
-          ensureSpace(24);
-          doc.setFontSize(14);
-          doc.text('EMI/Loan Debits Detected', 14, yPos);
-          yPos += 8;
-
-          const emiData = uw.emiDebits.map(e => [
-            e.date || 'N/A',
-            `₹${(e.amount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-            e.loanType || 'Unknown',
-            (e.description || '').substring(0, 30),
-          ]);
-
-          autoTable(doc, {
-            startY: yPos,
-            head: [['Date', 'Amount', 'Loan Type', 'Description']],
-            body: emiData,
-            theme: 'grid',
-            headStyles: { fillColor: [239, 68, 68] },
-            margin: { left: 14, right: 14 },
-          });
-          yPos = (doc as any).lastAutoTable.finalY + 10;
-        }
-      }
-
-        // Recommendations & Improvements
-        {
-          const recommendations: string[] = [];
-          const risk = analytics?.riskAnalysis;
-          const uw = analytics?.underwriting;
-
-          if (risk?.integrityScore !== undefined && risk.integrityScore < 70) {
-            recommendations.push('Improve statement integrity: avoid edited PDFs and provide original bank exports.');
-          }
-          if ((risk?.balanceMismatches ?? 0) > 0) {
-            recommendations.push('Resolve balance mismatches to strengthen accuracy and trust.');
-          }
-          if (analytics && analytics.netFlow < 0) {
-            recommendations.push('Improve net cash flow by reducing debits or increasing credits.');
-          }
-          if (uw?.summary?.foirScore !== undefined && uw.summary.foirScore > 50) {
-            recommendations.push('Reduce EMI obligations or increase income to improve FOIR.');
-          }
-          if (uw?.salaryCredits && uw.salaryCredits.length === 0) {
-            recommendations.push('Maintain consistent salary credits to improve eligibility signals.');
-          }
-
-          if (recommendations.length === 0) {
-            recommendations.push('Maintain consistent inflows and avoid abrupt balance dips for best results.');
-          }
-
-          ensureSpace(30);
-          doc.setFontSize(14);
-          doc.setTextColor(40);
-          doc.text(isPremiumReport ? 'Recommendations & Next Steps' : 'Suggested Improvements', 14, yPos);
-          yPos += 8;
-
-          doc.setFontSize(9);
-          doc.setTextColor(70);
-          recommendations.slice(0, isPremiumReport ? 6 : 3).forEach((item) => {
-            ensureSpace(6);
-            doc.text(`• ${item}`, 16, yPos);
-            yPos += 5;
-          });
-
-          if (isPremiumReport) {
-            ensureSpace(10);
-            doc.setTextColor(90);
-            doc.text('Premium tip: use 6–12 months statements for stronger underwriting accuracy.', 16, yPos);
-            yPos += 6;
-          }
-
-          yPos += 4;
-        }
-
-        // Risk Analysis Section
-      if (analytics?.riskAnalysis) {
-        const risk = analytics.riskAnalysis;
-
-        ensureSpace(24);
-        doc.setFontSize(14);
-        doc.setTextColor(40);
-        doc.text('Risk & Fraud Analysis', 14, yPos);
-        yPos += 8;
-
-        const riskData = [
-          ['Document Integrity Score', `${risk.integrityScore ?? 0}%`],
-          ['Balance Mismatches', (risk.balanceMismatches ?? 0).toString()],
-          ['Average Daily Balance', `₹${(risk.averageDailyBalance ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['Max Dip Amount', `₹${(risk.maxDip?.amount ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`],
-          ['Max Dip Date', risk.maxDip?.date || 'N/A'],
-        ];
-
-        autoTable(doc, {
-          startY: yPos,
-          head: [['Metric', 'Value']],
-          body: riskData,
-          theme: 'grid',
-          headStyles: { fillColor: [249, 115, 22] },
-          margin: { left: 14, right: 14 },
-        });
-        yPos = (doc as any).lastAutoTable.finalY + 10;
-
-        // Risk Flags
-        if (risk.riskFlags && risk.riskFlags.length > 0) {
-          doc.setFontSize(12);
-          doc.text('Risk Flags Detected:', 14, yPos);
-          yPos += 6;
-
-          const flagData = risk.riskFlags.map(f => [f.type || 'Unknown', (f.count ?? 0).toString()]);
-
-          autoTable(doc, {
-            startY: yPos,
-            head: [['Risk Type', 'Count']],
-            body: flagData,
-            theme: 'grid',
-            headStyles: { fillColor: [220, 38, 38] },
-            margin: { left: 14, right: 14 },
-          });
-          yPos = (doc as any).lastAutoTable.finalY + 10;
-        }
-
-        // Fraud Alerts
-        if (risk.fraudAlerts && risk.fraudAlerts.length > 0) {
-          doc.setFontSize(12);
-          doc.text('Fraud Alerts:', 14, yPos);
-          yPos += 6;
-
-          const alertData = risk.fraudAlerts.map((a: any) => [
-            a.alert_type || a.type || 'Unknown',
-            a.severity || 'medium',
-            (a.description || '').substring(0, 50),
-          ]);
-
-          autoTable(doc, {
-            startY: yPos,
-            head: [['Type', 'Severity', 'Description']],
-            body: alertData,
-            theme: 'grid',
-            headStyles: { fillColor: [185, 28, 28] },
-            margin: { left: 14, right: 14 },
-          });
-          yPos = (doc as any).lastAutoTable.finalY + 10;
-        }
-      }
-
-      // Glossary / Definitions
-      ensureSpace(24);
-      doc.setFontSize(14);
-      doc.setTextColor(40);
-      doc.text('Glossary (What these terms mean)', 14, yPos);
-      yPos += 8;
-
-      doc.setFontSize(9);
-      doc.setTextColor(70);
-      const glossary = [
-        ['Total Credits', 'Sum of all incoming amounts in the statement period.'],
-        ['Total Debits', 'Sum of all outgoing amounts in the statement period.'],
-        ['Net Cash Flow', 'Credits minus Debits for the period.'],
-        ['FOIR', 'Fixed Obligation to Income Ratio — EMI as % of income.'],
-        ['Integrity Score', 'Confidence in statement consistency and reliability.'],
-        ['Balance Mismatch', 'When running balance does not reconcile with transactions.'],
-        ['EMI Debits', 'Detected loan/EMI payments from the statement.'],
-        ['Risk Flags', 'Signals indicating potential anomalies or concerns.'],
-      ];
-
-      glossary.forEach(([term, desc]) => {
-        ensureSpace(6);
-        doc.text(`${term}: ${desc}`, 14, yPos);
-        yPos += 5;
-      });
-
-      // Footer
-      const pageCount = doc.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text(
-          `Page ${i} of ${pageCount} | Generated by Akromeda`,
-          pageWidth / 2,
-          doc.internal.pageSize.getHeight() - 10,
-          { align: 'center' }
-        );
-      }
-
-      doc.save(`bank_statement_analysis_${Date.now()}.pdf`);
-
-      toast({
-        title: "PDF Report Downloaded",
-        description: "Your complete analysis report has been exported to PDF.",
-      });
-    } catch (error) {
-      console.error('PDF export error:', error);
-      toast({
-        variant: "destructive",
-        title: "Export Failed",
-        description: "Failed to generate PDF report.",
-      });
-    }
-  };
-
   return (
     <section className="relative py-16 px-4 sm:px-6 overflow-hidden bg-[#0A0502]">
       <div className="container mx-auto relative z-10">
@@ -1709,7 +1316,7 @@ ${xmlTransactions}
               </div>
 
               {/* PDF Password Input - Only show when password is required */}
-              {selectedFile && showPasswordInput && !limitReached && (
+              {(selectedFile || selectedFiles.length > 0) && showPasswordInput && !limitReached && (
                 <div className="space-y-4 p-6 bg-destructive/5 rounded-xl border-2 border-destructive/30">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-destructive/20 rounded-lg">
@@ -1791,7 +1398,7 @@ ${xmlTransactions}
               {/* reCAPTCHA v3 runs invisibly - no UI needed */}
 
               {/* Error Panel with Retry */}
-              {lastError && selectedFile && !converting && !uploading && (
+              {lastError && (selectedFile || selectedFiles.length > 0) && !converting && !uploading && (
                 <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-xl space-y-3">
                   <div className="flex items-start gap-3">
                     <XCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
@@ -1884,7 +1491,7 @@ ${xmlTransactions}
                          </>
                        ) : (
                          <>
-                           <FileDown className="mr-2 h-5 w-5" />
+                           <FileSpreadsheet className="mr-2 h-5 w-5" />
                            Separate Excel
                          </>
                        )}
@@ -1989,30 +1596,12 @@ ${xmlTransactions}
                     </Button>
                     <Button
                       size="lg"
-                      className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white"
-                      onClick={exportAsPDF}
-                      disabled={transactions.length === 0 && !analytics}
-                    >
-                      <FileDown className="mr-2 h-5 w-5" />
-                      PDF Report
-                    </Button>
-                    <Button
-                      size="lg"
                       variant="outline"
                       onClick={exportAsCSV}
                       disabled={transactions.length === 0}
                     >
                       <FileText className="mr-2 h-5 w-5" />
                       CSV
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={exportAsJSON}
-                      disabled={transactions.length === 0}
-                    >
-                      <FileJson className="mr-2 h-5 w-5" />
-                      JSON
                     </Button>
                      <Button
                        size="lg"
@@ -2327,9 +1916,9 @@ ${xmlTransactions}
               Premium Feature
             </DialogTitle>
             <DialogDescription className="space-y-4 pt-4">
-              <p>XML and DOCX exports are available for premium users.</p>
+              <p>This export is available for paid users only.</p>
               <p className="text-sm text-muted-foreground">
-                Upgrade to unlock professional Word documents and structured XML exports for your financial data.
+                Upgrade your plan to unlock DOCX and XML exports for your financial data.
               </p>
               <div className="flex flex-col sm:flex-row gap-2 pt-4">
                 <Button 
@@ -2356,3 +1945,4 @@ ${xmlTransactions}
     </section>
   );
 };
+
