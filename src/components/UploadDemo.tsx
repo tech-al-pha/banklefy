@@ -157,6 +157,14 @@ const categoryColors: Record<string, string> = {
   "Other": "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
 };
 
+const conversionSteps = [
+  "Reading document",
+  "Detecting amounts",
+  "Categorizing data",
+  "Analyzing information",
+  "Done",
+];
+
 export const UploadDemo = () => {
   const { toast } = useToast();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -188,6 +196,8 @@ export const UploadDemo = () => {
   const [editedPdfWarning, setEditedPdfWarning] = useState<{ fileName: string; reason: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [progressStep, setProgressStep] = useState(0);
+  const [showProgress, setShowProgress] = useState(false);
   const dismissedEditedWarningsRef = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
@@ -218,6 +228,45 @@ export const UploadDemo = () => {
       setSelectedFile(null);
     }
   }, [selectedFiles]);
+
+  useEffect(() => {
+    if (!converting) return;
+
+    setShowProgress(true);
+    setProgressStep(0);
+
+    const timeouts: number[] = [];
+    const delays = [900, 1100, 1300, 1500];
+
+    const schedule = (nextStep: number) => {
+      const delay = delays[nextStep - 1] ?? 1200;
+      timeouts.push(
+        window.setTimeout(() => {
+          setProgressStep(nextStep);
+          if (nextStep < 3) {
+            schedule(nextStep + 1);
+          }
+        }, delay)
+      );
+    };
+
+    schedule(1);
+
+    return () => {
+      timeouts.forEach((t) => window.clearTimeout(t));
+    };
+  }, [converting]);
+
+  useEffect(() => {
+    if (converting || !showProgress) return;
+
+    setProgressStep(4);
+    const timeout = window.setTimeout(() => {
+      setShowProgress(false);
+    }, 900);
+
+    return () => window.clearTimeout(timeout);
+  }, [converting, showProgress]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1372,7 +1421,7 @@ ${xmlTransactions}
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Button
                       variant="outline"
-                      className="w-full border-amber-500/50 hover:bg-amber-500/10 text-amber-500"
+                      className="w-full border-[#F2C94C]/55 hover:bg-[#F2C94C]/10 text-[#F2C94C] shadow-[0_0_14px_rgba(242,201,76,0.22)] hover:shadow-[0_0_18px_rgba(242,201,76,0.28)]"
                       onClick={() => {
                         dismissedEditedWarningsRef.current.add(editedPdfWarning.fileName);
                         setEditedPdfWarning(null);
@@ -1638,6 +1687,58 @@ ${xmlTransactions}
               {/* AI Processing Status Panel */}
               {aiStatus && <AIStatusPanel aiStatus={aiStatus} />}
 
+              {(converting || showProgress) && (
+                <div className="rounded-xl border border-primary/20 bg-muted/20 p-4 sm:p-5">
+                  <div className="space-y-2">
+                    {conversionSteps.map((step, index) => {
+                      const isDone = index < progressStep;
+                      const isActive = index === progressStep;
+                      const isUpcoming = index > progressStep;
+
+                      return (
+                        <div
+                          key={step}
+                          className={`relative flex items-center gap-3 rounded-lg px-3 py-2 transition-all duration-500 ${
+                            isActive
+                              ? "text-foreground"
+                              : isDone
+                                ? "text-foreground/80"
+                                : "text-muted-foreground"
+                          } ${
+                            isActive
+                              ? "before:absolute before:inset-0 before:-z-10 before:rounded-lg before:bg-primary/10 before:blur-xl before:opacity-70 before:content-['']"
+                              : ""
+                          } ${isDone ? "bg-primary/5 border border-primary/10" : "border border-transparent"}`}
+                        >
+                          <div
+                            className={`relative flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-500 ${
+                              isDone
+                                ? "bg-primary/15 border-primary/40 text-primary"
+                                : isActive
+                                  ? "border-primary/60 text-primary shadow-[0_0_18px_hsl(var(--primary)/0.35)]"
+                                  : "border-white/10 text-muted-foreground"
+                            }`}
+                          >
+                            {isDone ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <div
+                                className={`h-2 w-2 rounded-full ${
+                                  isActive ? "bg-primary animate-pulse" : "bg-white/30"
+                                }`}
+                              />
+                            )}
+                          </div>
+                          <span className={`text-sm font-medium ${isUpcoming ? "text-muted-foreground" : ""}`}>
+                            {step}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* FOIR & Underwriting Analysis Panel - with skeleton during conversion */}
               {converting && (
                 <UnderwritingPanelSkeleton />
@@ -1735,7 +1836,7 @@ ${xmlTransactions}
                           variant="outline"
                           size="sm"
                           onClick={() => setShowDuplicatesOnly(!showDuplicatesOnly)}
-                          className={showDuplicatesOnly ? 'bg-yellow-500/20 border-yellow-500/50' : ''}
+                          className={showDuplicatesOnly ? 'bg-[#F2C94C]/20 border-[#F2C94C]/50 shadow-[0_0_10px_rgba(242,201,76,0.18)]' : ''}
                         >
                           <AlertTriangle className="w-4 h-4 mr-1" />
                           {showDuplicatesOnly ? 'Show All' : `Show Duplicates (${analytics.duplicateCount})`}
