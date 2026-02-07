@@ -26,25 +26,11 @@ export default defineConfig(({ mode }) => {
     chunkSizeWarningLimit: 1600,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
-
-          const parts = id.split("node_modules/")[1].split("/");
-          const pkg = parts[0].startsWith("@") ? `${parts[0]}/${parts[1]}` : parts[0];
-
-          if (pkg === "react" || pkg === "react-dom") return "vendor-react";
-          if (pkg === "react-router" || pkg === "react-router-dom") return "vendor-router";
-          if (pkg.startsWith("@radix-ui")) return "vendor-radix";
-          if (pkg.startsWith("@supabase")) return "vendor-supabase";
-          if (pkg.startsWith("@tanstack")) return "vendor-tanstack";
-          if (pkg === "pdfjs-dist") return "vendor-pdf";
-          if (pkg === "recharts") return "vendor-charts";
-          if (pkg === "lucide-react") return "vendor-icons";
-          if (pkg === "date-fns") return "vendor-date";
-          if (pkg === "zod") return "vendor-zod";
-
-          return "vendor-misc";
-        },
+        // NOTE: Avoid custom manualChunks here.
+        // We observed production/runtime crashes like:
+        // "Cannot access 'X' before initialization" (hashed vendor chunks), which often comes from
+        // circular dependencies split across manually-forced chunks.
+        // Let Rollup/Vite decide chunk boundaries to keep cyclic graphs safe.
       },
     },
   },
