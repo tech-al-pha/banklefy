@@ -14,13 +14,13 @@ export const Hero = () => {
       </div>
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 text-center">
-        <div className="max-w-5xl mx-auto flex flex-col items-center space-y-7 pt-10">
+        <div className="max-w-5xl mx-auto flex flex-col items-center space-y-6 pt-16">
           <div className="flex flex-col items-center leading-tight">
             <h1
               className="font-bold tracking-tight text-white/95 max-w-[18ch]"
-              style={{ fontSize: "clamp(2.25rem, 4.2vw, 4.5rem)", textWrap: "balance" }}
+              style={{ fontSize: "clamp(2.5rem, 5vw, 5.5rem)", textWrap: "balance" }}
             >
-              AI Bank Statement
+              Bank Statement
             </h1>
             <h2
               className="font-black uppercase tracking-tight bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-200 bg-clip-text text-transparent leading-[0.95]"
@@ -30,11 +30,11 @@ export const Hero = () => {
             </h2>
           </div>
 
-          <div className="text-xs sm:text-sm md:text-2xl font-bold text-primary tracking-[0.08em] md:tracking-[0.12em] uppercase pt-2">
+          <div className="text-[10px] sm:text-xs md:text-base font-semibold text-primary tracking-[0.06em] md:tracking-[0.1em] uppercase pt-1">
             professional look | OCR-Powered | Instant Results
           </div>
 
-          <p className="text-sm md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed opacity-70">
+          <p className="text-sm md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed opacity-70 italic">
             Convert bank statements to Excel with AI-powered OCR technology. 
             <br className="hidden md:block" />
             100% accurate data extraction with bank-level security.
