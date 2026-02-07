@@ -62,7 +62,7 @@ begin
     perform cron.schedule(
       'purge_expired_conversions',
       '0 * * * *',
-      $$select public.purge_expired_conversions();$$
+      $cron$select public.purge_expired_conversions();$cron$
     );
   end if;
 end;
