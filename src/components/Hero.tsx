@@ -6,7 +6,7 @@ export const Hero = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-24 pb-6">
+    <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden pt-12 pb-4">
       <div className="absolute inset-0 bg-gradient-dark -z-10">
         <div className="absolute inset-0 bg-gradient-glow opacity-50 animate-pulse" />
         <div className="absolute top-10 left-6 sm:top-20 sm:left-20 w-72 h-72 sm:w-96 sm:h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
@@ -14,7 +14,7 @@ export const Hero = () => {
       </div>
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 text-center">
-        <div className="max-w-5xl mx-auto flex flex-col items-center space-y-7 pt-20">
+        <div className="max-w-5xl mx-auto flex flex-col items-center space-y-7 pt-10">
           <div className="flex flex-col items-center leading-tight">
             <h1
               className="font-bold tracking-tight text-white/95 max-w-[18ch]"
@@ -56,7 +56,7 @@ export const Hero = () => {
               className="w-full sm:w-auto border-primary/40 bg-[#1a120b]/80 text-primary hover:bg-[#1a120b] hover:border-primary/60 backdrop-blur-xl transition-all duration-300 px-8"
               onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
             >
-              View Pricing
+              Sample Report
             </Button>
           </div>
 
