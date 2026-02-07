@@ -55,7 +55,7 @@ const Index = () => {
                 variant="ghost"
                 size="sm" 
                 onClick={() => navigate('/pricing')}
-                className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium px-2 py-1"
+                className="text-xs gap-1 text-muted-foreground transition-all duration-300 font-medium px-2 py-1"
               >
                 <CircleDollarSign className="h-3 w-3" />
                 <span>Pricing</span>
@@ -66,7 +66,7 @@ const Index = () => {
                 variant="ghost"
                 size="sm" 
                 onClick={() => navigate('/benefits')}
-                className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium px-2 py-1"
+                className="text-xs gap-1 text-muted-foreground transition-all duration-300 font-medium px-2 py-1"
               >
                 <Gift className="h-3 w-3" />
                 <span>Benefits</span>
@@ -77,7 +77,7 @@ const Index = () => {
                 variant="ghost"
                 size="sm" 
                 onClick={() => navigate('/features')}
-                className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 font-medium px-2 py-1"
+                className="text-xs gap-1 text-muted-foreground transition-all duration-300 font-medium px-2 py-1"
               >
                 <Sparkles className="h-3 w-3" />
                 {t('nav.features')}
@@ -88,7 +88,7 @@ const Index = () => {
                 variant="ghost"
                 size="sm" 
                 onClick={() => navigate('/chat')}
-                className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 px-2 py-1"
+                className="text-xs gap-1 text-muted-foreground transition-all duration-300 px-2 py-1"
               >
                 <MessageCircle className="h-3 w-3" />
                 {t('nav.chatAura')}
@@ -98,7 +98,7 @@ const Index = () => {
                 variant="ghost"
                 size="sm" 
                 onClick={() => navigate('/settings')}
-                className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300 px-2 py-1"
+                className="text-xs gap-1 text-muted-foreground transition-all duration-300 px-2 py-1"
               >
                 <Settings className="h-3 w-3" />
                 {t('nav.settings')}
@@ -109,7 +109,7 @@ const Index = () => {
                   variant="ghost"
                   size="sm" 
                   onClick={() => navigate('/admin')}
-                  className="text-xs gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all px-2 py-1"
+                  className="text-xs gap-1 text-muted-foreground transition-all px-2 py-1"
                 >
                   <Shield className="h-3 w-3" />
                   {t('nav.admin')}
@@ -122,7 +122,7 @@ const Index = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="border-primary/50 text-foreground hover:bg-primary/10 transition-colors"
+                className="border-primary/50 text-foreground transition-colors"
                 onClick={handleAuthClick}
               >
                 {user ? (
@@ -137,7 +137,7 @@ const Index = () => {
 
               <Button 
                 size="sm" 
-                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-transform active:scale-95"
+                className="bg-primary text-primary-foreground shadow-neon transition-transform active:scale-95"
                 onClick={() => {
                   document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
                 }}
@@ -153,7 +153,7 @@ const Index = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-muted-foreground hover:text-primary hover:bg-primary/5"
+                    className="text-muted-foreground"
                     aria-label="Open menu"
                   >
                     <Menu className="h-5 w-5" />
@@ -171,7 +171,7 @@ const Index = () => {
                     <SheetClose asChild>
                       <Button
                         variant="ghost"
-                        className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                        className="justify-start gap-2 text-muted-foreground"
                         onClick={() => navigate('/pricing')}
                       >
                         <CircleDollarSign className="h-4 w-4" />
@@ -182,7 +182,7 @@ const Index = () => {
                     <SheetClose asChild>
                       <Button
                         variant="ghost"
-                        className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                        className="justify-start gap-2 text-muted-foreground"
                         onClick={() => navigate('/benefits')}
                       >
                         <Gift className="h-4 w-4" />
@@ -193,7 +193,7 @@ const Index = () => {
                     <SheetClose asChild>
                       <Button
                         variant="ghost"
-                        className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                        className="justify-start gap-2 text-muted-foreground"
                         onClick={() => navigate('/features')}
                       >
                         <Sparkles className="h-4 w-4" />
@@ -204,7 +204,7 @@ const Index = () => {
                     <SheetClose asChild>
                       <Button
                         variant="ghost"
-                        className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                        className="justify-start gap-2 text-muted-foreground"
                         onClick={() => navigate('/chat')}
                       >
                         <MessageCircle className="h-4 w-4" />
@@ -215,7 +215,7 @@ const Index = () => {
                     <SheetClose asChild>
                       <Button
                         variant="ghost"
-                        className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                        className="justify-start gap-2 text-muted-foreground"
                         onClick={() => navigate('/settings')}
                       >
                         <Settings className="h-4 w-4" />
@@ -227,7 +227,7 @@ const Index = () => {
                       <SheetClose asChild>
                         <Button
                           variant="ghost"
-                          className="justify-start gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                          className="justify-start gap-2 text-muted-foreground"
                           onClick={() => navigate('/admin')}
                         >
                           <Shield className="h-4 w-4" />
@@ -240,7 +240,7 @@ const Index = () => {
                       <SheetClose asChild>
                         <Button
                           variant="outline"
-                          className="border-primary/40 text-foreground hover:bg-primary/10"
+                          className="border-primary/40 text-foreground"
                           onClick={handleAuthClick}
                         >
                           {user ? (
@@ -256,7 +256,7 @@ const Index = () => {
 
                       <SheetClose asChild>
                         <Button
-                          className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
+                          className="bg-primary text-primary-foreground shadow-neon"
                           onClick={() => {
                             document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
                           }}
@@ -294,7 +294,7 @@ const Index = () => {
             {t('footer.cta.desc')}
           </p>
           <button 
-            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 px-8 py-4 rounded-lg font-bold text-lg"
+            className="bg-primary text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 px-8 py-4 rounded-lg font-bold text-lg"
             onClick={() => {
               document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
             }}
@@ -322,12 +322,12 @@ const Index = () => {
                   <li>
                     <button 
                       onClick={() => navigate('/features')}
-                      className="hover:text-primary transition-colors text-left font-medium"
+                      className="transition-colors text-left font-medium"
                     >
                       {t('footer.features')}
                     </button>
                   </li>
-                  <li><a href="#demo" className="hover:text-primary transition-colors">{t('footer.howItWorks')}</a></li>
+                  <li><a href="#demo" className="transition-colors">{t('footer.howItWorks')}</a></li>
                 </ul>
               </div>
             </div>
@@ -339,7 +339,7 @@ const Index = () => {
                   <li>
                     <button 
                       onClick={() => navigate('/about')}
-                      className="hover:text-primary transition-colors text-left font-medium"
+                      className="transition-colors text-left font-medium"
                     >
                       {t('footer.about')}
                     </button>
@@ -347,7 +347,7 @@ const Index = () => {
                   <li>
                     <button 
                       onClick={() => navigate('/privacy')}
-                      className="hover:text-primary transition-colors text-left font-medium"
+                      className="transition-colors text-left font-medium"
                     >
                       {t('footer.privacy')}
                     </button>
@@ -355,7 +355,7 @@ const Index = () => {
                   <li>
                     <button 
                       onClick={() => navigate('/terms')}
-                      className="hover:text-primary transition-colors text-left font-medium"
+                      className="transition-colors text-left font-medium"
                     >
                       Terms & Conditions
                     </button>
@@ -372,7 +372,7 @@ const Index = () => {
             This site is protected by reCAPTCHA and the Google{" "}
             <a
               href="https://policies.google.com/privacy"
-              className="underline underline-offset-2 hover:text-primary transition-colors"
+              className="underline underline-offset-2 transition-colors"
               rel="noreferrer"
               target="_blank"
             >
@@ -381,7 +381,7 @@ const Index = () => {
             and{" "}
             <a
               href="https://policies.google.com/terms"
-              className="underline underline-offset-2 hover:text-primary transition-colors"
+              className="underline underline-offset-2 transition-colors"
               rel="noreferrer"
               target="_blank"
             >
@@ -396,3 +396,5 @@ const Index = () => {
 };
 
 export default Index;
+
+

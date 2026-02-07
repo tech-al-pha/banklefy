@@ -36,7 +36,7 @@ const FeaturesPage = () => {
           <Button 
             variant="ghost" 
             onClick={() => navigate('/')} 
-            className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
+            className="btn-glow text-primary gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
           >
             <ArrowLeft size={18} /> Back to Home
           </Button>
@@ -112,14 +112,14 @@ const FeaturesPage = () => {
           <div className="flex gap-4 justify-center flex-wrap">
             <Button 
               onClick={() => navigate('/')}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 py-4 sm:px-8 sm:py-6 text-base sm:text-lg"
+              className="bg-primary text-primary-foreground font-bold px-6 py-4 sm:px-8 sm:py-6 text-base sm:text-lg"
             >
               {t('featuresPage.cta.tryDemo')}
             </Button>
             <Button 
               variant="outline"
               onClick={() => navigate('/auth')}
-              className="border-primary/50 text-primary hover:bg-primary/10 font-bold px-6 py-4 sm:px-8 sm:py-6 text-base sm:text-lg"
+              className="border-primary/50 text-primary font-bold px-6 py-4 sm:px-8 sm:py-6 text-base sm:text-lg"
             >
               {t('featuresPage.cta.signUp')}
             </Button>

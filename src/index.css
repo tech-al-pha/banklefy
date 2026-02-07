@@ -254,6 +254,16 @@
   box-shadow: 0 0 30px hsl(42 85% 55% / 0.4);
 }
 
+/* Subtle glow without color shift */
+.btn-glow {
+  position: relative;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.btn-glow:hover {
+  box-shadow: 0 0 18px hsl(42 85% 55% / 0.35);
+}
+
 /* reCAPTCHA v3 badge - hidden (notice shown in footer) */
 .grecaptcha-badge {
   visibility: hidden !important;

@@ -161,8 +161,8 @@ const renderPlanCard = (plan: Plan) => (
       <Button
         className={`w-full h-12 text-base font-bold uppercase tracking-wider rounded-lg ${
           plan.highlighted
-            ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
-            : "bg-[#1a120b] hover:bg-[#251a10] border border-primary/30 text-primary"
+            ? "bg-primary text-primary-foreground shadow-neon"
+            : "bg-[#1a120b] border border-primary/30 text-primary"
         } transition-all duration-300`}
       >
         Choose Plan
@@ -183,7 +183,7 @@ const PricingPage = () => {
           <Button
             variant="ghost"
             onClick={() => navigate("/")}
-            className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
+            className="btn-glow text-primary gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
           >
             Back to Home
           </Button>
@@ -255,7 +255,7 @@ const PricingPage = () => {
             <Button
               variant="outline"
               size="lg"
-              className="border-primary/40 text-white hover:bg-primary/10 backdrop-blur-lg px-10 h-14 font-black uppercase tracking-widest"
+              className="border-primary/40 text-white backdrop-blur-lg px-10 h-14 font-black uppercase tracking-widest"
             >
               Contact Sales
             </Button>

@@ -1297,7 +1297,7 @@ ${xmlTransactions}
                     <Upload className={`w-10 h-10 transition-all duration-300 ${
                       limitReached 
                         ? 'text-muted-foreground utility-icon-muted' 
-                        : 'text-primary group-hover:text-accent'
+                        : 'text-primary'
                     }`} />
                   </div>
                   
@@ -1328,7 +1328,7 @@ ${xmlTransactions}
                               e.stopPropagation();
                               setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
                             }}
-                            className="text-destructive hover:text-destructive/80"
+                            className="text-destructive"
                           >
                             <XCircle className="h-4 w-4" />
                           </button>
@@ -1340,7 +1340,7 @@ ${xmlTransactions}
                   {/* Choose File button - Orange circle removed */}
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <Button 
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto"
+                      className="bg-primary text-primary-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleUploadClick();
@@ -1351,7 +1351,7 @@ ${xmlTransactions}
                     </Button>
                     {selectedFiles.length > 0 && (
                       <Button 
-                        className="bg-accent hover:bg-accent/90 text-accent-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto"
+                        className="bg-accent text-accent-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto"
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedFiles([]);
@@ -1391,7 +1391,7 @@ ${xmlTransactions}
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -1421,7 +1421,7 @@ ${xmlTransactions}
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Button
                       variant="outline"
-                      className="w-full border-[#F2C94C]/55 hover:bg-[#F2C94C]/10 text-[#F2C94C] shadow-[0_0_14px_rgba(242,201,76,0.22)] hover:shadow-[0_0_18px_rgba(242,201,76,0.28)]"
+                      className="w-full border-[#F2C94C]/55 text-[#F2C94C] shadow-[0_0_14px_rgba(242,201,76,0.22)] hover:shadow-[0_0_18px_rgba(242,201,76,0.28)]"
                       onClick={() => {
                         dismissedEditedWarningsRef.current.add(editedPdfWarning.fileName);
                         setEditedPdfWarning(null);
@@ -1435,7 +1435,7 @@ ${xmlTransactions}
                     </Button>
                     <Button
                       variant="ghost"
-                      className="w-full text-muted-foreground hover:text-foreground"
+                      className="w-full text-muted-foreground"
                       onClick={() => setEditedPdfWarning(null)}
                     >
                       Cancel
@@ -1459,7 +1459,7 @@ ${xmlTransactions}
                   {lastError.canRetry && (
                     <Button
                       variant="outline"
-                      className="w-full border-destructive/50 hover:bg-destructive/10 text-destructive"
+                      className="w-full border-destructive/50 text-destructive"
                       onClick={() => {
                         setLastError(null);
                         if (selectedFiles.length === 1) {
@@ -1488,7 +1488,7 @@ ${xmlTransactions}
                     <div className="space-y-3">
                       <Button
                         size="lg"
-                        className="bg-secondary hover:bg-secondary/90 text-secondary-foreground shadow-neon w-full md:w-auto"
+                        className="bg-secondary text-secondary-foreground shadow-neon w-full md:w-auto"
                         onClick={() => {
                           if (selectedFiles.length === 1) {
                             const firstFile = selectedFiles[0];
@@ -1529,7 +1529,7 @@ ${xmlTransactions}
                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
                      <Button
                        size="lg"
-                       className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                       className="bg-primary text-primary-foreground"
                        onClick={handleBatchDownload}
                        disabled={batchDownloading}
                      >
@@ -1548,7 +1548,7 @@ ${xmlTransactions}
                      {mergeInfo && mergeInfo.available && mergeResult && (
                        <Button
                          size="lg"
-                         className="bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                         className="bg-secondary text-secondary-foreground"
                          onClick={handleMergedDownload}
                          disabled={mergeDownloading}
                        >
@@ -1868,7 +1868,7 @@ ${xmlTransactions}
                             .map((transaction, index) => (
                             <TableRow 
                               key={index} 
-                              className={`hover:bg-muted/30 ${
+                              className={`${
                                 transaction.balanceMismatch 
                                   ? 'bg-red-500/10 border-l-2 border-l-red-500' 
                                   : transaction.riskFlag 
@@ -1996,7 +1996,7 @@ ${xmlTransactions}
                   {["HDFC Bank", "ICICI Bank", "Axis Bank", "State Bank of India", "IDBI Bank", "Yes Bank", "Kotak Bank", "Union Bank", "Bank of Baroda", "Punjab National Bank", "HSBC", "Citibank", "Deutsche Bank", "Chase Bank", "Bank of America", "Wells Fargo", "Santander", "BNP Paribas", "ING", "Barclays", "DBS Bank", "OCBC", "UOB", "China Construction Bank", "Agricultural Bank of China", "Bank of China", "ICBC", "Mitsubishi UFJ", "Sumitomo Mitsui", "Nomura"].map((bank) => (
                     <span 
                       key={bank}
-                      className="px-3 py-1 text-xs rounded-full bg-muted/50 text-muted-foreground hover:bg-primary/20 hover:text-primary transition-all"
+                      className="px-3 py-1 text-xs rounded-full bg-muted/50 text-muted-foreground transition-all"
                     >
                       {bank}
                     </span>
@@ -2023,7 +2023,7 @@ ${xmlTransactions}
               </p>
               <div className="flex flex-col sm:flex-row gap-2 pt-4">
                 <Button 
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="bg-primary text-primary-foreground"
                   onClick={() => {
                     setShowUpgradeDialog(false);
                     navigate('/pricing');
@@ -2046,4 +2046,5 @@ ${xmlTransactions}
     </section>
   );
 };
+
 

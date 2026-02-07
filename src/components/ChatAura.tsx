@@ -259,7 +259,7 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
               <Button 
                 onClick={handleSend} 
                 disabled={!input.trim() || isLoading}
-                className="bg-primary hover:bg-primary/90"
+                className="bg-primary"
               >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

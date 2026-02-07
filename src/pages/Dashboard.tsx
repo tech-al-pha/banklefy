@@ -148,7 +148,7 @@ const Dashboard = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate("/")}
-                className="text-muted-foreground hover:text-foreground"
+                className="btn-glow text-muted-foreground"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
@@ -174,7 +174,7 @@ const Dashboard = () => {
                 variant="outline"
                 size="sm"
                 onClick={signOut}
-                className="border-primary/50 hover:bg-primary/10 w-full sm:w-auto"
+                className="border-primary/50 w-full sm:w-auto"
               >
                 Sign Out
               </Button>
@@ -235,7 +235,7 @@ const Dashboard = () => {
                               size="sm"
                               onClick={() => downloadExcel(conversion)}
                               disabled={downloadingId === conversion.id}
-                              className="bg-green-600 hover:bg-green-700"
+                              className="bg-green-600"
                             >
                               {downloadingId === conversion.id ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

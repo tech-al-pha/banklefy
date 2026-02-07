@@ -19,7 +19,7 @@ export const LanguageSelector = () => {
         <Button 
           variant="ghost" 
           size="sm" 
-          className="text-sm gap-1 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
+          className="text-sm gap-1 text-muted-foreground transition-all duration-300"
         >
           {languageNames[language]}
           <ChevronDown className="h-3 w-3" />

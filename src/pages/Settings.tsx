@@ -460,7 +460,7 @@ const Settings = () => {
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate(-1)}
-                className="text-muted-foreground hover:text-primary"
+                className="btn-glow text-muted-foreground"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -480,7 +480,7 @@ const Settings = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => navigate('/')}
-                className="border-primary/50 text-foreground hover:bg-primary/10 w-full sm:w-auto"
+                className="border-primary/50 text-foreground w-full sm:w-auto"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 {t('settings.backToHome')}

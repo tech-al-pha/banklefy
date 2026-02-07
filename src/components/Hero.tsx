@@ -43,7 +43,7 @@ export const Hero = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6 w-full max-w-2xl mx-auto">
             <Button 
               size="lg" 
-              className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 group px-8"
+              className="w-full sm:w-auto bg-primary text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 group px-8"
               onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}
             >
               <Upload className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
@@ -53,8 +53,8 @@ export const Hero = () => {
             <Button 
               size="lg" 
               variant="outline"
-              className="w-full sm:w-auto border-primary/40 bg-[#1a120b]/80 text-primary hover:bg-[#1a120b] hover:border-primary/60 backdrop-blur-xl transition-all duration-300 px-8"
-              onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+              className="w-full sm:w-auto border-primary/40 bg-[#1a120b]/80 text-primary backdrop-blur-xl transition-all duration-300 px-8"
+              onClick={() => navigate("/sample-report")}
             >
               Sample Report
             </Button>

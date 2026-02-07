@@ -42,7 +42,7 @@ export const UsageLimitBanner = ({
           <Button
             size="sm"
             onClick={() => navigate('/pricing')}
-            className="bg-primary hover:bg-primary/90"
+            className="bg-primary"
           >
             <Crown className="mr-2 h-4 w-4" />
             Upgrade to Premium
@@ -67,7 +67,7 @@ export const UsageLimitBanner = ({
             <Button
               size="sm"
               onClick={() => navigate('/auth')}
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary"
             >
               <User className="mr-2 h-4 w-4" />
               Sign up for 6 free conversions!
@@ -92,7 +92,7 @@ export const UsageLimitBanner = ({
           variant="link"
           size="sm"
           onClick={() => navigate('/auth')}
-          className="text-primary hover:text-primary/80 p-0 h-auto font-medium w-full sm:w-auto justify-start sm:justify-center"
+          className="text-primary p-0 h-auto font-medium w-full sm:w-auto justify-start sm:justify-center"
         >
           Sign up for more →
         </Button>

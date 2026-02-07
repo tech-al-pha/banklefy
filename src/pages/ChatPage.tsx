@@ -22,7 +22,7 @@ const ChatPage = () => {
             <Button 
               variant="ghost" 
               onClick={() => navigate('/')} 
-              className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
+              className="btn-glow text-primary gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
             >
               <ArrowLeft size={18} /> Back to Home
             </Button>

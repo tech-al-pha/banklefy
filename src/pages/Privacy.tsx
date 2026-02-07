@@ -81,7 +81,7 @@ const Privacy = () => {
             <Button 
               variant="ghost" 
               onClick={() => navigate('/')} 
-              className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
+              className="btn-glow text-primary gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
             >
               <ArrowLeft size={18} /> {t('common.backToHome')}
             </Button>
@@ -145,7 +145,7 @@ const Privacy = () => {
           </p>
           <Button 
             size="lg" 
-            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-neon"
+            className="bg-primary text-primary-foreground shadow-neon"
             onClick={() => navigate('/')}
           >
             {t('common.backToHome')}

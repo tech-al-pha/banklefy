@@ -129,7 +129,7 @@ const BenefitsPage = () => {
           <Button
             variant="ghost"
             onClick={() => navigate("/")}
-            className="text-primary hover:bg-primary/10 gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
+            className="btn-glow text-primary gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
           >
             <ArrowLeft size={18} /> Back to Home
           </Button>
@@ -204,14 +204,14 @@ const BenefitsPage = () => {
           <div className="flex gap-4 justify-center flex-wrap">
             <Button
               onClick={() => navigate("/auth")}
-              className="bg-primary hover:bg-primary/80 text-black font-bold uppercase tracking-wider px-8"
+              className="bg-primary text-black font-bold uppercase tracking-wider px-8"
             >
               Get Started
             </Button>
             <Button
               onClick={() => navigate("/pricing")}
               variant="outline"
-              className="border-primary/50 text-primary hover:bg-primary/10 font-bold uppercase tracking-wider px-8"
+              className="border-primary/50 text-primary font-bold uppercase tracking-wider px-8"
             >
               View Pricing
             </Button>

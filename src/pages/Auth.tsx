@@ -300,7 +300,7 @@ export default function Auth() {
       {/* Back button */}
       <button
         onClick={() => navigate('/')}
-        className="absolute top-6 left-6 z-20 flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors"
+        className="absolute top-6 left-6 z-20 flex items-center gap-2 text-muted-foreground transition-colors"
       >
         <ArrowLeft className="h-5 w-5" />
         <span>Back</span>
@@ -336,7 +336,7 @@ export default function Auth() {
               </div>
               <Button
                 type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="w-full bg-primary text-primary-foreground"
                 disabled={loading}
               >
                 {loading ? (
@@ -385,7 +385,7 @@ export default function Auth() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -410,7 +410,7 @@ export default function Auth() {
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                       >
                         {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -418,7 +418,7 @@ export default function Auth() {
                   </div>
                   <Button
                     type="submit"
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                    className="w-full bg-primary text-primary-foreground"
                     disabled={loading || !recoverySessionReady}
                   >
                     {loading ? (
@@ -458,7 +458,7 @@ export default function Auth() {
                         setEmail('');
                         setMode('signup');
                       }}
-                      className="text-xs text-muted-foreground hover:text-primary hover:underline"
+                      className="text-xs text-muted-foreground hover:underline"
                     >
                       Not you? Use a different account
                     </button>
@@ -480,7 +480,7 @@ export default function Auth() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -495,7 +495,7 @@ export default function Auth() {
                   <button
                     type="button"
                     onClick={() => setMode('forgot')}
-                    className="text-sm text-muted-foreground hover:text-primary hover:underline"
+                    className="text-sm text-muted-foreground hover:underline"
                     disabled={loading}
                   >
                     {t('auth.forgotPassword')}
@@ -527,7 +527,7 @@ export default function Auth() {
 
                 <Button
                   type="submit"
-                  className={`w-full bg-primary hover:bg-primary/90 text-primary-foreground ${loading || (mode === 'signup' && !termsAccepted) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  className={`w-full bg-primary text-primary-foreground ${loading || (mode === 'signup' && !termsAccepted) ? 'opacity-60 cursor-not-allowed' : ''}`}
                   disabled={loading || (mode === 'signup' && !termsAccepted)}
                 >
                   {loading ? (
