@@ -6,7 +6,7 @@ export const Hero = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden pt-12 pb-4">
+    <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden pt-8 pb-0">
       <div className="absolute inset-0 bg-gradient-dark -z-10">
         <div className="absolute inset-0 bg-gradient-glow opacity-50 animate-pulse" />
         <div className="absolute top-10 left-6 sm:top-20 sm:left-20 w-72 h-72 sm:w-96 sm:h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
