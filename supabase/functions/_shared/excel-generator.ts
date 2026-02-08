@@ -75,6 +75,8 @@ const THEME = {
   headerBg: '1E3A5F',
   headerFg: 'FFFFFF',
   border: 'D0D0D0',
+  debitRed: 'C0392B',
+  creditGreen: '27AE60',
 };
 
 export const headerStyle = {
@@ -97,6 +99,33 @@ export const totalStyle = {
 export const netStyle = {
   font: { bold: true },
 } as const;
+
+const debitTotalStyle = {
+  font: { bold: true, color: { rgb: THEME.debitRed } },
+  alignment: { horizontal: 'right' },
+  border: {
+    top: { style: 'double', color: { rgb: THEME.border } },
+    bottom: { style: 'double', color: { rgb: THEME.border } },
+  },
+} as SheetStyle;
+
+const creditTotalStyle = {
+  font: { bold: true, color: { rgb: THEME.creditGreen } },
+  alignment: { horizontal: 'right' },
+  border: {
+    top: { style: 'double', color: { rgb: THEME.border } },
+    bottom: { style: 'double', color: { rgb: THEME.border } },
+  },
+} as SheetStyle;
+
+const totalLabelStyle = {
+  font: { bold: true },
+  alignment: { horizontal: 'right' },
+  border: {
+    top: { style: 'double', color: { rgb: THEME.border } },
+    bottom: { style: 'double', color: { rgb: THEME.border } },
+  },
+} as SheetStyle;
 
 const TABLE_HEADERS = [
   'Date',
@@ -199,11 +228,40 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   rows.push(...buildAccountRows(config.bankInfo));
   const headerRowIndex = rows.length;
   rows.push(TABLE_HEADERS);
-  rows.push(...buildTransactionRows(config.transactions));
+  const txnRows = buildTransactionRows(config.transactions);
+  rows.push(...txnRows);
+
+  // Add totals row with formulas
+  const dataStartRow = headerRowIndex + 2; // 1-indexed, after header
+  const dataEndRow = headerRowIndex + 1 + txnRows.length;
+  const totalRowIndex = rows.length;
+  
+  // Debit is column D (index 3), Credit is column E (index 4)
+  rows.push([
+    '', '', 'TOTAL',
+    null, // Debit formula placeholder
+    null, // Credit formula placeholder
+    '', '', ''
+  ]);
 
   const ws = XLSX.utils.aoa_to_sheet(rows) as Worksheet;
+  
+  // Add SUM formulas for Debit and Credit
+  const debitCol = 'D';
+  const creditCol = 'E';
+  const debitAddr = `${debitCol}${totalRowIndex + 1}`;
+  const creditAddr = `${creditCol}${totalRowIndex + 1}`;
+  
+  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
+  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
+  
   ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
   setRowStyle(ws, headerRowIndex, TABLE_HEADERS.length, headerStyle);
+  
+  // Style the totals row
+  setCellStyle(ws, `C${totalRowIndex + 1}`, totalLabelStyle);
+  setCellStyle(ws, debitAddr, debitTotalStyle);
+  setCellStyle(ws, creditAddr, creditTotalStyle);
 
   XLSX.utils.book_append_sheet(workbook, ws, 'Transactions');
   const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
@@ -212,10 +270,40 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
 
 export function generateSimpleExcel(transactions: Transaction[]): ArrayBuffer {
   const workbook = XLSX.utils.book_new();
-  const rows: SheetData = [TABLE_HEADERS, ...buildTransactionRows(transactions)];
+  const txnRows = buildTransactionRows(transactions);
+  const rows: SheetData = [TABLE_HEADERS, ...txnRows];
+  
+  // Add totals row
+  const dataStartRow = 2; // 1-indexed, after header
+  const dataEndRow = 1 + txnRows.length;
+  const totalRowIndex = rows.length;
+  
+  rows.push([
+    '', '', 'TOTAL',
+    null, // Debit formula placeholder
+    null, // Credit formula placeholder
+    '', '', ''
+  ]);
+
   const ws = XLSX.utils.aoa_to_sheet(rows) as Worksheet;
+  
+  // Add SUM formulas for Debit and Credit
+  const debitCol = 'D';
+  const creditCol = 'E';
+  const debitAddr = `${debitCol}${totalRowIndex + 1}`;
+  const creditAddr = `${creditCol}${totalRowIndex + 1}`;
+  
+  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
+  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
+  
   ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
   setRowStyle(ws, 0, TABLE_HEADERS.length, headerStyle);
+  
+  // Style the totals row
+  setCellStyle(ws, `C${totalRowIndex + 1}`, totalLabelStyle);
+  setCellStyle(ws, debitAddr, debitTotalStyle);
+  setCellStyle(ws, creditAddr, creditTotalStyle);
+
   XLSX.utils.book_append_sheet(workbook, ws, 'Transactions');
   return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 }
@@ -240,11 +328,39 @@ export function generateMergedStatementsExcel(config: MergedExcelConfig): ExcelG
 
   const headerRowIndex = rows.length;
   rows.push(TABLE_HEADERS);
-  rows.push(...buildTransactionRows(config.transactions));
+  const txnRows = buildTransactionRows(config.transactions);
+  rows.push(...txnRows);
+
+  // Add totals row with formulas
+  const dataStartRow = headerRowIndex + 2; // 1-indexed, after header
+  const dataEndRow = headerRowIndex + 1 + txnRows.length;
+  const totalRowIndex = rows.length;
+  
+  rows.push([
+    '', '', 'TOTAL',
+    null, // Debit formula placeholder
+    null, // Credit formula placeholder
+    '', '', ''
+  ]);
 
   const ws = XLSX.utils.aoa_to_sheet(rows) as Worksheet;
+  
+  // Add SUM formulas for Debit and Credit
+  const debitCol = 'D';
+  const creditCol = 'E';
+  const debitAddr = `${debitCol}${totalRowIndex + 1}`;
+  const creditAddr = `${creditCol}${totalRowIndex + 1}`;
+  
+  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
+  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
+  
   ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
   setRowStyle(ws, headerRowIndex, TABLE_HEADERS.length, headerStyle);
+  
+  // Style the totals row
+  setCellStyle(ws, `C${totalRowIndex + 1}`, totalLabelStyle);
+  setCellStyle(ws, debitAddr, debitTotalStyle);
+  setCellStyle(ws, creditAddr, creditTotalStyle);
 
   XLSX.utils.book_append_sheet(workbook, ws, 'Merged Statement');
   const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
