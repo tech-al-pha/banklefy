@@ -1,7 +1,11 @@
 // ============= MULTI-STATEMENT MERGE UTILITIES =============
 // Validation + normalization + merge helpers for combining multiple statements.
 
-import type { Transaction } from '../_shared/financial-engine.ts';
+import {
+  type Transaction,
+  detectDuplicates,
+  reconcileBalances,
+} from '../_shared/financial-engine.ts';
 import type { BankMetadata } from '../_shared/ocr-processor.ts';
 import type { BankInfo } from '../_shared/excel-generator.ts';
 
@@ -56,7 +60,7 @@ const pickFirstNonEmpty = (values: Array<string | undefined | null>): string => 
 };
 
 const parseNumericDate = (value: string): Date | null => {
-  const match = value.match(/^(\d{1,4})[\/\-](\d{1,2})[\/\-](\d{1,4})/);
+  const match = value.match(/^(\d{1,4})[/-](\d{1,2})[/-](\d{1,4})/);
   if (!match) return null;
   const part1 = Number(match[1]);
   const part2 = Number(match[2]);
@@ -95,13 +99,9 @@ const parseFlexibleDate = (value?: string): Date | null => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const formatMonthYear = (date: Date): string => {
-  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date);
-};
-
 const parseStatementPeriod = (period?: string): { start?: Date; end?: Date } => {
   if (!period) return {};
-  const matches = period.match(/\d{1,4}[\/\-]\d{1,2}[\/\-]\d{1,4}/g);
+  const matches = period.match(/\d{1,4}[/-]\d{1,2}[/-]\d{1,4}/g);
   if (!matches || matches.length < 2) {
     // Attempt to parse a month-based period like "April 2024 - December 2024"
     const split = period.split(/\s*[-–—]\s*/);
@@ -186,8 +186,8 @@ export function validateStatementsForMerge(statements: StatementData[]): MergeVa
   };
 }
 
-const normalizeDescription = (value?: string): string =>
-  (value ?? '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
+const normalizeRefNumber = (value?: string): string =>
+  (value ?? '').toString();
 
 const transactionAmount = (transaction: Transaction): number => {
   const debit = Number(transaction.debit || 0);
@@ -224,32 +224,46 @@ export function mergeTransactions(statements: StatementData[]): { merged: Transa
   for (const item of withIndex) {
     const key = [
       item.transaction.date?.trim() ?? '',
-      transactionAmount(item.transaction).toFixed(2),
-      normalizeDescription(item.transaction.description),
+      normalizeRefNumber(item.transaction.refNumber),
+      transactionAmount(item.transaction),
     ].join('|');
 
-    if (seen.has(key)) {
+    const hasRef = normalizeRefNumber(item.transaction.refNumber) !== '';
+    if (hasRef && seen.has(key)) {
       duplicatesRemoved += 1;
-      continue;
+      // Preserve all rows; flagging happens downstream
     }
 
-    seen.add(key);
+    if (hasRef) {
+      seen.add(key);
+    }
     merged.push(item.transaction);
   }
 
   return { merged, duplicatesRemoved };
 }
 
-const computeStatementPeriod = (statements: StatementData[]): string | undefined => {
-  const ranges = statements.map(getStatementDateRange);
-  const starts = ranges.map((r) => r.start).filter((d): d is Date => !!d);
-  const ends = ranges.map((r) => r.end).filter((d): d is Date => !!d);
-  if (starts.length === 0 || ends.length === 0) return undefined;
-  starts.sort((a, b) => a.getTime() - b.getTime());
-  ends.sort((a, b) => a.getTime() - b.getTime());
-  const start = starts[0];
-  const end = ends[ends.length - 1];
-  return `${formatMonthYear(start)} \u2013 ${formatMonthYear(end)}`;
+const getTransactionDateRangeLabel = (transactions: Transaction[]): { startLabel?: string; endLabel?: string } => {
+  const dated = transactions
+    .map((t) => ({
+      date: parseFlexibleDate(t.date),
+      label: (t.date ?? '').toString().trim(),
+    }))
+    .filter((d): d is { date: Date; label: string } => !!d.date && !!d.label);
+
+  if (dated.length === 0) return {};
+
+  dated.sort((a, b) => a.date.getTime() - b.date.getTime());
+  return {
+    startLabel: dated[0].label,
+    endLabel: dated[dated.length - 1].label,
+  };
+};
+
+const computeStatementPeriod = (transactions: Transaction[]): string | undefined => {
+  const range = getTransactionDateRangeLabel(transactions);
+  if (!range.startLabel || !range.endLabel) return undefined;
+  return `${range.startLabel} to ${range.endLabel}`;
 };
 
 const computeFinalBalance = (statements: StatementData[]): number | null => {
@@ -287,16 +301,25 @@ const computeFinalBalance = (statements: StatementData[]): number | null => {
 
 export function buildMergedStatement(statements: StatementData[]): MergeComputationResult {
   const { merged, duplicatesRemoved } = mergeTransactions(statements);
+  // Reconcile balances and detect duplicates across the merged timeline
+  reconcileBalances(merged);
+  detectDuplicates(merged);
   const totalDebit = merged.reduce((sum, t) => sum + Math.abs(Number(t.debit) || 0), 0);
   const totalCredit = merged.reduce((sum, t) => sum + Math.abs(Number(t.credit) || 0), 0);
   const finalBalance = computeFinalBalance(statements);
-  const statementPeriod = computeStatementPeriod(statements);
+  const statementPeriod = computeStatementPeriod(merged);
 
   const bankName = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.bankName));
   const accountNumber = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.accountNumber));
   const currency = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.currency));
   const accountHolder = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.accountHolder));
   const iban = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.iban));
+  const ifsc = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.ifsc));
+  const swift = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.swift));
+  const routingNumber = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.routingNumber));
+  const sortCode = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.sortCode));
+  const bsb = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.bsb));
+  const micr = pickFirstNonEmpty(statements.map((s) => s.bankMetadata?.micr));
 
   const bankInfo: BankInfo = {
     bankName,
@@ -304,6 +327,12 @@ export function buildMergedStatement(statements: StatementData[]): MergeComputat
     currency,
     accountHolder,
     iban: iban || undefined,
+    ifsc: ifsc || undefined,
+    swift: swift || undefined,
+    routingNumber: routingNumber || undefined,
+    sortCode: sortCode || undefined,
+    bsb: bsb || undefined,
+    micr: micr || undefined,
     statementPeriod,
     closingBalance: finalBalance ?? undefined,
   };

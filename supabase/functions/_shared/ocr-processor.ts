@@ -7,6 +7,12 @@ export interface BankMetadata {
   accountHolder: string;
   currency: string;
   iban?: string;
+  ifsc?: string;
+  swift?: string;
+  routingNumber?: string;
+  sortCode?: string;
+  bsb?: string;
+  micr?: string;
   statementPeriod?: string;
   openingBalance?: number;
   closingBalance?: number;
@@ -45,6 +51,12 @@ OUTPUT FORMAT - Return a JSON object with TWO parts:
     "accountHolder": "Account holder name",
     "currency": "3-letter code: USD, AED, INR, EUR, GBP, SGD, etc.",
     "iban": "IBAN if present",
+    "ifsc": "IFSC code if present (India)",
+    "swift": "SWIFT/BIC code if present",
+    "routingNumber": "Routing number if present (US)",
+    "sortCode": "Sort code if present (UK)",
+    "bsb": "BSB if present (Australia)",
+    "micr": "MICR if present",
     "statementPeriod": "e.g., 01/01/2025 - 31/01/2025",
     "openingBalance": 1000.00,
     "closingBalance": 5000.00
@@ -52,7 +64,7 @@ OUTPUT FORMAT - Return a JSON object with TWO parts:
   "transactions": [
     {
       "date": "YYYY-MM-DD",
-      "refNumber": "Reference/Transaction ID from the document (P123456, UTR123, TXN789, etc.)",
+      "refNumber": "Reference/Transaction ID copied EXACTLY as shown in the document (string, preserve leading zeros, no truncation, no added prefixes)",
       "description": "transaction narration/description", 
       "debit": 1234.56,
       "credit": 0,
@@ -77,6 +89,11 @@ CURRENCY DETECTION - Look at:
 REFERENCE NUMBER - Extract from:
 - "Ref. Number", "Reference", "Txn ID", "UTR", "NEFT Ref", "IMPS Ref"
 - Transaction codes like P123456, N789012, IMPS/456/...
+COPY EXACTLY AS SHOWN. Do NOT add prefixes or alter case.
+If no reference number exists for a row, return an empty string.
+
+DO NOT merge content across different pages or rows.
+IGNORE headers, footers, summaries, opening/closing balance lines, and page-break artifacts. Only real transaction rows.
 
 AMOUNT RULES:
 1. DEBIT = money OUT - positive number
@@ -86,6 +103,88 @@ AMOUNT RULES:
 5. Handle formats: "1,234.56", "1,23,456", "-500"
 
 Return ONLY valid JSON. No markdown, no code blocks.`;
+
+const pickString = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return undefined;
+};
+
+const normalizeBankMetadata = (raw: Record<string, unknown>): BankMetadata => {
+  const get = (keys: string[]): string | undefined => {
+    for (const key of keys) {
+      if (key in raw) {
+        const value = pickString(raw[key]);
+        if (value && value.trim()) return value;
+      }
+    }
+    return undefined;
+  };
+
+  const numberFrom = (keys: string[]): number | undefined => {
+    for (const key of keys) {
+      if (key in raw) {
+        const value = raw[key];
+        if (typeof value === 'number' && !Number.isNaN(value)) return value;
+        if (typeof value === 'string') {
+          const cleaned = value.replace(/[,\s]/g, '');
+          const num = Number(cleaned);
+          if (!Number.isNaN(num)) return num;
+        }
+      }
+    }
+    return undefined;
+  };
+
+  return {
+    bankName: get(['bankName', 'bank', 'bank_name', 'bankname', 'institution', 'bankTitle']) || '',
+    accountNumber: get(['accountNumber', 'accountNo', 'account_no', 'accNo', 'accNumber', 'account_number', 'accountId', 'acctNo', 'acctNumber', 'a_c_no']) || '',
+    accountHolder: get(['accountHolder', 'accountHolderName', 'accountName', 'accHolder', 'account_title', 'accountTitle', 'customerName', 'name']) || '',
+    currency: get(['currency', 'currencyCode', 'currency_type', 'currencyType']) || '',
+    iban: get(['iban', 'IBAN']),
+    ifsc: get(['ifsc', 'ifscCode', 'ifsc_code', 'IFSC']),
+    swift: get(['swift', 'swiftCode', 'bic', 'bicCode', 'SWIFT']),
+    routingNumber: get(['routingNumber', 'routing_no', 'routing', 'routing_number']),
+    sortCode: get(['sortCode', 'sort_code', 'sortcode']),
+    bsb: get(['bsb', 'bsbCode', 'bsb_code']),
+    micr: get(['micr', 'micrCode', 'micr_code']),
+    statementPeriod: get(['statementPeriod', 'statement_period', 'period', 'periodRange', 'dateRange']),
+    openingBalance: numberFrom(['openingBalance', 'opening_balance', 'openingBal', 'opening']),
+    closingBalance: numberFrom(['closingBalance', 'closing_balance', 'closingBal', 'closing']),
+  };
+};
+
+const normalizeTransaction = (raw: Record<string, unknown>): RawTransaction => {
+  const normalized = { ...raw } as RawTransaction;
+
+  const description = raw.description ?? raw.narration ?? raw.details ?? raw.memo ?? raw.particulars;
+  if (description !== undefined && description !== null) {
+    normalized.description = String(description);
+  }
+
+  const ref =
+    raw.refNumber ??
+    raw.refNo ??
+    raw.referenceNo ??
+    raw.referenceNumber ??
+    raw.reference ??
+    raw.ref ??
+    raw.transactionId ??
+    raw.transactionID ??
+    raw.txnId ??
+    raw.txnID ??
+    raw.id;
+  if (ref !== undefined && ref !== null) {
+    normalized.refNumber = typeof ref === 'string' ? ref : String(ref);
+  }
+
+  return normalized;
+};
+
+const normalizeTransactions = (rows: unknown[]): RawTransaction[] => {
+  return rows.map((row) => normalizeTransaction(row as Record<string, unknown>));
+};
 
 export async function callGroqVisionOCR(
   imageBase64: string, 
@@ -152,15 +251,15 @@ export async function callGroqVisionOCR(
           console.log(`Groq Vision OCR extracted ${parsed.transactions.length} transactions with bank metadata`);
           return { 
             success: true, 
-            transactions: parsed.transactions, 
-            bankMetadata: parsed.bankMetadata,
+            transactions: normalizeTransactions(parsed.transactions), 
+            bankMetadata: normalizeBankMetadata(parsed.bankMetadata),
             text: textContent 
           };
         }
         
         // If it's just an object but has date/description, it might be a single transaction
         if (parsed.date && parsed.description) {
-          return { success: true, transactions: [parsed], text: textContent };
+          return { success: true, transactions: normalizeTransactions([parsed]), text: textContent };
         }
       } catch (parseError) {
         console.log('Object parse failed, trying array format...');
@@ -173,7 +272,7 @@ export async function callGroqVisionOCR(
       try {
         const transactions = JSON.parse(jsonMatch[0]);
         console.log(`Groq Vision OCR extracted ${transactions.length} transactions (legacy format)`);
-        return { success: true, transactions, text: textContent };
+        return { success: true, transactions: normalizeTransactions(transactions), text: textContent };
       } catch (parseError) {
         console.error('Failed to parse Groq JSON:', parseError);
         return { success: true, text: textContent };

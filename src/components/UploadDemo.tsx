@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, FileCode, Crown } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +40,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import * as XLSX from "xlsx";
 
 // Enhanced Transaction interface with Universal Schema
 interface Transaction {
@@ -49,6 +50,7 @@ interface Transaction {
   debit: number;
   credit: number;
   balance: number;
+  refNumber?: string;
   isDuplicate?: boolean;
   duplicateGroup?: number | null;
   balanceMismatch?: boolean;
@@ -59,6 +61,35 @@ interface Transaction {
   type?: string;
 }
 
+interface FraudAlertDetail {
+  rowIndex: number;
+  expected?: number;
+  actual?: number;
+  difference?: number;
+}
+
+interface FraudAlertTransaction {
+  date?: string;
+  description?: string;
+  amount?: number;
+}
+
+interface FraudAlertMetadata {
+  details?: FraudAlertDetail[];
+  transactions?: FraudAlertTransaction[];
+  transferCount?: number;
+  pattern?: string;
+  totalAmount?: number;
+}
+
+interface FraudAlert {
+  type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  affectedRows: number[];
+  metadata: FraudAlertMetadata;
+}
+
 interface RiskAnalysis {
   integrityScore: number;
   balanceMismatches: number;
@@ -66,7 +97,7 @@ interface RiskAnalysis {
   maxDip: { amount: number; date: string | null };
   maxPeak: number;
   riskFlags: { type: string; count: number }[];
-  fraudAlerts: any[];
+  fraudAlerts: FraudAlert[];
 }
 
 interface UnderwritingAnalysis {
@@ -102,6 +133,15 @@ interface Analytics {
   underwriting?: UnderwritingAnalysis;
 }
 
+type AiStatus = {
+  groqVision?: { success: boolean; time?: number; error?: string };
+  groqText?: { success: boolean; time?: number; error?: string };
+  mistral?: { success: boolean; time?: number; error?: string };
+  gemini?: { success: boolean; time?: number; error?: string };
+  lovable?: { success: boolean; time?: number; error?: string };
+  patternFallback?: { success: boolean; time?: number; error?: string };
+};
+
 interface MultiStatementResult {
   fileName: string;
   excelData: string;
@@ -135,6 +175,39 @@ interface MultiConversionResponse {
   analytics?: Analytics;
   transactions?: Transaction[];
   planType?: string;
+  error?: string;
+  message?: string;
+  limitReached?: boolean;
+  requiresPassword?: boolean;
+}
+
+interface ConversionResponse {
+  conversionId?: string | null;
+  resultPath?: string | null;
+  excelData?: string;
+  transactions?: Transaction[];
+  analytics?: Analytics;
+  aiStatus?: AiStatus;
+  remaining?: number;
+  limitReached?: boolean;
+  requiresPassword?: boolean;
+  error?: string;
+  message?: string;
+}
+
+interface BatchFilePayload {
+  fileName: string;
+  fileId?: string;
+  fileData?: string;
+  pdfPageImages?: string[];
+  pdfPassword?: string;
+}
+
+interface BatchRequestBody {
+  files: BatchFilePayload[];
+  timezone: string;
+  pdfPassword?: string;
+  recaptchaToken?: string;
 }
 
 // Category color mapping
@@ -172,19 +245,12 @@ export const UploadDemo = () => {
   const [uploading, setUploading] = useState(false);
   const [converting, setConverting] = useState(false);
   const [conversionResult, setConversionResult] = useState<{ id: string | null; resultPath: string | null; excelData?: string } | null>(null);
-  const [batchResults, setBatchResults] = useState<Array<{ fileName: string; status: 'success' | 'error'; data?: any; error?: string }>>([]);
+  const [batchResults, setBatchResults] = useState<Array<{ fileName: string; status: 'success' | 'error'; data?: { excelData: string }; error?: string }>>([]);
   const [mergeInfo, setMergeInfo] = useState<MergeInfo | null>(null);
   const [mergeResult, setMergeResult] = useState<{ excelData: string; fileName: string } | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [aiStatus, setAiStatus] = useState<{
-    groqVision?: { success: boolean; time?: number; error?: string };
-    groqText?: { success: boolean; time?: number; error?: string };
-    mistral?: { success: boolean; time?: number; error?: string };
-    gemini?: { success: boolean; time?: number; error?: string };
-    lovable?: { success: boolean; time?: number; error?: string };
-    patternFallback?: { success: boolean; time?: number; error?: string };
-  } | null>(null);
+  const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [batchDownloading, setBatchDownloading] = useState(false);
   const [mergeDownloading, setMergeDownloading] = useState(false);
@@ -202,6 +268,11 @@ export const UploadDemo = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof Error && error.message) return error.message;
+    if (typeof error === 'string') return error;
+    return fallback;
+  };
     const { 
       remaining, 
       conversionsLimit, 
@@ -440,7 +511,7 @@ export const UploadDemo = () => {
 
     try {
       const timezone = getTimezone();
-      let requestBody: any = {
+      const requestBody: Record<string, unknown> = {
         fileName: fileToConvert.name,
         timezone,
       };
@@ -463,9 +534,10 @@ export const UploadDemo = () => {
       if (isPdf) {
         try {
           requestBody.pdfPageImages = await pdfToPageImages(fileToConvert, pdfPassword.trim() || undefined);
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const error = err as { name?: string; message?: string };
           // Surface password errors in existing UX
-          if (err?.name === 'PasswordException' || String(err?.message || '').toLowerCase().includes('password')) {
+          if (error?.name === 'PasswordException' || String(error?.message || '').toLowerCase().includes('password')) {
             setPasswordError(true);
             setShowPasswordInput(true);
             throw new Error('This PDF is password-protected. Please enter the correct password.');
@@ -533,7 +605,7 @@ export const UploadDemo = () => {
         }
       }
 
-      const { data, error: functionError, response } = await invokeEdgeFunction<any>('convert-document', {
+      const { data, error: functionError } = await invokeEdgeFunction<ConversionResponse>('convert-document', {
         body: requestBody,
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
@@ -543,14 +615,15 @@ export const UploadDemo = () => {
         
         // Check if we got structured error data
         if (data && typeof data === 'object') {
-          if ((data as any).limitReached) {
+          const payload: Partial<ConversionResponse> = data;
+          if (payload.limitReached) {
             refreshUsageLimit();
           }
-          if ((data as any).requiresPassword) {
+          if (payload.requiresPassword) {
             setPasswordError(true);
             setShowPasswordInput(true);
           }
-          message = (data as any).message || (data as any).error || message;
+          message = payload.message || payload.error || message;
         }
 
         throw new Error(message);
@@ -576,29 +649,29 @@ export const UploadDemo = () => {
         excelData: data.excelData,
       });
       
-      if (data.transactions && Array.isArray(data.transactions)) {
+      if (data?.transactions && Array.isArray(data.transactions)) {
         setTransactions(data.transactions);
       }
       
-      if (data.analytics) {
+      if (data?.analytics) {
         setAnalytics(data.analytics);
       }
 
       // Store AI processing status for display
-      if (data.aiStatus) {
+      if (data?.aiStatus) {
         setAiStatus(data.aiStatus);
       }
 
       // Store extracted PDF context in sessionStorage for Chat Aura access
       // This allows Chat Aura to provide context-aware responses about the PDF
-      if (data.transactions && Array.isArray(data.transactions)) {
+      if (data?.transactions && Array.isArray(data.transactions)) {
         // Create a concise text representation of the extracted data
         const extractedSummary = `Bank Statement Extracted Data:
         
 Total Transactions: ${data.transactions.length}
 
 Transactions:
-${data.transactions.map((t: any, i: number) => 
+${data.transactions.map((t: Transaction, i: number) => 
   i < 50 ? `${t.date} | ${t.description} | Category: ${t.category} | Debit: ${t.debit} | Credit: ${t.credit} | Balance: ${t.balance}` : ''
 ).filter(Boolean).join('\n')}
 ${data.transactions.length > 50 ? `\n... and ${data.transactions.length - 50} more transactions` : ''}
@@ -619,7 +692,7 @@ Analytics Summary:
 
       toast({
         title: "Conversion complete!",
-        description: `Extracted ${data.transactions?.length || 0} transactions. ${data.remaining} conversions remaining today.`,
+        description: `Extracted ${data?.transactions?.length || 0} transactions. ${data?.remaining ?? ''} conversions remaining today.`.trim(),
       });
 
       setSelectedFile(null);
@@ -630,9 +703,9 @@ Analytics Summary:
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Conversion error:', error);
-      const errorMessage = error.message || 'An unexpected error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       
       // Check if it's a password-related error
       if (errorMessage.toLowerCase().includes('password') ||
@@ -713,7 +786,7 @@ Analytics Summary:
 
     try {
       const timezone = getTimezone();
-      const requestBody: any = {
+      const requestBody: BatchRequestBody = {
         files: [],
         timezone,
       };
@@ -732,7 +805,7 @@ Analytics Summary:
 
       for (const [index, file] of selectedFiles.entries()) {
         const isPdf = file.name.toLowerCase().endsWith('.pdf');
-        const payload: any = { fileName: file.name };
+        const payload: BatchFilePayload = { fileName: file.name };
 
         if (pdfPassword.trim()) {
           payload.pdfPassword = pdfPassword.trim();
@@ -741,8 +814,9 @@ Analytics Summary:
         if (isPdf) {
           try {
             payload.pdfPageImages = await pdfToPageImages(file, pdfPassword.trim() || undefined);
-          } catch (err: any) {
-            if (err?.name === 'PasswordException' || String(err?.message || '').toLowerCase().includes('password')) {
+          } catch (err: unknown) {
+            const error = err as { name?: string; message?: string };
+            if (error?.name === 'PasswordException' || String(error?.message || '').toLowerCase().includes('password')) {
               setPasswordError(true);
               setShowPasswordInput(true);
               throw new Error('This PDF is password-protected. Please enter the correct password.');
@@ -802,25 +876,25 @@ Analytics Summary:
 
       if (functionError) {
         let message = functionError.message || 'Batch conversion failed';
-        const payload = data as any;
-        if (payload?.limitReached) {
+        const payload: Partial<MultiConversionResponse> = data ?? {};
+        if (payload.limitReached) {
           refreshUsageLimit();
         }
-        if (payload?.requiresPassword) {
+        if (payload.requiresPassword) {
           setPasswordError(true);
           setShowPasswordInput(true);
         }
-        message = payload?.message || payload?.error || message;
+        message = payload.message || payload.error || message;
         throw new Error(message);
       }
 
-      if ((data as any)?.error) {
-        const payload = data as any;
-        if (payload?.limitReached) {
+      if (data?.error) {
+        const payload: MultiConversionResponse = data;
+        if (payload.limitReached) {
           refreshUsageLimit();
           throw new Error(payload.message || 'Conversion limit reached');
         }
-        if (payload?.requiresPassword) {
+        if (payload.requiresPassword) {
           setPasswordError(true);
           setShowPasswordInput(true);
           throw new Error(payload.error);
@@ -868,9 +942,9 @@ Analytics Summary:
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Batch conversion error:', error);
-      const errorMessage = error.message || 'An unexpected error occurred';
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
 
       if (errorMessage.toLowerCase().includes('password') ||
           errorMessage.toLowerCase().includes('encrypted') ||
@@ -951,12 +1025,12 @@ Analytics Summary:
         title: "Downloaded!",
         description: "Your Excel file has been downloaded.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Download error:', error);
       toast({
         variant: "destructive",
         title: "Download failed",
-        description: error.message || "Failed to download the file.",
+        description: getErrorMessage(error, "Failed to download the file."),
       });
     } finally {
       setDownloading(false);
@@ -996,12 +1070,12 @@ Analytics Summary:
         title: "Downloaded!",
         description: `${batchResults.filter(r => r.status === 'success').length} file(s) downloaded.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Batch download error:', error);
       toast({
         variant: "destructive",
         title: "Download failed",
-        description: error.message || "Failed to download the files.",
+        description: getErrorMessage(error, "Failed to download the files."),
       });
     } finally {
       setBatchDownloading(false);
@@ -1033,12 +1107,12 @@ Analytics Summary:
         title: "Downloaded!",
         description: "Your merged Excel file has been downloaded.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Merge download error:', error);
       toast({
         variant: "destructive",
         title: "Download failed",
-        description: error.message || "Failed to download the merged file.",
+        description: getErrorMessage(error, "Failed to download the merged file."),
       });
     } finally {
       setMergeDownloading(false);
@@ -1049,11 +1123,29 @@ Analytics Summary:
     if (transactions.length === 0) return;
 
     // Convert transactions to CSV with new schema
-    const headers = ['Date', 'Description', 'Category', 'Debit', 'Credit', 'Balance', 'Is Duplicate'];
+    const headers = [
+      'Date',
+      'Reference No / Transaction ID',
+      'Description',
+      'Debit',
+      'Credit',
+      'Balance',
+      'Pricing Mismatch Flag',
+      'Duplicate Flag',
+    ];
     const csvRows = [
       headers.join(','),
       ...transactions.map(t => 
-        [t.date, `"${t.description}"`, `"${t.category}"`, t.debit, t.credit, t.balance, t.isDuplicate ? 'Yes' : 'No'].join(',')
+        [
+          t.date,
+          `"${t.refNumber || ''}"`,
+          `"${t.description}"`,
+          t.debit,
+          t.credit,
+          t.balance,
+          t.balanceMismatch ? 'YES' : '',
+          t.isDuplicate ? 'YES' : '',
+        ].join(',')
       )
     ];
     const csvContent = csvRows.join('\n');
@@ -1078,46 +1170,50 @@ Analytics Summary:
   // Check if user has premium access
   const isPaidUser = planType && planType !== 'free';
 
-  const exportAsXML = () => {
+  const exportAsODS = () => {
     if (transactions.length === 0) return;
 
-    // Build XML structure
-    const xmlTransactions = transactions.map(t => `    <Transaction>
-      <Date>${t.date || ''}</Date>
-      <Description><![CDATA[${t.description || ''}]]></Description>
-      <Category>${t.category || 'Other'}</Category>
-      <Debit>${t.debit || 0}</Debit>
-      <Credit>${t.credit || 0}</Credit>
-      <Balance>${t.balance || 0}</Balance>
-    </Transaction>`).join('\n');
+    const headers = [
+      'Date',
+      'Reference No / Transaction ID',
+      'Description',
+      'Debit',
+      'Credit',
+      'Balance',
+      'Pricing Mismatch Flag',
+      'Duplicate Flag',
+    ];
+    const rows = [
+      headers,
+      ...transactions.map(t => [
+        t.date || '',
+        t.refNumber || '',
+        t.description || '',
+        t.debit ?? 0,
+        t.credit ?? 0,
+        t.balance ?? 0,
+        t.balanceMismatch ? 'YES' : '',
+        t.isDuplicate ? 'YES' : '',
+      ]),
+    ];
 
-    const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<BankStatement>
-  <Metadata>
-    <GeneratedAt>${new Date().toISOString()}</GeneratedAt>
-    <TotalTransactions>${transactions.length}</TotalTransactions>
-    <TotalCredits>${analytics?.totalCredits || 0}</TotalCredits>
-    <TotalDebits>${analytics?.totalDebits || 0}</TotalDebits>
-    <NetFlow>${analytics?.netFlow || 0}</NetFlow>
-  </Metadata>
-  <Transactions>
-${xmlTransactions}
-  </Transactions>
-</BankStatement>`;
-
-    const blob = new Blob([xmlContent], { type: 'application/xml' });
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
+    const wbout = XLSX.write(workbook, { bookType: 'ods', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.oasis.opendocument.spreadsheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `transactions_${Date.now()}.xml`;
+    a.download = `transactions_${Date.now()}.ods`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
     toast({
-      title: "XML Downloaded",
-      description: "Your transaction data has been exported to XML.",
+      title: "ODS Downloaded",
+      description: "Your transaction data has been exported to ODS.",
     });
   };
 
@@ -1226,7 +1322,7 @@ ${xmlTransactions}
     }
   };
 
-  const handlePremiumExport = (format: 'docx' | 'xml') => {
+  const handlePremiumExport = (format: 'docx' | 'ods') => {
     if (!isPaidUser) {
       setShowUpgradeDialog(true);
       return;
@@ -1234,7 +1330,7 @@ ${xmlTransactions}
     if (format === 'docx') {
       exportAsDOCX();
     } else {
-      exportAsXML();
+      exportAsODS();
     }
   };
 
@@ -1587,17 +1683,6 @@ ${xmlTransactions}
                      <Button
                        size="sm"
                        variant="outline"
-                       onClick={() => handlePremiumExport('xml')}
-                       disabled={transactions.length === 0}
-                       className={!isPaidUser ? 'opacity-70' : ''}
-                     >
-                       <FileCode className="mr-2 h-4 w-4" />
-                       XML
-                       {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
-                     </Button>
-                     <Button
-                       size="sm"
-                       variant="outline"
                        onClick={() => handlePremiumExport('docx')}
                        disabled={transactions.length === 0}
                        className={!isPaidUser ? 'opacity-70' : ''}
@@ -1606,11 +1691,22 @@ ${xmlTransactions}
                        DOCX
                        {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
                      </Button>
+                     <Button
+                       size="sm"
+                       variant="outline"
+                       onClick={() => handlePremiumExport('ods')}
+                       disabled={transactions.length === 0}
+                       className={!isPaidUser ? 'opacity-70' : ''}
+                     >
+                       <FileSpreadsheet className="mr-2 h-4 w-4" />
+                       ODS
+                       {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
+                     </Button>
                    </div>
                    {!isPaidUser && (
                      <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                        <Crown className="h-3 w-3 text-amber-500" />
-                       XML & DOCX are premium formats
+                       DOCX & ODS are premium formats
                      </p>
                    )}
                  </div>
@@ -1652,35 +1748,35 @@ ${xmlTransactions}
                       <FileText className="mr-2 h-5 w-5" />
                       CSV
                     </Button>
-                     <Button
-                       size="lg"
-                       variant="outline"
-                       onClick={() => handlePremiumExport('xml')}
-                       disabled={transactions.length === 0}
-                       className={!isPaidUser ? 'opacity-70' : ''}
-                     >
-                       <FileCode className="mr-2 h-5 w-5" />
-                       XML
-                       {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
-                     </Button>
-                     <Button
-                       size="lg"
-                       variant="outline"
-                       onClick={() => handlePremiumExport('docx')}
-                       disabled={transactions.length === 0}
-                       className={!isPaidUser ? 'opacity-70' : ''}
-                     >
-                       <FileText className="mr-2 h-5 w-5" />
-                       DOCX
-                       {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
-                     </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={() => handlePremiumExport('docx')}
+                      disabled={transactions.length === 0}
+                      className={!isPaidUser ? 'opacity-70' : ''}
+                    >
+                      <FileText className="mr-2 h-5 w-5" />
+                      DOCX
+                      {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={() => handlePremiumExport('ods')}
+                      disabled={transactions.length === 0}
+                      className={!isPaidUser ? 'opacity-70' : ''}
+                    >
+                      <FileSpreadsheet className="mr-2 h-5 w-5" />
+                      ODS
+                      {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
+                    </Button>
                   </div>
-                   {!isPaidUser && (
-                     <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                       <Crown className="h-3 w-3 text-amber-500" />
-                       XML & DOCX are premium formats
-                     </p>
-                   )}
+                  {!isPaidUser && (
+                    <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                      <Crown className="h-3 w-3 text-amber-500" />
+                      DOCX & ODS are premium formats
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -2019,7 +2115,7 @@ ${xmlTransactions}
             <DialogDescription className="space-y-4 pt-4">
               <p>This export is available for paid users only.</p>
               <p className="text-sm text-muted-foreground">
-                Upgrade your plan to unlock DOCX and XML exports for your financial data.
+                Upgrade your plan to unlock DOCX and ODS exports for your financial data.
               </p>
               <div className="flex flex-col sm:flex-row gap-2 pt-4">
                 <Button 

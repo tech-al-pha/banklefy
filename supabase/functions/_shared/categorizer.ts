@@ -8,6 +8,7 @@ export interface ProcessedTransaction {
   debit: number;
   credit: number;
   balance: number;
+  refNumber?: string;
   originalDescription?: string;
   isDuplicate?: boolean;
   duplicateGroup?: number | null;
@@ -23,6 +24,24 @@ export interface CategorizationResult {
   transactions?: ProcessedTransaction[];
   error?: string;
   processingTimeMs?: number;
+}
+
+interface RawTransaction {
+  date?: string;
+  description?: string;
+  category?: string;
+  debit?: number;
+  credit?: number;
+  balance?: number;
+  amount?: number;
+  type?: string;
+  refNumber?: string;
+}
+
+interface CategorizedItem {
+  i?: number;
+  desc?: string;
+  cat?: string;
 }
 
 // Category list for external use
@@ -74,7 +93,7 @@ const GROQ_SYSTEM_PROMPT = `You are a lightning-fast transaction categorizer for
 Return a JSON array with cleaned descriptions and assigned categories. Keep all other fields unchanged.`;
 
 export async function callGroqCategorizer(
-  transactions: any[]
+  transactions: RawTransaction[]
 ): Promise<CategorizationResult> {
   const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
 
@@ -145,11 +164,11 @@ export async function callGroqCategorizer(
     }
 
     try {
-      const categorized = JSON.parse(jsonMatch[0]);
+      const categorized = JSON.parse(jsonMatch[0]) as CategorizedItem[];
 
       // Map back to original transactions
       const processedTransactions: ProcessedTransaction[] = transactions.map((t, index) => {
-        const categorizedItem = categorized.find((c: any) => c.i === index);
+        const categorizedItem = categorized.find((c) => c.i === index);
         return {
           date: t.date,
           description: categorizedItem?.desc || t.description,
@@ -157,6 +176,7 @@ export async function callGroqCategorizer(
           debit: t.debit || 0,
           credit: t.credit || 0,
           balance: t.balance || 0,
+          refNumber: t.refNumber,
           originalDescription: t.description,
         };
       });
@@ -230,7 +250,7 @@ const CATEGORY_PATTERNS: Record<string, RegExp[]> = {
   ],
 };
 
-export function fallbackCategorize(transactions: any[]): ProcessedTransaction[] {
+export function fallbackCategorize(transactions: RawTransaction[]): ProcessedTransaction[] {
   return transactions.map(t => {
     const desc = (t.description || '').toLowerCase();
     let category = 'Other';
@@ -252,6 +272,7 @@ export function fallbackCategorize(transactions: any[]): ProcessedTransaction[] 
       debit: typeof t.debit === 'number' ? Math.abs(t.debit) : 0,
       credit: typeof t.credit === 'number' ? Math.abs(t.credit) : 0,
       balance: typeof t.balance === 'number' ? t.balance : 0,
+      refNumber: t.refNumber,
       originalDescription: t.description,
       isDuplicate: false,
       duplicateGroup: null,
@@ -268,7 +289,7 @@ export const applyPatternCategorization = fallbackCategorize;
 function cleanDescription(desc: string): string {
   return desc
     .replace(/\s+/g, ' ')
-    .replace(/[^\w\s@.\/\-]/g, '')
+    .replace(/[^\w\s@./-]/g, '')
     .trim()
     .split(' ')
     .map(word => {

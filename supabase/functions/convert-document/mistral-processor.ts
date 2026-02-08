@@ -15,6 +15,7 @@ export interface ProcessedTransaction {
   debit: number;
   credit: number;
   balance: number;
+  refNumber?: string;
   originalDescription?: string;
   isDuplicate?: boolean;
   duplicateGroup?: number | null;
@@ -23,6 +24,17 @@ export interface ProcessedTransaction {
   riskFlag?: string | null;
   amount?: number;
   type?: string;
+}
+
+interface RawTransaction {
+  date?: string;
+  description?: string;
+  narration?: string;
+  category?: string;
+  debit?: number | string;
+  credit?: number | string;
+  balance?: number | string;
+  refNumber?: string;
 }
 
 const CATEGORY_LIST = [
@@ -74,7 +86,7 @@ CATEGORIZATION RULES:
 Return JSON with: date, description (cleaned), category, debit (SAME as input), credit (SAME as input), balance (SAME as input)`;
 
 export async function callMistralCategorizer(
-  transactions: any[]
+  transactions: RawTransaction[]
 ): Promise<MistralCategorizationResult> {
   const MISTRAL_API_KEY = Deno.env.get('MISTRAL_API_KEY');
   
@@ -136,7 +148,7 @@ export async function callMistralCategorizer(
     }
     
     // Parse JSON from response
-    let parsedTransactions: ProcessedTransaction[];
+    let parsedTransactions: RawTransaction[];
     
     try {
       // Try to parse as JSON object first (for response_format: json_object)
@@ -144,14 +156,14 @@ export async function callMistralCategorizer(
       
       // Handle both array and object with transactions key
       if (Array.isArray(parsed)) {
-        parsedTransactions = parsed;
+        parsedTransactions = parsed as RawTransaction[];
       } else if (parsed.transactions && Array.isArray(parsed.transactions)) {
-        parsedTransactions = parsed.transactions;
+        parsedTransactions = parsed.transactions as RawTransaction[];
       } else {
         // Try to find array in the response
         const jsonMatch = textContent.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
-          parsedTransactions = JSON.parse(jsonMatch[0]);
+          parsedTransactions = JSON.parse(jsonMatch[0]) as RawTransaction[];
         } else {
           throw new Error('No valid array found');
         }
@@ -166,33 +178,38 @@ export async function callMistralCategorizer(
     }
     
     // Normalize transactions - PRESERVE original numerical values
-    const normalizedTransactions: ProcessedTransaction[] = parsedTransactions.map((t: any, index: number) => {
+    const normalizedTransactions: ProcessedTransaction[] = parsedTransactions.map((t, index) => {
       // Get original transaction to preserve amounts if Mistral changed them
-      const original = transactions[index] || {};
+      const original = transactions[index];
       
       // Parse amounts from either source, preferring original if Mistral returned 0
-      const parseAmount = (val: any): number => {
-        if (typeof val === 'number' && !isNaN(val)) return Math.abs(val);
+      const parseAmount = (val: unknown): number => {
+        if (typeof val === 'number' && !Number.isNaN(val)) return Math.abs(val);
         if (typeof val === 'string') {
           const cleaned = val.replace(/[,\s]/g, '').replace(/^-/, '');
           const num = parseFloat(cleaned);
-          return isNaN(num) ? 0 : Math.abs(num);
+          return Number.isNaN(num) ? 0 : Math.abs(num);
         }
         return 0;
       };
       
       // Use original values if Mistral returned 0 but original had a value
-      const debit = parseAmount(t.debit) || parseAmount(original.debit);
-      const credit = parseAmount(t.credit) || parseAmount(original.credit);
-      const balance = parseAmount(t.balance) || parseAmount(original.balance);
+      const debit = parseAmount(t.debit) || parseAmount(original?.debit);
+      const credit = parseAmount(t.credit) || parseAmount(original?.credit);
+      const balance = parseAmount(t.balance) || parseAmount(original?.balance);
       
+      const rawDate = original?.date || t.date || '';
+      const rawDescription = original?.description || original?.narration || t.description || t.narration || '';
+
       return {
-        date: normalizeDate(t.date || original.date),
-        description: cleanDescription(t.description || t.narration || original.description || ''),
-        category: validateCategory(t.category),
+        date: normalizeDate(rawDate),
+        description: cleanDescription(t.description || t.narration || rawDescription || ''),
+        category: validateCategory(t.category ?? ''),
         debit,
         credit,
         balance,
+        refNumber: t.refNumber || original?.refNumber,
+        originalDescription: rawDescription,
       };
     });
     

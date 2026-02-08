@@ -35,6 +35,7 @@ import {
   type Transaction,
 } from '../_shared/financial-engine.ts';
 import { generateProfessionalExcel } from '../_shared/excel-generator.ts';
+import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
 
 // ============= ADMIN WHITELIST (Server-Side Only) =============
 const ADMIN_EMAILS = ['inspirexali@gmail.com'];
@@ -331,7 +332,7 @@ Deno.serve(async (req) => {
     let bytes: Uint8Array;
 
     if (user && fileId) {
-      const { data: fileData, error: downloadError } = await supabase.storage
+      const { data: fileData, error: downloadError } = await supabaseAdmin.storage
         .from('bank-statements')
         .download(`${user.id}/${fileId}`);
 
@@ -676,25 +677,27 @@ Deno.serve(async (req) => {
     console.log('=== Starting Specialized Categorization ===');
     
     const categorizationResult = await performCategorization(rawTransactions, extractionResult.status);
-    let categorizedTransactions = categorizationResult.transactions;
+    const categorizedTransactions = categorizationResult.transactions;
     
     // Log final status
     console.log(generateStatusReport(categorizationResult.status));
 
     // Convert to Transaction type for financial engine
-    const transactions: Transaction[] = categorizedTransactions.map(t => ({
+    const extractedTransactions: Transaction[] = categorizedTransactions.map(t => ({
       date: t.date,
-      description: t.description,
+      description: t.originalDescription || t.description,
       category: t.category,
       debit: t.debit,
       credit: t.credit,
       balance: t.balance,
+      refNumber: t.refNumber,
       isDuplicate: t.isDuplicate,
       duplicateGroup: t.duplicateGroup,
       balanceMismatch: t.balanceMismatch,
       expectedBalance: t.expectedBalance,
       riskFlag: t.riskFlag,
     }));
+    const transactions = sanitizeTransactions(extractedTransactions);
 
     // ============= LAYER 4: FINANCIAL ENGINE (Pure TypeScript) =============
     console.log('Starting financial analysis...');

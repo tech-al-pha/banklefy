@@ -25,6 +25,7 @@ import {
   calculateIntegrityScore,
   type Transaction,
 } from '../_shared/financial-engine.ts';
+import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
 import {
   generateProfessionalExcel,
   generateMergedStatementsExcel,
@@ -189,7 +190,7 @@ const bufferToBase64 = (buffer: ArrayBuffer): string => {
 };
 
 const sanitizeFileName = (fileName: string): string =>
-  fileName.replace(/[\\\/]/g, '').substring(0, 255);
+  fileName.replace(/[\\/]/g, '').substring(0, 255);
 
 const buildCategoryCorrections = async (supabaseAdmin: ReturnType<typeof createClient<unknown>>, userId?: string) => {
   if (!userId) return undefined;
@@ -227,6 +228,14 @@ type ProcessedStatement = {
   };
 };
 
+interface FraudAlert {
+  type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  affectedRows: number[];
+  metadata?: Record<string, unknown>;
+}
+
 // Aggregated analytics for batch mode
 interface AggregatedAnalytics {
   totalTransactions: number;
@@ -242,7 +251,7 @@ interface AggregatedAnalytics {
     maxDip: { amount: number; date: string | null };
     maxPeak: number;
     riskFlags: { type: string; count: number }[];
-    fraudAlerts: any[];
+    fraudAlerts: FraudAlert[];
   };
   underwriting: {
     salaryCredits: { date: string; amount: number; description: string }[];
@@ -487,19 +496,21 @@ const processStatement = async (params: {
   const categorizationResult = await performCategorization(rawTransactions, extractionResult.status);
   console.log(generateStatusReport(categorizationResult.status));
 
-  const transactions: Transaction[] = categorizationResult.transactions.map(t => ({
+  const extractedTransactions: Transaction[] = categorizationResult.transactions.map(t => ({
     date: t.date,
-    description: t.description,
+    description: t.originalDescription || t.description,
     category: t.category,
     debit: t.debit,
     credit: t.credit,
     balance: t.balance,
+    refNumber: t.refNumber,
     isDuplicate: t.isDuplicate,
     duplicateGroup: t.duplicateGroup,
     balanceMismatch: t.balanceMismatch,
     expectedBalance: t.expectedBalance,
     riskFlag: t.riskFlag,
   }));
+  const transactions = sanitizeTransactions(extractedTransactions);
 
   const reconciliation = reconcileBalances(transactions);
   const duplicateCount = detectDuplicates(transactions);
@@ -785,7 +796,7 @@ const categoryCorrections = await buildCategoryCorrections(supabaseAdmin as Retu
         // Retrieve bytes (for validation and non-PDF extraction)
         let bytes = new Uint8Array();
         if (user && file.fileId) {
-          const { data: fileData, error: downloadError } = await supabase.storage
+          const { data: fileData, error: downloadError } = await supabaseAdmin.storage
             .from('bank-statements')
             .download(`${user.id}/${file.fileId}`);
 

@@ -177,10 +177,13 @@ export function detectDuplicates(transactions: Transaction[]): number {
   let duplicateCount = 0;
   
   transactions.forEach((t, i) => {
-    // Create a key based on date, amount, and first 20 chars of description
-    const amount = Math.abs(t.debit || t.credit || 0);
-    const descKey = t.description.substring(0, 20).toLowerCase().replace(/\s+/g, '');
-    const key = `${t.date}_${amount}_${descKey}`;
+    // Create a key based on Date + Reference No + Amount (per statement rules)
+    const debitVal = Number(t.debit || 0);
+    const creditVal = Number(t.credit || 0);
+    const amount = Math.abs(debitVal > 0 ? debitVal : creditVal || 0);
+    const refKey = (t.refNumber || '').toString();
+    if (!refKey) return;
+    const key = `${t.date}_${refKey}_${amount}`;
     
     if (duplicateMap.has(key)) {
       const existing = duplicateMap.get(key)!;
@@ -308,7 +311,7 @@ export function detectCircularTrading(transactions: Transaction[]): RiskTransact
     if (t.category === 'Transfer In' || t.category === 'Transfer Out') {
       const desc = t.description.toLowerCase();
       // Extract potential account identifier
-      const match = desc.match(/(?:to|from|upi|imps|neft|rtgs)\s*[:\-]?\s*([a-z0-9@\-_.]+)/);
+      const match = desc.match(/(?:to|from|upi|imps|neft|rtgs)\s*[:-]?\s*([a-z0-9@_.-]+)/);
       if (match) {
         const key = match[1].substring(0, 20);
         const existing = transferPairs.get(key);

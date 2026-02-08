@@ -89,7 +89,9 @@ export async function performExtraction(
                 role: 'system',
                 content: `Extract ALL transactions from this bank statement text.
                 
-Return JSON array with: date (YYYY-MM-DD), description, debit (number), credit (number), balance (number).
+Return JSON array with: date (YYYY-MM-DD), refNumber (as shown in the document), description, debit (number), credit (number), balance (number).
+If refNumber is not present for a row, return an empty string.
+Ignore headers, footers, summaries, opening/closing balance lines, and page-break artifacts.
 Return ONLY the JSON array, no markdown.`,
               },
               {
@@ -109,7 +111,19 @@ Return ONLY the JSON array, no markdown.`,
           const responseText = groqData.choices?.[0]?.message?.content || '';
           const jsonMatch = responseText.match(/\[[\s\S]*\]/);
           if (jsonMatch) {
-            transactions = JSON.parse(jsonMatch[0]);
+            const parsed = JSON.parse(jsonMatch[0]) as RawTransaction[];
+            transactions = parsed.map((t) => ({
+              ...t,
+              description: t.description ?? (t as { narration?: string }).narration ?? '',
+              refNumber: (() => {
+                const refValue =
+                  t.refNumber ??
+                  (t as { refNo?: string; referenceNo?: string; transactionId?: string }).refNo ??
+                  (t as { referenceNo?: string }).referenceNo ??
+                  (t as { transactionId?: string }).transactionId;
+                return refValue === undefined || refValue === null ? '' : String(refValue);
+              })(),
+            }));
             status.groqText.success = true;
             console.log(`✅ Groq Text extracted ${transactions.length} transactions in ${status.groqText.time}ms`);
             return { transactions, status, extractedText: finalExtractedText };
