@@ -116,6 +116,54 @@ export type Database = {
         }
         Relationships: []
       }
+      razorpay_orders: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          metadata: Json | null
+          notes: Json | null
+          plan_id: string
+          payment_capture: boolean
+          razorpay_order_id: string
+          receipt: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          notes?: Json | null
+          plan_id: string
+          payment_capture?: boolean
+          razorpay_order_id: string
+          receipt: string
+          status: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          notes?: Json | null
+          plan_id?: string
+          payment_capture?: boolean
+          razorpay_order_id?: string
+          receipt?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       fraud_alerts: {
         Row: {
           affected_rows: Json | null

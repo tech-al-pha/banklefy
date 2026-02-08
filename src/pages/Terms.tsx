@@ -40,7 +40,7 @@ const Terms = () => {
     {
       icon: Shield,
       title: "Third-Party Services",
-      content: "We rely on third-party providers (such as Supabase and reCAPTCHA) to operate the service. Your use of those services may be subject to their terms and privacy policies.",
+      content: "We rely on third-party providers (such as Supabase, reCAPTCHA, and Razorpay) to operate the service. Your use of those services may be subject to their terms and privacy policies.",
     },
     {
       icon: FileText,
@@ -56,6 +56,11 @@ const Terms = () => {
       icon: Scale,
       title: "Governing Law",
       content: "These terms are governed by the laws of India, and you submit to the exclusive jurisdiction of the courts located there.",
+    },
+    {
+      icon: FileText,
+      title: "Payment Processing",
+      content: "Payments and subscriptions are handled through Razorpay. Your payment information is sent directly to Razorpay and processed under their Terms & Conditions and Privacy Policy; we only store invoices and confirmation tokens needed to grant access to premium features.",
     },
   ];
 

@@ -1,13 +1,18 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
 import Logo from "@/components/Logo";
+import { supabase } from "@/integrations/supabase/client";
 
 type Plan = {
+  planId: string;
+  category: "perPage" | "monthly" | "yearly";
   name: string;
   price: string;
+  amountInRupee: number;
   unit: string;
   description: string;
   statements: string;
@@ -18,16 +23,22 @@ type Plan = {
 
 const monthlyPlans: Plan[] = [
   {
+    planId: "monthly_basic",
+    category: "monthly",
     name: "Monthly Basic",
     price: "$9",
+    amountInRupee: 899,
     unit: "/month",
     description: "Perfect for regular analysis",
     statements: "300 Pages/month",
     features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
   },
   {
+    planId: "monthly_pro",
+    category: "monthly",
     name: "Monthly Pro",
     price: "$19",
+    amountInRupee: 1899,
     unit: "/month",
     description: "Most popular for professionals",
     statements: "1000 Pages/month",
@@ -35,8 +46,11 @@ const monthlyPlans: Plan[] = [
     highlighted: true,
   },
   {
+    planId: "monthly_enterprise",
+    category: "monthly",
     name: "Monthly Enterprise",
     price: "$39",
+    amountInRupee: 3899,
     unit: "/month",
     description: "For heavy users and teams",
     statements: "4500 Pages/month",
@@ -46,8 +60,11 @@ const monthlyPlans: Plan[] = [
 
 const yearlyPlans: Plan[] = [
   {
+    planId: "yearly_lite",
+    category: "yearly",
     name: "Yearly Lite",
     price: "$99",
+    amountInRupee: 8999,
     unit: "/year",
     description: "Great for regular users",
     statements: "5000 Pages/year",
@@ -55,8 +72,11 @@ const yearlyPlans: Plan[] = [
     features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
   },
   {
+    planId: "yearly_full",
+    category: "yearly",
     name: "Yearly Full",
     price: "$199",
+    amountInRupee: 18999,
     unit: "/year",
     description: "Best value for professionals",
     statements: "15,000 Pages/year",
@@ -65,8 +85,11 @@ const yearlyPlans: Plan[] = [
     highlighted: true,
   },
   {
+    planId: "yearly_pro",
+    category: "yearly",
     name: "Yearly Pro",
     price: "$399",
+    amountInRupee: 37999,
     unit: "/year",
     description: "Maximum savings for power users",
     statements: "65,000 Pages/year",
@@ -77,16 +100,22 @@ const yearlyPlans: Plan[] = [
 
 const perPagePlans: Plan[] = [
   {
+    planId: "per_page_lite",
+    category: "perPage",
     name: "Lite",
     price: "$1",
+    amountInRupee: 89,
     unit: "/conversion",
     description: "Quick single conversion",
     statements: "10 Pages",
     features: ["Analyzed PDF Report", "Download in 4 Formats"],
   },
   {
+    planId: "per_page_standard",
+    category: "perPage",
     name: "Standard",
     price: "$2",
+    amountInRupee: 179,
     unit: "/conversion",
     description: "Popular for small batches",
     statements: "25 Pages",
@@ -94,8 +123,11 @@ const perPagePlans: Plan[] = [
     highlighted: true,
   },
   {
+    planId: "per_page_power",
+    category: "perPage",
     name: "Power",
     price: "$3",
+    amountInRupee: 299,
     unit: "/conversion",
     description: "For larger batches",
     statements: "50 Pages",
@@ -103,76 +135,155 @@ const perPagePlans: Plan[] = [
   },
 ];
 
-const renderPlanCard = (plan: Plan) => (
-  <Card
-    key={plan.name}
-    className={`relative p-8 bg-[#1a120b]/80 backdrop-blur-xl transition-all duration-300 rounded-2xl ${
-      plan.highlighted
-        ? "border-2 border-primary shadow-neon scale-105"
-        : "border border-primary/20 hover:border-primary/40 hover:shadow-card"
-    }`}
-  >
-    {plan.highlighted && (
-      <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground border-0 font-bold px-4 py-1 uppercase tracking-wider text-xs">
-        Most Popular
-      </Badge>
-    )}
-
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h3 className="text-2xl font-bold text-white">{plan.name}</h3>
-        <p className="text-sm text-muted-foreground">{plan.description}</p>
-      </div>
-
-      <div className="space-y-1">
-        <div className="flex items-baseline gap-1">
-          <span className="text-4xl md:text-5xl font-black text-white tracking-tighter">
-            {plan.price}
-          </span>
-          {plan.unit && (
-            <span className="text-muted-foreground font-medium">{plan.unit}</span>
-          )}
-        </div>
-      </div>
-
-      {plan.statements && (
-        <div className="py-3 px-4 bg-primary/10 border border-primary/20 rounded-lg">
-          <p className="text-sm font-semibold text-primary">{plan.statements}</p>
-        </div>
-      )}
-
-      {plan.savings && (
-        <div className="py-2 px-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-          <p className="text-sm font-bold text-green-400">{plan.savings}</p>
-        </div>
-      )}
-
-      {plan.features && plan.features.length > 0 && (
-        <ul className="space-y-2">
-          {plan.features.map((feature, idx) => (
-            <li key={idx} className="flex items-start gap-2">
-              <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-muted-foreground">{feature}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <Button
-        className={`w-full h-12 text-base font-bold uppercase tracking-wider rounded-lg ${
-          plan.highlighted
-            ? "bg-primary text-primary-foreground shadow-neon"
-            : "bg-[#1a120b] border border-primary/30 text-primary"
-        } transition-all duration-300`}
-      >
-        Choose Plan
-      </Button>
-    </div>
-  </Card>
-);
-
 const PricingPage = () => {
+  const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const navigate = useNavigate();
+  const razorpaySiteKey = import.meta.env.VITE_RAZORPAY_SITE_KEY;
+
+  const handlePlanPurchase = async (plan: Plan) => {
+    if (processingPlan) return;
+    setProcessingPlan(plan.planId);
+
+    try {
+      if (!razorpaySiteKey) {
+        throw new Error("Razorpay site key is missing.");
+      }
+
+      const { data, error } = await supabase.functions.invoke("razorpay-order", {
+        method: "POST",
+        body: JSON.stringify({
+          planId: plan.planId,
+          amount: plan.amountInRupee,
+          currency: "INR",
+          razorpayKeyId: razorpaySiteKey,
+          notes: {
+            planName: plan.name,
+            planCategory: plan.category,
+          },
+        }),
+      });
+
+      if (error) {
+        throw new Error(error.message || "Failed to create payment order");
+      }
+
+      const payload = typeof data === "string" ? JSON.parse(data) : data;
+      const order = payload?.order;
+      const razorpayKeyId = payload?.razorpayKeyId;
+      const checkoutKey = razorpaySiteKey || razorpayKeyId;
+
+      if (!order || !checkoutKey) {
+        throw new Error("Unexpected response from payment service");
+      }
+
+      if (!window.Razorpay) {
+        throw new Error("Razorpay checkout is not loaded yet.");
+      }
+
+      const checkout = new window.Razorpay({
+        key: checkoutKey,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Akromeda",
+        description: plan.description,
+        order_id: order.id,
+        notes: {
+          plan_id: plan.planId,
+          plan_name: plan.name,
+        },
+        handler: (response) => {
+          alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
+        },
+      });
+      checkout.on("payment.failed", (failure) => {
+        console.error("Payment failed", failure);
+        alert("Payment failed. Please try again.");
+      });
+      checkout.open();
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "Unable to start Razorpay checkout.");
+    } finally {
+      setProcessingPlan(null);
+    }
+  };
+
+  const renderPlanCard = (plan: Plan) => {
+    const isProcessing = processingPlan === plan.planId;
+
+    return (
+      <Card
+        key={plan.planId}
+        className={`relative p-8 bg-[#1a120b]/80 backdrop-blur-xl transition-all duration-300 rounded-2xl ${
+          plan.highlighted
+            ? "border-2 border-primary shadow-neon scale-105"
+            : "border border-primary/20 hover:border-primary/40 hover:shadow-card"
+        }`}
+      >
+        {plan.highlighted && (
+          <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground border-0 font-bold px-4 py-1 uppercase tracking-wider text-xs">
+            Most Popular
+          </Badge>
+        )}
+
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <h3 className="text-2xl font-bold text-white">{plan.name}</h3>
+            <p className="text-sm text-muted-foreground">{plan.description}</p>
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex items-baseline gap-1">
+              <span className="text-4xl md:text-5xl font-black text-white tracking-tighter">
+                {plan.price}
+              </span>
+              {plan.unit && (
+                <span className="text-muted-foreground font-medium">{plan.unit}</span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              ~₹{plan.amountInRupee.toLocaleString("en-IN")} INR
+            </p>
+          </div>
+
+          {plan.statements && (
+            <div className="py-3 px-4 bg-primary/10 border border-primary/20 rounded-lg">
+              <p className="text-sm font-semibold text-primary">{plan.statements}</p>
+            </div>
+          )}
+
+          {plan.savings && (
+            <div className="py-2 px-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <p className="text-sm font-bold text-green-400">{plan.savings}</p>
+            </div>
+          )}
+
+          {plan.features && plan.features.length > 0 && (
+            <ul className="space-y-2">
+              {plan.features.map((feature, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-muted-foreground">{feature}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <Button
+            className={`w-full h-12 text-base font-bold uppercase tracking-wider rounded-lg ${
+              plan.highlighted
+                ? "bg-primary text-primary-foreground shadow-neon"
+                : "bg-[#1a120b] border border-primary/30 text-primary"
+            } transition-all duration-300`}
+            onClick={() => handlePlanPurchase(plan)}
+            disabled={isProcessing}
+          >
+            {isProcessing ? "Opening checkout…" : "Choose Plan"}
+          </Button>
+        </div>
+      </Card>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0502] text-foreground">

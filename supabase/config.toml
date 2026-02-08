@@ -17,3 +17,7 @@ verify_jwt = false
 
 [functions.convert-statements-batch]
 verify_jwt = false
+
+[functions.razorpay-order]
+verify_jwt = false
+

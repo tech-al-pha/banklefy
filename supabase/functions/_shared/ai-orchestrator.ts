@@ -44,7 +44,6 @@ export async function performExtraction(
   
   let transactions: RawTransaction[] = [];
   let finalExtractedText = extractedText;
-  let bankMetadata: BankMetadata | undefined;
   
   // ===== STEP 1: Groq Vision (Primary OCR - Fastest) =====
   console.log('🔹 LAYER 1: Groq Vision OCR (Primary - Only AI for OCR)...');
@@ -53,7 +52,7 @@ export async function performExtraction(
   
   const ocrResult = await callGroqVisionOCR(base64Data, mimeType);
   status.groqVision.time = Date.now() - groqStartTime;
-  bankMetadata = ocrResult.bankMetadata ?? bankMetadata;
+  const bankMetadata = ocrResult.bankMetadata;
   
   if (ocrResult.success && ocrResult.transactions && ocrResult.transactions.length > 0) {
     transactions = ocrResult.transactions;

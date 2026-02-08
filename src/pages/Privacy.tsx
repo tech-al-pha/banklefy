@@ -50,6 +50,11 @@ const Privacy = () => {
       content: "We use third-party providers such as Supabase (authentication and storage) and Google reCAPTCHA (abuse prevention). These providers may process data under their own policies. We do not sell your data.",
     },
     {
+      icon: Shield,
+      title: "Payment Processors",
+      content: "Razorpay handles our billing and subscription payments. Razorpay temporarily sees the payment details you enter, and we only receive confirmation, transaction IDs, and invoices necessary to unlock paid features. Razorpay processes that data under their own Terms & Privacy Policy.",
+    },
+    {
       icon: Server,
       title: "Server Security",
       content: "We use reputable providers and reasonable security measures to protect data. No system is 100% secure, so please use the service with care.",
