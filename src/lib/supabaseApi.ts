@@ -23,8 +23,8 @@ export function getEdgeFunctionUrl(functionName: string): string {
   return `${base}/functions/v1/${functionName}`;
 }
 
-export interface InvokeOptions {
-  body?: Record<string, unknown>;
+export interface InvokeOptions<TBody = unknown> {
+  body?: TBody;
   headers?: Record<string, string>;
 }
 
@@ -47,10 +47,10 @@ const extractErrorMessage = (payload: unknown, fallback: string) => {
  * Invoke a Supabase Edge Function via explicit REST call.
  * This is deployment-agnostic and does not rely on any internal proxy.
  */
-export async function invokeEdgeFunction<T = unknown>(
+export async function invokeEdgeFunction<TResponse = unknown, TBody = unknown>(
   functionName: string,
-  options: InvokeOptions = {}
-): Promise<InvokeResult<T>> {
+  options: InvokeOptions<TBody> = {}
+): Promise<InvokeResult<TResponse>> {
   const url = getEdgeFunctionUrl(functionName);
 
   const headers: Record<string, string> = {
@@ -68,7 +68,7 @@ export async function invokeEdgeFunction<T = unknown>(
     });
 
     // Try to parse JSON regardless of status
-    let data: T | null = null;
+    let data: TResponse | null = null;
     const text = await response.text();
     try {
       data = text ? JSON.parse(text) : null;

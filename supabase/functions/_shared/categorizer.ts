@@ -170,8 +170,8 @@ export async function callGroqCategorizer(
       const processedTransactions: ProcessedTransaction[] = transactions.map((t, index) => {
         const categorizedItem = categorized.find((c) => c.i === index);
         return {
-          date: t.date,
-          description: categorizedItem?.desc || t.description,
+          date: t.date || 'Unknown',
+          description: categorizedItem?.desc || t.description || 'Unknown Transaction',
           category: categorizedItem?.cat || t.category || 'Other',
           debit: t.debit || 0,
           credit: t.credit || 0,
