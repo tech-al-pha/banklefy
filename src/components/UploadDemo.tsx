@@ -1122,31 +1122,26 @@ Analytics Summary:
   const exportAsCSV = () => {
     if (transactions.length === 0) return;
 
-    // Convert transactions to CSV with new schema
-    const headers = [
-      'Date',
-      'Reference No / Transaction ID',
-      'Description',
-      'Debit',
-      'Credit',
-      'Balance',
-      'Pricing Mismatch Flag',
-      'Duplicate Flag',
-    ];
+    // Simple CSV with only essential columns: Date, Description, Debit, Credit, Balance
+    const headers = ['Date', 'Description', 'Debit', 'Credit', 'Balance'];
+    
+    // Calculate totals
+    const totalDebit = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
+    const totalCredit = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
+    
     const csvRows = [
       headers.join(','),
       ...transactions.map(t => 
         [
-          t.date,
-          `"${t.refNumber || ''}"`,
-          `"${t.description}"`,
-          t.debit,
-          t.credit,
-          t.balance,
-          t.balanceMismatch ? 'YES' : '',
-          t.isDuplicate ? 'YES' : '',
+          t.date || '',
+          `"${(t.description || '').replace(/"/g, '""')}"`,
+          t.debit || '',
+          t.credit || '',
+          t.balance ?? '',
         ].join(',')
-      )
+      ),
+      // Add totals row
+      ['', 'TOTAL', totalDebit.toFixed(2), totalCredit.toFixed(2), ''].join(',')
     ];
     const csvContent = csvRows.join('\n');
 
