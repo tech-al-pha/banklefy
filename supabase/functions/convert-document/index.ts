@@ -818,6 +818,7 @@ Deno.serve(async (req) => {
     };
 
     // Generate Excel (styled)
+    const bankInfo = collectedBankMetadata || extractionResult.bankMetadata;
     const excelResult = generateProfessionalExcel({
       transactions,
       analytics: {
@@ -831,7 +832,7 @@ Deno.serve(async (req) => {
       fraudAlerts,
       liquidity: liquidityMetrics,
       reconciliation,
-      bankInfo: collectedBankMetadata, // NEW: Pass bank metadata
+      bankInfo, // NEW: Pass bank metadata
     });
     const excelBuffer = excelResult.buffer;
     

@@ -183,12 +183,19 @@ export async function callMistralCategorizer(
       const original = transactions[index];
 
       // Parse amounts from either source, preferring original if Mistral returned 0
-      const parseAmount = (val: unknown): number => {
-        if (typeof val === 'number' && !Number.isNaN(val)) return Math.abs(val);
+      const parseAmount = (val: unknown, signed = false): number => {
+        if (typeof val === 'number' && !Number.isNaN(val)) {
+          return signed ? val : Math.abs(val);
+        }
         if (typeof val === 'string') {
-          const cleaned = val.replace(/[,\s]/g, '').replace(/^-/, '');
+          const trimmed = val.trim();
+          if (!trimmed) return 0;
+          const isNegative = /^\(.*\)$/.test(trimmed);
+          const cleaned = trimmed.replace(/[(),\s]/g, '');
           const num = parseFloat(cleaned);
-          return Number.isNaN(num) ? 0 : Math.abs(num);
+          if (Number.isNaN(num)) return 0;
+          const withSign = isNegative ? -num : num;
+          return signed ? withSign : Math.abs(withSign);
         }
         return 0;
       };
@@ -196,7 +203,7 @@ export async function callMistralCategorizer(
       // Use original values if Mistral returned 0 but original had a value
       const debit = parseAmount(t.debit) || parseAmount(original?.debit);
       const credit = parseAmount(t.credit) || parseAmount(original?.credit);
-      const balance = parseAmount(t.balance) || parseAmount(original?.balance);
+      const balance = parseAmount(t.balance, true) || parseAmount(original?.balance, true);
       
       const rawDate = original?.date || t.date || '';
       const rawDescription = original?.description || original?.narration || t.description || t.narration || '';

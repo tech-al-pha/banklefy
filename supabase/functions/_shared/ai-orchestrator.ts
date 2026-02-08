@@ -44,6 +44,7 @@ export async function performExtraction(
   
   let transactions: RawTransaction[] = [];
   let finalExtractedText = extractedText;
+  let bankMetadata: BankMetadata | undefined;
   
   // ===== STEP 1: Groq Vision (Primary OCR - Fastest) =====
   console.log('🔹 LAYER 1: Groq Vision OCR (Primary - Only AI for OCR)...');
@@ -52,12 +53,13 @@ export async function performExtraction(
   
   const ocrResult = await callGroqVisionOCR(base64Data, mimeType);
   status.groqVision.time = Date.now() - groqStartTime;
+  bankMetadata = ocrResult.bankMetadata ?? bankMetadata;
   
   if (ocrResult.success && ocrResult.transactions && ocrResult.transactions.length > 0) {
     transactions = ocrResult.transactions;
     status.groqVision.success = true;
     console.log(`✅ Groq Vision extracted ${transactions.length} transactions in ${status.groqVision.time}ms`);
-    return { transactions, status, extractedText: ocrResult.text };
+    return { transactions, status, extractedText: ocrResult.text, bankMetadata };
   } else if (ocrResult.success && ocrResult.text) {
     finalExtractedText = ocrResult.text;
     status.groqVision.success = true;
@@ -126,7 +128,7 @@ Return ONLY the JSON array, no markdown.`,
             }));
             status.groqText.success = true;
             console.log(`✅ Groq Text extracted ${transactions.length} transactions in ${status.groqText.time}ms`);
-            return { transactions, status, extractedText: finalExtractedText };
+            return { transactions, status, extractedText: finalExtractedText, bankMetadata };
           }
         } else {
           const errorText = await groqResponse.text();
@@ -148,7 +150,7 @@ Return ONLY the JSON array, no markdown.`,
   
   console.log('⚠️ Groq-only pipeline complete. No AI fallback used.');
   
-  return { transactions, status, extractedText: finalExtractedText };
+  return { transactions, status, extractedText: finalExtractedText, bankMetadata };
 }
 
 // ============= LAYER 2: CATEGORIZATION =============

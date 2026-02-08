@@ -251,6 +251,23 @@ const CATEGORY_PATTERNS: Record<string, RegExp[]> = {
 };
 
 export function fallbackCategorize(transactions: RawTransaction[]): ProcessedTransaction[] {
+  const parseAmount = (val: unknown, signed = false): number => {
+    if (typeof val === 'number' && !Number.isNaN(val)) {
+      return signed ? val : Math.abs(val);
+    }
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (!trimmed) return 0;
+      const isNegative = /^\(.*\)$/.test(trimmed);
+      const cleaned = trimmed.replace(/[(),\s]/g, '');
+      const num = parseFloat(cleaned);
+      if (Number.isNaN(num)) return 0;
+      const withSign = isNegative ? -num : num;
+      return signed ? withSign : Math.abs(withSign);
+    }
+    return 0;
+  };
+
   return transactions.map(t => {
     const desc = (t.description || '').toLowerCase();
     let category = 'Other';
@@ -269,9 +286,9 @@ export function fallbackCategorize(transactions: RawTransaction[]): ProcessedTra
       date: t.date || 'Unknown',
       description: cleanedDesc,
       category: t.category || category,
-      debit: typeof t.debit === 'number' ? Math.abs(t.debit) : 0,
-      credit: typeof t.credit === 'number' ? Math.abs(t.credit) : 0,
-      balance: typeof t.balance === 'number' ? t.balance : 0,
+      debit: parseAmount(t.debit),
+      credit: parseAmount(t.credit),
+      balance: parseAmount(t.balance, true),
       refNumber: t.refNumber,
       originalDescription: t.description,
       isDuplicate: false,
