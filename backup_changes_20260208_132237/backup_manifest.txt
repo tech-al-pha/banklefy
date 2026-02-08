@@ -1,0 +1,47 @@
+﻿ M eslint.config.js
+ M package-lock.json
+ M package.json
+ D public/samples/sample-report.xml
+ M src/components/FraudAlertPanel.tsx
+ M src/components/Hero.tsx
+ M src/components/HowItWorks.tsx
+ M src/components/PdfPreview.tsx
+ M src/components/UnderwritingPanel.tsx
+ M src/components/UploadDemo.tsx
+ M src/components/UsageLimitBanner.tsx
+ M src/components/ui/command.tsx
+ M src/components/ui/textarea.tsx
+ M src/contexts/LanguageContext.tsx
+ M src/hooks/useRecaptcha.ts
+ M src/hooks/useSettings.ts
+ M src/hooks/useUsageLimit.ts
+ M src/lib/supabaseApi.ts
+ M src/pages/Admin.tsx
+ M src/pages/Auth.tsx
+ M src/pages/BenefitsPage.tsx
+ M src/pages/Dashboard.tsx
+ M src/pages/Privacy.tsx
+ M src/pages/SampleReport.tsx
+ M src/pages/Terms.tsx
+ M supabase/functions/_shared/ai-orchestrator.ts
+ M supabase/functions/_shared/categorizer.ts
+ M supabase/functions/_shared/excel-generator.ts
+ M supabase/functions/_shared/financial-engine.ts
+ M supabase/functions/_shared/mistral-processor.ts
+ M supabase/functions/_shared/multi-statement.ts
+ M supabase/functions/_shared/ocr-processor.ts
+ M supabase/functions/convert-document/categorizer.ts
+ M supabase/functions/convert-document/excel-generator.ts
+ M supabase/functions/convert-document/excel-generator_test.ts
+ M supabase/functions/convert-document/financial-engine.ts
+ M supabase/functions/convert-document/index.ts
+ M supabase/functions/convert-document/mistral-processor.ts
+ M supabase/functions/convert-document/multi-statement.ts
+ M supabase/functions/convert-document/ocr-processor.ts
+ M supabase/functions/convert-statements-batch/index.ts
+ M tailwind.config.ts
+?? backup_20260208_132134/
+?? public/samples/sample-report.ods
+?? supabase/functions/_shared/transaction-sanitizer.ts
+?? supabase/functions/purge-expired-conversions/
+?? supabase/migrations/20260207120000_update_free_limits.sql
