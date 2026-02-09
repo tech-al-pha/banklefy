@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Shield, Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
+import { Shield, Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
@@ -12,7 +12,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
 
 const Index = () => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const { t } = useLanguage();
@@ -34,7 +34,7 @@ const Index = () => {
 
   const handleAuthClick = () => {
     if (user) {
-      signOut();
+      navigate('/profile');
     } else {
       navigate('/auth');
     }
@@ -127,14 +127,7 @@ const Index = () => {
                 className="border-primary/50 text-foreground transition-colors"
                 onClick={handleAuthClick}
               >
-                {user ? (
-                  <>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    {t('nav.signOut')}
-                  </>
-                ) : (
-                  t('nav.signIn')
-                )}
+                {user ? "Profile" : t('nav.signIn')}
               </Button>
 
               <Button 
@@ -245,14 +238,7 @@ const Index = () => {
                           className="border-primary/40 text-foreground"
                           onClick={handleAuthClick}
                         >
-                          {user ? (
-                            <>
-                              <LogOut className="mr-2 h-4 w-4" />
-                              {t('nav.signOut')}
-                            </>
-                          ) : (
-                            t('nav.signIn')
-                          )}
+                          {user ? "Profile" : t('nav.signIn')}
                         </Button>
                       </SheetClose>
 

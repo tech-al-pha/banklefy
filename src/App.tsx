@@ -24,6 +24,7 @@ const BenefitsPage = lazyWithRetry(() => import("./pages/BenefitsPage"));
 const Settings = lazyWithRetry(() => import("./pages/Settings"));
 const PricingPage = lazyWithRetry(() => import("./pages/PricingPage"));
 const SampleReport = lazyWithRetry(() => import("./pages/SampleReport"));
+const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -85,6 +86,10 @@ const AppRoutes = () => {
         title: "Settings | Akromeda",
         description: "Manage your account settings and preferences.",
       },
+      "/profile": {
+        title: "Profile | Akromeda",
+        description: "View your account details and recent conversions.",
+      },
       "/admin": {
         title: "Admin Console | Akromeda",
         description: "Administrative dashboard for system status and operations.",
@@ -124,7 +129,7 @@ const AppRoutes = () => {
     setMeta("property", "og:url", canonical);
     setMeta("name", "twitter:url", canonical);
 
-    const noIndexPaths = ["/admin", "/dashboard", "/settings", "/auth", "/chat"];
+    const noIndexPaths = ["/admin", "/dashboard", "/settings", "/profile", "/auth", "/chat"];
     const shouldNoIndex = noIndexPaths.some((path) => pathname.startsWith(path));
     setMeta("name", "robots", shouldNoIndex ? "noindex, nofollow" : "index, follow");
   }, [location.pathname]);
@@ -153,6 +158,7 @@ const AppRoutes = () => {
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/sample-report" element={<SampleReport />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/profile" element={<Profile />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

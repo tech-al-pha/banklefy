@@ -9,8 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { LanguageSelector } from "@/components/LanguageSelector";
 import Logo from "@/components/Logo";
 import {
   AlertDialog,
@@ -26,9 +24,7 @@ import {
 import { 
   Search, 
   User, 
-  Bell, 
   Shield, 
-  Palette, 
   HelpCircle,
   FileText,
   BarChart3,
@@ -36,10 +32,6 @@ import {
   Mail,
   Lock,
   Eye,
-  Smartphone,
-  Moon,
-  Sun,
-  Volume2,
   Download,
   Trash2,
   LogOut,
@@ -64,11 +56,9 @@ const Settings = () => {
   const { toast } = useToast();
   const { conversionsUsed, conversionsLimit, remaining, isAuthenticated } = useUsageLimit();
   const {
-    settings,
     loading: settingsLoading,
     saving,
     profileData,
-    updateSetting,
     updateProfile,
     sendPasswordReset,
     exportUserData,
@@ -215,72 +205,6 @@ const Settings = () => {
         </div>
       )
     },
-    // Notifications
-    {
-      id: "notifications-email",
-      title: t('settings.notifications.email'),
-      description: t('settings.notifications.emailDesc'),
-      category: "notifications",
-      icon: <Mail className="h-5 w-5" />,
-      component: (
-        <Switch 
-          checked={settings.emailNotifications} 
-          onCheckedChange={(checked) => updateSetting('emailNotifications', checked)} 
-        />
-      )
-    },
-    {
-      id: "notifications-push",
-      title: t('settings.notifications.push'),
-      description: t('settings.notifications.pushDesc'),
-      category: "notifications",
-      icon: <Smartphone className="h-5 w-5" />,
-      component: (
-        <Switch 
-          checked={settings.pushNotifications} 
-          onCheckedChange={(checked) => updateSetting('pushNotifications', checked)} 
-        />
-      )
-    },
-    {
-      id: "notifications-sound",
-      title: t('settings.notifications.sound'),
-      description: t('settings.notifications.soundDesc'),
-      category: "notifications",
-      icon: <Volume2 className="h-5 w-5" />,
-      component: (
-        <Switch 
-          checked={settings.soundEnabled} 
-          onCheckedChange={(checked) => updateSetting('soundEnabled', checked)} 
-        />
-      )
-    },
-    // Appearance
-    {
-      id: "appearance-theme",
-      title: t('settings.appearance.theme'),
-      description: t('settings.appearance.themeDesc'),
-      category: "appearance",
-      icon: settings.darkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />,
-      component: (
-        <div className="flex items-center gap-2">
-          <Sun className="h-4 w-4 text-muted-foreground" />
-          <Switch 
-            checked={settings.darkMode} 
-            onCheckedChange={(checked) => updateSetting('darkMode', checked)} 
-          />
-          <Moon className="h-4 w-4 text-muted-foreground" />
-        </div>
-      )
-    },
-    {
-      id: "appearance-language",
-      title: t('settings.appearance.language'),
-      description: t('settings.appearance.languageDesc'),
-      category: "appearance",
-      icon: <Eye className="h-5 w-5" />,
-      component: <LanguageSelector />
-    },
     // Privacy & Security
     {
       id: "privacy-visibility",
@@ -346,47 +270,13 @@ const Settings = () => {
         </AlertDialog>
       )
     },
-    // Advanced
-    {
-      id: "advanced-download",
-      title: t('settings.advanced.autoDownload'),
-      description: t('settings.advanced.autoDownloadDesc'),
-      category: "advanced",
-      icon: <Download className="h-5 w-5" />,
-      component: (
-        <Switch 
-          checked={settings.autoDownload} 
-          onCheckedChange={(checked) => updateSetting('autoDownload', checked)} 
-        />
-      )
-    },
-    {
-      id: "advanced-excel-format",
-      title: "Premium Excel Export",
-      description: "Enable premium formatting with Summary Box, Audit sheet, and Reference IDs",
-      category: "advanced",
-      icon: <FileText className="h-5 w-5" />,
-      component: (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Simple</span>
-          <Switch 
-            checked={settings.premiumExcelExport} 
-            onCheckedChange={(checked) => updateSetting('premiumExcelExport', checked)} 
-          />
-          <span className="text-xs text-muted-foreground">Premium</span>
-        </div>
-      )
-    },
-  ], [user, conversionsUsed, conversionsLimit, remaining, isAuthenticated, settings, displayName, nameChanged, saving, t, toast, handleNameChange, handleSaveName, handlePasswordReset, handleExportData, handleDeleteAccount, updateSetting]);
+  ], [user, conversionsUsed, conversionsLimit, remaining, isAuthenticated, displayName, nameChanged, saving, t, toast, handleNameChange, handleSaveName, handlePasswordReset, handleExportData, handleDeleteAccount]);
 
   const categories = [
     { id: "all", label: t('settings.categories.all'), icon: <SettingsIcon className="h-4 w-4" /> },
     { id: "profile", label: t('settings.categories.profile'), icon: <User className="h-4 w-4" /> },
     { id: "usage", label: t('settings.categories.usage'), icon: <BarChart3 className="h-4 w-4" /> },
-    { id: "notifications", label: t('settings.categories.notifications'), icon: <Bell className="h-4 w-4" /> },
-    { id: "appearance", label: t('settings.categories.appearance'), icon: <Palette className="h-4 w-4" /> },
     { id: "privacy", label: t('settings.categories.privacy'), icon: <Shield className="h-4 w-4" /> },
-    { id: "advanced", label: t('settings.categories.advanced'), icon: <SettingsIcon className="h-4 w-4" /> },
   ];
 
   const filteredSettings = useMemo(() => {

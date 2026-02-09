@@ -54,6 +54,12 @@
     cursor: none;
   }
 
+  html,
+  body,
+  * {
+    cursor: none !important;
+  }
+
   #root {
     min-height: 100vh;
     background: var(--background);
@@ -144,9 +150,9 @@
 @layer components {
   .luxury-cursor {
     position: fixed;
-    width: 32px;
-    height: 32px;
-    border: 1.5px solid var(--text-muted);
+    width: 24px;
+    height: 24px;
+    border: 1.2px solid var(--text-muted);
     border-radius: 50%;
     pointer-events: none;
     z-index: 9999;
@@ -157,16 +163,7 @@
   }
 
   .luxury-cursor::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 5px;
-    height: 5px;
-    background: var(--text-primary);
-    border-radius: 50%;
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
+    display: none;
   }
 
   .luxury-cursor.hover {

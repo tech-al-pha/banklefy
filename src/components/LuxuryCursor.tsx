@@ -8,10 +8,23 @@ export const LuxuryCursor = () => {
   const rafRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
+    const styleId = "force-cursor-none";
+    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = styleId;
+      styleEl.textContent = `
+        html, body, * , *::before, *::after {
+          cursor: none !important;
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+
     const updateCursor = () => {
       if (cursorRef.current) {
-        cursorRef.current.style.left = `${positionRef.current.x - 20}px`;
-        cursorRef.current.style.top = `${positionRef.current.y - 20}px`;
+        cursorRef.current.style.left = `${positionRef.current.x - 12}px`;
+        cursorRef.current.style.top = `${positionRef.current.y - 12}px`;
       }
     };
 
@@ -58,6 +71,9 @@ export const LuxuryCursor = () => {
       document.removeEventListener("mouseout", handleHoverEnd);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
+      }
+      if (styleEl && styleEl.parentNode) {
+        styleEl.parentNode.removeChild(styleEl);
       }
     };
   }, []);
