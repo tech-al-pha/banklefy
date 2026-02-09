@@ -320,14 +320,12 @@ export default function Auth() {
         <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.18),transparent_55%)]" />
         <CardHeader className="space-y-2 pt-8">
           <div className="flex justify-center mb-3">
-            <div className="rounded-full border border-primary/40 bg-black/40 p-3 shadow-[0_0_18px_rgba(245,158,11,0.25)]">
-              <img src={akromedaLogo} alt="Akromeda" className="h-14 w-14 md:h-16 md:w-16 object-contain" />
-            </div>
+            <img src={akromedaLogo} alt="Akromeda" className="h-20 w-20 md:h-24 md:w-24 object-contain" />
           </div>
           <div className="text-center text-xs uppercase tracking-[0.35em] text-muted-foreground">
             Secure Access
           </div>
-          <CardTitle className="text-3xl md:text-4xl font-black text-center bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-200 bg-clip-text text-transparent">
+          <CardTitle className="text-center text-[1.65rem] md:text-[2.1rem] font-extrabold uppercase tracking-[0.09em] bg-gradient-to-r from-[#fdf7f0] via-[#f6d58b] to-[#e3a93f] bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
             Akromeda
           </CardTitle>
           <CardDescription className="text-center text-muted-foreground/90">
