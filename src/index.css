@@ -118,22 +118,26 @@
     color: inherit;
   }
 
-  /* Hard-hide reCAPTCHA badge + iframe. */
+  /* Hard-hide reCAPTCHA badge + iframe + all injected elements */
   .grecaptcha-badge,
-  .grecaptcha-badge * {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-  }
-
+  .grecaptcha-badge *,
   iframe[src*="recaptcha"],
   iframe[title*="reCAPTCHA"],
-  div[style*="recaptcha"] {
+  div[style*="recaptcha"],
+  iframe[src*="google.com/recaptcha"],
+  iframe[src*="recaptcha/api2"],
+  div > div > iframe[src*="recaptcha"] {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    left: -9999px !important;
+    top: -9999px !important;
     pointer-events: none !important;
+    z-index: -1 !important;
   }
 }
 
