@@ -1,6 +1,4 @@
-import { Hero } from "@/components/Hero";
-import { HowItWorks } from "@/components/HowItWorks";
-import { UploadDemo } from "@/components/UploadDemo";
+import { LandingPageContent } from "@/components/LandingPageContent";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
@@ -45,7 +43,7 @@ const Index = () => {
     <div className="min-h-screen bg-[#0A0502] text-foreground">
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/60 backdrop-blur-lg border-b border-primary/20">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-2 sm:py-3">
           <div className="flex items-center justify-between">
           <Logo />
           <div className="hidden lg:flex items-center gap-3">
@@ -273,36 +271,7 @@ const Index = () => {
         </div>
       </nav>
 
-      <Hero />
-      <HowItWorks />
-
-      <div id="demo">
-        <UploadDemo />
-      </div>
-
-      {/* Footer CTA */}
-      <section className="relative py-12 px-4 sm:px-6 overflow-hidden bg-[#0A0502]">
-        <div className="container mx-auto text-center relative z-10 space-y-6">
-          <h2 className="text-4xl md:text-5xl font-bold italic">
-            {t('footer.cta.title')}
-            <br />
-            <span className="text-primary">
-              {t('footer.cta.subtitle')}
-            </span>
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            {t('footer.cta.desc')}
-          </p>
-          <button 
-            className="bg-primary text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 px-8 py-4 rounded-lg font-bold text-lg"
-            onClick={() => {
-              document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          >
-            {t('footer.cta.btn')}
-          </button>
-        </div>
-      </section>
+      <LandingPageContent />
 
       {/* Footer */}
       <footer className="border-t border-primary/20 py-16 px-4 sm:px-6 bg-[#0A0502]">

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardDescription, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -299,12 +299,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070402] flex items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-dark opacity-80" />
-      <div className="absolute inset-0 bg-gradient-glow opacity-30" />
-      <div className="absolute -top-24 left-10 h-72 w-72 rounded-full bg-primary/15 blur-[140px]" />
-      <div className="absolute -bottom-24 right-10 h-72 w-72 rounded-full bg-secondary/15 blur-[140px]" />
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+    <div className="min-h-screen bg-[#0A0502] flex items-center justify-center p-6 relative overflow-hidden">
       
       {/* Back button */}
       <button
@@ -315,10 +310,8 @@ export default function Auth() {
         <span>Back</span>
       </button>
       
-      <Card className="w-full max-w-md bg-gradient-to-b from-[#1a120b]/90 to-[#0f0906]/90 backdrop-blur-2xl border border-primary/30 shadow-[0_30px_80px_rgba(0,0,0,0.55)] relative z-10 rounded-3xl overflow-hidden">
-        <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
-        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,rgba(245,158,11,0.18),transparent_55%)]" />
-        <CardHeader className="space-y-2 pt-8">
+      <div className="w-full max-w-md relative z-10">
+        <div className="space-y-2 pt-2">
           <div className="flex justify-center mb-3">
             <img src={akromedaLogo} alt="Akromeda" className="h-20 w-20 md:h-24 md:w-24 object-contain" />
           </div>
@@ -331,8 +324,8 @@ export default function Auth() {
           <CardDescription className="text-center text-muted-foreground/90">
             {getCardDescription()}
           </CardDescription>
-        </CardHeader>
-        <CardContent className="pb-8">
+        </div>
+        <div className="pb-8 pt-6">
           {mode === 'forgot' && (
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div className="space-y-2">
@@ -350,7 +343,7 @@ export default function Auth() {
               </div>
               <Button
                 type="submit"
-                className="w-full bg-primary text-primary-foreground"
+                className="w-full glass-premium border border-primary/30 text-foreground"
                 disabled={loading}
               >
                 {loading ? (
@@ -432,7 +425,7 @@ export default function Auth() {
                   </div>
                   <Button
                     type="submit"
-                    className="w-full bg-primary text-primary-foreground"
+                    className="w-full glass-premium border border-primary/30 text-foreground"
                     disabled={loading || !recoverySessionReady}
                   >
                     {loading ? (
@@ -541,7 +534,7 @@ export default function Auth() {
 
                 <Button
                   type="submit"
-                  className={`w-full bg-primary text-primary-foreground ${loading || (mode === 'signup' && !termsAccepted) ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  className={`w-full glass-premium border border-primary/30 text-foreground ${loading || (mode === 'signup' && !termsAccepted) ? 'opacity-60 cursor-not-allowed' : ''}`}
                   disabled={loading || (mode === 'signup' && !termsAccepted)}
                 >
                   {loading ? (
@@ -569,8 +562,8 @@ export default function Auth() {
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -44,6 +44,13 @@ interface AnonymousSummary {
   totalConversions: number;
 }
 
+interface ConversionRecord {
+  id: string;
+  status: string;
+  created_at: string;
+  error_message: string | null;
+}
+
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -65,11 +72,12 @@ export default function Admin() {
     totalIPs: 0,
     totalConversions: 0,
   });
-  const [activeSection, setActiveSection] = useState<'overview' | 'users' | 'conversions' | 'security' | 'system'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'users' | 'conversions' | 'security' | 'system' | 'api'>('overview');
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'user'>('all');
   const [tierFilter, setTierFilter] = useState<'all' | 'free' | 'paid'>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [conversions, setConversions] = useState<ConversionRecord[]>([]);
 
   const PAGE_SIZE = 10;
   const getErrorMessage = (error: unknown, fallback: string) => {
@@ -121,6 +129,59 @@ export default function Admin() {
     const latest = [...dailyStats].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
     return latest?.date || null;
   }, [dailyStats]);
+
+  const apiEvents = useMemo(() => {
+    return [...conversions]
+      .filter((c) => c.status === 'failed' && c.error_message)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [conversions]);
+
+  const apiIssueSummary = useMemo(() => {
+    const categories = [
+      { key: 'limits', label: 'Limits/Quota', match: /(limit|quota|rate limit|too many requests|429)/i },
+      { key: 'auth', label: 'Auth/Permissions', match: /(auth|token|session|permission|unauthorized|forbidden|rls)/i },
+      { key: 'storage', label: 'Storage', match: /(storage|bucket|upload|download|file)/i },
+      { key: 'groq', label: 'Groq Vision OCR', match: /(groq|vision|ocr)/i },
+      { key: 'text', label: 'Groq Text', match: /(groq text|text extraction)/i },
+      { key: 'mistral', label: 'Mistral AI', match: /(mistral)/i },
+      { key: 'rule', label: 'Rule-Based', match: /(rule-based|foir|emi)/i },
+      { key: 'edge', label: 'Edge Functions', match: /(edge function|function|invoke)/i },
+      { key: 'timeout', label: 'Timeouts', match: /(timeout|504|gateway|deadline)/i },
+      { key: 'network', label: 'Network', match: /(network|fetch|connection|dns)/i },
+      { key: 'supabase', label: 'Supabase', match: /(supabase|postgrest|realtime)/i },
+    ];
+
+    return categories.map((cat) => {
+      const matching = apiEvents.filter((err) => cat.match.test(err.error_message || ''));
+      return {
+        key: cat.key,
+        label: cat.label,
+        count: matching.length,
+        latest: matching[0]?.error_message || null,
+      };
+    });
+  }, [apiEvents]);
+
+  const apiHealth = useMemo(() => {
+    const apis = [
+      { name: 'Conversion API', match: /(conversion|edge function|convert)/i },
+      { name: 'OCR API (Groq Vision)', match: /(groq|vision|ocr)/i },
+      { name: 'Text API (Groq Text)', match: /(groq text|text extraction)/i },
+      { name: 'Mistral AI', match: /(mistral)/i },
+      { name: 'Rule-Based Engine', match: /(rule-based|foir|emi)/i },
+      { name: 'Storage API', match: /(storage|upload|download|file)/i },
+      { name: 'Auth API', match: /(auth|token|session|permission)/i },
+    ];
+
+    return apis.map((api) => {
+      const hit = apiEvents.find((err) => api.match.test(err.error_message || ''));
+      return {
+        name: api.name,
+        status: hit ? 'Degraded' : 'Healthy',
+        error: hit?.error_message || null,
+      };
+    });
+  }, [apiEvents]);
 
   const filteredUsers = useMemo(() => {
     const query = userSearch.trim().toLowerCase();
@@ -190,6 +251,7 @@ export default function Admin() {
       });
       setDailyStats(data.dailyStats || []);
       setAnonymousSummary(data.anonymousSummary || { totalIPs: 0, totalConversions: 0 });
+      setConversions(data.conversions || []);
 
     } catch (error: unknown) {
       const message = getErrorMessage(error, 'Failed to load dashboard data.');
@@ -332,6 +394,14 @@ export default function Admin() {
                   <Server className="h-4 w-4" />
                   System
                 </Button>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start gap-3 ${activeSection === 'api' ? 'bg-primary/15 text-primary' : 'text-muted-foreground'}`}
+                  onClick={() => setActiveSection('api')}
+                >
+                  <KeyRound className="h-4 w-4" />
+                  API
+                </Button>
               </nav>
 
               <div className="mt-auto space-y-3 border-t border-primary/10 px-6 py-6">
@@ -370,6 +440,7 @@ export default function Admin() {
                     {activeSection === 'conversions' && 'Conversions'}
                     {activeSection === 'security' && 'Security Center'}
                     {activeSection === 'system' && 'System Status'}
+                    {activeSection === 'api' && 'API Status'}
                   </h1>
                   <p className="text-sm text-muted-foreground">
                     {activeSection === 'overview' && 'At-a-glance performance, usage, and activity.'}
@@ -377,6 +448,7 @@ export default function Admin() {
                     {activeSection === 'conversions' && 'Monitor daily volumes and conversion health.'}
                     {activeSection === 'security' && 'Audit access, roles, and sensitive operations.'}
                     {activeSection === 'system' && 'Track infrastructure and operational signals.'}
+                    {activeSection === 'api' && 'API limits, failures, and degraded services only.'}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -845,6 +917,79 @@ export default function Admin() {
                   </div>
                   <Badge variant="outline">{stats.todayCount}</Badge>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeSection === 'api' && (
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[2fr_1fr]">
+            <Card className="bg-card/70 backdrop-blur-lg border-primary/20">
+              <CardHeader>
+                <CardTitle>API Health</CardTitle>
+                <CardDescription>Derived from recent conversion errors</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {apiHealth.map((api) => (
+                  <div key={api.name} className="flex items-center justify-between rounded-lg border border-primary/10 bg-background/40 px-4 py-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{api.name}</p>
+                      {api.error && <p className="text-xs text-destructive mt-1">{api.error}</p>}
+                    </div>
+                    <Badge className={api.error ? 'bg-destructive text-white' : 'bg-emerald-500/20 text-emerald-300'}>
+                      {api.status}
+                    </Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/70 backdrop-blur-lg border-primary/20">
+              <CardHeader>
+                <CardTitle>Limits & Failures</CardTitle>
+                <CardDescription>Only API-related issues</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {apiIssueSummary.filter((item) => item.count > 0).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No API issues detected.</p>
+                ) : (
+                  apiIssueSummary
+                    .filter((item) => item.count > 0)
+                    .map((item) => (
+                      <div key={item.key} className="rounded-lg border border-primary/10 bg-background/40 px-4 py-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">{item.label}</span>
+                          <Badge variant="outline">{item.count}</Badge>
+                        </div>
+                        {item.latest && <p className="text-xs text-destructive mt-2">{item.latest}</p>}
+                      </div>
+                    ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/70 backdrop-blur-lg border-primary/20 xl:col-span-2">
+              <CardHeader>
+                <CardTitle>Recent API Errors</CardTitle>
+                <CardDescription>Latest failed API-related conversions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {apiEvents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No API errors detected.</p>
+                ) : (
+                  <ScrollArea className="max-h-56 pr-2">
+                    <div className="space-y-2">
+                      {apiEvents.slice(0, 10).map((err) => (
+                        <div key={err.id} className="rounded-md border border-border/30 bg-muted/10 p-3">
+                          <p className="text-xs text-foreground">{err.error_message}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {new Date(err.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
               </CardContent>
             </Card>
           </div>

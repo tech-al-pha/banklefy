@@ -1776,7 +1776,7 @@ Analytics Summary:
               )}
 
               {/* AI Processing Status Panel */}
-              {aiStatus && <AIStatusPanel aiStatus={aiStatus} />}
+              {aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
 
               {(converting || showProgress) && (
                 <div className="rounded-xl border border-primary/20 bg-muted/20 p-4 sm:p-5">

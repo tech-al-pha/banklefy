@@ -264,6 +264,11 @@
   box-shadow: 0 0 18px hsl(42 85% 55% / 0.35);
 }
 
+/* Allow specific buttons to opt out of the glow shadow */
+.btn-glow.no-glow:hover {
+  box-shadow: none;
+}
+
 /* reCAPTCHA v3 badge - hidden (notice shown in footer) */
 .grecaptcha-badge {
   visibility: hidden !important;
