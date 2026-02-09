@@ -159,7 +159,7 @@ const normalizeTransaction = (raw: Record<string, unknown>): RawTransaction => {
   const toNumber = (value: unknown): number | undefined => {
     if (typeof value === 'number' && !Number.isNaN(value)) return value;
     if (typeof value === 'string') {
-      const cleaned = value.replace(/[\s,]/g, ).trim();
+      const cleaned = value.replace(/[\s,]/g, '').trim();
       if (!cleaned) return undefined;
       const num = Number(cleaned);
       return Number.isNaN(num) ? undefined : num;

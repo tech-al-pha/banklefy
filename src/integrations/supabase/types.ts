@@ -116,54 +116,6 @@ export type Database = {
         }
         Relationships: []
       }
-      razorpay_orders: {
-        Row: {
-          amount: number
-          created_at: string
-          currency: string
-          id: string
-          metadata: Json | null
-          notes: Json | null
-          plan_id: string
-          payment_capture: boolean
-          razorpay_order_id: string
-          receipt: string
-          status: string
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          currency?: string
-          id?: string
-          metadata?: Json | null
-          notes?: Json | null
-          plan_id: string
-          payment_capture?: boolean
-          razorpay_order_id: string
-          receipt: string
-          status: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          currency?: string
-          id?: string
-          metadata?: Json | null
-          notes?: Json | null
-          plan_id?: string
-          payment_capture?: boolean
-          razorpay_order_id?: string
-          receipt?: string
-          status?: string
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       fraud_alerts: {
         Row: {
           affected_rows: Json | null
@@ -240,6 +192,107 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      razorpay_orders: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          metadata: Json | null
+          notes: Json | null
+          payment_capture: boolean | null
+          plan_id: string
+          razorpay_order_id: string
+          receipt: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          notes?: Json | null
+          payment_capture?: boolean | null
+          plan_id: string
+          razorpay_order_id: string
+          receipt?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          notes?: Json | null
+          payment_capture?: boolean | null
+          plan_id?: string
+          razorpay_order_id?: string
+          receipt?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      razorpay_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string
+          metadata: Json | null
+          order_id: string | null
+          plan_id: string
+          razorpay_order_id: string
+          razorpay_payment_id: string
+          razorpay_signature: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          plan_id: string
+          razorpay_order_id: string
+          razorpay_payment_id: string
+          razorpay_signature?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          plan_id?: string
+          razorpay_order_id?: string
+          razorpay_payment_id?: string
+          razorpay_signature?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "razorpay_payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "razorpay_orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       risk_analysis: {
         Row: {
