@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'; // Akromeda Language System
 
-export type Language = 'en' | 'zh' | 'ja' | 'es' | 'it';
+export type Language = 'en' | 'zh' | 'ja' | 'es' | 'it' | 'ar';
 
 interface LanguageContextType {
   language: Language;
@@ -20,21 +20,29 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.signIn': 'Sign In',
     'nav.signOut': 'Sign Out',
     'nav.getStarted': 'Get Started',
+    'nav.pricing': 'Pricing',
+    'nav.benefits': 'Benefits',
+    'nav.menu': 'Menu',
     
     // Hero
     'hero.title': 'AI Bank Statement Converter',
-    'hero.subtitle': 'Transform your bank statements into organized Excel files instantly with AI-powered precision.',
+    'hero.titleLine1': 'Bank Statement',
+    'hero.titleLine2': 'Converter',
+    'hero.tagline': 'professional look | OCR-Powered | Instant Results',
+    'hero.subtitle': 'Convert bank statements to Excel with AI-powered OCR technology. High-accuracy data extraction with bank-level security.',
     'hero.uploadBtn': 'Upload Your Statement Now',
     'hero.pricingBtn': 'View Pricing',
+    'hero.sampleReportBtn': 'Sample Report',
     
     // How It Works
     'howItWorks.title': 'How It Works',
+    'howItWorks.subtitle': 'Transform your bank statements into Excel in three simple steps',
     'howItWorks.step1.title': 'Upload',
-    'howItWorks.step1.desc': 'Upload your PDF or image bank statement',
-    'howItWorks.step2.title': 'Process',
-    'howItWorks.step2.desc': 'AI extracts and categorizes transactions',
-    'howItWorks.step3.title': 'Download',
-    'howItWorks.step3.desc': 'Get organized Excel file instantly',
+    'howItWorks.step1.desc': 'Upload your bank statement in any format - PDF, scanned image, or photo. We support documents from any bank worldwide.',
+    'howItWorks.step2.title': 'AI Processing',
+    'howItWorks.step2.desc': 'Our AI-powered OCR instantly extracts and organizes transaction data with high accuracy. Supports 50+ languages including Hindi, Arabic, and Mandarin.',
+    'howItWorks.step3.title': 'Download Excel',
+    'howItWorks.step3.desc': 'Receive a clean, structured Excel spreadsheet ready for accounting, analysis, or integration with your financial tools.',
     
     // Features
     'features.title': 'Features',
@@ -59,11 +67,17 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.company': 'Company',
     'footer.about': 'About',
     'footer.privacy': 'Privacy Policy',
+    'footer.terms': 'Terms & Conditions',
     'footer.cta.title': 'Ready to Transform Your',
     'footer.cta.subtitle': 'Financial Workflow?',
     'footer.cta.desc': 'Join thousands of businesses and individuals who trust Akromeda for accurate, instant bank statement conversions.',
     'footer.cta.btn': 'Start Converting Now',
     'footer.copyright': '© 2026 Akromeda. Created by Faizan Rizvi.',
+    'footer.recaptcha.prefix': 'This site is protected by reCAPTCHA and the Google',
+    'footer.recaptcha.privacy': 'Privacy Policy',
+    'footer.recaptcha.and': 'and',
+    'footer.recaptcha.terms': 'Terms of Service',
+    'footer.recaptcha.suffix': 'apply.',
     
     // Auth
     'auth.welcome': 'Welcome back!',
@@ -305,15 +319,23 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.signIn': '登录',
     'nav.signOut': '登出',
     'nav.getStarted': '开始使用',
+    'nav.pricing': '定价',
+    'nav.benefits': '优势',
+    'nav.menu': '菜单',
     
     // Hero
     'hero.title': 'AI银行对账单转换器',
+    'hero.titleLine1': '银行对账单',
+    'hero.titleLine2': '转换器',
+    'hero.tagline': '专业外观 | OCR驱动 | 即时结果',
     'hero.subtitle': '使用AI驱动的精度，即时将您的银行对账单转换为有组织的Excel文件。',
     'hero.uploadBtn': '立即上传您的对账单',
     'hero.pricingBtn': '查看价格',
+    'hero.sampleReportBtn': '示例报告',
     
     // How It Works
     'howItWorks.title': '使用方法',
+    'howItWorks.subtitle': '三步将银行对账单转换为Excel',
     'howItWorks.step1.title': '上传',
     'howItWorks.step1.desc': '上传您的PDF或图片银行对账单',
     'howItWorks.step2.title': '处理',
@@ -344,11 +366,17 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.company': '公司',
     'footer.about': '关于',
     'footer.privacy': '隐私政策',
+    'footer.terms': '条款和条件',
     'footer.cta.title': '准备好改变您的',
     'footer.cta.subtitle': '财务工作流程？',
     'footer.cta.desc': '加入数千家信任Akromeda进行准确、即时银行对账单转换的企业和个人。',
     'footer.cta.btn': '立即开始转换',
     'footer.copyright': '© 2026 Akromeda。由Faizan Rizvi创建。',
+    'footer.recaptcha.prefix': '本网站受 reCAPTCHA 保护，并受 Google 的',
+    'footer.recaptcha.privacy': '隐私政策',
+    'footer.recaptcha.and': '和',
+    'footer.recaptcha.terms': '服务条款',
+    'footer.recaptcha.suffix': '约束。',
     
     // Auth
     'auth.welcome': '欢迎回来！',
@@ -523,15 +551,23 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.signIn': 'ログイン',
     'nav.signOut': 'ログアウト',
     'nav.getStarted': '始める',
+    'nav.pricing': '料金',
+    'nav.benefits': 'メリット',
+    'nav.menu': 'メニュー',
     
     // Hero
     'hero.title': 'AI銀行明細書コンバーター',
+    'hero.titleLine1': '銀行明細',
+    'hero.titleLine2': 'コンバーター',
+    'hero.tagline': 'プロ品質 | OCR搭載 | 即時結果',
     'hero.subtitle': 'AI搭載の精度で、銀行明細書を整理されたExcelファイルに即座に変換します。',
     'hero.uploadBtn': '今すぐ明細書をアップロード',
     'hero.pricingBtn': '価格を見る',
+    'hero.sampleReportBtn': 'サンプルレポート',
     
     // How It Works
     'howItWorks.title': '使い方',
+    'howItWorks.subtitle': '銀行明細をExcelに変換する3つの簡単ステップ',
     'howItWorks.step1.title': 'アップロード',
     'howItWorks.step1.desc': 'PDFまたは画像の銀行明細書をアップロード',
     'howItWorks.step2.title': '処理',
@@ -562,11 +598,17 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.company': '会社',
     'footer.about': '概要',
     'footer.privacy': 'プライバシーポリシー',
+    'footer.terms': '利用規約',
     'footer.cta.title': '変革の準備はできましたか',
     'footer.cta.subtitle': '財務ワークフロー？',
     'footer.cta.desc': '正確で即座の銀行明細書変換でAkromedaを信頼する何千もの企業や個人に参加しましょう。',
     'footer.cta.btn': '今すぐ変換を開始',
     'footer.copyright': '© 2026 Akromeda。Faizan Rizviが作成。',
+    'footer.recaptcha.prefix': 'このサイトはreCAPTCHAで保護され、Googleの',
+    'footer.recaptcha.privacy': 'プライバシーポリシー',
+    'footer.recaptcha.and': 'と',
+    'footer.recaptcha.terms': '利用規約',
+    'footer.recaptcha.suffix': 'が適用されます。',
     
     // Auth
     'auth.welcome': 'おかえりなさい！',
@@ -727,15 +769,23 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.signIn': 'Iniciar sesión',
     'nav.signOut': 'Cerrar sesión',
     'nav.getStarted': 'Empezar',
+    'nav.pricing': 'Precios',
+    'nav.benefits': 'Beneficios',
+    'nav.menu': 'Menú',
     
     // Hero
     'hero.title': 'Convertidor de Extractos Bancarios con IA',
+    'hero.titleLine1': 'Extracto Bancario',
+    'hero.titleLine2': 'Convertidor',
+    'hero.tagline': 'Aspecto profesional | OCR impulsado | Resultados instantáneos',
     'hero.subtitle': 'Transforma tus extractos bancarios en archivos Excel organizados al instante con precisión impulsada por IA.',
     'hero.uploadBtn': 'Sube tu extracto ahora',
     'hero.pricingBtn': 'Ver precios',
+    'hero.sampleReportBtn': 'Informe de muestra',
     
     // How It Works
     'howItWorks.title': 'Cómo funciona',
+    'howItWorks.subtitle': 'Convierte tus extractos bancarios a Excel en tres pasos simples',
     'howItWorks.step1.title': 'Subir',
     'howItWorks.step1.desc': 'Sube tu extracto bancario en PDF o imagen',
     'howItWorks.step2.title': 'Procesar',
@@ -766,11 +816,17 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.company': 'Empresa',
     'footer.about': 'Acerca de',
     'footer.privacy': 'Política de privacidad',
+    'footer.terms': 'Términos y Condiciones',
     'footer.cta.title': '¿Listo para transformar tu',
     'footer.cta.subtitle': 'flujo de trabajo financiero?',
     'footer.cta.desc': 'Únete a miles de empresas e individuos que confían en Akromeda para conversiones de extractos bancarios precisas e instantáneas.',
     'footer.cta.btn': 'Comienza a convertir ahora',
     'footer.copyright': '© 2026 Akromeda. Creado por Faizan Rizvi.',
+    'footer.recaptcha.prefix': 'Este sitio está protegido por reCAPTCHA y la',
+    'footer.recaptcha.privacy': 'Política de privacidad',
+    'footer.recaptcha.and': 'y los',
+    'footer.recaptcha.terms': 'Términos del servicio',
+    'footer.recaptcha.suffix': 'de Google se aplican.',
     
     // Auth
     'auth.welcome': '¡Bienvenido de nuevo!',
@@ -935,15 +991,23 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.signIn': 'Accedi',
     'nav.signOut': 'Esci',
     'nav.getStarted': 'Inizia',
+    'nav.pricing': 'Prezzi',
+    'nav.benefits': 'Vantaggi',
+    'nav.menu': 'Menu',
     
     // Hero
     'hero.title': 'Convertitore di Estratti Conto con IA',
+    'hero.titleLine1': 'Estratto Conto',
+    'hero.titleLine2': 'Convertitore',
+    'hero.tagline': 'Aspetto professionale | OCR potenziato | Risultati immediati',
     'hero.subtitle': "Trasforma i tuoi estratti conto in file Excel organizzati istantaneamente con precisione basata sull'IA.",
     'hero.uploadBtn': 'Carica il tuo estratto conto ora',
     'hero.pricingBtn': 'Vedi prezzi',
+    'hero.sampleReportBtn': 'Report di esempio',
     
     // How It Works
     'howItWorks.title': 'Come funziona',
+    'howItWorks.subtitle': 'Trasforma i tuoi estratti conto in Excel in tre semplici passaggi',
     'howItWorks.step1.title': 'Carica',
     'howItWorks.step1.desc': 'Carica il tuo estratto conto in PDF o immagine',
     'howItWorks.step2.title': 'Elabora',
@@ -974,11 +1038,17 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.company': 'Azienda',
     'footer.about': 'Chi siamo',
     'footer.privacy': 'Politica sulla privacy',
+    'footer.terms': 'Termini e condizioni',
     'footer.cta.title': 'Pronto a trasformare il tuo',
     'footer.cta.subtitle': 'flusso di lavoro finanziario?',
     'footer.cta.desc': 'Unisciti a migliaia di aziende e privati che si affidano ad Akromeda per conversioni di estratti conto accurate e istantanee.',
     'footer.cta.btn': 'Inizia a convertire ora',
     'footer.copyright': '© 2026 Akromeda. Creato da Faizan Rizvi.',
+    'footer.recaptcha.prefix': 'Questo sito è protetto da reCAPTCHA e la',
+    'footer.recaptcha.privacy': 'Informativa sulla privacy',
+    'footer.recaptcha.and': 'e i',
+    'footer.recaptcha.terms': 'Termini di servizio',
+    'footer.recaptcha.suffix': 'di Google si applicano.',
     
     // Auth
     'auth.welcome': 'Bentornato!',
@@ -1131,6 +1201,303 @@ const translations: Record<Language, Record<string, string>> = {
     // Language
     'language': 'Italiano',
   },
+  ar: {
+    // Navigation
+    'nav.features': 'الميزات',
+    'nav.demo': 'عرض تجريبي',
+    'nav.chatAura': 'شات أورا',
+    'nav.settings': 'الإعدادات',
+    'nav.admin': 'المشرف',
+    'nav.about': 'حول',
+    'nav.signIn': 'تسجيل الدخول',
+    'nav.signOut': 'تسجيل الخروج',
+    'nav.getStarted': 'ابدأ الآن',
+    'nav.pricing': 'الأسعار',
+    'nav.benefits': 'المزايا',
+    'nav.menu': 'القائمة',
+    
+    // Hero
+    'hero.title': 'محوّل كشوف الحساب بالذكاء الاصطناعي',
+    'hero.titleLine1': 'كشف الحساب',
+    'hero.titleLine2': 'المحوّل',
+    'hero.tagline': 'مظهر احترافي | مدعوم بـ OCR | نتائج فورية',
+    'hero.subtitle': 'حوّل كشوفات حسابك إلى ملفات Excel منظمة فورًا بدقة مدعومة بالذكاء الاصطناعي.',
+    'hero.uploadBtn': 'ارفع كشف الحساب الآن',
+    'hero.pricingBtn': 'عرض الأسعار',
+    'hero.sampleReportBtn': 'تقرير نموذجي',
+    
+    // How It Works
+    'howItWorks.title': 'كيف يعمل',
+    'howItWorks.subtitle': 'حوّل كشوفات حسابك إلى Excel في ثلاث خطوات بسيطة',
+    'howItWorks.step1.title': 'تحميل',
+    'howItWorks.step1.desc': 'قم بتحميل كشف حسابك بأي تنسيق — PDF أو صورة ممسوحة ضوئيًا أو صورة ملتقطة. ندعم مستندات من أي بنك حول العالم.',
+    'howItWorks.step2.title': 'معالجة بالذكاء الاصطناعي',
+    'howItWorks.step2.desc': 'يقوم OCR المدعوم بالذكاء الاصطناعي باستخراج بيانات المعاملات وتنظيمها فورًا بدقة عالية. يدعم أكثر من 50 لغة بما في ذلك الهندية والعربية والماندرين.',
+    'howItWorks.step3.title': 'تنزيل Excel',
+    'howItWorks.step3.desc': 'احصل على جدول Excel منظم ونظيف جاهز للمحاسبة أو التحليل أو الدمج مع أدواتك المالية.',
+    
+    // Features
+    'features.title': 'الميزات',
+    'features.accuracy': 'دقة عالية',
+    'features.accuracyDesc': 'الاستخراج المدعوم بالذكاء الاصطناعي مصمم لتقليل الأخطاء.',
+    'features.fast': 'سرعة فائقة',
+    'features.fastDesc': 'حوّل الكشوف في ثوانٍ',
+    'features.secure': 'أمان بمستوى البنوك',
+    'features.secureDesc': 'بياناتك مشفرة ومحميّة',
+    
+    // Pricing
+    'pricing.title': 'الأسعار',
+    'pricing.free': 'مجاني',
+    'pricing.daily': 'يومي',
+    'pricing.business': 'أعمال',
+    
+    // Footer
+    'footer.product': 'المنتج',
+    'footer.features': 'الميزات',
+    'footer.pricing': 'الأسعار',
+    'footer.howItWorks': 'كيف يعمل',
+    'footer.company': 'الشركة',
+    'footer.about': 'حول',
+    'footer.privacy': 'سياسة الخصوصية',
+    'footer.terms': 'الشروط والأحكام',
+    'footer.cta.title': 'جاهز لتحويل',
+    'footer.cta.subtitle': 'سير عملك المالي؟',
+    'footer.cta.desc': 'انضم إلى آلاف الشركات والأفراد الذين يثقون في Akromeda لتحويل كشوفات الحساب بدقة وفورًا.',
+    'footer.cta.btn': 'ابدأ التحويل الآن',
+    'footer.copyright': '© 2026 Akromeda. من إنشاء Faizan Rizvi.',
+    'footer.recaptcha.prefix': 'هذا الموقع محمي بواسطة reCAPTCHA و',
+    'footer.recaptcha.privacy': 'سياسة الخصوصية',
+    'footer.recaptcha.and': 'و',
+    'footer.recaptcha.terms': 'شروط الخدمة',
+    'footer.recaptcha.suffix': 'الخاصة بـ Google تنطبق.',
+    
+    // Auth
+    'auth.welcome': 'مرحبًا بعودتك!',
+    'auth.signedIn': 'تم تسجيل الدخول بنجاح.',
+    'auth.accountCreated': 'تم إنشاء الحساب!',
+    'auth.canUse': 'يمكنك الآن البدء في استخدام Akromeda.',
+    'auth.email': 'البريد الإلكتروني',
+    'auth.password': 'كلمة المرور',
+    'auth.signIn': 'تسجيل الدخول',
+    'auth.signUp': 'إنشاء حساب',
+    'auth.forgotPassword': 'هل نسيت كلمة المرور؟',
+    'auth.noAccount': 'ليس لديك حساب؟ أنشئ حسابًا',
+    'auth.hasAccount': 'لديك حساب بالفعل؟ سجّل الدخول',
+
+    // Common
+    'common.backToHome': 'العودة إلى الصفحة الرئيسية',
+
+    // Features Directory Page
+    'featuresPage.title': 'جميع الميزات',
+    'featuresPage.subtitle':
+      'قائمة شاملة من الألف إلى الياء بكل ما يقدمه Akromeda — من OCR المدعوم بالذكاء الاصطناعي إلى الأمان بمستوى البنوك. مصمم للدقة والسرعة والتحليل المالي بمستوى المؤسسات.',
+    'featuresPage.categories.core': 'التقنية الأساسية',
+    'featuresPage.categories.financial': 'التحليل المالي',
+    'featuresPage.categories.risk': 'تحليل المخاطر',
+    'featuresPage.categories.assistant': 'مساعد الذكاء الاصطناعي',
+    'featuresPage.categories.export': 'التصدير',
+    'featuresPage.categories.performance': 'الأداء',
+    'featuresPage.categories.security': 'الأمان',
+    'featuresPage.categories.privacy': 'الخصوصية',
+    'featuresPage.categories.accessibility': 'إمكانية الوصول',
+    'featuresPage.categories.technology': 'التقنية',
+    'featuresPage.categories.usage': 'الاستخدام',
+
+    'featuresPage.items.aiOcr.title': 'محرك OCR بالذكاء الاصطناعي',
+    'featuresPage.items.aiOcr.desc':
+      'يستخرج البيانات من ملفات PDF والمسوح والصور. يتعرف على جداول المعاملات والتواريخ والمبالغ والأوصاف بدقة عالية — حتى من المستندات منخفضة الجودة.',
+    'featuresPage.items.excelCsv.title': 'تصدير Excel وCSV',
+    'featuresPage.items.excelCsv.desc':
+      'صدّر ملفات Excel (.xlsx) وCSV نظيفة مع أعمدة صحيحة (التاريخ، الوصف، المدين، الدائن، الرصيد، الفئة). يعمل مع أدوات المحاسبة الشائعة.',
+    'featuresPage.items.pdfReport.title': 'إنشاء تقارير PDF',
+    'featuresPage.items.pdfReport.desc':
+      'أنشئ تقارير PDF بعلامتك التجارية مع ملخصات ومقاييس الاكتتاب وتفاصيل دقيقة — مثالية للتدقيق وطلبات القروض.',
+
+    'featuresPage.items.foir.title': 'حساب FOIR',
+    'featuresPage.items.foir.desc':
+      'يحسب FOIR تلقائيًا عبر تحليل قائم على القواعد من خلال كشف تحويلات الراتب وخصومات EMI — يُستخدم في تقييم أهلية القروض.',
+    'featuresPage.items.emiDetection.title': 'اكتشاف EMI',
+    'featuresPage.items.emiDetection.desc':
+      'يرصد دفعات EMI المتكررة بأنماط حتمية (قروض منزل/سيارة/شخصية، EMI بطاقات الائتمان، BNPL). بلا تخمين — قابل للتفسير بالكامل.',
+    'featuresPage.items.salaryAnalysis.title': 'تحليل تحويلات الراتب',
+    'featuresPage.items.salaryAnalysis.desc':
+      'يعثر على تحويلات الراتب باستخدام الأنماط وكلمات جهة العمل لتقدير متوسط الدخل الشهري للاكتتاب.',
+    'featuresPage.items.cashflow.title': 'تحليل التدفق النقدي',
+    'featuresPage.items.cashflow.desc':
+      'يفصل التدفقات الداخلة والخارجة وصافي التدفق مع ملخصات الفئات ورؤى الاتجاهات.',
+    'featuresPage.items.adbAmb.title': 'متوسط الرصيد اليومي',
+    'featuresPage.items.adbAmb.desc':
+      'يحسب مؤشرات ADB/AMB التي تستخدمها البنوك لفحص الحد الأدنى للرصيد وتقييمات الإقراض.',
+
+    'featuresPage.items.fraudDetection.title': 'اكتشاف الاحتيال',
+    'featuresPage.items.fraudDetection.desc':
+      'يرصد أنماطًا مشبوهة مثل المعاملات بأرقام مستديرة، شذوذات عطلة نهاية الأسبوع، التكرارات، وعدم تطابق الرصيد.',
+    'featuresPage.items.integrityScoring.title': 'تقييم النزاهة',
+    'featuresPage.items.integrityScoring.desc':
+      'يتحقق من اتساق الكشوف عبر التواريخ والأرصدة للمساعدة في كشف العبث والأخطاء.',
+    'featuresPage.items.underwritingPanel.title': 'لوحة الاكتتاب',
+    'featuresPage.items.underwritingPanel.desc':
+      'كل المقاييس الرئيسية بنظرة واحدة: الدخل، EMI، FOIR، اتجاهات الرصيد، وأعلام المخاطر — مبنية لقرارات الإقراض.',
+
+    'featuresPage.items.languages.title': 'دعم أكثر من 50 لغة',
+    'featuresPage.items.languages.desc':
+      'عالج الكشوف بأكثر من 50 لغة. يدعم المستندات متعددة اللغات وتنسيقات البنوك الدولية.',
+    'featuresPage.items.instantProcessing.title': 'معالجة فورية',
+    'featuresPage.items.instantProcessing.desc':
+      'تحويلات سريعة خلال أقل من ~30 ثانية — مثالية للمحاسبة والتدقيق الحساسة للوقت.',
+    'featuresPage.items.batchProcessing.title': 'معالجة دفعات',
+    'featuresPage.items.batchProcessing.desc':
+      'حوّل عدة كشوف بالتوازي — مناسب للمحاسبين وسير العمل بالجملة.',
+    'featuresPage.items.chatAura.title': 'مساعد Chat Aura الذكي',
+    'featuresPage.items.chatAura.desc':
+      'اسأل عن كشفك واحصل على رؤى حول المعاملات والتدفق النقدي وأنماط الإنفاق.',
+
+    'featuresPage.items.encryption.title': 'تشفير بمستوى البنوك',
+    'featuresPage.items.encryption.desc':
+      'تشفير قوي أثناء الرفع والمعالجة والتنزيل لحماية البيانات المالية الحساسة.',
+    'featuresPage.items.zeroRetention.title': 'عدم الاحتفاظ بالبيانات',
+    'featuresPage.items.zeroRetention.desc':
+      'لا يتم الاحتفاظ بالملفات بعد المعالجة. أنت تتحكم بالكامل في بياناتك.',
+
+    'featuresPage.items.categorization.title': 'تصنيف ذكي',
+    'featuresPage.items.categorization.desc':
+      'يصنف المعاملات تلقائيًا إلى فئات (راتب، EMI، خدمات، تسوق، طعام، إلخ) مع تعيين قابل للتخصيص.',
+    'featuresPage.items.exportFormats.title': 'تنسيقات تصدير متعددة',
+    'featuresPage.items.exportFormats.desc': 'صدّر تقارير Excel وCSV وDOCX وODS — محسّنة للمحاسبة والتحليل.',
+    'featuresPage.items.ruleBased.title': 'دقة قائمة على القواعد',
+    'featuresPage.items.ruleBased.desc': 'لا هلوسة ولا تخمين — كل رقم محسوب بدقة ويمكن تفسيره.',
+    'featuresPage.items.dailyLimits.title': 'حدود يومية مُعاد ضبطها',
+    'featuresPage.items.dailyLimits.desc':
+      'تُعاد الحدود يوميًا عند منتصف الليل بالتوقيت المحلي. المستخدم المجهول: 2/يوم؛ المسجل: 6/يوم.',
+
+    'featuresPage.cta.title': 'جاهز لتجربة كل الميزات؟',
+    'featuresPage.cta.desc':
+      'ابدأ التحويل الآن مع تحويلين مجانيين يوميًا. سجّل للحصول على 5 تحويلات يوميًا وافتح القوة الكاملة لـ Akromeda.',
+    'featuresPage.cta.tryDemo': 'جرّب العرض التجريبي الآن',
+    'featuresPage.cta.signUp': 'سجّل مجانًا',
+    'featuresPage.footer': '© 2026 Akromeda | صُمم للتميّز',
+
+    // About Page
+    'aboutPage.visionTitle': 'الرؤية',
+    'aboutPage.visionSubtitle': 'حيث تلتقي الدقة بالأمن السيبراني.',
+    'aboutPage.visionP1':
+      'Akromeda ليست مجرد أداة؛ إنها معيار عالمي لنزاهة البيانات المالية. في عصر أصبحت فيه البيانات عملة جديدة، بنينا منصة لا تحول الملفات فحسب — بل تؤمّن سير عملك المالي بالكامل.',
+    'aboutPage.brainchildPrefix': 'من ابتكار',
+    'aboutPage.brainchildP1':
+      'صُممت على يد متخصص في الأمن السيبراني من جامعة هارفارد، مقيم في كوتا، راجستان. في عمر 18 عامًا، اكتشف فايزان ثغرة حرجة في طريقة التعامل مع المستندات المالية الحساسة عالميًا.',
+    'aboutPage.brainchildP2':
+      'بدمج التشفير المتقدم مع الأتمتة السلسة بالذكاء الاصطناعي، أطلقت Akromeda في عام 2026 لتمكين الشركات من تحويلات فورية عالية النزاهة — مع الحفاظ على خصوصية بياناتك وقوتها.',
+    'aboutPage.valueProps.cyberSafe.title': 'أمان سيبراني',
+    'aboutPage.valueProps.cyberSafe.desc': 'مبادئ أمان أولًا لسير عمل مالي حساس.',
+    'aboutPage.valueProps.instantFlux.title': 'تدفّق فوري',
+    'aboutPage.valueProps.instantFlux.desc': 'حوّل البيانات المعقدة بسرعة — دون إدخال يدوي.',
+    'aboutPage.valueProps.accuracy.title': 'دقة عالية',
+    'aboutPage.valueProps.accuracy.desc': 'تحويل يركز على الدقة للبيانات المالية عالية المخاطر.',
+    'aboutPage.connectTitle': 'تواصل مع المؤسس',
+    'aboutPage.contact.hotline': 'الخط الساخن',
+    'aboutPage.contact.mail': 'البريد',
+    'aboutPage.contact.social': 'التواصل',
+    'aboutPage.contact.hq': 'المقر',
+    'aboutPage.contact.hqValue': 'Prem Nagar 1st, Kota, Rajasthan 324004',
+    'aboutPage.footer': '© 2026 Akromeda | صُمم للتميّز',
+
+    // Privacy Page
+    'privacyPage.badge': 'الخصوصية والشفافية',
+    'privacyPage.title': 'سياسة الخصوصية',
+    'privacyPage.subtitle': 'نجمع فقط ما نحتاجه لتشغيل الخدمة وتأمينها.',
+    'privacyPage.lastUpdated': 'آخر تحديث: 7 فبراير 2026',
+    'privacyPage.sections.zeroRetention.title': 'احتفاظ لمدة 24 ساعة',
+    'privacyPage.sections.zeroRetention.desc': 'يتم تخزين الملفات المرفوعة والنتائج المُولدة لمدة تصل إلى 24 ساعة لتتمكن من تنزيلها. يجب عليك تنزيل ملفاتك بنفسك؛ نحن لا نقوم بتنزيل الملفات أو استرجاعها أو حذفها يدويًا نيابةً عنك. بعد 24 ساعة، تُحذف الملفات والنتائج نهائيًا ولا يمكن استعادتها.',
+    'privacyPage.sections.encryption.title': 'التشفير أثناء النقل',
+    'privacyPage.sections.encryption.desc': 'تُشفّر البيانات أثناء الرفع والنقل. نستخدم مزودين موثوقين وضوابط أمان معيارية في الصناعة.',
+    'privacyPage.sections.noTracking.title': 'لا تتبع إعلاني',
+    'privacyPage.sections.noTracking.desc': 'لا نبيع بياناتك ولا نشغّل متتبعات إعلانية. قد نستخدم أدوات مكافحة إساءة الاستخدام مثل reCAPTCHA التي قد تجمع إشارات الجهاز وتضع ملفات تعريف الارتباط.',
+    'privacyPage.sections.aiPowered.title': 'معالجة مؤتمتة',
+    'privacyPage.sections.aiPowered.desc': 'المعالجة تتم بشكل أساسي آليًا. الوصول إلى البيانات محدود للموظفين المخوّلين للدعم أو للأسباب القانونية.',
+    'privacyPage.sections.compliance.title': 'خصوصية مدروسة',
+    'privacyPage.sections.compliance.desc': 'نهدف إلى اتباع مبادئ الخصوصية وأن نكون شفافين حول كيفية استخدام البيانات.',
+    'privacyPage.aboutTitle': 'حول Akromeda',
+    'privacyPage.aboutP1':
+      'Akromeda أداة ذكية وسريعة وآمنة لتحويل كشوف الحساب من PDF إلى Excel بدقة وسهولة.',
+    'privacyPage.aboutP2Prefix': 'تم إنشاء هذه المنصة بواسطة',
+    'privacyPage.aboutP2Suffix':
+      ', طالب أمن سيبراني في جامعة هارفارد، مقيم في كوتا، راجستان، الهند. في عام 2026، بعمر 18 عامًا، أطلق فايزان Akromeda لمساعدة الأفراد والشركات على توفير الوقت والجهد في البيانات المالية.',
+    'privacyPage.whatTitle': 'ماذا تفعل Akromeda',
+    'privacyPage.whatItems.item1': 'تحوّل ملفات PDF المعقدة لكشوف الحساب إلى جداول Excel نظيفة وقابلة للتحرير',
+    'privacyPage.whatItems.item2': 'تحافظ على التنسيق والأعمدة ووضوح المعاملات',
+    'privacyPage.whatItems.item3': 'تعمل فورًا — دون تثبيت برامج',
+    'privacyPage.whatItems.item4': 'مصممة بخصوصية وأمان البيانات في جوهرها',
+    'privacyPage.contactTitle': 'أسئلة؟',
+    'privacyPage.contactDescPrefix': 'للاستفسارات حول الخصوصية، تواصل مع',
+    'privacyPage.footer': '(c) 2026 Akromeda. جميع الحقوق محفوظة.',
+
+    // Settings Page
+    'settings.title': 'الإعدادات',
+    'settings.subtitle': 'أدر حسابك وتفضيلاتك وإعدادات الخصوصية',
+    'settings.searchPlaceholder': 'ابحث في الإعدادات...',
+    'settings.backToHome': 'العودة إلى الصفحة الرئيسية',
+    'settings.verified': 'موثّق',
+    'settings.noResults': 'لم يتم العثور على إعدادات مطابقة لبحثك.',
+    'settings.categories.all': 'الكل',
+    'settings.categories.profile': 'الملف الشخصي',
+    'settings.categories.usage': 'الاستخدام',
+    'settings.categories.notifications': 'الإشعارات',
+    'settings.categories.appearance': 'المظهر',
+    'settings.categories.privacy': 'الخصوصية',
+    'settings.categories.advanced': 'متقدم',
+    'settings.profile.email': 'عنوان البريد الإلكتروني',
+    'settings.profile.emailDesc': 'عنوان بريد حسابك',
+    'settings.profile.name': 'اسم العرض',
+    'settings.profile.nameDesc': 'اسمك المعروض للجمهور',
+    'settings.profile.namePlaceholder': 'أدخل اسمك',
+    'settings.profile.password': 'كلمة المرور',
+    'settings.profile.passwordDesc': 'غيّر كلمة مرور حسابك',
+    'settings.profile.changePassword': 'تغيير كلمة المرور',
+    'settings.usage.stats': 'إحصائيات التحويل',
+    'settings.usage.statsDesc': 'استخدامك اليومي للتحويلات',
+    'settings.usage.conversionsToday': 'تحويلات اليوم',
+    'settings.usage.remaining': 'المتبقي',
+    'settings.usage.subscription': 'خطة الاشتراك',
+    'settings.usage.subscriptionDesc': 'فئة اشتراكك الحالية',
+    'settings.usage.freeTier': 'الخطة المجانية',
+    'settings.usage.anonymous': 'مجهول',
+    'settings.usage.upgrade': 'ترقية',
+    'settings.notifications.email': 'إشعارات البريد الإلكتروني',
+    'settings.notifications.emailDesc': 'تلقي التحديثات عبر البريد',
+    'settings.notifications.push': 'إشعارات الدفع',
+    'settings.notifications.pushDesc': 'إشعارات المتصفح',
+    'settings.notifications.sound': 'مؤثرات صوتية',
+    'settings.notifications.soundDesc': 'تشغيل الأصوات للإشعارات',
+    'settings.appearance.theme': 'المظهر',
+    'settings.appearance.themeDesc': 'التبديل بين الوضع الفاتح والداكن',
+    'settings.appearance.language': 'اللغة',
+    'settings.appearance.languageDesc': 'اختر لغتك المفضلة',
+    'settings.privacy.visibility': 'مرئية الملف الشخصي',
+    'settings.privacy.visibilityDesc': 'تحكم في من يمكنه رؤية ملفك',
+    'settings.privacy.manage': 'إدارة',
+    'settings.privacy.data': 'تصدير البيانات',
+    'settings.privacy.dataDesc': 'نزّل نسخة من بياناتك',
+    'settings.privacy.download': 'تنزيل',
+    'settings.privacy.delete': 'حذف الحساب',
+    'settings.privacy.deleteDesc': 'حذف حسابك وبياناتك نهائيًا',
+    'settings.privacy.deleteAccount': 'حذف الحساب',
+    'settings.advanced.autoDownload': 'تنزيل تلقائي',
+    'settings.advanced.autoDownloadDesc': 'تنزيل الملفات المحوّلة تلقائيًا',
+
+    // Chat Aura
+    'chatAura.greeting': 'مرحبًا! أنا Chat Aura، مساعدك المالي. كيف يمكنني مساعدتك اليوم؟',
+    'chatAura.greetingWithPdf': 'مرحبًا! لقد حملت مستندك ({fileName}). اسألني أي شيء عنه!',
+    'chatAura.subtitle': 'مساعدك المالي بالذكاء الاصطناعي',
+    'chatAura.remaining': 'محادثات متبقية',
+    'chatAura.placeholder': 'اسأل عن كشف حسابك...',
+    'chatAura.errorResponse': 'عذرًا، حدث خطأ. يرجى المحاولة مرة أخرى.',
+    'chatAura.limitReached': 'تم الوصول إلى حد المحادثات',
+    'chatAura.signUpForMore': 'سجّل للحصول على محادثات غير محدودة',
+    'chatAura.signUp': 'سجّل',
+    
+    // Language
+    'language': 'العربية',
+  },
 };
 
 const languageNames: Record<Language, string> = {
@@ -1139,6 +1506,7 @@ const languageNames: Record<Language, string> = {
   ja: '日本語',
   es: 'Español',
   it: 'Italiano',
+  ar: 'العربية',
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -1151,6 +1519,10 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     localStorage.setItem('language', language);
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = language;
+      document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    }
   }, [language]);
 
   const setLanguage = (lang: Language) => {

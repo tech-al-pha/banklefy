@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Upload, Zap } from "lucide-react"; 
 import { useNavigate } from "react-router-dom"; 
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export const Hero = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   return (
     <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden pt-8 pb-0">
@@ -20,24 +22,22 @@ export const Hero = () => {
               className="font-bold tracking-tight text-white/95 max-w-[18ch]"
               style={{ fontSize: "clamp(2.5rem, 5vw, 5.5rem)", textWrap: "balance" }}
             >
-              Bank Statement
+              {t('hero.titleLine1')}
             </h1>
             <h2
               className="font-black uppercase tracking-tight bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-200 bg-clip-text text-transparent leading-[0.95]"
               style={{ fontSize: "clamp(3.5rem, 9vw, 9rem)", textWrap: "balance" }}
             >
-              Converter
+              {t('hero.titleLine2')}
             </h2>
           </div>
 
           <div className="text-sm sm:text-lg md:text-xl font-semibold text-primary tracking-[0.06em] md:tracking-[0.1em] uppercase pt-1">
-            professional look | OCR-Powered | Instant Results
+            {t('hero.tagline')}
           </div>
 
           <p className="text-sm md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed opacity-70 italic mt-8">
-            Convert bank statements to Excel with AI-powered OCR technology. 
-            <br className="hidden md:block" />
-            High-accuracy data extraction with bank-level security.
+            {t('hero.subtitle')}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-10 w-full max-w-2xl mx-auto">
@@ -47,7 +47,7 @@ export const Hero = () => {
               onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}
             >
               <Upload className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
-              Upload Your Statement Now
+              {t('hero.uploadBtn')}
             </Button>
 
             <Button 
@@ -56,7 +56,7 @@ export const Hero = () => {
               className="w-full sm:w-auto border-primary/40 bg-[#1a120b]/80 text-primary backdrop-blur-xl transition-all duration-300 px-8"
               onClick={() => navigate("/sample-report")}
             >
-              Sample Report
+              {t('hero.sampleReportBtn')}
             </Button>
           </div>
 

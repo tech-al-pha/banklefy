@@ -11,7 +11,7 @@ const AboutPage = () => {
   return (
     <div className="min-h-screen bg-[#0A0502] text-white font-sans selection:bg-primary/30">
       {/* Header Area */}
-      <nav className="border-b border-primary/10 bg-black/40 backdrop-blur-md p-4 sticky top-0 z-50">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-black/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <Button 
@@ -24,7 +24,7 @@ const AboutPage = () => {
         </div>
       </nav>
 
-      <main className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 max-w-4xl">
+      <main className="container mx-auto px-4 sm:px-6 pt-24 pb-12 sm:pt-28 sm:pb-16 max-w-4xl">
         {/* About Section - Upgraded with Harvard/Cybersecurity details */}
         <section className="space-y-8 mb-20 animate-in fade-in slide-in-from-bottom-5 duration-700">
           <div className="space-y-2">

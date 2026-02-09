@@ -288,7 +288,7 @@ const PricingPage = () => {
   return (
     <div className="min-h-screen bg-[#0A0502] text-foreground">
       {/* Header */}
-      <header className="border-b border-primary/10 bg-black/40 backdrop-blur-md p-4 sticky top-0 z-50">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-black/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <Button
@@ -301,7 +301,7 @@ const PricingPage = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 max-w-6xl">
+      <main className="container mx-auto px-4 sm:px-6 pt-24 pb-12 sm:pt-28 sm:pb-16 max-w-6xl">
         <section className="text-center mb-16 space-y-4">
           <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white leading-tight">
             Flexible pricing for

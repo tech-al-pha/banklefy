@@ -1,24 +1,26 @@
 import { Upload, Brain, Download } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export const HowItWorks = () => {
+  const { t } = useLanguage();
   const steps = [
     {
       icon: Upload,
       number: "01",
-      title: "Upload",
-      description: "Upload your bank statement in any format - PDF, scanned image, or photo. We support documents from any bank worldwide."
+      title: t('howItWorks.step1.title'),
+      description: t('howItWorks.step1.desc'),
     },
     {
       icon: Brain,
       number: "02",
-      title: "AI Processing",
-      description: "Our AI-powered OCR instantly extracts and organizes transaction data with high accuracy. Supports 50+ languages including Hindi, Arabic, and Mandarin."
+      title: t('howItWorks.step2.title'),
+      description: t('howItWorks.step2.desc'),
     },
     {
       icon: Download,
       number: "03",
-      title: "Download Excel",
-      description: "Receive a clean, structured Excel spreadsheet ready for accounting, analysis, or integration with your financial tools."
+      title: t('howItWorks.step3.title'),
+      description: t('howItWorks.step3.desc'),
     }
   ];
 
@@ -27,10 +29,10 @@ export const HowItWorks = () => {
       <div className="container mx-auto relative z-10">
         <div className="text-center mb-12 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold italic text-white">
-            How It Works
+            {t('howItWorks.title')}
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Transform your bank statements into Excel in three simple steps
+            {t('howItWorks.subtitle')}
           </p>
         </div>
 

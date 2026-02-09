@@ -145,7 +145,7 @@ const Dashboard = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10 relative">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 bg-[#1a120b]/80">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">

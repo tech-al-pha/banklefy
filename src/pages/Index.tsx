@@ -58,7 +58,7 @@ const Index = () => {
                 className="text-xs gap-1 text-muted-foreground transition-all duration-300 font-medium px-2 py-1"
               >
                 <CircleDollarSign className="h-3 w-3" />
-                <span>Pricing</span>
+                <span>{t('nav.pricing')}</span>
               </Button>
 
               {/* Benefits Button */}
@@ -69,7 +69,7 @@ const Index = () => {
                 className="text-xs gap-1 text-muted-foreground transition-all duration-300 font-medium px-2 py-1"
               >
                 <Gift className="h-3 w-3" />
-                <span>Benefits</span>
+                <span>{t('nav.benefits')}</span>
               </Button>
 
               {/* Features Button */}
@@ -163,7 +163,7 @@ const Index = () => {
                   <div className="mt-10 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        Menu
+                        {t('nav.menu')}
                       </span>
                       <LanguageSelector />
                     </div>
@@ -175,7 +175,7 @@ const Index = () => {
                         onClick={() => navigate('/pricing')}
                       >
                         <CircleDollarSign className="h-4 w-4" />
-                        Pricing
+                        {t('nav.pricing')}
                       </Button>
                     </SheetClose>
 
@@ -186,7 +186,7 @@ const Index = () => {
                         onClick={() => navigate('/benefits')}
                       >
                         <Gift className="h-4 w-4" />
-                        Benefits
+                        {t('nav.benefits')}
                       </Button>
                     </SheetClose>
 
@@ -357,7 +357,7 @@ const Index = () => {
                       onClick={() => navigate('/terms')}
                       className="transition-colors text-left font-medium"
                     >
-                      Terms & Conditions
+                      {t('footer.terms')}
                     </button>
                   </li>
                 </ul>
@@ -369,25 +369,25 @@ const Index = () => {
             <p>{t('footer.copyright')}</p>
           </div>
           <div className="mt-4 text-center text-xs text-muted-foreground">
-            This site is protected by reCAPTCHA and the Google{" "}
+            {t('footer.recaptcha.prefix')}{" "}
             <a
               href="https://policies.google.com/privacy"
               className="underline underline-offset-2 transition-colors"
               rel="noreferrer"
               target="_blank"
             >
-              Privacy Policy
+              {t('footer.recaptcha.privacy')}
             </a>{" "}
-            and{" "}
+            {t('footer.recaptcha.and')}{" "}
             <a
               href="https://policies.google.com/terms"
               className="underline underline-offset-2 transition-colors"
               rel="noreferrer"
               target="_blank"
             >
-              Terms of Service
+              {t('footer.recaptcha.terms')}
             </a>{" "}
-            apply.
+            {t('footer.recaptcha.suffix')}
           </div>
         </div>
       </footer>
