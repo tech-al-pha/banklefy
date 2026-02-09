@@ -7,23 +7,24 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { LuxuryCursor } from "@/components/LuxuryCursor";
 import { Loader2 } from "lucide-react";
-import { lazy, Suspense, useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import Index from "./pages/Index";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
-const Auth = lazy(() => import("./pages/Auth"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Privacy = lazy(() => import("./pages/Privacy"));
-const Terms = lazy(() => import("./pages/Terms"));
-const ChatPage = lazy(() => import("./pages/ChatPage"));
-const Admin = lazy(() => import("./pages/Admin"));
-const About = lazy(() => import("./pages/About"));
-const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
-const BenefitsPage = lazy(() => import("./pages/BenefitsPage"));
-const Settings = lazy(() => import("./pages/Settings"));
-const PricingPage = lazy(() => import("./pages/PricingPage"));
-const SampleReport = lazy(() => import("./pages/SampleReport"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+const Auth = lazyWithRetry(() => import("./pages/Auth"));
+const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"));
+const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
+const Terms = lazyWithRetry(() => import("./pages/Terms"));
+const ChatPage = lazyWithRetry(() => import("./pages/ChatPage"));
+const Admin = lazyWithRetry(() => import("./pages/Admin"));
+const About = lazyWithRetry(() => import("./pages/About"));
+const FeaturesPage = lazyWithRetry(() => import("./pages/FeaturesPage"));
+const BenefitsPage = lazyWithRetry(() => import("./pages/BenefitsPage"));
+const Settings = lazyWithRetry(() => import("./pages/Settings"));
+const PricingPage = lazyWithRetry(() => import("./pages/PricingPage"));
+const SampleReport = lazyWithRetry(() => import("./pages/SampleReport"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 

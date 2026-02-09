@@ -1,10 +1,11 @@
 import { Hero } from "@/components/Hero";
 import { HowItWorks } from "@/components/HowItWorks";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { scrollToId } from "@/lib/scroll";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
-const UploadDemo = lazy(() =>
+const UploadDemo = lazyWithRetry(() =>
   import("@/components/UploadDemo").then((module) => ({ default: module.UploadDemo })),
 );
 
