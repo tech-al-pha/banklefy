@@ -82,9 +82,9 @@ const Privacy = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0A0502] text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/80 backdrop-blur-xl border-b border-primary/20">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Logo />
@@ -125,7 +125,7 @@ const Privacy = () => {
           {sections.map((section, index) => (
             <div 
               key={index}
-              className="bg-[#1a120b]/80 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-4 hover:border-primary/40 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 duration-700"
+              className="bg-surface-elevated/80 backdrop-blur-lg border border-primary/20 rounded-2xl p-8 space-y-4 hover:border-primary/40 transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 duration-700"
               style={{ animationDelay: `${index * 50}ms` }}
             >
               <div className="flex items-start gap-4">

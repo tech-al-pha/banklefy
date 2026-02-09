@@ -17,7 +17,7 @@ import { FraudAlertPanel } from "./FraudAlertPanel";
 import { UnderwritingPanel } from "./UnderwritingPanel";
 import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
 import { AIStatusPanel } from "./AIStatusPanel";
-import akromedaLogo from "@/assets/akromeda-logo.png";
+import akromedaLogo from "@/assets/akromeda-logo.svg";
 import {
   Dialog,
   DialogContent,
@@ -1360,7 +1360,7 @@ Analytics Summary:
   };
 
   return (
-    <section className="relative py-16 px-4 sm:px-6 overflow-hidden bg-[#0A0502]">
+    <section className="relative py-16 px-4 sm:px-6 overflow-hidden bg-background">
       <div className="container mx-auto relative z-10">
         <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
           <h2 className="text-4xl md:text-5xl font-bold">
@@ -1373,7 +1373,7 @@ Analytics Summary:
         </div>
 
         <div className="max-w-4xl mx-auto">
-          <Card className="p-6 sm:p-8 md:p-12 bg-[#1a120b]/80 backdrop-blur-xl border border-primary/20 rounded-2xl">
+          <div className="space-y-8">
             {/* Usage Limit Banner */}
             {!usageLimitLoading && (
               <UsageLimitBanner
@@ -1408,7 +1408,7 @@ Analytics Summary:
                 tabIndex={0}
                 aria-disabled={limitReached}
                 data-hover
-                className={`bg-[#0f0906]/80 border-2 border-primary/20 hover:border-primary/40 rounded-xl p-6 sm:p-10 md:p-12 text-center transition-all duration-500 cursor-pointer group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0502] ${
+                className={`subtle-border-glow bg-[#191919]/80 border-2 border-primary/20 hover:border-primary/40 rounded-xl p-6 sm:p-10 md:p-12 text-center transition-all duration-500 cursor-pointer group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                   limitReached 
                     ? 'opacity-50 cursor-not-allowed' 
                     : ''
@@ -1473,7 +1473,7 @@ Analytics Summary:
                   {/* Choose File button - Orange circle removed */}
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <Button 
-                      className="bg-primary text-primary-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto"
+                      className="bg-primary text-primary-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto active:bg-primary active:text-primary-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleUploadClick();
@@ -1560,7 +1560,7 @@ Analytics Summary:
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Button
                       variant="outline"
-                      className="w-full border-[#F2C94C]/55 text-[#F2C94C] shadow-[0_0_14px_rgba(242,201,76,0.22)] hover:shadow-[0_0_18px_rgba(242,201,76,0.28)]"
+                      className="w-full border border-surface-elevated/50 text-foreground shadow-[0_0_14px_rgba(0,0,0,0.22)] hover:shadow-[0_0_18px_rgba(0,0,0,0.28)]"
                       onClick={() => {
                         dismissedEditedWarningsRef.current.add(editedPdfWarning.fileName);
                         setEditedPdfWarning(null);
@@ -1977,7 +1977,11 @@ Analytics Summary:
                           variant="outline"
                           size="sm"
                           onClick={() => setShowDuplicatesOnly(!showDuplicatesOnly)}
-                          className={showDuplicatesOnly ? 'bg-[#F2C94C]/20 border-[#F2C94C]/50 shadow-[0_0_10px_rgba(242,201,76,0.18)]' : ''}
+                          className={
+                            showDuplicatesOnly
+                              ? "bg-surface-elevated/30 border border-surface-elevated/60 shadow-[0_0_10px_rgba(0,0,0,0.18)]"
+                              : ""
+                          }
                         >
                           <AlertTriangle className="w-4 h-4 mr-1" />
                           {showDuplicatesOnly ? 'Show All' : `Show Duplicates (${analytics.duplicateCount})`}
@@ -2091,7 +2095,7 @@ Analytics Summary:
 
               {/* Process Steps */}
               <div className="grid md:grid-cols-3 gap-6">
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-[#0A0502]/40 backdrop-blur-lg border border-primary/20">
+                <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-primary/20">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <FileText className="w-4 h-4 text-primary" />
                   </div>
@@ -2103,7 +2107,7 @@ Analytics Summary:
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-[#0A0502]/40 backdrop-blur-lg border border-secondary/20">
+                <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-secondary/20">
                   <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
                     <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
                   </div>
@@ -2115,7 +2119,7 @@ Analytics Summary:
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-[#0A0502]/40 backdrop-blur-lg border border-green-500/20">
+                <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-green-500/20">
                   <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
                     <CheckCircle className="w-4 h-4 text-green-500" />
                   </div>
@@ -2145,7 +2149,7 @@ Analytics Summary:
                 </div>
               </div>
             </div>
-          </Card>
+          </div>
         </div>
       </div>
 

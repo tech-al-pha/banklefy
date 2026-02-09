@@ -162,7 +162,7 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto bg-[#1a120b]/90 border-primary/20 backdrop-blur-xl">
+    <Card className="w-full max-w-2xl mx-auto bg-surface-elevated/90 border-primary/20 backdrop-blur-xl">
       <CardHeader className="border-b border-primary/20 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

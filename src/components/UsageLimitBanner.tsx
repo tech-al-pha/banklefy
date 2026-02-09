@@ -80,7 +80,7 @@ export const UsageLimitBanner = ({
 
   // Show usage counter
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6 px-5 py-3 rounded-xl bg-[#0A0502]/40 backdrop-blur-lg border border-primary/20">
+    <div className="subtle-border-glow flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6 px-5 py-3 rounded-xl bg-[#191919]/70 backdrop-blur-lg border border-primary/20">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Crown className="h-4 w-4 text-primary" />
         <span>

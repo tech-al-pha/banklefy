@@ -24,7 +24,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { 
-  ArrowLeft, 
   Search, 
   User, 
   Bell, 
@@ -418,7 +417,7 @@ const Settings = () => {
     return (
       <div className="space-y-4">
         {items.map((item) => (
-          <Card key={item.id} className="bg-[#1a120b]/60 border-primary/20 backdrop-blur-sm">
+          <Card key={item.id} className="bg-surface-elevated/60 border-primary/20 backdrop-blur-sm">
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-4">
@@ -443,28 +442,22 @@ const Settings = () => {
 
   if (authLoading || settingsLoading) {
     return (
-      <div className="min-h-screen bg-[#0A0502] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-primary">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0502] text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/80 backdrop-blur-xl border-b border-primary/20">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate(-1)}
-                className="btn-glow text-muted-foreground"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <Logo />
+              <div className="-ml-1">
+                <Logo />
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
               <div className="relative w-full sm:w-auto">
@@ -504,7 +497,7 @@ const Settings = () => {
                 <TabsTrigger
                   key={cat.id}
                   value={cat.id}
-                  className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary border border-primary/20 bg-[#1a120b]/60 gap-2"
+                  className="chip-muted gap-2"
                 >
                   {cat.icon}
                   {cat.label}
@@ -522,7 +515,7 @@ const Settings = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-primary/20 py-8 px-6 bg-[#0A0502]">
+      <footer className="border-t border-primary/20 py-8 px-6 bg-background">
         <div className="container mx-auto text-center">
           <p className="text-xs text-muted-foreground">
             {t('footer.copyright')}

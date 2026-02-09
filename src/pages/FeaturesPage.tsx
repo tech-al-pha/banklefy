@@ -28,9 +28,9 @@ const FeaturesPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#0A0502] text-white font-sans selection:bg-primary/30">
+    <div className="min-h-screen bg-background text-white font-sans selection:bg-primary/30">
       {/* Header Area */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-black/40 backdrop-blur-md p-4">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <Button 
@@ -56,7 +56,7 @@ const FeaturesPage = () => {
             {featureCategoryOrder.map((cat) => (
               <span 
                 key={cat} 
-                className="px-4 py-1.5 bg-primary/10 border border-primary/20 rounded-full text-xs text-primary uppercase tracking-wider font-medium"
+                className="chip-muted px-4 py-1.5 rounded-full text-xs uppercase tracking-wider font-medium"
               >
                 {t(featureCategoryLabelKey[cat])}
               </span>
@@ -81,7 +81,7 @@ const FeaturesPage = () => {
                     className="animate-in fade-in slide-in-from-bottom-5 duration-700"
                     style={{ animationDelay: `${(catIdx * 50) + (index * 50)}ms` }}
                   >
-                    <div className="h-full flex items-start gap-5 p-6 bg-[#1A100B] border border-primary/20 rounded-2xl transition-all hover:border-primary hover:shadow-neon">
+                    <div className="glass-card h-full flex items-start gap-5 p-6 rounded-2xl transition-all hover:shadow-neon">
                       <div className="bg-primary/10 p-3 rounded-full text-primary flex-shrink-0">
                         <Icon size={24} />
                       </div>
@@ -102,7 +102,7 @@ const FeaturesPage = () => {
         ))}
 
         {/* CTA Section */}
-        <section className="mt-20 text-center p-6 sm:p-8 md:p-12 bg-[#1A100B] border border-primary/20 rounded-3xl">
+        <section className="mt-20 text-center p-6 sm:p-8 md:p-12 bg-surface border border-primary/20 rounded-3xl">
           <h2 className="text-3xl font-black text-primary uppercase mb-4">
             {t('featuresPage.cta.title')}
           </h2>

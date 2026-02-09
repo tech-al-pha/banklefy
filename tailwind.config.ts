@@ -1,6 +1,32 @@
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
 
+const surfacePalette = {
+  300: "var(--text-muted)",
+  400: "var(--text-muted)",
+  500: "var(--surface)",
+  600: "var(--surface-elevated)",
+};
+
+const surfaceColorAliases = [
+  "amber",
+  "blue",
+  "cyan",
+  "emerald",
+  "gray",
+  "green",
+  "indigo",
+  "lime",
+  "orange",
+  "pink",
+  "purple",
+  "rose",
+  "slate",
+  "teal",
+  "yellow",
+  "zinc",
+];
+
 export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
@@ -15,59 +41,87 @@ export default {
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        ink: "var(--ink)",
+        background: "var(--background)",
+        foreground: "var(--text-body)",
+        surface: "var(--surface)",
+        "surface-elevated": "var(--surface-elevated)",
+        border: "var(--border)",
+        input: "var(--border)",
+        ring: "var(--text-primary)",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
+          DEFAULT: "var(--text-primary)",
+          foreground: "var(--surface)",
         },
         secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
+          DEFAULT: "var(--surface-elevated)",
+          foreground: "var(--text-body)",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+          DEFAULT: "var(--ink)",
+          foreground: "var(--text-primary)",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "var(--background)",
+          foreground: "var(--text-muted)",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "var(--text-primary)",
+          foreground: "var(--ink)",
         },
         popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+          DEFAULT: "var(--surface)",
+          foreground: "var(--text-body)",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "var(--surface)",
+          foreground: "var(--text-body)",
         },
-        lightning: "hsl(var(--lightning))",
-        highlight: "hsl(var(--highlight))",
-        "warm-brown": "hsl(var(--warm-brown))",
+        lightning: "var(--text-primary)",
+        highlight: "var(--text-primary)",
+        ...surfaceColorAliases.reduce((acc, name) => {
+          acc[name] = surfacePalette;
+          return acc;
+        }, {} as Record<string, typeof surfacePalette>),
       },
       backgroundImage: {
-        'gradient-primary': 'var(--gradient-primary)',
-        'gradient-dark': 'var(--gradient-dark)',
-        'gradient-glow': 'var(--gradient-glow)',
-        'gradient-lightning': 'var(--gradient-lightning)',
+        "gradient-primary": "linear-gradient(120deg, #FFFFFF 0%, #B5B5B5 50%, #717171 100%)",
+        "gradient-dark": "linear-gradient(180deg, #000000 0%, #000000 100%)",
+        "gradient-glow": "radial-gradient(circle at center, rgba(255,255,255,0.18), transparent 65%)",
+        "gradient-lightning": "linear-gradient(90deg, transparent, #FFFFFF, transparent)",
       },
       boxShadow: {
-        'neon': 'var(--shadow-neon)',
-        'card': 'var(--shadow-card)',
-        'lightning': 'var(--shadow-lightning)',
-        'luxury': 'var(--shadow-luxury)',
+        neon: "0 0 24px rgba(255,255,255,0.25)",
+        card: "0 20px 40px -15px rgba(0,0,0,0.6)",
+        lightning: "0 0 30px rgba(255,255,255,0.2)",
+        luxury: "0 30px 60px -25px rgba(0,0,0,0.7)",
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        sm: "14px",
+        md: "16px",
+        lg: "18px",
+        xl: "18px",
+        "2xl": "18px",
+        "3xl": "18px",
+        full: "9999px",
+      },
+      transitionDuration: {
+        DEFAULT: "220ms",
+        75: "220ms",
+        100: "220ms",
+        150: "220ms",
+        200: "220ms",
+        300: "220ms",
+        500: "220ms",
+        700: "220ms",
+        1000: "220ms",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "ease-out",
+        linear: "ease-out",
+        in: "ease-out",
+        out: "ease-out",
+        "in-out": "ease-out",
       },
       keyframes: {
         "accordion-down": {
@@ -97,11 +151,11 @@ export default {
         "pulse-glow": {
           "0%, 100%": {
             opacity: "0.5",
-            boxShadow: "0 0 20px hsl(42 85% 55% / 0.3)",
+            boxShadow: "0 0 18px rgba(255,255,255,0.25)",
           },
           "50%": {
             opacity: "1",
-            boxShadow: "0 0 40px hsl(195 100% 50% / 0.6), 0 0 60px hsl(42 85% 55% / 0.4)",
+            boxShadow: "0 0 28px rgba(255,255,255,0.3), 0 0 45px rgba(255,255,255,0.2)",
           },
         },
       },

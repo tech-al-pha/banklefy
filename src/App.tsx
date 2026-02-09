@@ -133,7 +133,7 @@ const AppRoutes = () => {
     <ErrorBoundary resetKey={location.pathname}>
       <Suspense
         fallback={
-          <div className="min-h-screen bg-[#0A0502] flex items-center justify-center" role="status" aria-live="polite">
+          <div className="min-h-screen bg-background flex items-center justify-center" role="status" aria-live="polite">
             <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
             <span className="sr-only">Loading page</span>
           </div>

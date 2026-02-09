@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { FileSpreadsheet, ArrowLeft, Loader2, Home } from "lucide-react";
 import { format } from "date-fns";
-import akromedaLogo from "@/assets/akromeda-logo.png";
+import akromedaLogo from "@/assets/akromeda-logo.svg";
 
 interface Conversion {
   id: string;
@@ -129,14 +129,14 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0502] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0502] text-foreground relative overflow-hidden">
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
       {/* 3D Background */}
       <div className="dashboard-3d" aria-hidden="true">
         <div className="dashboard-3d-layer layer-1" />
@@ -146,7 +146,7 @@ const Dashboard = () => {
 
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-primary/10">
-        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 bg-[#1a120b]/80">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 bg-surface-elevated/80">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
               <Button

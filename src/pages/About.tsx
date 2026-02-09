@@ -9,9 +9,9 @@ const AboutPage = () => {
   const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-[#0A0502] text-white font-sans selection:bg-primary/30">
+    <div className="min-h-screen bg-background text-white font-sans selection:bg-primary/30">
       {/* Header Area */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-black/40 backdrop-blur-md p-4">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <Button 
@@ -80,7 +80,7 @@ const AboutPage = () => {
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <a href="https://t.me/n3x4z" target="_blank" rel="noopener noreferrer" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+            <a href="https://t.me/n3x4z" target="_blank" rel="noopener noreferrer" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
               <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><MessageCircle size={24} /></div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Telegram</p>
@@ -88,7 +88,7 @@ const AboutPage = () => {
               </div>
             </a>
 
-            <a href="https://x.com/inspirexali" target="_blank" rel="noopener noreferrer" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+            <a href="https://x.com/inspirexali" target="_blank" rel="noopener noreferrer" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
               <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><X size={24} /></div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">X (Twitter)</p>
@@ -96,7 +96,7 @@ const AboutPage = () => {
               </div>
             </a>
 
-            <a href="mailto:inspirexali@gmail.com" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+            <a href="mailto:inspirexali@gmail.com" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
               <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><Mail size={24} /></div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.mail')}</p>
@@ -104,7 +104,7 @@ const AboutPage = () => {
               </div>
             </a>
 
-            <a href="https://instagram.com/inspirexali" target="_blank" rel="noopener noreferrer" className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+            <a href="https://instagram.com/inspirexali" target="_blank" rel="noopener noreferrer" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
               <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><Instagram size={24} /></div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.social')}</p>
@@ -112,7 +112,7 @@ const AboutPage = () => {
               </div>
             </a>
 
-            <div className="group p-8 bg-[#1A100B] border border-primary/20 rounded-[2rem] flex items-center gap-6 md:col-span-2">
+            <div className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 md:col-span-2">
               <div className="bg-primary/10 p-4 rounded-full text-primary"><MapPin size={24} /></div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.hq')}</p>

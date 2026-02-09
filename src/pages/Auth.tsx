@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
-import akromedaLogo from '@/assets/akromeda-logo.png';
+import akromedaLogo from '@/assets/akromeda-logo.svg';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const emailSchema = z.string().email('Invalid email address').max(255);
@@ -299,7 +299,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0502] flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
       
       {/* Back button */}
       <button
@@ -318,7 +318,7 @@ export default function Auth() {
           <div className="text-center text-xs uppercase tracking-[0.35em] text-muted-foreground">
             Secure Access
           </div>
-          <CardTitle className="text-center text-[1.65rem] md:text-[2.1rem] font-extrabold uppercase tracking-[0.09em] bg-gradient-to-r from-[#fdf7f0] via-[#f6d58b] to-[#e3a93f] bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
+          <CardTitle className="text-center text-[1.65rem] md:text-[2.1rem] font-extrabold uppercase tracking-[0.09em] bg-gradient-to-r from-[#FFFFFF] via-[#B5B5B5] to-[#717171] bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
             Akromeda
           </CardTitle>
           <CardDescription className="text-center text-muted-foreground/90">

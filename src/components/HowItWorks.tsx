@@ -43,7 +43,7 @@ export const HowItWorks = () => {
               className="relative group"
             >
               {/* Card */}
-              <div className="relative bg-[#1a120b]/80 backdrop-blur-xl border border-primary/20 rounded-2xl p-8 space-y-4 hover:border-primary/40 transition-all duration-300 hover:shadow-neon group-hover:scale-[1.02] h-full">
+              <div className="relative bg-[#0F0E0E]/80 backdrop-blur-xl border border-primary/20 rounded-2xl p-8 space-y-4 hover:border-primary/40 transition-all duration-300 hover:shadow-neon group-hover:scale-[1.02] h-full">
                 {/* Number Badge */}
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-10 h-10 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm shadow-neon">
                   {step.number}

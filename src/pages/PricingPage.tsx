@@ -254,7 +254,7 @@ const PricingPage = () => {
           );
         },
         theme: {
-          color: "#D4AF37",
+          color: "#B5B5B5",
         },
       });
       checkout.on("payment.failed", () => {
@@ -275,7 +275,7 @@ const PricingPage = () => {
     return (
       <Card
         key={plan.planId}
-        className={`relative p-8 bg-[#1a120b]/80 backdrop-blur-xl transition-all duration-300 rounded-2xl ${
+        className={`relative p-8 bg-surface-elevated/80 backdrop-blur-xl transition-all duration-300 rounded-2xl ${
           plan.highlighted
             ? "border-2 border-primary shadow-neon scale-105"
             : "border border-primary/20 hover:border-primary/40 hover:shadow-card"
@@ -334,7 +334,7 @@ const PricingPage = () => {
             className={`w-full h-12 text-base font-bold uppercase tracking-wider rounded-lg ${
               plan.highlighted
                 ? "bg-primary text-primary-foreground shadow-neon"
-                : "bg-[#1a120b] border border-primary/30 text-primary"
+                : "bg-surface-elevated border border-primary/30 text-primary"
             } transition-all duration-300`}
             onClick={() => handlePlanPurchase(plan)}
             disabled={isProcessing}
@@ -347,9 +347,9 @@ const PricingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0502] text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-black/40 backdrop-blur-md p-4">
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <Button

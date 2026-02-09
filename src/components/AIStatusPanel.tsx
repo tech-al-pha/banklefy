@@ -21,33 +21,33 @@ const serviceInfo = {
     name: 'Groq Vision',
     icon: Zap,
     role: 'OCR & Data Extraction',
-    color: 'text-orange-500',
-    bgColor: 'bg-orange-500/10',
-    borderColor: 'border-orange-500/30',
+    color: 'text-primary',
+    bgColor: 'bg-surface-elevated/20',
+    borderColor: 'border-border/40',
   },
   groqText: {
     name: 'Groq Text',
     icon: Zap,
     role: 'Text Extraction (Backup)',
-    color: 'text-amber-500',
-    bgColor: 'bg-amber-500/10',
-    borderColor: 'border-amber-500/30',
+    color: 'text-primary',
+    bgColor: 'bg-surface-elevated/20',
+    borderColor: 'border-border/40',
   },
   mistral: {
     name: 'Mistral AI',
     icon: Brain,
     role: 'Categorization',
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-500/10',
-    borderColor: 'border-blue-500/30',
+    color: 'text-primary',
+    bgColor: 'bg-surface-elevated/20',
+    borderColor: 'border-border/40',
   },
   patternFallback: {
     name: 'Rule-Based',
     icon: Bot,
     role: 'Financial Analysis',
-    color: 'text-emerald-400',
-    bgColor: 'bg-emerald-500/10',
-    borderColor: 'border-emerald-500/30',
+    color: 'text-primary',
+    bgColor: 'bg-surface-elevated/20',
+    borderColor: 'border-border/40',
   },
 };
 
@@ -78,7 +78,7 @@ export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
               <TooltipTrigger
                 type="button"
                 aria-label={`${info.name} status`}
-                className={`w-full p-2 rounded-lg text-left ${data.success ? info.bgColor : 'bg-destructive/10'} border ${data.success ? info.borderColor : 'border-destructive/30'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0502]`}
+                className={`w-full p-2 rounded-lg text-left ${data.success ? info.bgColor : 'bg-destructive/10'} border ${data.success ? info.borderColor : 'border-destructive/30'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#000000]`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -88,7 +88,7 @@ export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
                     </span>
                   </div>
                   {data.success ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" aria-hidden="true" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
                   ) : (
                     <XCircle className="w-3.5 h-3.5 text-destructive" aria-hidden="true" />
                   )}
@@ -120,7 +120,7 @@ export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
         <p className="text-xs text-muted-foreground">
           <span className="font-medium">Pipeline:</span> Groq (OCR) → Mistral (Categorize) → Rule-Based (FOIR/EMI)
         </p>
-        <p className="text-xs text-emerald-400 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           ✓ Deterministic: FOIR, Salary & EMI use mathematical formulas (no AI)
         </p>
       </div>

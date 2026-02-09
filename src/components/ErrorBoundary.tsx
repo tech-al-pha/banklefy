@@ -32,8 +32,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (!this.state.hasError) return this.props.children;
 
     return (
-      <div className="min-h-screen bg-[#0A0502] text-foreground flex items-center justify-center px-4">
-        <div className="max-w-lg w-full rounded-2xl border border-primary/20 bg-[#1a120b]/60 p-6 text-center space-y-4">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-4">
+        <div className="max-w-lg w-full rounded-2xl border border-primary/20 bg-surface-elevated/60 p-6 text-center space-y-4">
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Something went wrong</p>
           <h1 className="text-2xl font-semibold text-foreground">We hit a snag</h1>
           <p className="text-sm text-muted-foreground">

@@ -70,28 +70,28 @@ interface FraudAlertPanelProps {
 
 const severityConfig = {
   low: { 
-    bg: 'bg-blue-500/10', 
-    border: 'border-blue-500/30', 
-    text: 'text-blue-400',
-    badge: 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+    bg: 'bg-surface-elevated/10', 
+    border: 'border-border/30', 
+    text: 'text-foreground',
+    badge: 'bg-surface-elevated/20 text-foreground border-border/30'
   },
   medium: { 
-    bg: 'bg-yellow-500/10', 
-    border: 'border-yellow-500/30', 
-    text: 'text-yellow-400',
-    badge: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+    bg: 'bg-surface-elevated/20', 
+    border: 'border-border/40', 
+    text: 'text-primary',
+    badge: 'bg-surface-elevated/30 text-primary border-border/40'
   },
   high: { 
-    bg: 'bg-orange-500/10', 
-    border: 'border-orange-500/30', 
-    text: 'text-orange-400',
-    badge: 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+    bg: 'bg-surface-elevated/30', 
+    border: 'border-border/50', 
+    text: 'text-primary',
+    badge: 'bg-surface-elevated/40 text-primary border-border/50'
   },
   critical: { 
-    bg: 'bg-red-500/10', 
-    border: 'border-red-500/30', 
-    text: 'text-red-400',
-    badge: 'bg-red-500/20 text-red-400 border-red-500/30'
+    bg: 'bg-ink/60', 
+    border: 'border-border/60', 
+    text: 'text-primary',
+    badge: 'bg-ink/70 text-primary border-border/60'
   },
 };
 
@@ -105,17 +105,17 @@ const alertTypeIcons: Record<string, React.ReactNode> = {
 };
 
 const getIntegrityIcon = (score: number) => {
-  if (score >= 80) return <ShieldCheck className="w-8 h-8 text-green-500" />;
-  if (score >= 60) return <Shield className="w-8 h-8 text-yellow-500" />;
-  if (score >= 40) return <ShieldAlert className="w-8 h-8 text-orange-500" />;
-  return <ShieldX className="w-8 h-8 text-red-500" />;
+  if (score >= 80) return <ShieldCheck className="w-8 h-8 text-primary" />;
+  if (score >= 60) return <Shield className="w-8 h-8 text-foreground" />;
+  if (score >= 40) return <ShieldAlert className="w-8 h-8 text-muted-foreground" />;
+  return <ShieldX className="w-8 h-8 text-muted-foreground" />;
 };
 
 const getIntegrityColor = (score: number) => {
-  if (score >= 80) return 'text-green-500';
-  if (score >= 60) return 'text-yellow-500';
-  if (score >= 40) return 'text-orange-500';
-  return 'text-red-500';
+  if (score >= 80) return 'text-primary';
+  if (score >= 60) return 'text-foreground';
+  if (score >= 40) return 'text-muted-foreground';
+  return 'text-muted-foreground';
 };
 
 const getIntegrityLabel = (score: number) => {
@@ -166,16 +166,16 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className={`p-3 ${balanceMismatches > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-green-500/5 border-green-500/20'}`}>
+        <Card className={`p-3 ${balanceMismatches > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
             {balanceMismatches > 0 ? (
-              <XCircle className="w-3 h-3 text-red-500" />
+              <XCircle className="w-3 h-3 text-muted-foreground" />
             ) : (
-              <CheckCircle2 className="w-3 h-3 text-green-500" />
+              <CheckCircle2 className="w-3 h-3 text-primary" />
             )}
             Balance Check
           </div>
-          <p className={`text-lg font-bold ${balanceMismatches > 0 ? 'text-red-500' : 'text-green-500'}`}>
+          <p className={`text-lg font-bold ${balanceMismatches > 0 ? 'text-muted-foreground' : 'text-primary'}`}>
             {balanceMismatches > 0 ? `${balanceMismatches} Errors` : 'Passed'}
           </p>
         </Card>
@@ -190,12 +190,12 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
           </p>
         </Card>
 
-        <Card className={`p-3 ${maxDip.amount <= 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-muted/30 border-muted'}`}>
+        <Card className={`p-3 ${maxDip.amount <= 0 ? 'bg-ink/60 border-border/60' : 'bg-muted/30 border-border/30'}`}>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
             <TrendingDown className="w-3 h-3" />
             Lowest Balance
           </div>
-          <p className={`text-lg font-bold ${maxDip.amount <= 0 ? 'text-red-500' : 'text-foreground'}`}>
+          <p className={`text-lg font-bold ${maxDip.amount <= 0 ? 'text-muted-foreground' : 'text-foreground'}`}>
             ₹{maxDip.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </p>
           {maxDip.date && (
@@ -203,12 +203,12 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
           )}
         </Card>
 
-        <Card className={`p-3 ${riskFlags.length > 0 ? 'bg-orange-500/5 border-orange-500/20' : 'bg-green-500/5 border-green-500/20'}`}>
+        <Card className={`p-3 ${riskFlags.length > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
             <AlertTriangle className="w-3 h-3" />
             Risk Flags
           </div>
-          <p className={`text-lg font-bold ${riskFlags.length > 0 ? 'text-orange-500' : 'text-green-500'}`}>
+          <p className={`text-lg font-bold ${riskFlags.length > 0 ? 'text-muted-foreground' : 'text-primary'}`}>
             {riskFlags.length > 0 ? riskFlags.reduce((sum, r) => sum + r.count, 0) : 'None'}
           </p>
         </Card>
@@ -216,10 +216,10 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
 
       {/* Fraud Alerts */}
       {fraudAlerts.length > 0 ? (
-        <Card className="p-4 border-orange-500/20 bg-orange-500/5">
+        <Card className="p-4 border-border/50 bg-surface-elevated/15">
           <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-5 h-5 text-orange-500" />
-            <h4 className="font-semibold text-orange-500">
+            <AlertTriangle className="w-5 h-5 text-primary" />
+            <h4 className="font-semibold text-primary">
               {fraudAlerts.length} Alert{fraudAlerts.length !== 1 ? 's' : ''} Detected
             </h4>
           </div>
@@ -384,11 +384,11 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
           </Accordion>
         </Card>
       ) : (
-        <Card className="p-4 border-green-500/20 bg-green-500/5">
+        <Card className="p-4 border-border/40 bg-surface-elevated/15">
           <div className="flex items-center gap-3">
-            <ShieldCheck className="w-6 h-6 text-green-500" />
+            <ShieldCheck className="w-6 h-6 text-primary" />
             <div>
-              <p className="font-semibold text-green-500">No Anomalies Detected</p>
+              <p className="font-semibold text-primary">No Anomalies Detected</p>
               <p className="text-sm text-muted-foreground">
                 Document passed all integrity checks. No suspicious activity found.
               </p>

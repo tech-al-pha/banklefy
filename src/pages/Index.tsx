@@ -41,87 +41,81 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0502] text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-[#1a120b] focus:px-4 focus:py-2 focus:text-sm focus:text-foreground"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-surface-elevated focus:px-4 focus:py-2 focus:text-sm focus:text-foreground"
       >
         Skip to content
       </a>
       {/* Navigation */}
       <nav
-        className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/60 backdrop-blur-lg border-b border-primary/20"
+        className="fixed top-0 left-0 right-0 z-50 bg-surface-elevated/60 backdrop-blur-lg border-b border-primary/20"
         aria-label="Primary"
       >
-        <div className="container mx-auto px-4 sm:px-6 py-2 sm:py-3">
+        <div className="container mx-auto px-4 sm:px-6 py-1.5 sm:py-2.5">
           <div className="flex items-center justify-between">
           <Logo />
           <div className="hidden lg:flex items-center gap-3">
               
               {/* Pricing Button */}
-              <Button 
-                variant="ghost"
-                size="sm" 
+              <button
+                type="button"
                 onClick={() => navigate('/pricing')}
-                className="text-xs gap-1 text-muted-foreground transition-all duration-300 font-medium px-2 py-1"
+                className="text-glow-link text-xs font-medium"
               >
                 <CircleDollarSign className="h-3 w-3" />
                 <span>{t('nav.pricing')}</span>
-              </Button>
+              </button>
 
               {/* Benefits Button */}
-              <Button 
-                variant="ghost"
-                size="sm" 
+              <button
+                type="button"
                 onClick={() => navigate('/benefits')}
-                className="text-xs gap-1 text-muted-foreground transition-all duration-300 font-medium px-2 py-1"
+                className="text-glow-link text-xs font-medium"
               >
                 <Gift className="h-3 w-3" />
                 <span>{t('nav.benefits')}</span>
-              </Button>
+              </button>
 
               {/* Features Button */}
-              <Button 
-                variant="ghost"
-                size="sm" 
+              <button
+                type="button"
                 onClick={() => navigate('/features')}
-                className="text-xs gap-1 text-muted-foreground transition-all duration-300 font-medium px-2 py-1"
+                className="text-glow-link text-xs font-medium"
               >
                 <Sparkles className="h-3 w-3" />
                 {t('nav.features')}
-              </Button>
+              </button>
 
               {/* Chat Aura Button */}
-              <Button 
-                variant="ghost"
-                size="sm" 
+              <button
+                type="button"
                 onClick={() => navigate('/chat')}
-                className="text-xs gap-1 text-muted-foreground transition-all duration-300 px-2 py-1"
+                className="text-glow-link text-xs font-medium"
               >
                 <MessageCircle className="h-3 w-3" />
                 {t('nav.chatAura')}
-              </Button>
+              </button>
 
-              <Button 
-                variant="ghost"
-                size="sm" 
+              <button
+                type="button"
                 onClick={() => navigate('/settings')}
-                className="text-xs gap-1 text-muted-foreground transition-all duration-300 px-2 py-1"
+                className="text-glow-link text-xs font-medium"
               >
                 <Settings className="h-3 w-3" />
                 {t('nav.settings')}
-              </Button>
+              </button>
 
               {isAdmin && (
-                <Button 
-                  variant="ghost"
-                  size="sm" 
+                <button
+                  type="button"
                   onClick={() => navigate('/admin')}
-                  className="text-xs gap-1 text-muted-foreground transition-all px-2 py-1"
+                  className="text-glow-link text-xs font-medium"
                 >
                   <Shield className="h-3 w-3" />
                   {t('nav.admin')}
-                </Button>
+                </button>
               )}
 
               {/* Language Selector */}
@@ -167,7 +161,7 @@ const Index = () => {
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="bg-[#1a120b]/95 border-primary/20 w-[320px]">
+                <SheetContent side="right" className="bg-surface-elevated/95 border-primary/20 w-[320px]">
                   <div className="mt-10 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -286,7 +280,7 @@ const Index = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-primary/20 py-16 px-4 sm:px-6 bg-[#0A0502]">
+      <footer className="border-t border-primary/20 py-16 px-4 sm:px-6 bg-background">
         <div className="container mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
             <div className="space-y-4">
@@ -303,12 +297,12 @@ const Index = () => {
                   <li>
                     <button 
                       onClick={() => navigate('/features')}
-                      className="transition-colors text-left font-medium"
+                      className="text-glow-link text-left font-medium"
                     >
                       {t('footer.features')}
                     </button>
                   </li>
-                  <li><a href="#demo" className="transition-colors">{t('footer.howItWorks')}</a></li>
+                  <li><a href="#demo" className="text-glow-link">{t('footer.howItWorks')}</a></li>
                 </ul>
               </div>
             </div>
@@ -320,7 +314,7 @@ const Index = () => {
                   <li>
                     <button 
                       onClick={() => navigate('/about')}
-                      className="transition-colors text-left font-medium"
+                      className="text-glow-link text-left font-medium"
                     >
                       {t('footer.about')}
                     </button>
@@ -328,7 +322,7 @@ const Index = () => {
                   <li>
                     <button 
                       onClick={() => navigate('/privacy')}
-                      className="transition-colors text-left font-medium"
+                      className="text-glow-link text-left font-medium"
                     >
                       {t('footer.privacy')}
                     </button>
@@ -336,7 +330,7 @@ const Index = () => {
                   <li>
                     <button 
                       onClick={() => navigate('/terms')}
-                      className="transition-colors text-left font-medium"
+                      className="text-glow-link text-left font-medium"
                     >
                       {t('footer.terms')}
                     </button>

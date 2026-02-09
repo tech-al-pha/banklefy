@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, Users, FileText, TrendingUp, Calendar, Shield, RefreshCw, BarChart3, ShieldAlert, Database, KeyRound, Settings, Server } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import akromedaLogo from '@/assets/akromeda-logo.png';
+import akromedaLogo from '@/assets/akromeda-logo.svg';
 import { getEdgeFunctionUrl } from '@/lib/supabaseApi';
 
 interface UserProfile {

@@ -57,7 +57,7 @@ export const LandingPageContent = () => {
 
   return (
     <>
-      <div className="bg-[#0A0502]">
+      <div className="bg-background">
         <Hero />
         <HowItWorks />
       </div>
@@ -66,7 +66,7 @@ export const LandingPageContent = () => {
         {shouldLoadUpload ? (
           <Suspense
             fallback={
-              <div className="bg-[#0A0502] py-12 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+              <div className="bg-background py-12 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
                 Loading converter...
               </div>
             }
@@ -74,14 +74,14 @@ export const LandingPageContent = () => {
             <UploadDemo />
           </Suspense>
         ) : (
-          <div className="bg-[#0A0502] py-12 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+          <div className="bg-background py-12 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
             Loading converter...
           </div>
         )}
       </div>
 
       {/* Footer CTA */}
-      <section className="relative py-12 px-4 sm:px-6 overflow-hidden bg-[#0A0502]">
+      <section className="relative py-12 px-4 sm:px-6 overflow-hidden bg-background">
         <div className="container mx-auto text-center relative z-10 space-y-6">
           <h2 className="text-4xl md:text-5xl font-bold italic">
             {t('footer.cta.title')}
