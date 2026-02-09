@@ -15,6 +15,9 @@ verify_jwt = false
 [functions.admin-dashboard]
 verify_jwt = false
 
+[functions.api-status]
+verify_jwt = false
+
 [functions.convert-statements-batch]
 verify_jwt = false
 

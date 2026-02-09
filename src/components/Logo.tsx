@@ -1,13 +1,12 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import akromedaLogo from "@/assets/akromeda-logo.png";
 
 const Logo = () => {
-  const navigate = useNavigate();
-
   return (
-    <div 
-      className="flex items-center cursor-pointer group h-14 md:h-16" 
-      onClick={() => navigate("/")}
+    <Link
+      to="/"
+      aria-label="Akromeda home"
+      className="flex items-center cursor-pointer group h-14 md:h-16"
     >
       {/* Logo Container */}
       <div className="relative w-14 h-14 md:w-16 md:h-16 flex items-center justify-center overflow-visible">
@@ -22,7 +21,7 @@ const Logo = () => {
       <span className="ml-3 text-xl md:text-2xl font-black tracking-tighter bg-gradient-to-r from-[#f7efe6] via-[#d9b373] to-[#b07b3a] bg-clip-text text-transparent uppercase hidden sm:block drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)]">
         Akromeda
       </span>
-    </div>
+    </Link>
   );
 };
 

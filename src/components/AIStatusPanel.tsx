@@ -75,28 +75,30 @@ export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
 
           return (
             <Tooltip key={key}>
-              <TooltipTrigger asChild>
-                <div className={`p-2 rounded-lg ${data.success ? info.bgColor : 'bg-destructive/10'} border ${data.success ? info.borderColor : 'border-destructive/30'}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Icon className={`w-4 h-4 ${data.success ? info.color : 'text-destructive'}`} />
-                      <span className={`text-xs font-medium ${data.success ? info.color : 'text-destructive'}`}>
-                        {info.name}
-                      </span>
-                    </div>
-                    {data.success ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                    ) : (
-                      <XCircle className="w-3.5 h-3.5 text-destructive" />
-                    )}
+              <TooltipTrigger
+                type="button"
+                aria-label={`${info.name} status`}
+                className={`w-full p-2 rounded-lg text-left ${data.success ? info.bgColor : 'bg-destructive/10'} border ${data.success ? info.borderColor : 'border-destructive/30'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0502]`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Icon className={`w-4 h-4 ${data.success ? info.color : 'text-destructive'}`} aria-hidden="true" />
+                    <span className={`text-xs font-medium ${data.success ? info.color : 'text-destructive'}`}>
+                      {info.name}
+                    </span>
                   </div>
-                  {data.time && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Clock className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{(data.time / 1000).toFixed(1)}s</span>
-                    </div>
+                  {data.success ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" aria-hidden="true" />
+                  ) : (
+                    <XCircle className="w-3.5 h-3.5 text-destructive" aria-hidden="true" />
                   )}
                 </div>
+                {data.time && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <Clock className="w-3 h-3 text-muted-foreground" aria-hidden="true" />
+                    <span className="text-xs text-muted-foreground">{(data.time / 1000).toFixed(1)}s</span>
+                  </div>
+                )}
               </TooltipTrigger>
               <TooltipContent className="max-w-[250px]">
                 <p className="font-medium">{info.name}</p>

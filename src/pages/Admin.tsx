@@ -44,12 +44,35 @@ interface AnonymousSummary {
   totalConversions: number;
 }
 
-interface ConversionRecord {
-  id: string;
+interface ApiServiceStatus {
+  name: string;
   status: string;
-  created_at: string;
-  error_message: string | null;
+  message?: string | null;
+  rateLimit?: {
+    remaining: number | null;
+    limit: number | null;
+    reset: number | null;
+    raw?: Record<string, string>;
+  } | null;
 }
+
+interface ApiErrorItem {
+  id: string;
+  created_at: string;
+  message: string;
+}
+
+interface ApiStatusPayload {
+  checkedAt: string;
+  services: ApiServiceStatus[];
+  recentErrors: ApiErrorItem[];
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string') return error;
+  return fallback;
+};
 
 export default function Admin() {
   const { user, loading: authLoading } = useAuth();
@@ -77,14 +100,11 @@ export default function Admin() {
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'user'>('all');
   const [tierFilter, setTierFilter] = useState<'all' | 'free' | 'paid'>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [conversions, setConversions] = useState<ConversionRecord[]>([]);
+  const [apiStatus, setApiStatus] = useState<ApiStatusPayload | null>(null);
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const PAGE_SIZE = 10;
-  const getErrorMessage = (error: unknown, fallback: string) => {
-    if (error instanceof Error && error.message) return error.message;
-    if (typeof error === 'string') return error;
-    return fallback;
-  };
 
   const recentUsers = useMemo(() => {
     return [...users]
@@ -130,58 +150,6 @@ export default function Admin() {
     return latest?.date || null;
   }, [dailyStats]);
 
-  const apiEvents = useMemo(() => {
-    return [...conversions]
-      .filter((c) => c.status === 'failed' && c.error_message)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [conversions]);
-
-  const apiIssueSummary = useMemo(() => {
-    const categories = [
-      { key: 'limits', label: 'Limits/Quota', match: /(limit|quota|rate limit|too many requests|429)/i },
-      { key: 'auth', label: 'Auth/Permissions', match: /(auth|token|session|permission|unauthorized|forbidden|rls)/i },
-      { key: 'storage', label: 'Storage', match: /(storage|bucket|upload|download|file)/i },
-      { key: 'groq', label: 'Groq Vision OCR', match: /(groq|vision|ocr)/i },
-      { key: 'text', label: 'Groq Text', match: /(groq text|text extraction)/i },
-      { key: 'mistral', label: 'Mistral AI', match: /(mistral)/i },
-      { key: 'rule', label: 'Rule-Based', match: /(rule-based|foir|emi)/i },
-      { key: 'edge', label: 'Edge Functions', match: /(edge function|function|invoke)/i },
-      { key: 'timeout', label: 'Timeouts', match: /(timeout|504|gateway|deadline)/i },
-      { key: 'network', label: 'Network', match: /(network|fetch|connection|dns)/i },
-      { key: 'supabase', label: 'Supabase', match: /(supabase|postgrest|realtime)/i },
-    ];
-
-    return categories.map((cat) => {
-      const matching = apiEvents.filter((err) => cat.match.test(err.error_message || ''));
-      return {
-        key: cat.key,
-        label: cat.label,
-        count: matching.length,
-        latest: matching[0]?.error_message || null,
-      };
-    });
-  }, [apiEvents]);
-
-  const apiHealth = useMemo(() => {
-    const apis = [
-      { name: 'Conversion API', match: /(conversion|edge function|convert)/i },
-      { name: 'OCR API (Groq Vision)', match: /(groq|vision|ocr)/i },
-      { name: 'Text API (Groq Text)', match: /(groq text|text extraction)/i },
-      { name: 'Mistral AI', match: /(mistral)/i },
-      { name: 'Rule-Based Engine', match: /(rule-based|foir|emi)/i },
-      { name: 'Storage API', match: /(storage|upload|download|file)/i },
-      { name: 'Auth API', match: /(auth|token|session|permission)/i },
-    ];
-
-    return apis.map((api) => {
-      const hit = apiEvents.find((err) => api.match.test(err.error_message || ''));
-      return {
-        name: api.name,
-        status: hit ? 'Degraded' : 'Healthy',
-        error: hit?.error_message || null,
-      };
-    });
-  }, [apiEvents]);
 
   const filteredUsers = useMemo(() => {
     const query = userSearch.trim().toLowerCase();
@@ -251,7 +219,6 @@ export default function Admin() {
       });
       setDailyStats(data.dailyStats || []);
       setAnonymousSummary(data.anonymousSummary || { totalIPs: 0, totalConversions: 0 });
-      setConversions(data.conversions || []);
 
     } catch (error: unknown) {
       const message = getErrorMessage(error, 'Failed to load dashboard data.');
@@ -265,6 +232,53 @@ export default function Admin() {
       setLoading(false);
     }
   }, [toast]);
+
+  const loadApiStatus = useCallback(async () => {
+    setApiLoading(true);
+    setApiError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No valid session');
+      }
+
+      const response = await fetch(getEdgeFunctionUrl('api-status'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to load API status');
+      }
+
+      setApiStatus(data);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Failed to load API status.');
+      setApiError(message);
+      toast({
+        variant: 'destructive',
+        title: 'API Status Error',
+        description: message,
+      });
+    } finally {
+      setApiLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (activeSection === 'api') {
+      loadApiStatus();
+    }
+  }, [activeSection, loadApiStatus]);
 
   const checkAdminAccess = useCallback(async () => {
     try {
@@ -312,6 +326,9 @@ export default function Admin() {
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadDashboardData();
+    if (activeSection === 'api') {
+      await loadApiStatus();
+    }
     setRefreshing(false);
     toast({
       title: 'Refreshed',
@@ -321,8 +338,9 @@ export default function Admin() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-gradient-dark flex items-center justify-center" role="status" aria-live="polite">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+        <span className="sr-only">Loading admin dashboard</span>
       </div>
     );
   }
@@ -925,22 +943,55 @@ export default function Admin() {
         {activeSection === 'api' && (
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[2fr_1fr]">
             <Card className="bg-card/70 backdrop-blur-lg border-primary/20">
-              <CardHeader>
-                <CardTitle>API Health</CardTitle>
-                <CardDescription>Derived from recent conversion errors</CardDescription>
+              <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle>API Health</CardTitle>
+                  <CardDescription>Live checks + admin-only diagnostics</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={loadApiStatus} disabled={apiLoading}>
+                  {apiLoading ? 'Checking...' : 'Refresh'}
+                </Button>
               </CardHeader>
               <CardContent className="space-y-3">
-                {apiHealth.map((api) => (
+                {apiLoading && <p className="text-sm text-muted-foreground">Checking API health...</p>}
+                {!apiLoading && apiError && (
+                  <p className="text-sm text-destructive">{apiError}</p>
+                )}
+                {!apiLoading && !apiError && (!apiStatus || apiStatus.services.length === 0) && (
+                  <p className="text-sm text-muted-foreground">No API data available.</p>
+                )}
+                {!apiLoading && !apiError && apiStatus?.services?.map((api) => (
                   <div key={api.name} className="flex items-center justify-between rounded-lg border border-primary/10 bg-background/40 px-4 py-3">
                     <div>
                       <p className="text-sm text-muted-foreground">{api.name}</p>
-                      {api.error && <p className="text-xs text-destructive mt-1">{api.error}</p>}
+                      {api.message && <p className="text-xs text-muted-foreground mt-1">{api.message}</p>}
+                      {api.rateLimit?.remaining !== null && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Remaining: {api.rateLimit.remaining}
+                          {api.rateLimit.limit !== null ? ` / ${api.rateLimit.limit}` : ''}
+                        </p>
+                      )}
                     </div>
-                    <Badge className={api.error ? 'bg-destructive text-white' : 'bg-emerald-500/20 text-emerald-300'}>
+                    <Badge
+                      className={
+                        api.status === 'Healthy'
+                          ? 'bg-emerald-500/20 text-emerald-300'
+                          : api.status === 'Rate Limited'
+                            ? 'bg-amber-500/20 text-amber-300'
+                            : api.status === 'Not Configured'
+                              ? 'bg-muted/40 text-muted-foreground'
+                              : 'bg-destructive text-white'
+                      }
+                    >
                       {api.status}
                     </Badge>
                   </div>
                 ))}
+                {apiStatus?.checkedAt && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Last checked: {new Date(apiStatus.checkedAt).toLocaleString()}
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -950,20 +1001,20 @@ export default function Admin() {
                 <CardDescription>Only API-related issues</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {apiIssueSummary.filter((item) => item.count > 0).length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No API issues detected.</p>
-                ) : (
-                  apiIssueSummary
-                    .filter((item) => item.count > 0)
-                    .map((item) => (
-                      <div key={item.key} className="rounded-lg border border-primary/10 bg-background/40 px-4 py-3">
+                {apiStatus?.services?.filter((svc) => svc.status !== 'Healthy').length ? (
+                  apiStatus.services
+                    .filter((svc) => svc.status !== 'Healthy')
+                    .map((svc) => (
+                      <div key={svc.name} className="rounded-lg border border-primary/10 bg-background/40 px-4 py-3">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">{item.label}</span>
-                          <Badge variant="outline">{item.count}</Badge>
+                          <span className="text-sm text-muted-foreground">{svc.name}</span>
+                          <Badge variant="outline">{svc.status}</Badge>
                         </div>
-                        {item.latest && <p className="text-xs text-destructive mt-2">{item.latest}</p>}
+                        {svc.message && <p className="text-xs text-destructive mt-2">{svc.message}</p>}
                       </div>
                     ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No API issues detected.</p>
                 )}
               </CardContent>
             </Card>
@@ -974,14 +1025,12 @@ export default function Admin() {
                 <CardDescription>Latest failed API-related conversions</CardDescription>
               </CardHeader>
               <CardContent>
-                {apiEvents.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No API errors detected.</p>
-                ) : (
+                {apiStatus?.recentErrors?.length ? (
                   <ScrollArea className="max-h-56 pr-2">
                     <div className="space-y-2">
-                      {apiEvents.slice(0, 10).map((err) => (
+                      {apiStatus.recentErrors.map((err) => (
                         <div key={err.id} className="rounded-md border border-border/30 bg-muted/10 p-3">
-                          <p className="text-xs text-foreground">{err.error_message}</p>
+                          <p className="text-xs text-foreground">{err.message}</p>
                           <p className="text-[10px] text-muted-foreground mt-1">
                             {new Date(err.created_at).toLocaleString()}
                           </p>
@@ -989,6 +1038,8 @@ export default function Admin() {
                       ))}
                     </div>
                   </ScrollArea>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No API errors detected.</p>
                 )}
               </CardContent>
             </Card>

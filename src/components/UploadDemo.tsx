@@ -40,7 +40,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import * as XLSX from "xlsx";
 
 // Enhanced Transaction interface with Universal Schema
 interface Transaction {
@@ -240,6 +239,13 @@ const conversionSteps = [
 
 export const UploadDemo = () => {
   const { toast } = useToast();
+  const pluralize = (count: number, singular: string, plural = `${singular}s`) =>
+    count === 1 ? singular : plural;
+  const formatRemaining = (remaining?: number) => {
+    if (remaining === null || remaining === undefined) return "";
+    const label = pluralize(remaining, "conversion");
+    return `${remaining} ${label} remaining today.`;
+  };
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -264,6 +270,8 @@ export const UploadDemo = () => {
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [progressStep, setProgressStep] = useState(0);
   const [showProgress, setShowProgress] = useState(false);
+  const pdfPasswordHelpId = "pdf-password-help";
+  const pdfPasswordErrorId = "pdf-password-error";
   const dismissedEditedWarningsRef = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
@@ -371,7 +379,7 @@ export const UploadDemo = () => {
       
       toast({
         title: "Files Selected",
-        description: `${newFiles.length} file(s) added - Ready to convert`,
+        description: `${newFiles.length} ${pluralize(newFiles.length, "file")} added - Ready to convert`,
       });
     }
   };
@@ -692,7 +700,12 @@ Analytics Summary:
 
       toast({
         title: "Conversion complete!",
-        description: `Extracted ${data?.transactions?.length || 0} transactions. ${data?.remaining ?? ''} conversions remaining today.`.trim(),
+        description: [
+          `Extracted ${data?.transactions?.length || 0} transactions.`,
+          formatRemaining(data?.remaining),
+        ]
+          .filter(Boolean)
+          .join(" "),
       });
 
       setSelectedFile(null);
@@ -931,7 +944,12 @@ Analytics Summary:
 
       toast({
         title: "Batch conversion complete!",
-        description: `${results.length} statement(s) converted. ${data?.remaining ?? ''}`.trim(),
+        description: [
+          `${results.length} ${pluralize(results.length, "statement")} converted.`,
+          formatRemaining(data?.remaining),
+        ]
+          .filter(Boolean)
+          .join(" "),
       });
 
       setSelectedFiles([]);
@@ -1066,9 +1084,10 @@ Analytics Summary:
         }
       }
 
+      const successCount = batchResults.filter((result) => result.status === "success").length;
       toast({
         title: "Downloaded!",
-        description: `${batchResults.filter(r => r.status === 'success').length} file(s) downloaded.`,
+        description: `${successCount} ${pluralize(successCount, "file")} downloaded.`,
       });
     } catch (error: unknown) {
       console.error('Batch download error:', error);
@@ -1165,51 +1184,62 @@ Analytics Summary:
   // Check if user has premium access
   const isPaidUser = planType && planType !== 'free';
 
-  const exportAsODS = () => {
+  const exportAsODS = async () => {
     if (transactions.length === 0) return;
 
-    const headers = [
-      'Date',
-      'Reference No / Transaction ID',
-      'Description',
-      'Debit',
-      'Credit',
-      'Balance',
-      'Pricing Mismatch Flag',
-      'Duplicate Flag',
-    ];
-    const rows = [
-      headers,
-      ...transactions.map(t => [
-        t.date || '',
-        t.refNumber || '',
-        t.description || '',
-        t.debit ?? 0,
-        t.credit ?? 0,
-        t.balance ?? 0,
-        t.balanceMismatch ? 'YES' : '',
-        t.isDuplicate ? 'YES' : '',
-      ]),
-    ];
+    try {
+      const XLSX = await import("xlsx");
 
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
-    const wbout = XLSX.write(workbook, { bookType: 'ods', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/vnd.oasis.opendocument.spreadsheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `transactions_${Date.now()}.ods`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      const headers = [
+        'Date',
+        'Reference No / Transaction ID',
+        'Description',
+        'Debit',
+        'Credit',
+        'Balance',
+        'Pricing Mismatch Flag',
+        'Duplicate Flag',
+      ];
+      const rows = [
+        headers,
+        ...transactions.map(t => [
+          t.date || '',
+          t.refNumber || '',
+          t.description || '',
+          t.debit ?? 0,
+          t.credit ?? 0,
+          t.balance ?? 0,
+          t.balanceMismatch ? 'YES' : '',
+          t.isDuplicate ? 'YES' : '',
+        ]),
+      ];
 
-    toast({
-      title: "ODS Downloaded",
-      description: "Your transaction data has been exported to ODS.",
-    });
+      const worksheet = XLSX.utils.aoa_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
+      const wbout = XLSX.write(workbook, { bookType: 'ods', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.oasis.opendocument.spreadsheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions_${Date.now()}.ods`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "ODS Downloaded",
+        description: "Your transaction data has been exported to ODS.",
+      });
+    } catch (error: unknown) {
+      console.error('ODS export error:', error);
+      toast({
+        variant: "destructive",
+        title: "ODS export failed",
+        description: getErrorMessage(error, "Failed to export ODS."),
+      });
+    }
   };
 
   const exportAsDOCX = async () => {
@@ -1368,8 +1398,17 @@ Analytics Summary:
               {/* Upload Zone - Dark Brown Theme */}
               <div 
                 onClick={handleUploadClick}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    handleUploadClick();
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-disabled={limitReached}
                 data-hover
-                className={`bg-[#0f0906]/80 border-2 border-primary/20 hover:border-primary/40 rounded-xl p-6 sm:p-10 md:p-12 text-center transition-all duration-500 cursor-pointer group relative ${
+                className={`bg-[#0f0906]/80 border-2 border-primary/20 hover:border-primary/40 rounded-xl p-6 sm:p-10 md:p-12 text-center transition-all duration-500 cursor-pointer group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0502] ${
                   limitReached 
                     ? 'opacity-50 cursor-not-allowed' 
                     : ''
@@ -1395,13 +1434,13 @@ Analytics Summary:
                   <div className="space-y-3">
                     <p className="text-xl font-semibold tracking-wide text-white">
                       {selectedFiles.length > 0 
-                        ? `${selectedFiles.length} file(s) selected` 
+                        ? `${selectedFiles.length} ${pluralize(selectedFiles.length, "file")} selected` 
                         : "Drop your bank statements here"}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {limitReached 
                         ? "Daily limit reached" 
-                        : "or click to browse files • Supports PDF, PNG, JPG • Upload multiple files"}
+                        : "or click to browse files • Supports PDF, PNG, JPG/JPEG • Upload multiple files"}
                     </p>
                   </div>
 
@@ -1414,15 +1453,18 @@ Analytics Summary:
                             <FileText className="h-4 w-4 text-primary" />
                             <span className="flex-1 min-w-0 text-sm text-white truncate">{file.name}</span>
                           </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
-                            }}
-                            className="text-destructive"
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
+                              }}
+                              className="text-destructive"
+                              aria-label={`Remove ${file.name}`}
+                              title={`Remove ${file.name}`}
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </button>
                         </div>
                       ))}
                     </div>
@@ -1462,38 +1504,44 @@ Analytics Summary:
                     <div className="p-2 bg-destructive/20 rounded-lg">
                       <Lock className="h-5 w-5 text-destructive" />
                     </div>
-                    <div>
-                      <p className="font-semibold text-destructive">Password Required</p>
-                      <p className="text-xs text-muted-foreground">This PDF is password protected. Enter the password to continue.</p>
+                      <div>
+                        <p className="font-semibold text-destructive">Password Required</p>
+                        <p id={pdfPasswordHelpId} className="text-xs text-muted-foreground">This PDF is password protected. Enter the password to continue.</p>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter PDF password..."
-                      value={pdfPassword}
-                      onChange={(e) => {
-                        setPdfPassword(e.target.value);
-                        setPasswordError(false);
-                      }}
-                      className={`bg-background/50 border-2 pr-10 ${passwordError ? 'border-destructive focus:border-destructive' : 'border-destructive/40 focus:border-destructive'}`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  
-                  {passwordError && (
-                    <p className="text-sm text-destructive flex items-center gap-1">
-                      <AlertTriangle className="h-4 w-4" />
-                      Incorrect password. Please try again.
-                    </p>
-                  )}
+                    
+                    <div className="relative">
+                      <label htmlFor="pdf-password" className="sr-only">PDF password</label>
+                      <Input
+                        id="pdf-password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Enter PDF password..."
+                        value={pdfPassword}
+                        onChange={(e) => {
+                          setPdfPassword(e.target.value);
+                          setPasswordError(false);
+                        }}
+                        aria-invalid={passwordError}
+                        aria-describedby={`${pdfPasswordHelpId}${passwordError ? ` ${pdfPasswordErrorId}` : ''}`}
+                        className={`bg-background/50 border-2 pr-10 ${passwordError ? 'border-destructive focus:border-destructive' : 'border-destructive/40 focus:border-destructive'}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    
+                    {passwordError && (
+                      <p id={pdfPasswordErrorId} role="alert" className="text-sm text-destructive flex items-center gap-1">
+                        <AlertTriangle className="h-4 w-4" />
+                        Incorrect password. Please try again.
+                      </p>
+                    )}
                 </div>
               )}
 
@@ -1539,7 +1587,7 @@ Analytics Summary:
 
               {/* Error Panel with Retry */}
               {lastError && (selectedFile || selectedFiles.length > 0) && !converting && !uploading && (
-                <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-xl space-y-3">
+                <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-xl space-y-3" role="alert" aria-live="assertive">
                   <div className="flex items-start gap-3">
                     <XCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
@@ -1603,7 +1651,9 @@ Analytics Summary:
                           </>
                         )}
                       </Button>
-                      <p className="text-xs text-muted-foreground">{selectedFiles.length} file(s) ready to convert</p>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedFiles.length} {pluralize(selectedFiles.length, "file")} ready to convert
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1779,7 +1829,7 @@ Analytics Summary:
               {aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
 
               {(converting || showProgress) && (
-                <div className="rounded-xl border border-primary/20 bg-muted/20 p-4 sm:p-5">
+                <div className="rounded-xl border border-primary/20 bg-muted/20 p-4 sm:p-5" role="status" aria-live="polite" aria-atomic="true">
                   <div className="space-y-2">
                     {conversionSteps.map((step, index) => {
                       const isDone = index < progressStep;
@@ -1974,7 +2024,7 @@ Analytics Summary:
                                   {transaction.date}
                                   {transaction.balanceMismatch && (
                                     <Tooltip>
-                                      <TooltipTrigger>
+                                      <TooltipTrigger aria-label="Balance mismatch warning">
                                         <ShieldAlert className="w-4 h-4 text-red-500" />
                                       </TooltipTrigger>
                                       <TooltipContent>
@@ -1984,7 +2034,7 @@ Analytics Summary:
                                   )}
                                   {transaction.riskFlag && !transaction.balanceMismatch && (
                                     <Tooltip>
-                                      <TooltipTrigger>
+                                      <TooltipTrigger aria-label="Risk flag warning">
                                         <AlertTriangle className="w-4 h-4 text-orange-500" />
                                       </TooltipTrigger>
                                       <TooltipContent>
@@ -1994,7 +2044,7 @@ Analytics Summary:
                                   )}
                                   {transaction.isDuplicate && !transaction.balanceMismatch && !transaction.riskFlag && (
                                     <Tooltip>
-                                      <TooltipTrigger>
+                                      <TooltipTrigger aria-label="Potential duplicate warning">
                                         <AlertTriangle className="w-4 h-4 text-yellow-500" />
                                       </TooltipTrigger>
                                       <TooltipContent>

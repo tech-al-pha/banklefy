@@ -245,25 +245,27 @@ export const PdfPreview = ({
         </div>
         {pageCount > 1 && (
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageChange(selectedPage - 1)}
-              disabled={selectedPage <= 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(selectedPage - 1)}
+                disabled={selectedPage <= 1}
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
             <span className="text-sm min-w-[60px] text-center">
               {selectedPage} / {pageCount}
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handlePageChange(selectedPage + 1)}
-              disabled={selectedPage >= pageCount}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(selectedPage + 1)}
+                disabled={selectedPage >= pageCount}
+                aria-label="Next page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
           </div>
         )}
       </div>
@@ -282,11 +284,14 @@ export const PdfPreview = ({
         <ScrollArea className="w-full">
           <div className="flex gap-2 pb-2">
             {thumbnails.map((thumb) => (
-              <button
-                key={thumb.pageNum}
-                onClick={() => handlePageChange(thumb.pageNum)}
-                className={`relative flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
-                  selectedPage === thumb.pageNum
+                <button
+                  type="button"
+                  key={thumb.pageNum}
+                  onClick={() => handlePageChange(thumb.pageNum)}
+                  aria-label={`View page ${thumb.pageNum}`}
+                  aria-current={selectedPage === thumb.pageNum ? "page" : undefined}
+                  className={`relative flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                    selectedPage === thumb.pageNum
                     ? 'border-primary shadow-neon'
                     : 'border-border hover:border-primary/50'
                 }`}

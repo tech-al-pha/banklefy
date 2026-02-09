@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { scrollToId } from "@/lib/scroll";
 
 const Index = () => {
   const { user, signOut } = useAuth();
@@ -41,8 +42,17 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-[#0A0502] text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-[#1a120b] focus:px-4 focus:py-2 focus:text-sm focus:text-foreground"
+      >
+        Skip to content
+      </a>
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/60 backdrop-blur-lg border-b border-primary/20">
+      <nav
+        className="fixed top-0 left-0 right-0 z-50 bg-[#1a120b]/60 backdrop-blur-lg border-b border-primary/20"
+        aria-label="Primary"
+      >
         <div className="container mx-auto px-4 sm:px-6 py-2 sm:py-3">
           <div className="flex items-center justify-between">
           <Logo />
@@ -137,7 +147,7 @@ const Index = () => {
                 size="sm" 
                 className="bg-primary text-primary-foreground shadow-neon transition-transform active:scale-95"
                 onClick={() => {
-                  document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
+                  scrollToId("demo");
                 }}
               >
                 {t('nav.getStarted')}
@@ -256,7 +266,7 @@ const Index = () => {
                         <Button
                           className="bg-primary text-primary-foreground shadow-neon"
                           onClick={() => {
-                            document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' });
+                            scrollToId("demo");
                           }}
                         >
                           {t('nav.getStarted')}
@@ -271,7 +281,9 @@ const Index = () => {
         </div>
       </nav>
 
-      <LandingPageContent />
+      <main id="main-content" tabIndex={-1}>
+        <LandingPageContent />
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-primary/20 py-16 px-4 sm:px-6 bg-[#0A0502]">

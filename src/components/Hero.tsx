@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { Upload, Zap } from "lucide-react"; 
+import { Upload } from "lucide-react"; 
 import { useNavigate } from "react-router-dom"; 
 import { useLanguage } from "@/contexts/LanguageContext";
+import { scrollToId } from "@/lib/scroll";
 
 export const Hero = () => {
   const navigate = useNavigate();
@@ -38,10 +39,10 @@ export const Hero = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-14 w-full max-w-2xl mx-auto">
             <Button 
               size="lg" 
-              className="w-full sm:w-auto bg-primary text-primary-foreground shadow-none transition-all duration-300 hover:scale-105 group px-8 border-0 no-glow focus-visible:ring-0 focus-visible:ring-offset-0"
-              onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}
+              className="w-full sm:w-auto bg-primary text-primary-foreground shadow-none transition-all duration-300 hover:scale-105 group px-8 border-0 no-glow"
+              onClick={() => scrollToId("demo")}
             >
-              <Upload className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
+              <Upload className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" aria-hidden="true" />
               {t('hero.uploadBtn')}
             </Button>
 
