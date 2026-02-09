@@ -151,10 +151,13 @@ Deno.serve(async (req) => {
   }
 
   const userId = authData.user.id;
+  
+  // Receipt must be <= 40 chars for Razorpay
+  const shortId = crypto.randomUUID().slice(0, 8);
   const receipt =
-    typeof body.receipt === 'string' && body.receipt.trim()
+    typeof body.receipt === 'string' && body.receipt.trim() && body.receipt.trim().length <= 40
       ? body.receipt.trim()
-      : `akromeda-${planId}-${crypto.randomUUID()}`;
+      : `akro-${planId.slice(0, 12)}-${shortId}`;
 
   const amountInPaise = Math.round(amountValue * 100);
 

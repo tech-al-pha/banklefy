@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
+import { toast } from "sonner";
 import Logo from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -137,10 +138,60 @@ const perPagePlans: Plan[] = [
 
 const PricingPage = () => {
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
   const razorpaySiteKey = import.meta.env.VITE_RAZORPAY_SITE_KEY;
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session?.user);
+    };
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session?.user);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const verifyPayment = async (
+    razorpay_order_id: string,
+    razorpay_payment_id: string,
+    razorpay_signature: string
+  ) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("razorpay-verify", {
+        body: {
+          razorpay_order_id,
+          razorpay_payment_id,
+          razorpay_signature,
+        },
+      });
+
+      if (error) throw error;
+
+      const result = typeof data === "string" ? JSON.parse(data) : data;
+      if (result?.success) {
+        toast.success(`Payment successful! ${result.pages_added} pages added to your account.`);
+        navigate("/dashboard");
+      } else {
+        toast.error("Payment verification failed.");
+      }
+    } catch (err) {
+      console.error("Verification error:", err);
+      toast.error("Payment verification failed. Please contact support.");
+    }
+  };
+
   const handlePlanPurchase = async (plan: Plan) => {
+    if (!isAuthenticated) {
+      toast.error("Please login to purchase a plan.");
+      navigate("/auth");
+      return;
+    }
+
     if (processingPlan) return;
     setProcessingPlan(plan.planId);
 
@@ -150,8 +201,7 @@ const PricingPage = () => {
       }
 
       const { data, error } = await supabase.functions.invoke("razorpay-order", {
-        method: "POST",
-        body: JSON.stringify({
+        body: {
           planId: plan.planId,
           amount: plan.amountInRupee,
           currency: "INR",
@@ -160,7 +210,7 @@ const PricingPage = () => {
             planName: plan.name,
             planCategory: plan.category,
           },
-        }),
+        },
       });
 
       if (error) {
@@ -180,6 +230,8 @@ const PricingPage = () => {
         throw new Error("Razorpay checkout is not loaded yet.");
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+
       const checkout = new window.Razorpay({
         key: checkoutKey,
         amount: order.amount,
@@ -187,22 +239,31 @@ const PricingPage = () => {
         name: "Akromeda",
         description: plan.description,
         order_id: order.id,
+        prefill: {
+          email: user?.email || "",
+        },
         notes: {
           plan_id: plan.planId,
           plan_name: plan.name,
         },
         handler: (response) => {
-          alert(`Payment successful! Payment ID: ${response.razorpay_payment_id}`);
+          verifyPayment(
+            response.razorpay_order_id,
+            response.razorpay_payment_id,
+            response.razorpay_signature
+          );
+        },
+        theme: {
+          color: "#D4AF37",
         },
       });
-      checkout.on("payment.failed", (failure) => {
-        console.error("Payment failed", failure);
-        alert("Payment failed. Please try again.");
+      checkout.on("payment.failed", () => {
+        toast.error("Payment failed. Please try again.");
       });
       checkout.open();
     } catch (error) {
       console.error(error);
-      alert(error instanceof Error ? error.message : "Unable to start Razorpay checkout.");
+      toast.error(error instanceof Error ? error.message : "Unable to start Razorpay checkout.");
     } finally {
       setProcessingPlan(null);
     }
