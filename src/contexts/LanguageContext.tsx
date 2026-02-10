@@ -331,7 +331,7 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.helpCenter.desc': 'Step-by-step guidance on formats, limits, and troubleshooting for smooth conversions.',
     'featuresPage.items.refunds.title': 'REFUND POLICY',
     'featuresPage.items.refunds.desc': 'Clear refund process for failed paid conversions, supported by our team.',
-    'featuresPage.items.dailyLimits.desc': 'Limits reset daily at midnight local time. Anonymous users get 2/day; registered users get 5/day.',
+    // (dailyLimits.desc already defined above)
     // Language
     'language': 'English',
   },
@@ -1294,7 +1294,7 @@ const translations: Record<Language, Record<string, string>> = {
     'privacyPage.whatItems.item4': 'Progettato con privacy e sicurezza al centro',
     'privacyPage.contactTitle': 'Questions?',
     'privacyPage.contactDescPrefix': 'For privacy questions, contact',
-    'privacyPage.footer': '(c) 2026 Akromeda. All rights reserved.',ID ordine entro 7 giorni.'ID ordine entro 7 giorni.',ID ordine entro 7 giorni.',ID ordine entro 7 giorni.',ID ordine entro 7 giorni.',ID ordine entro 7 giorni.',
+    'privacyPage.footer': '© 2026 Akromeda. Tutti i diritti riservati.',
 
     'hero.tagline': 'Aspetto professionale | OCR avanzato | Risultati immediati',
     'hero.subtitle': 'Conversione con OCR di estratti conto con sicurezza di livello bancario, estrazione accurata, rilevamento errori, analisi prestiti e frodi, ed export multiformato.',
