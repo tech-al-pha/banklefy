@@ -24,6 +24,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatCurrencyValue } from "@/lib/currency";
 
 interface FraudAlertDetail {
   rowIndex: number;
@@ -66,32 +67,33 @@ interface RiskAnalysis {
 
 interface FraudAlertPanelProps {
   riskAnalysis: RiskAnalysis;
+  currencyCode?: string;
 }
 
 const severityConfig = {
   low: { 
-    bg: 'bg-surface-elevated/10', 
-    border: 'border-border/30', 
-    text: 'text-foreground',
-    badge: 'bg-surface-elevated/20 text-foreground border-border/30'
+    bg: 'tone-excellent-bg', 
+    border: 'tone-excellent-border', 
+    text: 'tone-excellent-text',
+    badge: 'tone-excellent-bg tone-excellent-text tone-excellent-border'
   },
   medium: { 
-    bg: 'bg-surface-elevated/20', 
-    border: 'border-border/40', 
-    text: 'text-primary',
-    badge: 'bg-surface-elevated/30 text-primary border-border/40'
+    bg: 'tone-good-bg', 
+    border: 'tone-good-border', 
+    text: 'tone-good-text',
+    badge: 'tone-good-bg tone-good-text tone-good-border'
   },
   high: { 
-    bg: 'bg-surface-elevated/30', 
-    border: 'border-border/50', 
-    text: 'text-primary',
-    badge: 'bg-surface-elevated/40 text-primary border-border/50'
+    bg: 'tone-moderate-bg', 
+    border: 'tone-moderate-border', 
+    text: 'tone-moderate-text',
+    badge: 'tone-moderate-bg tone-moderate-text tone-moderate-border'
   },
   critical: { 
-    bg: 'bg-ink/60', 
-    border: 'border-border/60', 
-    text: 'text-primary',
-    badge: 'bg-ink/70 text-primary border-border/60'
+    bg: 'tone-bad-bg', 
+    border: 'tone-bad-border', 
+    text: 'tone-bad-text',
+    badge: 'tone-bad-bg tone-bad-text tone-bad-border'
   },
 };
 
@@ -105,17 +107,17 @@ const alertTypeIcons: Record<string, React.ReactNode> = {
 };
 
 const getIntegrityIcon = (score: number) => {
-  if (score >= 80) return <ShieldCheck className="w-8 h-8 text-primary" />;
-  if (score >= 60) return <Shield className="w-8 h-8 text-foreground" />;
-  if (score >= 40) return <ShieldAlert className="w-8 h-8 text-muted-foreground" />;
-  return <ShieldX className="w-8 h-8 text-muted-foreground" />;
+  if (score >= 80) return <ShieldCheck className="w-8 h-8 tone-excellent-text" />;
+  if (score >= 60) return <Shield className="w-8 h-8 tone-good-text" />;
+  if (score >= 40) return <ShieldAlert className="w-8 h-8 tone-moderate-text" />;
+  return <ShieldX className="w-8 h-8 tone-bad-text" />;
 };
 
 const getIntegrityColor = (score: number) => {
-  if (score >= 80) return 'text-primary';
-  if (score >= 60) return 'text-foreground';
-  if (score >= 40) return 'text-muted-foreground';
-  return 'text-muted-foreground';
+  if (score >= 80) return 'tone-excellent-text';
+  if (score >= 60) return 'tone-good-text';
+  if (score >= 40) return 'tone-moderate-text';
+  return 'tone-bad-text';
 };
 
 const getIntegrityLabel = (score: number) => {
@@ -125,23 +127,52 @@ const getIntegrityLabel = (score: number) => {
   return 'Tamper Alert';
 };
 
-export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
+export const FraudAlertPanel = ({ riskAnalysis, currencyCode }: FraudAlertPanelProps) => {
   const { integrityScore, fraudAlerts, balanceMismatches, averageDailyBalance, maxDip, riskFlags } = riskAnalysis;
   
   const criticalAlerts = fraudAlerts.filter(a => a.severity === 'critical');
   const highAlerts = fraudAlerts.filter(a => a.severity === 'high');
   const otherAlerts = fraudAlerts.filter(a => a.severity !== 'critical' && a.severity !== 'high');
+  const totalRiskFlags = riskFlags.reduce((sum, r) => sum + r.count, 0);
+
+  const toneText = {
+    excellent: 'tone-excellent-text',
+    good: 'tone-good-text',
+    moderate: 'tone-moderate-text',
+    bad: 'tone-bad-text',
+  } as const;
+
+  const getMismatchTone = (count: number) =>
+    count === 0 ? 'excellent' : count <= 2 ? 'good' : count <= 5 ? 'moderate' : 'bad';
+  const getRiskTone = (count: number) =>
+    count === 0 ? 'excellent' : count <= 2 ? 'good' : count <= 5 ? 'moderate' : 'bad';
+  const getAvgBalanceTone = (value: number) =>
+    value >= 10000 ? 'excellent' : value > 0 ? 'good' : 'bad';
+  const getLowestBalanceTone = (value: number) =>
+    value >= 10000 ? 'excellent' : value >= 1000 ? 'good' : value > 0 ? 'moderate' : 'bad';
+  const getAlertHeaderTone = () =>
+    criticalAlerts.length > 0 ? 'bad' : highAlerts.length > 0 ? 'moderate' : fraudAlerts.length > 0 ? 'good' : 'excellent';
+
+  const balanceTone = getMismatchTone(balanceMismatches);
+  const riskTone = getRiskTone(totalRiskFlags);
+  const avgBalanceTone = getAvgBalanceTone(averageDailyBalance);
+  const lowestBalanceTone = getLowestBalanceTone(maxDip.amount);
+  const alertHeaderTone = getAlertHeaderTone();
+  const formatAmount = (
+    value: number,
+    options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
+  ) => formatCurrencyValue(value ?? 0, currencyCode, options);
 
   return (
     <div className="space-y-4">
       {/* Integrity Score Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Shield className="w-5 h-5 text-primary" />
+          <Shield className={`w-5 h-5 ${getIntegrityColor(integrityScore)}`} />
           Document Integrity & Risk Analysis
         </h3>
         <Tooltip>
-          <TooltipTrigger>
+          <TooltipTrigger className="no-hover-glow">
             <div className="flex items-center gap-2 cursor-help">
               {getIntegrityIcon(integrityScore)}
               <div className="text-right">
@@ -166,60 +197,60 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className={`p-3 ${balanceMismatches > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+        <Card className={`p-3 !bg-[#191919] ${balanceMismatches > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
+          <div className="flex items-center gap-2 text-xs label-muted mb-1">
             {balanceMismatches > 0 ? (
-              <XCircle className="w-3 h-3 text-muted-foreground" />
+              <XCircle className={`w-3 h-3 ${toneText[balanceTone]}`} />
             ) : (
-              <CheckCircle2 className="w-3 h-3 text-primary" />
+              <CheckCircle2 className={`w-3 h-3 ${toneText[balanceTone]}`} />
             )}
             Balance Check
           </div>
-          <p className={`text-lg font-bold ${balanceMismatches > 0 ? 'text-muted-foreground' : 'text-primary'}`}>
+          <p className={`text-lg font-bold ${toneText[balanceTone]}`}>
             {balanceMismatches > 0 ? `${balanceMismatches} Errors` : 'Passed'}
           </p>
         </Card>
 
-        <Card className="p-3 bg-primary/5 border-primary/20">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-            <TrendingDown className="w-3 h-3 text-primary" />
+        <Card className="p-3 !bg-[#191919] border-primary/20">
+          <div className="flex items-center gap-2 text-xs label-muted mb-1">
+            <TrendingDown className={`w-3 h-3 ${toneText[avgBalanceTone]}`} />
             Avg Daily Balance
           </div>
-          <p className="text-lg font-bold text-primary">
-            ₹{averageDailyBalance.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+          <p className={`text-lg font-bold ${toneText[avgBalanceTone]}`}>
+            {formatAmount(averageDailyBalance, { maximumFractionDigits: 0 })}
           </p>
         </Card>
 
-        <Card className={`p-3 ${maxDip.amount <= 0 ? 'bg-ink/60 border-border/60' : 'bg-muted/30 border-border/30'}`}>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-            <TrendingDown className="w-3 h-3" />
+        <Card className={`p-3 !bg-[#191919] ${maxDip.amount <= 0 ? 'bg-ink/60 border-border/60' : 'bg-muted/30 border-border/30'}`}>
+          <div className="flex items-center gap-2 text-xs label-muted mb-1">
+            <TrendingDown className={`w-3 h-3 ${toneText[lowestBalanceTone]}`} />
             Lowest Balance
           </div>
-          <p className={`text-lg font-bold ${maxDip.amount <= 0 ? 'text-muted-foreground' : 'text-foreground'}`}>
-            ₹{maxDip.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+          <p className={`text-lg font-bold ${toneText[lowestBalanceTone]}`}>
+            {formatAmount(maxDip.amount, { maximumFractionDigits: 0 })}
           </p>
           {maxDip.date && (
             <p className="text-xs text-muted-foreground">{maxDip.date}</p>
           )}
         </Card>
 
-        <Card className={`p-3 ${riskFlags.length > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-            <AlertTriangle className="w-3 h-3" />
+        <Card className={`p-3 !bg-[#191919] ${riskFlags.length > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
+          <div className="flex items-center gap-2 text-xs label-muted mb-1">
+            <AlertTriangle className={`w-3 h-3 ${toneText[riskTone]}`} />
             Risk Flags
           </div>
-          <p className={`text-lg font-bold ${riskFlags.length > 0 ? 'text-muted-foreground' : 'text-primary'}`}>
-            {riskFlags.length > 0 ? riskFlags.reduce((sum, r) => sum + r.count, 0) : 'None'}
+          <p className={`text-lg font-bold ${toneText[riskTone]}`}>
+            {riskFlags.length > 0 ? totalRiskFlags : 'None'}
           </p>
         </Card>
       </div>
 
       {/* Fraud Alerts */}
       {fraudAlerts.length > 0 ? (
-        <Card className="p-4 border-border/50 bg-surface-elevated/15">
+        <Card className="p-4 !bg-[#191919] border-border/50">
           <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-5 h-5 text-primary" />
-            <h4 className="font-semibold text-primary">
+            <AlertTriangle className={`w-5 h-5 ${toneText[alertHeaderTone]}`} />
+            <h4 className={`font-semibold ${toneText[alertHeaderTone]}`}>
               {fraudAlerts.length} Alert{fraudAlerts.length !== 1 ? 's' : ''} Detected
             </h4>
           </div>
@@ -230,9 +261,9 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
               <AccordionItem 
                 key={`critical-${index}`} 
                 value={`critical-${index}`}
-                className={`border rounded-lg px-4 ${severityConfig.critical.bg} ${severityConfig.critical.border}`}
+                className={`border rounded-lg px-4 card-hover-glow ${severityConfig.critical.bg} ${severityConfig.critical.border}`}
               >
-                <AccordionTrigger className="hover:no-underline py-3">
+                <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
                   <div className="flex items-center gap-3 text-left">
                     <span className={severityConfig.critical.text}>
                       {alertTypeIcons[alert.type] || <AlertTriangle className="w-5 h-5" />}
@@ -258,11 +289,25 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
                       <div>
                         <p className="text-muted-foreground mb-1">Affected Transactions:</p>
                         <ul className="list-disc list-inside space-y-1">
-                          {alert.metadata.details.slice(0, 5).map((d, i) => (
-                            <li key={i} className="text-xs">
-                              Row {d.rowIndex + 1}: Expected ₹{d.expected?.toFixed(2)} but found ₹{d.actual?.toFixed(2)} (Diff: ₹{d.difference?.toFixed(2)})
-                            </li>
-                          ))}
+                          {alert.metadata.details.slice(0, 5).map((d, i) => {
+                            const expected =
+                              d.expected == null
+                                ? 'N/A'
+                                : formatAmount(d.expected, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            const actual =
+                              d.actual == null
+                                ? 'N/A'
+                                : formatAmount(d.actual, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            const diff =
+                              d.difference == null
+                                ? 'N/A'
+                                : formatAmount(d.difference, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            return (
+                              <li key={i} className="text-xs">
+                                Row {d.rowIndex + 1}: Expected {expected} but found {actual} (Diff: {diff})
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     )}
@@ -270,11 +315,17 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
                       <div>
                         <p className="text-muted-foreground mb-1">Flagged Transactions:</p>
                         <ul className="list-disc list-inside space-y-1">
-                          {alert.metadata.transactions.slice(0, 5).map((t, i) => (
-                            <li key={i} className="text-xs">
-                              {t.date}: {t.description} - ₹{t.amount?.toLocaleString('en-IN')}
-                            </li>
-                          ))}
+                          {alert.metadata.transactions.slice(0, 5).map((t, i) => {
+                            const amount =
+                              t.amount == null
+                                ? 'N/A'
+                                : formatAmount(t.amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            return (
+                              <li key={i} className="text-xs">
+                                {t.date}: {t.description} - {amount}
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     )}
@@ -288,9 +339,9 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
               <AccordionItem 
                 key={`high-${index}`} 
                 value={`high-${index}`}
-                className={`border rounded-lg px-4 ${severityConfig.high.bg} ${severityConfig.high.border}`}
+                className={`border rounded-lg px-4 card-hover-glow ${severityConfig.high.bg} ${severityConfig.high.border}`}
               >
-                <AccordionTrigger className="hover:no-underline py-3">
+                <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
                   <div className="flex items-center gap-3 text-left">
                     <span className={severityConfig.high.text}>
                       {alertTypeIcons[alert.type] || <AlertTriangle className="w-5 h-5" />}
@@ -316,11 +367,21 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
                       <div>
                         <p className="text-muted-foreground mb-1">Balance Mismatches:</p>
                         <ul className="list-disc list-inside space-y-1">
-                          {alert.metadata.details.slice(0, 5).map((d, i) => (
-                            <li key={i} className="text-xs">
-                              Row {d.rowIndex + 1}: Expected ₹{d.expected?.toFixed(2)}, Found ₹{d.actual?.toFixed(2)}
-                            </li>
-                          ))}
+                          {alert.metadata.details.slice(0, 5).map((d, i) => {
+                            const expected =
+                              d.expected == null
+                                ? 'N/A'
+                                : formatAmount(d.expected, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            const actual =
+                              d.actual == null
+                                ? 'N/A'
+                                : formatAmount(d.actual, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            return (
+                              <li key={i} className="text-xs">
+                                Row {d.rowIndex + 1}: Expected {expected}, Found {actual}
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     )}
@@ -328,17 +389,23 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
                       <div>
                         <p className="text-muted-foreground mb-1">Detected Activity:</p>
                         <ul className="list-disc list-inside space-y-1">
-                          {alert.metadata.transactions.slice(0, 5).map((t, i) => (
-                            <li key={i} className="text-xs">
-                              {t.date}: {t.description} - ₹{t.amount?.toLocaleString('en-IN')}
-                            </li>
-                          ))}
+                          {alert.metadata.transactions.slice(0, 5).map((t, i) => {
+                            const amount =
+                              t.amount == null
+                                ? 'N/A'
+                                : formatAmount(t.amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            return (
+                              <li key={i} className="text-xs">
+                                {t.date}: {t.description} - {amount}
+                              </li>
+                            );
+                          })}
                         </ul>
                       </div>
                     )}
                     {alert.metadata.transferCount && (
                       <p className="text-xs text-muted-foreground">
-                        Pattern: {alert.metadata.pattern} | Total: ₹{alert.metadata.totalAmount?.toLocaleString('en-IN')}
+                        Pattern: {alert.metadata.pattern} | Total: {alert.metadata.totalAmount == null ? 'N/A' : formatAmount(alert.metadata.totalAmount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     )}
                   </div>
@@ -351,9 +418,9 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
               <AccordionItem 
                 key={`other-${index}`} 
                 value={`other-${index}`}
-                className={`border rounded-lg px-4 ${severityConfig[alert.severity].bg} ${severityConfig[alert.severity].border}`}
+                className={`border rounded-lg px-4 card-hover-glow ${severityConfig[alert.severity].bg} ${severityConfig[alert.severity].border}`}
               >
-                <AccordionTrigger className="hover:no-underline py-3">
+                <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
                   <div className="flex items-center gap-3 text-left">
                     <span className={severityConfig[alert.severity].text}>
                       {alertTypeIcons[alert.type] || <AlertTriangle className="w-5 h-5" />}
@@ -384,11 +451,11 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
           </Accordion>
         </Card>
       ) : (
-        <Card className="p-4 border-border/40 bg-surface-elevated/15">
+        <Card className="p-4 !bg-[#191919] border-border/40">
           <div className="flex items-center gap-3">
-            <ShieldCheck className="w-6 h-6 text-primary" />
+            <ShieldCheck className="w-6 h-6 tone-excellent-text" />
             <div>
-              <p className="font-semibold text-primary">No Anomalies Detected</p>
+              <p className="font-semibold tone-excellent-text">No Anomalies Detected</p>
               <p className="text-sm text-muted-foreground">
                 Document passed all integrity checks. No suspicious activity found.
               </p>
@@ -399,3 +466,4 @@ export const FraudAlertPanel = ({ riskAnalysis }: FraudAlertPanelProps) => {
     </div>
   );
 };
+

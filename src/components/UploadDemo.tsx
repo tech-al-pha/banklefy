@@ -18,6 +18,7 @@ import { UnderwritingPanel } from "./UnderwritingPanel";
 import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
 import { AIStatusPanel } from "./AIStatusPanel";
 import akromedaLogo from "@/assets/akromeda-logo.svg";
+import { formatCurrencyValue, normalizeCurrencyCode } from "@/lib/currency";
 import {
   Dialog,
   DialogContent,
@@ -141,10 +142,28 @@ type AiStatus = {
   patternFallback?: { success: boolean; time?: number; error?: string };
 };
 
+interface BankInfo {
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
+  currency?: string;
+  iban?: string;
+  ifsc?: string;
+  swift?: string;
+  routingNumber?: string;
+  sortCode?: string;
+  bsb?: string;
+  micr?: string;
+  statementPeriod?: string;
+  openingBalance?: number;
+  closingBalance?: number;
+}
+
 interface MultiStatementResult {
   fileName: string;
   excelData: string;
   totals?: { totalCredits: number; totalDebits: number };
+  bankInfo?: BankInfo;
 }
 
 interface MergeTotals {
@@ -174,6 +193,7 @@ interface MultiConversionResponse {
   analytics?: Analytics;
   transactions?: Transaction[];
   planType?: string;
+  bankInfo?: BankInfo;
   error?: string;
   message?: string;
   limitReached?: boolean;
@@ -186,6 +206,7 @@ interface ConversionResponse {
   excelData?: string;
   transactions?: Transaction[];
   analytics?: Analytics;
+  bankInfo?: BankInfo;
   aiStatus?: AiStatus;
   remaining?: number;
   limitReached?: boolean;
@@ -256,6 +277,7 @@ export const UploadDemo = () => {
   const [mergeResult, setMergeResult] = useState<{ excelData: string; fileName: string } | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [currencyCode, setCurrencyCode] = useState<string>('');
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [batchDownloading, setBatchDownloading] = useState(false);
@@ -276,6 +298,15 @@ export const UploadDemo = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const formatAmount = (
+    value: number,
+    options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
+  ) => formatCurrencyValue(value ?? 0, currencyCode, options);
+  const truncateDecimals = (value: number, decimals = 2) => {
+    const factor = 10 ** decimals;
+    if (!Number.isFinite(value)) return 0;
+    return Math.trunc(value * factor) / factor;
+  };
   const getErrorMessage = (error: unknown, fallback: string) => {
     if (error instanceof Error && error.message) return error.message;
     if (typeof error === 'string') return error;
@@ -515,6 +546,7 @@ export const UploadDemo = () => {
       }
     }
 
+    setCurrencyCode('');
     setUploading(true);
 
     try {
@@ -650,6 +682,8 @@ export const UploadDemo = () => {
         throw new Error(data.error);
       }
 
+      const responseCurrency = normalizeCurrencyCode(data?.bankInfo?.currency);
+
       // Store conversion result and transaction data
       setConversionResult({
         id: data.conversionId,
@@ -664,6 +698,7 @@ export const UploadDemo = () => {
       if (data?.analytics) {
         setAnalytics(data.analytics);
       }
+      setCurrencyCode(responseCurrency);
 
       // Store AI processing status for display
       if (data?.aiStatus) {
@@ -686,9 +721,9 @@ ${data.transactions.length > 50 ? `\n... and ${data.transactions.length - 50} mo
 
 ${data.analytics ? `
 Analytics Summary:
-- Total Credits: ₹${data.analytics.totalCredits}
-- Total Debits: ₹${data.analytics.totalDebits}
-- Net Flow: ₹${data.analytics.netFlow}
+- Total Credits: ${formatCurrencyValue(truncateDecimals(data.analytics.totalCredits), responseCurrency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Total Debits: ${formatCurrencyValue(truncateDecimals(data.analytics.totalDebits), responseCurrency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Net Flow: ${formatCurrencyValue(truncateDecimals(data.analytics.netFlow), responseCurrency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 ` : ''}`;
         
         sessionStorage.setItem('chatAuraContext', extractedSummary);
@@ -789,6 +824,7 @@ Analytics Summary:
     }
 
     setUploading(true);
+    setCurrencyCode('');
     setBatchResults([]);
     setMergeInfo(null);
     setMergeResult(null);
@@ -939,6 +975,10 @@ Analytics Summary:
       if (data?.transactions && Array.isArray(data.transactions)) {
         setTransactions(data.transactions);
       }
+      const batchCurrency = normalizeCurrencyCode(
+        data?.bankInfo?.currency || results.find((r) => r.bankInfo?.currency)?.bankInfo?.currency,
+      );
+      setCurrencyCode(batchCurrency);
 
       refreshUsageLimit();
 
@@ -1147,6 +1187,8 @@ Analytics Summary:
     // Calculate totals
     const totalDebit = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
     const totalCredit = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
+    const totalDebitDisplay = truncateDecimals(totalDebit).toFixed(2);
+    const totalCreditDisplay = truncateDecimals(totalCredit).toFixed(2);
     
     const csvRows = [
       headers.join(','),
@@ -1160,7 +1202,7 @@ Analytics Summary:
         ].join(',')
       ),
       // Add totals row
-      ['', 'TOTAL', totalDebit.toFixed(2), totalCredit.toFixed(2), ''].join(',')
+      ['', 'TOTAL', totalDebitDisplay, totalCreditDisplay, ''].join(',')
     ];
     const csvContent = csvRows.join('\n');
 
@@ -1181,8 +1223,199 @@ Analytics Summary:
     });
   };
 
+  const exportAsPDF = async () => {
+    if (transactions.length === 0) return;
+
+    try {
+      const { jsPDF } = await import("jspdf");
+      const autoTable = (await import("jspdf-autotable")).default;
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+      const marginX = 40;
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let cursorY = 48;
+
+      const formatAmount = (value: number, decimals = 2) =>
+        formatCurrencyValue(value, currencyCode, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
+      const addLine = (text: string) => {
+        if (cursorY > pageHeight - 48) {
+          doc.addPage();
+          cursorY = 48;
+        }
+        doc.text(text, marginX, cursorY);
+        cursorY += 14;
+      };
+
+      const addSection = (title: string) => {
+        if (cursorY > pageHeight - 72) {
+          doc.addPage();
+          cursorY = 48;
+        }
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text(title, marginX, cursorY);
+        cursorY += 16;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+      };
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("Analyzed Statement Report", marginX, cursorY);
+      cursorY += 18;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      // Reset spacing to avoid any unexpected letter spacing in PDF viewers
+      // @ts-expect-error - jsPDF exposes these setters
+      doc.setCharSpace?.(0);
+      // @ts-expect-error - jsPDF exposes these setters
+      doc.setWordSpacing?.(0);
+      doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, marginX, cursorY);
+      cursorY += 16;
+
+      doc.setFontSize(11);
+      addLine(`Total Transactions: ${transactions.length}`);
+      addLine(`Total Credits: ${formatAmount(truncateDecimals(analytics?.totalCredits ?? 0))}`);
+      addLine(`Total Debits: ${formatAmount(truncateDecimals(analytics?.totalDebits ?? 0))}`);
+      addLine(`Net Flow: ${formatAmount(truncateDecimals(analytics?.netFlow ?? 0))}`);
+
+      if (analytics?.underwriting) {
+        addSection("Underwriting Summary");
+        addLine(`FOIR Score: ${(analytics.underwriting.summary?.foirScore ?? 0).toFixed(1)}%`);
+        addLine(`FOIR Status: ${(analytics.underwriting.summary?.foirStatus ?? "N/A").toUpperCase()}`);
+        addLine(`Avg Monthly Income: ${formatAmount(analytics.underwriting.summary?.avgMonthlyIncome ?? 0, 0)}`);
+        addLine(`Avg Monthly EMI: ${formatAmount(analytics.underwriting.summary?.avgMonthlyEMI ?? 0, 0)}`);
+        addLine(`Salary Credits Detected: ${analytics.underwriting.summary?.totalSalaryDetected ?? 0}`);
+        addLine(`EMI Debits Detected: ${analytics.underwriting.summary?.totalEMIDetected ?? 0}`);
+        addLine(`Est. Loan Eligibility: ${formatAmount(analytics.underwriting.eligibility?.estimatedLoanEligibility ?? 0, 0)}`);
+        addLine(`Max New EMI: ${formatAmount(analytics.underwriting.eligibility?.maxNewEMI ?? 0, 0)}`);
+        addLine(`Eligibility Status: ${(analytics.underwriting.eligibility?.status ?? "N/A").toUpperCase()}`);
+        if (analytics.underwriting.eligibility?.message) {
+          addLine(`Message: ${analytics.underwriting.eligibility.message}`);
+        }
+      }
+
+      if (analytics?.riskAnalysis) {
+        addSection("Risk & Integrity Analysis");
+        addLine(`Integrity Score: ${analytics.riskAnalysis.integrityScore}%`);
+        addLine(`Balance Mismatches: ${analytics.riskAnalysis.balanceMismatches}`);
+        addLine(`Avg Daily Balance: ${formatAmount(analytics.riskAnalysis.averageDailyBalance ?? 0, 0)}`);
+        addLine(`Lowest Balance: ${formatAmount(analytics.riskAnalysis.maxDip?.amount ?? 0, 0)}${analytics.riskAnalysis.maxDip?.date ? ` on ${analytics.riskAnalysis.maxDip.date}` : ""}`);
+        const riskFlagCount = analytics.riskAnalysis.riskFlags?.reduce((sum, r) => sum + r.count, 0) ?? 0;
+        addLine(`Risk Flags: ${riskFlagCount}`);
+        if (analytics.duplicateCount > 0) {
+          addLine(`Duplicates Found: ${analytics.duplicateCount}`);
+        }
+        if (analytics.riskAnalysis.fraudAlerts?.length) {
+          addLine(`Fraud Alerts: ${analytics.riskAnalysis.fraudAlerts.length}`);
+        }
+      }
+
+      if (analytics?.categoryBreakdown && Object.keys(analytics.categoryBreakdown).length > 0) {
+        addSection("Category Breakdown");
+        const categoryRows = Object.entries(analytics.categoryBreakdown)
+          .sort((a, b) => b[1].count - a[1].count)
+          .slice(0, 12)
+          .map(([category, data]) => [
+            category,
+            `${data.count}`,
+            formatAmount(truncateDecimals(data.totalDebit ?? 0)),
+            formatAmount(truncateDecimals(data.totalCredit ?? 0)),
+          ]);
+
+        autoTable(doc, {
+          startY: cursorY + 6,
+          head: [["Category", "Count", "Total Debit", "Total Credit"]],
+          body: categoryRows,
+          styles: { fontSize: 9, cellPadding: 4 },
+          headStyles: { fillColor: [24, 24, 24], textColor: [255, 255, 255] },
+          columnStyles: {
+            0: { cellWidth: 180 },
+            1: { halign: "right" },
+            2: { halign: "right" },
+            3: { halign: "right" },
+          },
+          margin: { left: marginX, right: marginX },
+        });
+
+        // @ts-expect-error - autoTable adds lastAutoTable to doc
+        cursorY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 16 : cursorY + 24;
+      }
+
+      const tableRows = transactions.slice(0, 100).map((t) => [
+        t.date || "",
+        t.description || "",
+        t.debit ? formatAmount(t.debit) : "",
+        t.credit ? formatAmount(t.credit) : "",
+        t.balance != null ? formatAmount(t.balance) : "",
+      ]);
+
+      addSection("Transaction Details (first 100 rows)");
+      autoTable(doc, {
+        startY: cursorY + 6,
+        head: [["Date", "Description", "Debit", "Credit", "Balance"]],
+        body: tableRows,
+        styles: { fontSize: 9, cellPadding: 4 },
+        headStyles: { fillColor: [24, 24, 24], textColor: [255, 255, 255] },
+        columnStyles: {
+          0: { cellWidth: 72 },
+          1: { cellWidth: 220 },
+          2: { halign: "right" },
+          3: { halign: "right" },
+          4: { halign: "right" },
+        },
+        margin: { left: marginX, right: marginX },
+      });
+
+      doc.save(`analyzed_report_${Date.now()}.pdf`);
+
+      toast({
+        title: "PDF Downloaded",
+        description: "Your analyzed report has been exported to PDF.",
+      });
+    } catch (error: unknown) {
+      console.error("PDF export error:", error);
+      toast({
+        variant: "destructive",
+        title: "PDF export failed",
+        description: getErrorMessage(error, "Failed to export PDF."),
+      });
+    }
+  };
+
   // Check if user has premium access
   const isPaidUser = planType && planType !== 'free';
+  const toneClasses = {
+    excellent: { text: 'tone-excellent-text', border: 'tone-excellent-border' },
+    good: { text: 'tone-good-text', border: 'tone-good-border' },
+    moderate: { text: 'tone-moderate-text', border: 'tone-moderate-border' },
+    bad: { text: 'tone-bad-text', border: 'tone-bad-border' },
+  } as const;
+
+  type Tone = keyof typeof toneClasses;
+
+  const getCreditTone = (totalCredits: number): Tone => (totalCredits > 0 ? 'excellent' : 'bad');
+  const getDebitTone = (totalCredits: number, totalDebits: number): Tone => {
+    if (totalCredits <= 0) return totalDebits > 0 ? 'bad' : 'moderate';
+    const ratio = totalDebits / totalCredits;
+    if (ratio <= 0.6) return 'good';
+    if (ratio <= 0.9) return 'moderate';
+    return 'bad';
+  };
+  const getNetFlowTone = (netFlow: number, totalCredits: number): Tone => {
+    if (totalCredits > 0) {
+      const ratio = netFlow / totalCredits;
+      if (ratio >= 0.2) return 'excellent';
+      if (ratio > 0) return 'good';
+      if (ratio >= -0.1) return 'moderate';
+      return 'bad';
+    }
+    if (netFlow > 0) return 'good';
+    if (netFlow === 0) return 'moderate';
+    return 'bad';
+  };
 
   const exportAsODS = async () => {
     if (transactions.length === 0) return;
@@ -1296,9 +1529,9 @@ Analytics Summary:
               heading: HeadingLevel.HEADING_1,
             }),
             new Paragraph({ text: `Total Transactions: ${transactions.length}` }),
-            new Paragraph({ text: `Total Credits: ₹${(analytics?.totalCredits || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` }),
-            new Paragraph({ text: `Total Debits: ₹${(analytics?.totalDebits || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` }),
-            new Paragraph({ text: `Net Flow: ₹${(analytics?.netFlow || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` }),
+            new Paragraph({ text: `Total Credits: ${formatAmount(truncateDecimals(analytics?.totalCredits || 0), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
+            new Paragraph({ text: `Total Debits: ${formatAmount(truncateDecimals(analytics?.totalDebits || 0), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
+            new Paragraph({ text: `Net Flow: ${formatAmount(truncateDecimals(analytics?.netFlow || 0), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
             new Paragraph({ text: '' }),
             ...(analytics?.underwriting ? [
               new Paragraph({
@@ -1307,8 +1540,8 @@ Analytics Summary:
               }),
               new Paragraph({ text: `FOIR Score: ${analytics.underwriting.summary?.foirScore?.toFixed(2) || 0}%` }),
               new Paragraph({ text: `Status: ${(analytics.underwriting.summary?.foirStatus || 'N/A').toUpperCase()}` }),
-              new Paragraph({ text: `Avg Monthly Income: ₹${(analytics.underwriting.summary?.avgMonthlyIncome || 0).toLocaleString('en-IN')}` }),
-              new Paragraph({ text: `Avg Monthly EMI: ₹${(analytics.underwriting.summary?.avgMonthlyEMI || 0).toLocaleString('en-IN')}` }),
+              new Paragraph({ text: `Avg Monthly Income: ${formatAmount(analytics.underwriting.summary?.avgMonthlyIncome || 0, { maximumFractionDigits: 0 })}` }),
+              new Paragraph({ text: `Avg Monthly EMI: ${formatAmount(analytics.underwriting.summary?.avgMonthlyEMI || 0, { maximumFractionDigits: 0 })}` }),
               new Paragraph({ text: '' }),
             ] : []),
             new Paragraph({
@@ -1358,6 +1591,10 @@ Analytics Summary:
       exportAsODS();
     }
   };
+
+  const creditTone: Tone = analytics ? getCreditTone(analytics.totalCredits) : 'good';
+  const debitTone: Tone = analytics ? getDebitTone(analytics.totalCredits, analytics.totalDebits) : 'moderate';
+  const netFlowTone: Tone = analytics ? getNetFlowTone(analytics.netFlow, analytics.totalCredits) : 'moderate';
 
   return (
     <section className="relative py-16 px-4 sm:px-6 overflow-hidden bg-background">
@@ -1662,18 +1899,18 @@ Analytics Summary:
               {/* Batch Results and Download */}
               {batchResults.length > 0 && (
                 <div className="text-center space-y-3">
-                  <div className="flex items-center justify-center gap-2 text-green-500">
+                  <div className="flex items-center justify-center gap-2 tone-excellent-text">
                     <CheckCircle className="h-5 w-5" />
                     <span className="font-medium">Batch Conversion Complete!</span>
                   </div>
                   <p className="text-sm font-medium text-muted-foreground">Download options:</p>
                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                     <Button
-                       size="lg"
-                       className="bg-primary text-primary-foreground"
-                       onClick={handleBatchDownload}
-                       disabled={batchDownloading}
-                     >
+                    <Button
+                      size="lg"
+                      className="excel-button"
+                      onClick={handleBatchDownload}
+                      disabled={batchDownloading}
+                    >
                        {batchDownloading ? (
                          <>
                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -1687,12 +1924,12 @@ Analytics Summary:
                        )}
                      </Button>
                      {mergeInfo && mergeInfo.available && mergeResult && (
-                       <Button
-                         size="lg"
-                         className="bg-secondary text-secondary-foreground"
-                         onClick={handleMergedDownload}
-                         disabled={mergeDownloading}
-                       >
+                      <Button
+                        size="lg"
+                        className="excel-button"
+                        onClick={handleMergedDownload}
+                        disabled={mergeDownloading}
+                      >
                          {mergeDownloading ? (
                            <>
                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -1716,37 +1953,48 @@ Analytics Summary:
                    
                    {/* Additional Export Options for Batch */}
                    <div className="flex flex-wrap gap-2 justify-center pt-2">
-                     <Button
-                       size="sm"
-                       variant="outline"
-                       onClick={exportAsCSV}
-                       disabled={transactions.length === 0}
-                     >
-                       <FileText className="mr-2 h-4 w-4" />
-                       CSV
-                     </Button>
-                     <Button
-                       size="sm"
-                       variant="outline"
-                       onClick={() => handlePremiumExport('docx')}
-                       disabled={transactions.length === 0}
-                       className={!isPaidUser ? 'opacity-70' : ''}
-                     >
-                       <FileText className="mr-2 h-4 w-4" />
-                       DOCX
-                       {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
-                     </Button>
-                     <Button
-                       size="sm"
-                       variant="outline"
-                       onClick={() => handlePremiumExport('ods')}
-                       disabled={transactions.length === 0}
-                       className={!isPaidUser ? 'opacity-70' : ''}
-                     >
-                       <FileSpreadsheet className="mr-2 h-4 w-4" />
-                       ODS
-                       {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
-                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={exportAsCSV}
+                      disabled={transactions.length === 0}
+                      className="csv-button"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      CSV
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={exportAsPDF}
+                      disabled={transactions.length === 0}
+                      className="text-white"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Analyzed PDF
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePremiumExport('docx')}
+                      disabled={transactions.length === 0}
+                      className={`text-white ${!isPaidUser ? 'bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]' : ''}`}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      DOCX
+                      {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePremiumExport('ods')}
+                      disabled={transactions.length === 0}
+                      className={`text-white ${!isPaidUser ? 'bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]' : ''}`}
+                    >
+                      <FileSpreadsheet className="mr-2 h-4 w-4" />
+                      ODS
+                      {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
+                    </Button>
                    </div>
                    {!isPaidUser && (
                      <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
@@ -1760,7 +2008,7 @@ Analytics Summary:
               {/* Single File Download Buttons - Show after conversion */}
               {conversionResult && batchResults.length === 0 && (
                 <div className="text-center space-y-3">
-                  <div className="flex items-center justify-center gap-2 text-green-500">
+                  <div className="flex items-center justify-center gap-2 tone-excellent-text">
                     <CheckCircle className="h-5 w-5" />
                     <span className="font-medium">Conversion Complete!</span>
                   </div>
@@ -1768,7 +2016,7 @@ Analytics Summary:
                   <div className="flex flex-col sm:flex-row gap-2 justify-center">
                     <Button
                       size="lg"
-                      className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white"
+                      className="excel-button"
                       onClick={handleDownload}
                       disabled={downloading}
                     >
@@ -1789,6 +2037,7 @@ Analytics Summary:
                       variant="outline"
                       onClick={exportAsCSV}
                       disabled={transactions.length === 0}
+                      className="csv-button"
                     >
                       <FileText className="mr-2 h-5 w-5" />
                       CSV
@@ -1796,9 +2045,19 @@ Analytics Summary:
                     <Button
                       size="lg"
                       variant="outline"
+                      onClick={exportAsPDF}
+                      disabled={transactions.length === 0}
+                      className="text-white"
+                    >
+                      <FileText className="mr-2 h-5 w-5" />
+                      Analyzed PDF
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
                       onClick={() => handlePremiumExport('docx')}
                       disabled={transactions.length === 0}
-                      className={!isPaidUser ? 'opacity-70' : ''}
+                      className={`text-white ${!isPaidUser ? 'bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]' : ''}`}
                     >
                       <FileText className="mr-2 h-5 w-5" />
                       DOCX
@@ -1809,7 +2068,7 @@ Analytics Summary:
                       variant="outline"
                       onClick={() => handlePremiumExport('ods')}
                       disabled={transactions.length === 0}
-                      className={!isPaidUser ? 'opacity-70' : ''}
+                      className={`text-white ${!isPaidUser ? 'bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]' : ''}`}
                     >
                       <FileSpreadsheet className="mr-2 h-5 w-5" />
                       ODS
@@ -1885,12 +2144,12 @@ Analytics Summary:
                 <UnderwritingPanelSkeleton />
               )}
               {!converting && analytics?.underwriting && (
-                <UnderwritingPanel underwriting={analytics.underwriting} />
+                <UnderwritingPanel underwriting={analytics.underwriting} currencyCode={currencyCode} />
               )}
 
               {/* Risk Analysis & Fraud Detection Panel */}
               {analytics?.riskAnalysis && (
-                <FraudAlertPanel riskAnalysis={analytics.riskAnalysis} />
+                <FraudAlertPanel riskAnalysis={analytics.riskAnalysis} currencyCode={currencyCode} />
               )}
 
               {/* Analytics Summary */}
@@ -1902,43 +2161,43 @@ Analytics Summary:
                   </h3>
                   
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Card className="p-4 bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                        <TrendingUp className="w-4 h-4 text-green-500" />
+                    <Card className={`p-4 !bg-[#191919] ${toneClasses[creditTone].border}`}>
+                      <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[creditTone].text}`}>
+                        <TrendingUp className={`w-4 h-4 ${toneClasses[creditTone].text}`} />
                         Total Credits
                       </div>
-                      <p className="text-2xl font-bold text-green-500">
-                        ₹{analytics.totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <p className={`text-2xl font-bold ${toneClasses[creditTone].text}`}>
+                        {formatAmount(truncateDecimals(analytics.totalCredits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </Card>
                     
-                    <Card className="p-4 bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                        <TrendingDown className="w-4 h-4 text-red-500" />
+                    <Card className={`p-4 !bg-[#191919] ${toneClasses[debitTone].border}`}>
+                      <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[debitTone].text}`}>
+                        <TrendingDown className={`w-4 h-4 ${toneClasses[debitTone].text}`} />
                         Total Debits
                       </div>
-                      <p className="text-2xl font-bold text-red-500">
-                        ₹{analytics.totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <p className={`text-2xl font-bold ${toneClasses[debitTone].text}`}>
+                        {formatAmount(truncateDecimals(analytics.totalDebits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </Card>
                     
-                    <Card className={`p-4 bg-gradient-to-br ${analytics.netFlow >= 0 ? 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20' : 'from-orange-500/10 to-orange-500/5 border-orange-500/20'}`}>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                        {analytics.netFlow >= 0 ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-orange-500" />}
+                    <Card className={`p-4 !bg-[#191919] ${toneClasses[netFlowTone].border}`}>
+                      <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[netFlowTone].text}`}>
+                        {analytics.netFlow >= 0 ? <TrendingUp className={`w-4 h-4 ${toneClasses[netFlowTone].text}`} /> : <TrendingDown className={`w-4 h-4 ${toneClasses[netFlowTone].text}`} />}
                         Net Flow
                       </div>
-                      <p className={`text-2xl font-bold ${analytics.netFlow >= 0 ? 'text-emerald-500' : 'text-orange-500'}`}>
-                        {analytics.netFlow >= 0 ? '+' : ''}₹{analytics.netFlow.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <p className={`text-2xl font-bold ${toneClasses[netFlowTone].text}`}>
+                        {formatAmount(truncateDecimals(analytics.netFlow), { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'always' })}
                       </p>
                     </Card>
                     
                     {analytics.duplicateCount > 0 && (
-                      <Card className="p-4 bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                          <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                      <Card className="p-4 !bg-[#191919] border-orange-500/30">
+                        <div className="flex items-center gap-2 text-sm tone-moderate-text mb-1">
+                          <AlertTriangle className="w-4 h-4 tone-moderate-text" />
                           Duplicates Found
                         </div>
-                        <p className="text-2xl font-bold text-yellow-500">
+                        <p className="text-2xl font-bold tone-moderate-text">
                           {analytics.duplicateCount}
                         </p>
                       </Card>
@@ -1993,17 +2252,17 @@ Analytics Summary:
                     </div>
                   </div>
                   
-                  <Card className="overflow-hidden border-primary/20">
+                  <Card className="overflow-hidden !bg-[#191919] border-primary/20">
                     <div className="overflow-x-auto">
                       <ScrollArea className="h-[400px] min-w-[720px]">
                         <Table className="min-w-[720px]">
                         <TableHeader>
-                          <TableRow className="bg-muted/50">
+                          <TableRow className="bg-[#191919]">
                             <TableHead className="font-semibold">Date</TableHead>
                             <TableHead className="font-semibold">Description</TableHead>
                             <TableHead className="font-semibold">Category</TableHead>
-                            <TableHead className="font-semibold text-right">Debit</TableHead>
-                            <TableHead className="font-semibold text-right">Credit</TableHead>
+                            <TableHead className="font-semibold text-right tone-bad-text">Debit</TableHead>
+                            <TableHead className="font-semibold text-right tone-excellent-text">Credit</TableHead>
                             <TableHead className="font-semibold text-right">Balance</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -2029,10 +2288,10 @@ Analytics Summary:
                                   {transaction.balanceMismatch && (
                                     <Tooltip>
                                       <TooltipTrigger aria-label="Balance mismatch warning">
-                                        <ShieldAlert className="w-4 h-4 text-red-500" />
+                                        <ShieldAlert className="w-4 h-4 tone-bad-text" />
                                       </TooltipTrigger>
                                       <TooltipContent>
-                                        Balance mismatch! Expected: ₹{transaction.expectedBalance?.toLocaleString('en-IN')}
+                                        Balance mismatch! Expected: {transaction.expectedBalance == null ? 'N/A' : formatAmount(transaction.expectedBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                       </TooltipContent>
                                     </Tooltip>
                                   )}
@@ -2069,17 +2328,29 @@ Analytics Summary:
                                   {transaction.category}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-right font-semibold text-red-500">
-                                {transaction.debit > 0 ? `₹${transaction.debit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}
+                              <TableCell className="text-right">
+                                {transaction.debit > 0 ? (
+                                  <span className="inline-flex items-center justify-end rounded-md tone-bad-bg tone-bad-text px-2 py-0.5 font-semibold tabular-nums">
+                                    {formatAmount(transaction.debit, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
                               </TableCell>
-                              <TableCell className="text-right font-semibold text-green-500">
-                                {transaction.credit > 0 ? `₹${transaction.credit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-'}
+                              <TableCell className="text-right">
+                                {transaction.credit > 0 ? (
+                                  <span className="inline-flex items-center justify-end rounded-md tone-excellent-bg tone-excellent-text px-2 py-0.5 font-semibold tabular-nums">
+                                    {formatAmount(transaction.credit, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
                               </TableCell>
-                              <TableCell className={`text-right ${transaction.balanceMismatch ? 'text-red-500' : ''}`}>
-                                ₹{transaction.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              <TableCell className={`text-right ${transaction.balanceMismatch ? 'tone-bad-text' : ''}`}>
+                                {formatAmount(transaction.balance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 {transaction.balanceMismatch && transaction.expectedBalance && (
                                   <div className="text-xs text-muted-foreground">
-                                    Expected: ₹{transaction.expectedBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    Expected: {formatAmount(transaction.expectedBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </div>
                                 )}
                               </TableCell>
@@ -2121,7 +2392,7 @@ Analytics Summary:
 
                 <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-green-500/20">
                   <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <CheckCircle className="w-4 h-4 tone-excellent-text" />
                   </div>
                   <div className="space-y-1">
                     <p className="font-semibold text-sm">3. Download</p>
@@ -2191,5 +2462,6 @@ Analytics Summary:
     </section>
   );
 };
+
 
 

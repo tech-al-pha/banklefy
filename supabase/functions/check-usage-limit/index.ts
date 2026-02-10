@@ -67,13 +67,13 @@ const sanitizeError = (error: unknown): string => {
   return 'An unexpected error occurred. Please try again later.';
 };
 
-// Get client IP address securely (use rightmost IP in chain as it's most trusted)
+// Get client IP address (use leftmost IP in chain as original client)
 const getClientIp = (req: Request): string => {
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
-    // Get the rightmost IP (most trusted, added by our edge infrastructure)
+    // Use the leftmost IP (original client)
     const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
-    return ips[ips.length - 1] || 'unknown';
+    return ips[0] || 'unknown';
   }
   // Fallback to other headers
   return req.headers.get('cf-connecting-ip') || 

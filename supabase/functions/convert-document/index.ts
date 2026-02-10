@@ -148,7 +148,7 @@ const getClientIp = (req: Request): string => {
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
     const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
-    return ips[ips.length - 1] || 'unknown';
+    return ips[0] || 'unknown';
   }
   return req.headers.get('cf-connecting-ip') || 
          req.headers.get('x-real-ip') || 
@@ -376,7 +376,10 @@ Deno.serve(async (req) => {
 
     // Validate magic bytes
     const lowerFileName = fileName.toLowerCase();
-    if (lowerFileName.endsWith('.pdf')) {
+    const isPdf = lowerFileName.endsWith('.pdf');
+    const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
+    const pageCount = hasPdfPageImages ? (pdfPageImages as string[]).length : 1;
+    if (isPdf) {
       // If client provided page images, we might not have original PDF bytes.
       if (bytes.length > 0 && (bytes[0] !== 0x25 || bytes[1] !== 0x50 || bytes[2] !== 0x44 || bytes[3] !== 0x46)) {
         return new Response(
@@ -423,7 +426,7 @@ Deno.serve(async (req) => {
 
     const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
     const conversionsUsed = usageInfo?.conversions_used ?? 0;
-    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 6 : 2); // Default: 6 for users, 2 for anon
+    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 5 : 2); // Default: 5 for users, 2 for anon
 
     console.log('Usage info:', { conversionsUsed, conversionsLimit, user: !!user });
 
@@ -431,12 +434,17 @@ Deno.serve(async (req) => {
     const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
     console.log('Admin check:', { isAdmin, email: user?.email });
 
+    const isPaidUser = !!user && conversionsLimit > 5;
+    const usageEstimate = isPaidUser ? pageCount : 1;
+
     // Enforce limits (admin bypasses for simple PDFs)
-    if (!isAdmin && conversionsUsed >= conversionsLimit) {
+    if (!isAdmin && (conversionsUsed + usageEstimate) > conversionsLimit) {
       return new Response(
         JSON.stringify({
           error: user 
-            ? `You have reached your daily limit of ${conversionsLimit} conversions.`
+            ? (isPaidUser
+                ? `You have reached your usage limit of ${conversionsLimit}.`
+                : `You have reached your daily limit of ${conversionsLimit} conversions.`)
             : 'Free limit reached. Please sign up to continue.',
           status: 'anonymous_limit_reached',
           limitReached: true,
@@ -450,9 +458,6 @@ Deno.serve(async (req) => {
     // ============= PAGE LIMIT ENFORCEMENT =============
     // Check PDF page count for non-admin users
     // Each plan has specific page limits
-    const isPdf = lowerFileName.endsWith('.pdf');
-    const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
-    const pageCount = hasPdfPageImages ? (pdfPageImages as string[]).length : 1;
     
     // Plan page limits
     const planLimits: Record<string, number> = {
@@ -539,20 +544,6 @@ Deno.serve(async (req) => {
         console.error('Failed to create conversion record:', convError);
       } else {
         conversion = convData;
-        
-        // Update subscription pages_used_this_month (only if not special user)
-        if (!isSpecialUser) {
-          const { error: updateError } = await supabase
-            .from('subscriptions')
-            .update({ pages_used_this_month: totalPagesAfterConversion })
-            .eq('user_id', user.id);
-          
-          if (updateError) {
-            console.error('Failed to update pages used:', updateError);
-          } else {
-            console.log(`Updated pages used for user ${user.id}: ${totalPagesAfterConversion}/${userPlanLimit}`);
-          }
-        }
       }
     }
 
@@ -577,6 +568,7 @@ Deno.serve(async (req) => {
     // isPdf and hasPdfPageImages already defined above for page limit check
     // Track bank metadata across pages
     let collectedBankMetadata: BankMetadata | undefined;
+    let pagesWithData = 1;
 
     if (isPdf && hasPdfPageImages) {
       // Build a minimal status object consistent with ai-orchestrator
@@ -590,6 +582,7 @@ Deno.serve(async (req) => {
       const errors: string[] = [];
       const start = Date.now();
       const collected: RawTransaction[] = [];
+      pagesWithData = 0;
       let combinedText = '';
 
       for (const img of pdfPageImages as string[]) {
@@ -600,6 +593,7 @@ Deno.serve(async (req) => {
         const pageBase64 = match[2];
         const res = await callGroqVisionOCR(pageBase64, pageMime);
         if (res.success && res.transactions && res.transactions.length > 0) {
+          pagesWithData += 1;
           collected.push(...res.transactions);
           if (res.text) combinedText += (combinedText ? '\n' : '') + res.text;
           // Capture bank metadata from first page that has it
@@ -924,16 +918,34 @@ Deno.serve(async (req) => {
       patternFallback: categorizationResult.status.patternFallback,
     };
 
+    // Update monthly page usage based on pages that actually contained data
+    if (user && !isSpecialUser) {
+      const pagesToAdd = Math.max(1, pagesWithData);
+      const updatedPagesUsed = pagesUsedThisMonth + pagesToAdd;
+      const { error: updateError } = await supabase
+        .from('subscriptions')
+        .update({ pages_used_this_month: updatedPagesUsed })
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error('Failed to update pages used:', updateError);
+      } else {
+        console.log(`Updated pages used for user ${user.id}: ${updatedPagesUsed}/${userPlanLimit}`);
+      }
+    }
+
     // Increment usage count ONLY after successful conversion (prevents wasting credits/limit on failures)
+    const incrementBy = user ? (isPaidUser ? Math.max(1, pagesWithData) : 1) : 1;
     let remaining = conversionsLimit - conversionsUsed;
     const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
       p_ip_address: user ? null : ipAddress,
       p_user_id: user ? user.id : null,
+      p_increment: incrementBy,
     });
     if (incrementError) {
       console.error('Error incrementing usage after success:', incrementError);
     } else {
-      remaining = conversionsLimit - conversionsUsed - 1;
+      remaining = conversionsLimit - conversionsUsed - incrementBy;
     }
 
     return new Response(
@@ -943,6 +955,7 @@ Deno.serve(async (req) => {
         resultPath: resultPath,
         transactions: transactions,
         analytics: analytics,
+        bankInfo,
         // Always return excelData - storage upload may fail due to MIME restrictions
         excelData: excelBase64,
         message: 'Conversion completed successfully',

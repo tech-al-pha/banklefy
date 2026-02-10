@@ -137,7 +137,7 @@ const getClientIp = (req: Request): string => {
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
     const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
-    return ips[ips.length - 1] || 'unknown';
+    return ips[0] || 'unknown';
   }
   return req.headers.get('cf-connecting-ip') ||
          req.headers.get('x-real-ip') ||
@@ -222,6 +222,7 @@ type ProcessedStatement = {
   transactions: Transaction[];
   bankMetadata?: BankMetadata;
   excelBase64: string;
+  pagesWithData: number;
   totals: {
     totalCredits: number;
     totalDebits: number;
@@ -419,13 +420,14 @@ const processStatement = async (params: {
   bytes: Uint8Array;
   pdfPageImages?: string[];
   categoryCorrections?: Map<string, string>;
-}): Promise<{ transactions: Transaction[]; bankMetadata?: BankMetadata; excelBuffer: ArrayBuffer; totals: { totalCredits: number; totalDebits: number } }> => {
+}): Promise<{ transactions: Transaction[]; bankMetadata?: BankMetadata; excelBuffer: ArrayBuffer; totals: { totalCredits: number; totalDebits: number }; pagesWithData: number }> => {
   const lowerFileName = params.fileName.toLowerCase();
   const isPdf = lowerFileName.endsWith('.pdf');
   const hasPdfPageImages = Array.isArray(params.pdfPageImages) && params.pdfPageImages.length > 0;
 
   let extractionResult: Awaited<ReturnType<typeof performExtraction>>;
   let collectedBankMetadata: BankMetadata | undefined;
+  let pagesWithData = 1;
 
   if (isPdf && hasPdfPageImages) {
     const status: AIProcessingStatus = {
@@ -438,6 +440,7 @@ const processStatement = async (params: {
     const errors: string[] = [];
     const start = Date.now();
     const collected: RawTransaction[] = [];
+    pagesWithData = 0;
     let combinedText = '';
 
     for (const img of params.pdfPageImages as string[]) {
@@ -448,6 +451,7 @@ const processStatement = async (params: {
       const pageBase64 = match[2];
       const res = await callGroqVisionOCR(pageBase64, pageMime);
       if (res.success && res.transactions && res.transactions.length > 0) {
+        pagesWithData += 1;
         collected.push(...res.transactions);
         if (res.text) combinedText += (combinedText ? '\n' : '') + res.text;
         if (!collectedBankMetadata && res.bankMetadata) {
@@ -568,6 +572,7 @@ const processStatement = async (params: {
       totalCredits,
       totalDebits,
     },
+    pagesWithData: Math.max(1, pagesWithData),
   };
 };
 
@@ -705,14 +710,18 @@ Deno.serve(async (req) => {
 
     const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
     const conversionsUsed = usageInfo?.conversions_used ?? 0;
-    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 6 : 2);
+    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 5 : 2);
+    const isPaidUser = !!user && conversionsLimit > 5;
 
     const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
-    if (!isAdmin && conversionsUsed + files.length > conversionsLimit) {
+    const usageEstimate = isPaidUser ? totalPageCount : files.length;
+    if (!isAdmin && conversionsUsed + usageEstimate > conversionsLimit) {
       return new Response(
         JSON.stringify({
           error: user
-            ? `You have reached your daily limit of ${conversionsLimit} conversions.`
+            ? (isPaidUser
+                ? `You have reached your usage limit of ${conversionsLimit}.`
+                : `You have reached your daily limit of ${conversionsLimit} conversions.`)
             : 'Free limit reached. Please sign up to continue.',
           status: 'anonymous_limit_reached',
           limitReached: true,
@@ -769,19 +778,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update page usage once per batch
-    if (user && !isSpecialUser) {
-      const { error: updateError } = await supabase
-        .from('subscriptions')
-        .update({ pages_used_this_month: totalPagesAfterConversion })
-        .eq('user_id', user.id);
-
-      if (updateError) {
-        console.error('Failed to update pages used:', updateError);
-      }
-    }
-
-const categoryCorrections = await buildCategoryCorrections(supabaseAdmin as ReturnType<typeof createClient<unknown>>, user?.id);
+    const categoryCorrections = await buildCategoryCorrections(supabaseAdmin as ReturnType<typeof createClient<unknown>>, user?.id);
     const successes: ProcessedStatement[] = [];
     const failures: Array<{ fileName: string; error: string }> = [];
     const statementData: StatementData[] = [];
@@ -850,7 +847,7 @@ const categoryCorrections = await buildCategoryCorrections(supabaseAdmin as Retu
           }
         }
 
-        const { transactions, bankMetadata, excelBuffer, totals } = await processStatement({
+        const { transactions, bankMetadata, excelBuffer, totals, pagesWithData } = await processStatement({
           fileName: sanitizedName,
           bytes,
           pdfPageImages: file.pdfPageImages,
@@ -891,6 +888,7 @@ const categoryCorrections = await buildCategoryCorrections(supabaseAdmin as Retu
           transactions,
           bankMetadata,
           excelBase64,
+          pagesWithData,
           totals,
         });
 
@@ -960,18 +958,38 @@ const categoryCorrections = await buildCategoryCorrections(supabaseAdmin as Retu
       };
     }
 
-    // Increment usage count per successful statement
-    let remaining = conversionsLimit - conversionsUsed;
-    for (let i = 0; i < successes.length; i++) {
-      const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
-        p_ip_address: user ? null : ipAddress,
-        p_user_id: user ? user.id : null,
-      });
-      if (incrementError) {
-        console.error('Error incrementing usage after success:', incrementError);
+    const pagesWithDataTotal = successes.reduce((sum, s) => sum + (s.pagesWithData || 1), 0);
+
+    // Update page usage once per batch based on pages that actually contained data
+    if (user && !isSpecialUser) {
+      const updatedPagesUsed = pagesUsedThisMonth + pagesWithDataTotal;
+      const { error: updateError } = await supabase
+        .from('subscriptions')
+        .update({ pages_used_this_month: updatedPagesUsed })
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error('Failed to update pages used:', updateError);
+      } else {
+        console.log(`Updated pages used for user ${user.id}: ${updatedPagesUsed}/${userPlanLimit}`);
       }
     }
-    remaining = Math.max(0, conversionsLimit - conversionsUsed - successes.length);
+
+    // Increment usage count based on plan
+    const incrementBy = isPaidUser ? pagesWithDataTotal : successes.length;
+    let remaining = conversionsLimit - conversionsUsed;
+    const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
+      p_ip_address: user ? null : ipAddress,
+      p_user_id: user ? user.id : null,
+      p_increment: incrementBy,
+    });
+    if (incrementError) {
+      console.error('Error incrementing usage after success:', incrementError);
+    } else {
+      remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
+    }
+
+    const primaryBankInfo = successes.find((s) => s.bankMetadata)?.bankMetadata;
 
     return new Response(
       JSON.stringify({
@@ -981,6 +999,7 @@ const categoryCorrections = await buildCategoryCorrections(supabaseAdmin as Retu
             fileName: s.fileName,
             excelData: s.excelBase64,
             totals: s.totals,
+            bankInfo: s.bankMetadata,
           })),
           failures,
         },
@@ -992,6 +1011,7 @@ const categoryCorrections = await buildCategoryCorrections(supabaseAdmin as Retu
         // Include all transactions for export options
         transactions: successes.flatMap(s => s.transactions),
         planType: userPlanType,
+        bankInfo: primaryBankInfo,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

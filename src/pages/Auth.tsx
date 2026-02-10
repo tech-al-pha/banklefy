@@ -304,7 +304,7 @@ export default function Auth() {
       {/* Back button */}
       <button
         onClick={() => navigate('/')}
-        className="absolute top-6 left-6 z-20 flex items-center gap-2 text-muted-foreground transition-colors"
+        className="btn-glow absolute top-6 left-6 z-20 flex items-center gap-2 text-muted-foreground"
       >
         <ArrowLeft className="h-5 w-5" />
         <span>Back</span>
@@ -358,7 +358,7 @@ export default function Auth() {
               <button
                 type="button"
                 onClick={() => setMode('login')}
-                className="flex items-center justify-center w-full text-sm text-primary hover:underline"
+                className="text-glow-link no-hover-glow w-full justify-center text-sm text-primary"
                 disabled={loading}
               >
                 <ArrowLeft className="mr-1 h-4 w-4" />
@@ -508,7 +508,7 @@ export default function Auth() {
                   <button
                     type="button"
                     onClick={() => setMode('forgot')}
-                    className="text-sm text-muted-foreground hover:underline"
+                    className="text-glow-link no-hover-glow text-sm text-muted-foreground"
                     disabled={loading}
                   >
                     {t('auth.forgotPassword')}
@@ -529,7 +529,7 @@ export default function Auth() {
                       <button
                         type="button"
                         onClick={() => navigate('/terms')}
-                        className="text-primary hover:underline"
+                        className="text-glow-link no-hover-glow text-primary"
                         disabled={loading}
                       >
                         Terms &amp; Conditions
@@ -558,7 +558,7 @@ export default function Auth() {
                 <button
                   type="button"
                   onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-                  className="text-primary hover:underline"
+                  className="text-glow-link no-hover-glow text-primary"
                   disabled={loading}
                 >
                   {mode === 'login'

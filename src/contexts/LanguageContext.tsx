@@ -178,7 +178,7 @@ const translations: Record<Language, Record<string, string>> = {
       'Deterministic calculations: no hallucinations, no guessing — every number is computed with precision and can be explained.',
     'featuresPage.items.dailyLimits.title': 'DAILY RESET LIMITS',
     'featuresPage.items.dailyLimits.desc':
-      'Limits reset daily at midnight local time. Anonymous users get 2/day; registered users get 6/day.',
+      'Limits reset daily at midnight local time. Anonymous users get 2/day; registered users get 5/day.',
 
     'featuresPage.cta.title': 'Ready to Experience All Features?',
     'featuresPage.cta.desc':

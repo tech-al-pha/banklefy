@@ -74,7 +74,7 @@ const Terms = () => {
             <Button 
               variant="ghost" 
               onClick={() => navigate('/')} 
-              className="btn-glow text-primary gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
+              className="back-pill w-full sm:w-auto"
             >
               <ArrowLeft size={18} /> Back to Home
             </Button>
@@ -141,7 +141,7 @@ const Terms = () => {
           </p>
           <Button 
             size="lg" 
-            className="bg-primary text-primary-foreground shadow-neon"
+            className="back-pill"
             onClick={() => navigate('/')}
           >
             Back to Home

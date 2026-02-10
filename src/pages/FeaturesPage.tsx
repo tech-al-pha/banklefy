@@ -36,7 +36,7 @@ const FeaturesPage = () => {
           <Button 
             variant="ghost" 
             onClick={() => navigate('/')} 
-            className="btn-glow text-primary gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
+            className="back-pill w-full sm:w-auto"
           >
             <ArrowLeft size={18} /> Back to Home
           </Button>

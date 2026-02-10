@@ -92,7 +92,7 @@ export const UsageLimitBanner = ({
           variant="link"
           size="sm"
           onClick={() => navigate('/auth')}
-          className="text-primary p-0 h-auto font-medium w-full sm:w-auto justify-start sm:justify-center"
+          className="text-glow-link no-hover-glow text-primary p-0 h-auto font-medium w-full sm:w-auto justify-start sm:justify-center"
         >
           Sign up for more →
         </Button>

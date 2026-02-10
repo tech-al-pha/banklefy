@@ -53,7 +53,7 @@ export default function SampleReport() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Button
             variant="ghost"
-            className="btn-glow text-muted-foreground"
+            className="back-pill"
             onClick={() => navigate("/")}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />

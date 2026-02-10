@@ -355,7 +355,7 @@ const PricingPage = () => {
           <Button
             variant="ghost"
             onClick={() => navigate("/")}
-            className="btn-glow text-primary gap-2 font-bold uppercase tracking-tighter w-full sm:w-auto"
+            className="back-pill w-full sm:w-auto"
           >
             Back to Home
           </Button>

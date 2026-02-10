@@ -240,7 +240,7 @@ const Dashboard = () => {
                               size="sm"
                               onClick={() => downloadExcel(conversion)}
                               disabled={downloadingId === conversion.id}
-                              className="bg-green-600"
+                              className="excel-button"
                             >
                               {downloadingId === conversion.id ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

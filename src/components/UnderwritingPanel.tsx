@@ -21,6 +21,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatCurrencyValue } from "@/lib/currency";
 import {
   Accordion,
   AccordionContent,
@@ -71,46 +72,47 @@ interface UnderwritingAnalysis {
 
 interface UnderwritingPanelProps {
   underwriting: UnderwritingAnalysis;
+  currencyCode?: string;
 }
 
 const statusConfig = {
   excellent: { 
-    bg: 'bg-emerald-500/10', 
-    border: 'border-emerald-500/30', 
-    text: 'text-emerald-500',
+    bg: 'tone-excellent-bg', 
+    border: 'tone-excellent-border', 
+    text: 'tone-excellent-text',
     icon: CheckCircle2,
   },
   good: { 
-    bg: 'bg-green-500/10', 
-    border: 'border-green-500/30', 
-    text: 'text-green-500',
+    bg: 'tone-good-bg', 
+    border: 'tone-good-border', 
+    text: 'tone-good-text',
     icon: CheckCircle2,
   },
   moderate: { 
-    bg: 'bg-yellow-500/10', 
-    border: 'border-yellow-500/30', 
-    text: 'text-yellow-500',
+    bg: 'tone-moderate-bg', 
+    border: 'tone-moderate-border', 
+    text: 'tone-moderate-text',
     icon: AlertTriangle,
   },
   poor: { 
-    bg: 'bg-orange-500/10', 
-    border: 'border-orange-500/30', 
-    text: 'text-orange-500',
+    bg: 'tone-moderate-bg', 
+    border: 'tone-moderate-border', 
+    text: 'tone-moderate-text',
     icon: AlertTriangle,
   },
   ineligible: { 
-    bg: 'bg-red-500/10', 
-    border: 'border-red-500/30', 
-    text: 'text-red-500',
+    bg: 'tone-bad-bg', 
+    border: 'tone-bad-border', 
+    text: 'tone-bad-text',
     icon: XCircle,
   },
 };
 
 const foirColors = {
-  excellent: 'text-emerald-500',
-  good: 'text-green-500',
-  moderate: 'text-yellow-500',
-  high: 'text-red-500',
+  excellent: 'tone-excellent-text',
+  good: 'tone-good-text',
+  moderate: 'tone-moderate-text',
+  high: 'tone-bad-text',
 };
 
 const loanTypeIcons: Record<string, React.ReactNode> = {
@@ -123,7 +125,7 @@ const loanTypeIcons: Record<string, React.ReactNode> = {
   'Unknown': <CircleDollarSign className="w-4 h-4" />,
 };
 
-export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
+export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPanelProps) => {
   // Guard against undefined/partial data to prevent toLocaleString crashes
   const summary = underwriting?.summary ?? {
     avgMonthlyIncome: 0,
@@ -150,16 +152,45 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
   // Calculate FOIR progress (0-100, where lower is better)
   const foirScore = summary.foirScore ?? 0;
   const foirProgress = Math.min(100, foirScore);
-  const foirProgressColor = foirScore <= 30 ? 'bg-emerald-500' : 
-                            foirScore <= 50 ? 'bg-green-500' : 
-                            foirScore <= 65 ? 'bg-yellow-500' : 'bg-red-500';
+  const foirTone =
+    foirScore <= 30 ? 'excellent' :
+    foirScore <= 50 ? 'good' :
+    foirScore <= 65 ? 'moderate' : 'ineligible';
+  const foirProgressColor =
+    foirScore <= 30 ? 'tone-excellent-fill' :
+    foirScore <= 50 ? 'tone-good-fill' :
+    foirScore <= 65 ? 'tone-moderate-fill' : 'tone-bad-fill';
+  const incomeTone =
+    (summary.avgMonthlyIncome ?? 0) <= 0
+      ? 'ineligible'
+      : (summary.avgMonthlyEMI ?? 0) <= 0
+        ? 'excellent'
+        : foirTone;
+  const emiTone =
+    (summary.avgMonthlyEMI ?? 0) <= 0
+      ? 'excellent'
+      : foirTone;
+  const eligibilityTone =
+    eligibility.status === 'excellent'
+      ? 'excellent'
+      : eligibility.status === 'good'
+        ? 'good'
+        : eligibility.status === 'moderate'
+          ? 'moderate'
+          : eligibility.status === 'poor'
+            ? 'poor'
+            : 'ineligible';
+  const formatAmount = (
+    value: number,
+    options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
+  ) => formatCurrencyValue(value ?? 0, currencyCode, options);
 
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Wallet className="w-5 h-5 text-primary" />
+          <Wallet className={`w-5 h-5 ${statusConfig[eligibilityTone].text}`} />
           FOIR & Loan Eligibility Analysis
         </h3>
         <Badge variant="outline" className={`${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border} ${statusConfig[eligibility.status].text}`}>
@@ -168,7 +199,7 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
       </div>
 
       {/* Eligibility Summary Card */}
-      <Card className={`p-4 ${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border}`}>
+      <Card className={`p-4 !bg-[#191919] ${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border}`}>
         <div className="flex items-start gap-3">
           <StatusIcon className={`w-6 h-6 ${statusConfig[eligibility.status].text} flex-shrink-0 mt-0.5`} />
           <div className="flex-1">
@@ -191,10 +222,10 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* FOIR Score */}
-        <Card className="p-3">
+        <Card className="p-3 !bg-[#191919] card-hover-glow">
           <Tooltip>
-            <TooltipTrigger className="w-full text-left">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+            <TooltipTrigger className="w-full text-left no-hover-glow">
+              <div className="flex items-center gap-2 text-xs label-muted mb-2">
                 <BadgePercent className="w-3 h-3" />
                 FOIR Score
               </div>
@@ -221,13 +252,13 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
         </Card>
 
         {/* Monthly Income */}
-        <Card className="p-3 bg-green-500/5 border-green-500/20">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-            <TrendingUp className="w-3 h-3 text-green-500" />
+        <Card className={`p-3 !bg-[#191919] card-hover-glow ${statusConfig[incomeTone].border}`}>
+          <div className="flex items-center gap-2 text-xs label-muted mb-1">
+            <TrendingUp className={`w-3 h-3 ${statusConfig[incomeTone].text}`} />
             Avg Monthly Income
           </div>
-          <p className="text-lg font-bold text-green-500">
-            ₹{(summary.avgMonthlyIncome ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+          <p className={`text-lg font-bold ${statusConfig[incomeTone].text}`}>
+            {formatAmount(summary.avgMonthlyIncome ?? 0, { maximumFractionDigits: 0 })}
           </p>
           <p className="text-xs text-muted-foreground">
             {summary.totalSalaryDetected ?? 0} salary credit(s)
@@ -235,13 +266,13 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
         </Card>
 
         {/* Monthly EMI */}
-        <Card className="p-3 bg-orange-500/5 border-orange-500/20">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-            <TrendingDown className="w-3 h-3 text-orange-500" />
+        <Card className={`p-3 !bg-[#191919] card-hover-glow ${statusConfig[emiTone].border}`}>
+          <div className="flex items-center gap-2 text-xs label-muted mb-1">
+            <TrendingDown className={`w-3 h-3 ${statusConfig[emiTone].text}`} />
             Avg Monthly EMI
           </div>
-          <p className="text-lg font-bold text-orange-500">
-            ₹{(summary.avgMonthlyEMI ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+          <p className={`text-lg font-bold ${statusConfig[emiTone].text}`}>
+            {formatAmount(summary.avgMonthlyEMI ?? 0, { maximumFractionDigits: 0 })}
           </p>
           <p className="text-xs text-muted-foreground">
             {summary.totalEMIDetected ?? 0} EMI debit(s)
@@ -249,23 +280,23 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
         </Card>
 
         {/* Loan Eligibility */}
-        <Card className="p-3 bg-primary/5 border-primary/20">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-            <CircleDollarSign className="w-3 h-3 text-primary" />
+        <Card className={`p-3 !bg-[#191919] card-hover-glow ${statusConfig[eligibilityTone].border}`}>
+          <div className="flex items-center gap-2 text-xs label-muted mb-1">
+            <CircleDollarSign className={`w-3 h-3 ${statusConfig[eligibilityTone].text}`} />
             Est. Loan Eligibility
           </div>
-          <p className="text-lg font-bold text-primary">
-            ₹{(eligibility.estimatedLoanEligibility ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+          <p className={`text-lg font-bold ${statusConfig[eligibilityTone].text}`}>
+            {formatAmount(eligibility.estimatedLoanEligibility ?? 0, { maximumFractionDigits: 0 })}
           </p>
           <p className="text-xs text-muted-foreground">
-            Max new EMI: ₹{(eligibility.maxNewEMI ?? 0).toLocaleString('en-IN')}
+            Max new EMI: {formatAmount(eligibility.maxNewEMI ?? 0)}
           </p>
         </Card>
       </div>
 
       {/* EMI Breakdown by Loan Type */}
       {Object.keys(summary.emiByLoanType).length > 0 && (
-        <Card className="p-4">
+        <Card className="p-4 !bg-[#191919]">
           <h4 className="font-medium mb-3 flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-muted-foreground" />
             EMI Breakdown by Loan Type
@@ -282,7 +313,7 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
                 <div className="flex-1">
                   <p className="text-sm font-medium">{type}</p>
                   <p className="text-xs text-muted-foreground">
-                    {data?.count ?? 0}x • ₹{(data?.totalAmount ?? 0).toLocaleString('en-IN')}
+                    {data?.count ?? 0}x • {formatAmount(data?.totalAmount ?? 0)}
                   </p>
                 </div>
               </div>
@@ -295,23 +326,23 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
       <Accordion type="single" collapsible className="space-y-2">
         {/* Salary Credits */}
         {salaryCredits.length > 0 && (
-          <AccordionItem value="salaries" className="border rounded-lg px-4">
-            <AccordionTrigger className="hover:no-underline py-3">
+          <AccordionItem value="salaries" className="border rounded-lg px-4 bg-[#191919] card-hover-glow">
+            <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-green-500" />
+                <TrendingUp className={`w-4 h-4 ${statusConfig.excellent.text}`} />
                 <span>Salary Credits Detected ({salaryCredits.length})</span>
               </div>
             </AccordionTrigger>
             <AccordionContent className="pb-4">
               <div className="space-y-2">
                 {salaryCredits.map((s, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm p-2 rounded bg-green-500/5">
+                  <div key={i} className="flex justify-between items-center text-sm p-2 rounded tone-excellent-bg">
                     <div>
                       <p className="font-medium">{s.description}</p>
                       <p className="text-xs text-muted-foreground">{s.date}</p>
                     </div>
-                    <p className="font-medium text-green-500">
-                      +₹{(s.amount ?? 0).toLocaleString('en-IN')}
+                    <p className={`font-medium ${statusConfig.excellent.text}`}>
+                      {formatAmount(s.amount ?? 0, { signDisplay: 'always' })}
                     </p>
                   </div>
                 ))}
@@ -322,17 +353,17 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
 
         {/* EMI Debits */}
         {emiDebits.length > 0 && (
-          <AccordionItem value="emis" className="border rounded-lg px-4">
-            <AccordionTrigger className="hover:no-underline py-3">
+          <AccordionItem value="emis" className="border rounded-lg px-4 bg-[#191919] card-hover-glow">
+            <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
               <div className="flex items-center gap-2">
-                <TrendingDown className="w-4 h-4 text-orange-500" />
+                <TrendingDown className={`w-4 h-4 ${statusConfig[emiTone].text}`} />
                 <span>EMI/Loan Debits Detected ({emiDebits.length})</span>
               </div>
             </AccordionTrigger>
             <AccordionContent className="pb-4">
               <div className="space-y-2">
                 {emiDebits.map((e, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm p-2 rounded bg-orange-500/5">
+                  <div key={i} className={`flex justify-between items-center text-sm p-2 rounded ${statusConfig[emiTone].bg}`}>
                     <div>
                       <p className="font-medium">{e.description}</p>
                       <div className="flex items-center gap-2">
@@ -342,8 +373,8 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
                         <span className="text-xs text-muted-foreground">{e.date}</span>
                       </div>
                     </div>
-                    <p className="font-medium text-orange-500">
-                      -₹{(e.amount ?? 0).toLocaleString('en-IN')}
+                    <p className={`font-medium ${statusConfig[emiTone].text}`}>
+                      {formatAmount(-(e.amount ?? 0), { signDisplay: 'always' })}
                     </p>
                   </div>
                 ))}
@@ -354,10 +385,10 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
 
         {/* Monthly Breakdown */}
         {monthlyBreakdown.length > 0 && (
-          <AccordionItem value="monthly" className="border rounded-lg px-4">
-            <AccordionTrigger className="hover:no-underline py-3">
+          <AccordionItem value="monthly" className="border rounded-lg px-4 bg-[#191919] card-hover-glow">
+            <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
               <div className="flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-primary" />
+                <Wallet className={`w-4 h-4 ${statusConfig[incomeTone].text}`} />
                 <span>Monthly Income vs EMI ({monthlyBreakdown.length} months)</span>
               </div>
             </AccordionTrigger>
@@ -367,11 +398,11 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
                   <div key={i} className="flex justify-between items-center text-sm p-2 rounded bg-muted/30">
                     <span className="font-medium">{m.month}</span>
                     <div className="flex items-center gap-4">
-                      <span className="text-green-500">
-                        +₹{(m.salaryIncome ?? 0).toLocaleString('en-IN')}
+                      <span className={statusConfig[incomeTone].text}>
+                        {formatAmount(m.salaryIncome ?? 0, { signDisplay: 'always' })}
                       </span>
-                      <span className="text-orange-500">
-                        -₹{(m.emiOutflow ?? 0).toLocaleString('en-IN')}
+                      <span className={statusConfig[emiTone].text}>
+                        {formatAmount(-(m.emiOutflow ?? 0), { signDisplay: 'always' })}
                       </span>
                     </div>
                   </div>
@@ -384,11 +415,11 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
 
       {/* No Data Message */}
       {salaryCredits.length === 0 && emiDebits.length === 0 && (
-        <Card className="p-4 border-yellow-500/20 bg-yellow-500/5">
+        <Card className="p-4 !bg-[#191919] tone-moderate-border">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-500" />
+            <AlertTriangle className="w-5 h-5 tone-moderate-text" />
             <div>
-              <p className="font-medium text-yellow-500">Limited Financial Data</p>
+              <p className="font-medium tone-moderate-text">Limited Financial Data</p>
               <p className="text-sm text-muted-foreground">
                 No clear salary or EMI patterns detected. This may affect underwriting accuracy.
               </p>
@@ -399,3 +430,4 @@ export const UnderwritingPanel = ({ underwriting }: UnderwritingPanelProps) => {
     </div>
   );
 };
+
