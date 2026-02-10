@@ -469,7 +469,7 @@ export default function Auth() {
                         setEmail('');
                         setMode('signup');
                       }}
-                      className="text-xs text-muted-foreground hover:underline"
+                      className="text-glow-link no-hover-glow text-xs"
                     >
                       Not you? Use a different account
                     </button>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRequireAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import Logo from "@/components/Logo";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,22 +23,22 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { 
-  Search, 
-  User, 
-  Shield, 
+import {
+  Search,
+  Shield,
   HelpCircle,
   FileText,
   BarChart3,
   Settings as SettingsIcon,
-  Mail,
-  Lock,
   Eye,
   Download,
   Trash2,
   LogOut,
-  Save,
-  Loader2
+  Loader2,
+  Bell,
+  Palette,
+  MonitorSmartphone,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -56,42 +58,15 @@ const Settings = () => {
   const { toast } = useToast();
   const { conversionsUsed, conversionsLimit, remaining, isAuthenticated } = useUsageLimit();
   const {
+    settings,
     loading: settingsLoading,
     saving,
-    profileData,
-    updateProfile,
-    sendPasswordReset,
+    updateSetting,
     exportUserData,
     deleteAccount,
   } = useSettings();
   
   const [searchQuery, setSearchQuery] = useState("");
-  // Use profileData from Supabase, fallback to auth metadata
-  const [displayName, setDisplayName] = useState("");
-  const [nameChanged, setNameChanged] = useState(false);
-
-  // Initialize display name from Supabase profile or auth metadata
-  useEffect(() => {
-    const name = profileData?.full_name || user?.user_metadata?.full_name || "";
-    setDisplayName(name);
-  }, [profileData, user]);
-
-  // Handle display name change
-  const handleNameChange = useCallback((value: string) => {
-    setDisplayName(value);
-    setNameChanged(value !== (user?.user_metadata?.full_name || ""));
-  }, [user]);
-
-  const handleSaveName = useCallback(async () => {
-    await updateProfile(displayName);
-    setNameChanged(false);
-  }, [displayName, updateProfile]);
-
-  const handlePasswordReset = useCallback(async () => {
-    if (user?.email) {
-      await sendPasswordReset(user.email);
-    }
-  }, [user, sendPasswordReset]);
 
   const handleExportData = useCallback(async () => {
     if (user?.id) {
@@ -104,64 +79,6 @@ const Settings = () => {
   }, [deleteAccount]);
 
   const settingItems: SettingItem[] = useMemo(() => [
-    // Profile Settings
-    {
-      id: "profile-email",
-      title: t('settings.profile.email'),
-      description: t('settings.profile.emailDesc'),
-      category: "profile",
-      icon: <Mail className="h-5 w-5" />,
-      component: (
-        <div className="flex items-center gap-4">
-          <span className="text-muted-foreground">{user?.email || "—"}</span>
-          <Badge variant="secondary">{t('settings.verified')}</Badge>
-        </div>
-      )
-    },
-    {
-      id: "profile-name",
-      title: t('settings.profile.name'),
-      description: t('settings.profile.nameDesc'),
-      category: "profile",
-      icon: <User className="h-5 w-5" />,
-      component: (
-        <div className="flex items-center gap-2">
-          <Input 
-            placeholder={t('settings.profile.namePlaceholder')}
-            className="max-w-xs bg-background/50"
-            value={displayName}
-            onChange={(e) => handleNameChange(e.target.value)}
-          />
-          {nameChanged && (
-            <Button 
-              size="sm" 
-              onClick={handleSaveName}
-              disabled={saving}
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            </Button>
-          )}
-        </div>
-      )
-    },
-    {
-      id: "profile-password",
-      title: t('settings.profile.password'),
-      description: t('settings.profile.passwordDesc'),
-      category: "profile",
-      icon: <Lock className="h-5 w-5" />,
-      component: (
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handlePasswordReset}
-          disabled={saving}
-        >
-          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-          {t('settings.profile.changePassword')}
-        </Button>
-      )
-    },
     // Usage & Billing
     {
       id: "usage-stats",
@@ -203,6 +120,82 @@ const Settings = () => {
             {t('settings.usage.upgrade')}
           </Button>
         </div>
+      )
+    },
+    // Notifications
+    {
+      id: "notifications-email",
+      title: t('settings.notifications.email'),
+      description: t('settings.notifications.emailDesc'),
+      category: "notifications",
+      icon: <Bell className="h-5 w-5" />,
+      component: (
+        <Switch
+          checked={settings.emailNotifications}
+          onCheckedChange={(value) => updateSetting('emailNotifications', value)}
+        />
+      )
+    },
+    {
+      id: "notifications-push",
+      title: t('settings.notifications.push'),
+      description: t('settings.notifications.pushDesc'),
+      category: "notifications",
+      icon: <Bell className="h-5 w-5" />,
+      component: (
+        <Switch
+          checked={settings.pushNotifications}
+          onCheckedChange={(value) => updateSetting('pushNotifications', value)}
+        />
+      )
+    },
+    {
+      id: "notifications-sound",
+      title: t('settings.notifications.sound'),
+      description: t('settings.notifications.soundDesc'),
+      category: "notifications",
+      icon: <Bell className="h-5 w-5" />,
+      component: (
+        <Switch
+          checked={settings.soundEnabled}
+          onCheckedChange={(value) => updateSetting('soundEnabled', value)}
+        />
+      )
+    },
+    // Appearance
+    {
+      id: "appearance-theme",
+      title: t('settings.appearance.theme'),
+      description: t('settings.appearance.themeDesc'),
+      category: "appearance",
+      icon: <Palette className="h-5 w-5" />,
+      component: (
+        <Switch
+          checked={settings.darkMode}
+          onCheckedChange={(value) => updateSetting('darkMode', value)}
+        />
+      )
+    },
+    {
+      id: "appearance-language",
+      title: t('settings.appearance.language'),
+      description: t('settings.appearance.languageDesc'),
+      category: "appearance",
+      icon: <MonitorSmartphone className="h-5 w-5" />,
+      component: <LanguageSelector />
+    },
+    // Advanced
+    {
+      id: "advanced-auto-download",
+      title: t('settings.advanced.autoDownload'),
+      description: t('settings.advanced.autoDownloadDesc'),
+      category: "advanced",
+      icon: <SlidersHorizontal className="h-5 w-5" />,
+      component: (
+        <Switch
+          checked={settings.autoDownload}
+          onCheckedChange={(value) => updateSetting('autoDownload', value)}
+        />
       )
     },
     // Privacy & Security
@@ -270,13 +263,27 @@ const Settings = () => {
         </AlertDialog>
       )
     },
-  ], [user, conversionsUsed, conversionsLimit, remaining, isAuthenticated, displayName, nameChanged, saving, t, toast, handleNameChange, handleSaveName, handlePasswordReset, handleExportData, handleDeleteAccount]);
+  ], [
+    conversionsUsed,
+    conversionsLimit,
+    remaining,
+    isAuthenticated,
+    saving,
+    settings,
+    t,
+    toast,
+    updateSetting,
+    handleExportData,
+    handleDeleteAccount,
+  ]);
 
   const categories = [
     { id: "all", label: t('settings.categories.all'), icon: <SettingsIcon className="h-4 w-4" /> },
-    { id: "profile", label: t('settings.categories.profile'), icon: <User className="h-4 w-4" /> },
     { id: "usage", label: t('settings.categories.usage'), icon: <BarChart3 className="h-4 w-4" /> },
+    { id: "notifications", label: t('settings.categories.notifications'), icon: <Bell className="h-4 w-4" /> },
+    { id: "appearance", label: t('settings.categories.appearance'), icon: <Palette className="h-4 w-4" /> },
     { id: "privacy", label: t('settings.categories.privacy'), icon: <Shield className="h-4 w-4" /> },
+    { id: "advanced", label: t('settings.categories.advanced'), icon: <SlidersHorizontal className="h-4 w-4" /> },
   ];
 
   const filteredSettings = useMemo(() => {
@@ -417,3 +424,11 @@ const Settings = () => {
 };
 
 export default Settings;
+
+
+
+
+
+
+
+

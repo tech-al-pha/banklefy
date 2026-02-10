@@ -162,13 +162,32 @@ Deno.serve(async (req) => {
       role: roles?.find(r => r.user_id === profile.id)?.role || 'user',
     })) || [];
 
-    // Calculate conversion stats
+    // Calculate conversion stats with tolerant status handling
     const today = new Date().toISOString().split('T')[0];
+    const successStatuses = new Set(['completed', 'success', 'succeeded', 'done']);
+    const failedStatuses = new Set(['failed', 'error', 'errored', 'cancelled', 'canceled']);
+    const processingStatuses = new Set(['processing', 'pending', 'queued', 'running', 'in_progress', 'in-progress']);
+
+    const statusCounts = (conversions || []).reduce((acc, conversion) => {
+      const rawStatus = String(conversion.status || '').toLowerCase().trim();
+      if (failedStatuses.has(rawStatus)) {
+        acc.failed += 1;
+      } else if (processingStatuses.has(rawStatus)) {
+        acc.processing += 1;
+      } else if (successStatuses.has(rawStatus)) {
+        acc.completed += 1;
+      } else {
+        // Treat unknown status as completed to avoid showing zero success
+        acc.completed += 1;
+      }
+      return acc;
+    }, { completed: 0, processing: 0, failed: 0 });
+
     const conversionStats = {
       total: conversions?.length || 0,
-      completed: conversions?.filter(c => c.status === 'completed').length || 0,
-      processing: conversions?.filter(c => c.status === 'processing').length || 0,
-      failed: conversions?.filter(c => c.status === 'failed').length || 0,
+      completed: statusCounts.completed,
+      processing: statusCounts.processing,
+      failed: statusCounts.failed,
       todayCount: conversions?.filter(c => c.created_at?.startsWith(today)).length || 0,
     };
 

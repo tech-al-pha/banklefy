@@ -38,6 +38,11 @@ const Terms = () => {
       content: "Some features may require payment. Prices and plans may change over time. Refunds, if any, are handled per our policies or as required by law.",
     },
     {
+      icon: AlertCircle,
+      title: "Refunds & Abuse Prevention",
+      content: "Approved refunds are processed within 14 days. Refunds are not available if 35% or more of the plan usage has been consumed. Repeated refund requests may result in IP blocking to prevent abuse.",
+    },
+    {
       icon: Shield,
       title: "Third-Party Services",
       content: "We rely on third-party providers (such as Supabase, reCAPTCHA, and Razorpay) to operate the service. Your use of those services may be subject to their terms and privacy policies.",

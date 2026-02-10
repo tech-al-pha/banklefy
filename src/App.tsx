@@ -26,6 +26,7 @@ const PricingPage = lazyWithRetry(() => import("./pages/PricingPage"));
 const SampleReport = lazyWithRetry(() => import("./pages/SampleReport"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const Help = lazyWithRetry(() => import("./pages/Help"));
+const Blog = lazyWithRetry(() => import("./pages/Blog"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -95,6 +96,10 @@ const AppRoutes = () => {
         title: "Help Center | Akromeda",
         description:
           "Get help with supported formats, password-protected PDFs, daily limits, and refund requests.",
+      },
+      "/blog": {
+        title: "Blog | Akromeda",
+        description: "Product updates, tutorials, and announcements from Akromeda.",
       },
       "/admin": {
         title: "Admin Console | Akromeda",
@@ -166,6 +171,7 @@ const AppRoutes = () => {
           <Route path="/settings" element={<Settings />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/blog" element={<Blog />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

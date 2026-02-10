@@ -55,7 +55,9 @@ const Index = () => {
       >
         <div className="container mx-auto px-4 sm:px-6 py-1.5 sm:py-2.5">
           <div className="flex items-center justify-between">
-          <Logo />
+          <div className="ml-6 sm:ml-8">
+            <Logo />
+          </div>
           <div className="hidden lg:flex items-center gap-3">
               
               {/* Pricing Button */}
@@ -85,27 +87,30 @@ const Index = () => {
                 className="text-glow-link text-xs font-medium"
               >
                 <Sparkles className="h-3 w-3" />
-                {t('nav.features')}
+                <span>{t('nav.features')}</span>
               </button>
 
-              {/* Chat Aura Button */}
-              <button
-                type="button"
-                onClick={() => navigate('/chat')}
-                className="text-glow-link text-xs font-medium"
-              >
-                <MessageCircle className="h-3 w-3" />
-                {t('nav.chatAura')}
-              </button>
+              {user && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/chat')}
+                  className="text-glow-link text-xs font-medium"
+                >
+                  <MessageCircle className="h-3 w-3" />
+                  <span>{t('nav.chatAura')}</span>
+                </button>
+              )}
 
-              <button
-                type="button"
-                onClick={() => navigate('/settings')}
-                className="text-glow-link text-xs font-medium"
-              >
-                <Settings className="h-3 w-3" />
-                {t('nav.settings')}
-              </button>
+              {user && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/settings')}
+                  className="text-glow-link text-xs font-medium"
+                >
+                  <Settings className="h-3 w-3" />
+                  <span>{t('nav.settings')}</span>
+                </button>
+              )}
 
               {isAdmin && (
                 <button
@@ -114,7 +119,7 @@ const Index = () => {
                   className="text-glow-link text-xs font-medium"
                 >
                   <Shield className="h-3 w-3" />
-                  {t('nav.admin')}
+                  <span>{t('nav.admin')}</span>
                 </button>
               )}
 
@@ -196,27 +201,31 @@ const Index = () => {
                       </Button>
                     </SheetClose>
 
-                    <SheetClose asChild>
-                      <Button
-                        variant="ghost"
-                        className="justify-start gap-2 text-muted-foreground"
-                        onClick={() => navigate('/chat')}
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                        {t('nav.chatAura')}
-                      </Button>
-                    </SheetClose>
+                    {user && (
+                      <SheetClose asChild>
+                        <Button
+                          variant="ghost"
+                          className="justify-start gap-2 text-muted-foreground"
+                          onClick={() => navigate('/chat')}
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          {t('nav.chatAura')}
+                        </Button>
+                      </SheetClose>
+                    )}
 
-                    <SheetClose asChild>
-                      <Button
-                        variant="ghost"
-                        className="justify-start gap-2 text-muted-foreground"
-                        onClick={() => navigate('/settings')}
-                      >
-                        <Settings className="h-4 w-4" />
-                        {t('nav.settings')}
-                      </Button>
-                    </SheetClose>
+                    {user && (
+                      <SheetClose asChild>
+                        <Button
+                          variant="ghost"
+                          className="justify-start gap-2 text-muted-foreground"
+                          onClick={() => navigate('/settings')}
+                        >
+                          <Settings className="h-4 w-4" />
+                          {t('nav.settings')}
+                        </Button>
+                      </SheetClose>
+                    )}
 
                     {isAdmin && (
                       <SheetClose asChild>
@@ -288,13 +297,20 @@ const Index = () => {
                       {t('footer.features')}
                     </button>
                   </li>
-                  <li><a href="#demo" className="text-glow-link">{t('footer.howItWorks')}</a></li>
                   <li>
                     <button
                       onClick={() => navigate('/help')}
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.helpCenter')}
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => navigate('/blog')}
+                      className="text-glow-link text-left font-medium"
+                    >
+                      {t('footer.blog')}
                     </button>
                   </li>
                 </ul>

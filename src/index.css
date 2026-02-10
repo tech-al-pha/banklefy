@@ -58,6 +58,25 @@
     cursor: none;
   }
 
+  html {
+    color-scheme: dark;
+  }
+
+  input,
+  textarea,
+  select {
+    color: var(--text-primary);
+    background-color: rgba(20, 20, 20, 0.92);
+    color-scheme: dark;
+    caret-color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: rgba(255, 255, 255, 0.45);
+  }
+
   html,
   body,
   * {
@@ -119,7 +138,6 @@
   input,
   textarea {
     font: inherit;
-    color: inherit;
   }
 
   /* Hard-hide reCAPTCHA badge + iframe + all injected elements */
@@ -234,11 +252,7 @@
   }
 
   .btn-glow:hover:not(:disabled),
-  .btn-glow:focus-visible:not(:disabled),
-  button:hover:not(:disabled):not(.text-glow-link):not(.no-hover-glow),
-  button:focus-visible:not(:disabled):not(.text-glow-link):not(.no-hover-glow),
-  [role="button"]:hover:not([aria-disabled="true"]):not(.text-glow-link):not(.no-hover-glow),
-  [role="button"]:focus-visible:not([aria-disabled="true"]):not(.text-glow-link):not(.no-hover-glow) {
+  .btn-glow:focus-visible:not(:disabled) {
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.08),
       0 0 16px rgba(255, 255, 255, 0.2);
@@ -355,6 +369,7 @@
     border: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
+    outline: none !important;
     color: var(--text-muted);
     text-decoration: none !important;
     transition: color 200ms ease, text-shadow 200ms ease, filter 200ms ease;
@@ -367,19 +382,38 @@
   .text-glow-link:hover,
   .text-glow-link:focus-visible {
     color: var(--text-primary);
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.25);
+    text-shadow: 0 0 4px rgba(255, 255, 255, 0.25);
     box-shadow: none !important;
     filter: none;
+    outline: none !important;
   }
 
   .text-glow-link:hover span,
   .text-glow-link:focus-visible span {
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+    text-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus,
+  input:-internal-autofill-selected,
+  textarea:-internal-autofill-selected,
+  select:-internal-autofill-selected {
+    box-shadow: 0 0 0 1000px rgba(15, 14, 14, 0.95) inset !important;
+    -webkit-text-fill-color: #ffffff !important;
+    caret-color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.25) !important;
   }
 
   .text-glow-link:hover svg,
   .text-glow-link:focus-visible svg {
-    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.45));
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.32));
   }
 
   .skeleton-shimmer {

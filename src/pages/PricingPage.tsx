@@ -420,9 +420,9 @@ const PricingPage = () => {
             <div>
               <h2 className="text-2xl font-bold text-white">Refund Policy</h2>
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                If you want a refund, we will issue it. Request a refund within 7 days
-                of purchase and we will process it with no questions asked. This applies
-                to all paid plans. Email support with your order ID to start the refund.
+                Refunds are processed within 14 days. Refunds are not available if 35% or more
+                of the plan usage has been consumed. Repeated refund requests may result in
+                IP blocking to prevent abuse. Email support with your order ID to start the refund.
               </p>
               <Button
                 className="mt-4 bg-primary text-primary-foreground shadow-neon"

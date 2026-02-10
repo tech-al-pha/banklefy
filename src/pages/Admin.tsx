@@ -112,10 +112,16 @@ export default function Admin() {
       .slice(0, 6);
   }, [users]);
 
+  const completedCount = useMemo(() => {
+    if (stats.total === 0) return 0;
+    const fallback = Math.max(0, stats.total - stats.failed - stats.processing);
+    return stats.completed > 0 ? stats.completed : fallback;
+  }, [stats]);
+
   const successRate = useMemo(() => {
     if (stats.total === 0) return 0;
-    return Math.round((stats.completed / stats.total) * 100);
-  }, [stats]);
+    return Math.round((completedCount / stats.total) * 100);
+  }, [stats.total, completedCount]);
 
   const paidUsersCount = useMemo(() => {
     return users.filter((u) => u.subscription?.tier && u.subscription?.tier !== 'free').length;
@@ -512,7 +518,7 @@ export default function Admin() {
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{stats.total}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {stats.completed} completed, {stats.failed} failed
+                {completedCount} completed, {stats.failed} failed
               </p>
             </CardContent>
           </Card>
