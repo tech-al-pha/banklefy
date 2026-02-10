@@ -6,6 +6,7 @@ import {
   detectDuplicates,
   reconcileBalances,
 } from '../_shared/financial-engine.ts';
+import { fromMinorUnits, sumMinorUnits } from '../_shared/money.ts';
 import type { BankMetadata } from '../_shared/ocr-processor.ts';
 import type { BankInfo } from '../_shared/excel-generator.ts';
 
@@ -304,8 +305,11 @@ export function buildMergedStatement(statements: StatementData[]): MergeComputat
   // Reconcile balances and detect duplicates across the merged timeline
   reconcileBalances(merged);
   detectDuplicates(merged);
-  const totalDebit = merged.reduce((sum, t) => sum + Math.abs(Number(t.debit) || 0), 0);
-  const totalCredit = merged.reduce((sum, t) => sum + Math.abs(Number(t.credit) || 0), 0);
+  // Use minor units for exact debit/credit totals.
+  const totalDebitMinor = sumMinorUnits(merged.map((t) => Math.abs(Number(t.debit) || 0)));
+  const totalCreditMinor = sumMinorUnits(merged.map((t) => Math.abs(Number(t.credit) || 0)));
+  const totalDebit = fromMinorUnits(totalDebitMinor);
+  const totalCredit = fromMinorUnits(totalCreditMinor);
   const finalBalance = computeFinalBalance(statements);
   const statementPeriod = computeStatementPeriod(merged);
 

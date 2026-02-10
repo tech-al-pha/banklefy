@@ -35,6 +35,7 @@ import {
   validateStatementsForMerge,
   type StatementData,
 } from '../_shared/multi-statement.ts';
+import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 
 // ============= ADMIN WHITELIST (Server-Side Only) =============
 const ADMIN_EMAILS = ['inspirexali@gmail.com'];
@@ -308,18 +309,30 @@ function aggregateBatchAnalytics(statements: ProcessedStatement[]): AggregatedAn
   const integrityScore = calculateIntegrityScore(reconciliation, riskTransactions, liquidityMetrics);
 
   // Calculate totals
-  const totalCredits = allTransactions.reduce((sum, t) => sum + (t.credit || 0), 0);
-  const totalDebits = allTransactions.reduce((sum, t) => sum + (t.debit || 0), 0);
+  // Use minor-unit math for exact debit/credit totals (no float drift).
+  const totalCreditsMinor = sumMinorUnits(allTransactions.map((t) => t.credit || 0));
+  const totalDebitsMinor = sumMinorUnits(allTransactions.map((t) => t.debit || 0));
+  const totalCredits = fromMinorUnits(totalCreditsMinor);
+  const totalDebits = fromMinorUnits(totalDebitsMinor);
+  const netFlow = fromMinorUnits(totalCreditsMinor - totalDebitsMinor);
 
   // Build category breakdown
-  const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
-  allTransactions.forEach(t => {
-    if (!categoryBreakdown[t.category]) {
-      categoryBreakdown[t.category] = { count: 0, totalDebit: 0, totalCredit: 0 };
+  const categoryBreakdownMinor: Record<string, { count: number; totalDebitMinor: number; totalCreditMinor: number }> = {};
+  allTransactions.forEach((t) => {
+    if (!categoryBreakdownMinor[t.category]) {
+      categoryBreakdownMinor[t.category] = { count: 0, totalDebitMinor: 0, totalCreditMinor: 0 };
     }
-    categoryBreakdown[t.category].count++;
-    categoryBreakdown[t.category].totalDebit += t.debit || 0;
-    categoryBreakdown[t.category].totalCredit += t.credit || 0;
+    categoryBreakdownMinor[t.category].count++;
+    categoryBreakdownMinor[t.category].totalDebitMinor += toMinorUnits(t.debit || 0);
+    categoryBreakdownMinor[t.category].totalCreditMinor += toMinorUnits(t.credit || 0);
+  });
+  const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
+  Object.entries(categoryBreakdownMinor).forEach(([category, data]) => {
+    categoryBreakdown[category] = {
+      count: data.count,
+      totalDebit: fromMinorUnits(data.totalDebitMinor),
+      totalCredit: fromMinorUnits(data.totalCreditMinor),
+    };
   });
 
   // Build risk flags summary
@@ -333,7 +346,7 @@ function aggregateBatchAnalytics(statements: ProcessedStatement[]): AggregatedAn
     totalTransactions: allTransactions.length,
     totalCredits,
     totalDebits,
-    netFlow: totalCredits - totalDebits,
+    netFlow,
     duplicateCount,
     categoryBreakdown,
     riskAnalysis: {
@@ -535,17 +548,30 @@ const processStatement = async (params: {
   const integrityScore = calculateIntegrityScore(reconciliation, riskTransactions, liquidityMetrics);
   console.log(`Analysis complete. Integrity score: ${integrityScore}, Fraud alerts: ${fraudAlerts.length}`);
 
-  const totalCredits = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
-  const totalDebits = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
+  // Use minor-unit math for exact debit/credit totals (no float drift).
+  const totalCreditsMinor = sumMinorUnits(transactions.map((t) => t.credit || 0));
+  const totalDebitsMinor = sumMinorUnits(transactions.map((t) => t.debit || 0));
+  const totalCredits = fromMinorUnits(totalCreditsMinor);
+  const totalDebits = fromMinorUnits(totalDebitsMinor);
+  const netFlow = fromMinorUnits(totalCreditsMinor - totalDebitsMinor);
 
-  const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
-  transactions.forEach(t => {
-    if (!categoryBreakdown[t.category]) {
-      categoryBreakdown[t.category] = { count: 0, totalDebit: 0, totalCredit: 0 };
+  // Use minor units to keep debit/credit category totals exact.
+  const categoryBreakdownMinor: Record<string, { count: number; totalDebitMinor: number; totalCreditMinor: number }> = {};
+  transactions.forEach((t) => {
+    if (!categoryBreakdownMinor[t.category]) {
+      categoryBreakdownMinor[t.category] = { count: 0, totalDebitMinor: 0, totalCreditMinor: 0 };
     }
-    categoryBreakdown[t.category].count++;
-    categoryBreakdown[t.category].totalDebit += t.debit || 0;
-    categoryBreakdown[t.category].totalCredit += t.credit || 0;
+    categoryBreakdownMinor[t.category].count++;
+    categoryBreakdownMinor[t.category].totalDebitMinor += toMinorUnits(t.debit || 0);
+    categoryBreakdownMinor[t.category].totalCreditMinor += toMinorUnits(t.credit || 0);
+  });
+  const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
+  Object.entries(categoryBreakdownMinor).forEach(([category, data]) => {
+    categoryBreakdown[category] = {
+      count: data.count,
+      totalDebit: fromMinorUnits(data.totalDebitMinor),
+      totalCredit: fromMinorUnits(data.totalCreditMinor),
+    };
   });
 
   const excelResult = generateProfessionalExcel({
@@ -553,7 +579,7 @@ const processStatement = async (params: {
     analytics: {
       totalCredits,
       totalDebits,
-      netFlow: totalCredits - totalDebits,
+      netFlow,
       duplicateCount,
       categoryBreakdown,
     },

@@ -77,3 +77,25 @@ export const formatCurrencyValue = (
   const spacer = symbol && symbol.length > 1 ? ' ' : '';
   return `${sign}${symbol}${spacer}${formatted}`;
 };
+
+const DEFAULT_SCALE = 2;
+
+export const toMinorUnits = (value: number, scale = DEFAULT_SCALE): number => {
+  if (!Number.isFinite(value)) return 0;
+  const factor = 10 ** scale;
+  return Math.round((value + Number.EPSILON) * factor);
+};
+
+export const fromMinorUnits = (minor: number, scale = DEFAULT_SCALE): number => {
+  const factor = 10 ** scale;
+  return minor / factor;
+};
+
+export const sumMoney = (values: number[], scale = DEFAULT_SCALE): number => {
+  const totalMinor = values.reduce((sum, value) => sum + toMinorUnits(value, scale), 0);
+  return fromMinorUnits(totalMinor, scale);
+};
+
+export const roundMoney = (value: number, scale = DEFAULT_SCALE): number => {
+  return fromMinorUnits(toMinorUnits(value, scale), scale);
+};

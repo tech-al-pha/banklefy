@@ -362,6 +362,35 @@
     filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.45));
   }
 
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.12) 50%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+
+  .convert-button {
+    background: rgba(25, 25, 25, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    color: #ffffff !important;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 0 16px rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .convert-button:hover,
+  .convert-button:focus-visible {
+    background: rgba(36, 36, 36, 0.9) !important;
+    border-color: rgba(255, 255, 255, 0.45) !important;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.12),
+      0 0 22px rgba(255, 255, 255, 0.2) !important;
+  }
+
   .back-pill {
     border-radius: 9999px !important;
     padding: 0.55rem 1.4rem !important;
@@ -554,6 +583,15 @@
 
   .to-primary\/5 {
     --tw-gradient-to: rgba(0, 0, 0, 0.05);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
   }
 }
 

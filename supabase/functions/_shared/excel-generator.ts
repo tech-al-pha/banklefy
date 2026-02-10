@@ -9,6 +9,7 @@ import type {
   LiquidityAnalysis,
   ReconciliationResult,
 } from '../_shared/financial-engine.ts';
+import { fromMinorUnits, toMinorUnits } from '../_shared/money.ts';
 
 export interface ExcelGenerationResult {
   buffer: ArrayBuffer;
@@ -204,7 +205,10 @@ function buildAccountRows(bankInfo?: BankInfo, statementPeriod?: string): SheetD
 }
 
 function numberOrBlank(value: unknown): number | string {
-  if (typeof value === 'number' && !Number.isNaN(value)) return value;
+  if (typeof value === 'number' && !Number.isNaN(value)) {
+    // Normalize to minor units to avoid floating-point drift in Excel totals.
+    return fromMinorUnits(toMinorUnits(value));
+  }
   return value === 0 ? 0 : '';
 }
 

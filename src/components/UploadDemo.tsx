@@ -18,7 +18,7 @@ import { UnderwritingPanel } from "./UnderwritingPanel";
 import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
 import { AIStatusPanel } from "./AIStatusPanel";
 import akromedaLogo from "@/assets/akromeda-logo.svg";
-import { formatCurrencyValue, normalizeCurrencyCode } from "@/lib/currency";
+import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import {
   Dialog,
   DialogContent,
@@ -1185,10 +1185,10 @@ Analytics Summary:
     const headers = ['Date', 'Description', 'Debit', 'Credit', 'Balance'];
     
     // Calculate totals
-    const totalDebit = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
-    const totalCredit = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
-    const totalDebitDisplay = truncateDecimals(totalDebit).toFixed(2);
-    const totalCreditDisplay = truncateDecimals(totalCredit).toFixed(2);
+    const totalDebit = sumMoney(transactions.map((t) => t.debit || 0));
+    const totalCredit = sumMoney(transactions.map((t) => t.credit || 0));
+    const totalDebitDisplay = totalDebit.toFixed(2);
+    const totalCreditDisplay = totalCredit.toFixed(2);
     
     const csvRows = [
       headers.join(','),
@@ -1736,14 +1736,14 @@ Analytics Summary:
 
               {/* PDF Password Input - Only show when password is required */}
               {(selectedFile || selectedFiles.length > 0) && showPasswordInput && !limitReached && (
-                <div className="space-y-4 p-6 bg-destructive/5 rounded-xl border-2 border-destructive/30">
+                <div className="space-y-4 p-6 bg-[#191919]/80 rounded-xl border border-red-500/30">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-destructive/20 rounded-lg">
-                      <Lock className="h-5 w-5 text-destructive" />
+                    <div className="p-2 bg-red-500/15 rounded-lg">
+                      <Lock className="h-5 w-5 text-red-400" />
                     </div>
                       <div>
-                        <p className="font-semibold text-destructive">Password Required</p>
-                        <p id={pdfPasswordHelpId} className="text-xs text-muted-foreground">This PDF is password protected. Enter the password to continue.</p>
+                        <p className="font-semibold text-red-300">Password Required</p>
+                        <p id={pdfPasswordHelpId} className="text-xs text-white/60">This PDF is password protected. Enter the password to continue.</p>
                       </div>
                     </div>
                     
@@ -1760,12 +1760,12 @@ Analytics Summary:
                         }}
                         aria-invalid={passwordError}
                         aria-describedby={`${pdfPasswordHelpId}${passwordError ? ` ${pdfPasswordErrorId}` : ''}`}
-                        className={`bg-background/50 border-2 pr-10 ${passwordError ? 'border-destructive focus:border-destructive' : 'border-destructive/40 focus:border-destructive'}`}
+                        className={`bg-[#0f0f0f] border pr-10 text-white placeholder:text-white/40 ${passwordError ? 'border-red-500/60 focus:border-red-500' : 'border-white/10 focus:border-white/30'}`}
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60 transition-colors"
                         aria-label={showPassword ? "Hide password" : "Show password"}
                         aria-pressed={showPassword}
                       >
@@ -1774,7 +1774,7 @@ Analytics Summary:
                     </div>
                     
                     {passwordError && (
-                      <p id={pdfPasswordErrorId} role="alert" className="text-sm text-destructive flex items-center gap-1">
+                      <p id={pdfPasswordErrorId} role="alert" className="text-sm text-red-300 flex items-center gap-1">
                         <AlertTriangle className="h-4 w-4" />
                         Incorrect password. Please try again.
                       </p>
@@ -1784,12 +1784,12 @@ Analytics Summary:
 
               {/* Edited PDF Warning */}
               {editedPdfWarning && selectedFile && !converting && !uploading && (
-                <div className="p-4 bg-amber-500/10 border-2 border-amber-500/30 rounded-xl space-y-3">
+                <div className="p-4 bg-[#191919]/80 border border-amber-500/30 rounded-xl space-y-3">
                   <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="font-semibold text-amber-500">Possible Edited PDF Detected</p>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="font-semibold text-amber-300">Possible Edited PDF Detected</p>
+                      <p className="text-sm text-white/60 mt-1">
                         This statement looks like it may have been edited. Reason: {editedPdfWarning.reason}.
                       </p>
                     </div>
@@ -1797,7 +1797,7 @@ Analytics Summary:
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Button
                       variant="outline"
-                      className="w-full border border-surface-elevated/50 text-foreground shadow-[0_0_14px_rgba(0,0,0,0.22)] hover:shadow-[0_0_18px_rgba(0,0,0,0.28)]"
+                      className="w-full border border-amber-500/40 text-amber-200 bg-amber-500/10 hover:bg-amber-500/20"
                       onClick={() => {
                         dismissedEditedWarningsRef.current.add(editedPdfWarning.fileName);
                         setEditedPdfWarning(null);
@@ -1811,7 +1811,7 @@ Analytics Summary:
                     </Button>
                     <Button
                       variant="ghost"
-                      className="w-full text-muted-foreground"
+                      className="w-full text-white/60 hover:text-white"
                       onClick={() => setEditedPdfWarning(null)}
                     >
                       Cancel
@@ -1864,7 +1864,7 @@ Analytics Summary:
                     <div className="space-y-3">
                       <Button
                         size="lg"
-                        className="bg-secondary text-secondary-foreground shadow-neon w-full md:w-auto"
+                        className="convert-button w-full md:w-auto"
                         onClick={() => {
                           if (selectedFiles.length === 1) {
                             const firstFile = selectedFiles[0];
@@ -2088,7 +2088,7 @@ Analytics Summary:
               {aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
 
               {(converting || showProgress) && (
-                <div className="rounded-xl border border-primary/20 bg-muted/20 p-4 sm:p-5" role="status" aria-live="polite" aria-atomic="true">
+                <div className="rounded-xl border border-white/10 bg-[#191919]/80 p-4 sm:p-5" role="status" aria-live="polite" aria-atomic="true">
                   <div className="space-y-2">
                     {conversionSteps.map((step, index) => {
                       const isDone = index < progressStep;
@@ -2100,23 +2100,29 @@ Analytics Summary:
                           key={step}
                           className={`relative flex items-center gap-3 rounded-lg px-3 py-2 transition-all duration-500 ${
                             isActive
-                              ? "text-foreground"
+                              ? "text-white"
                               : isDone
-                                ? "text-foreground/80"
-                                : "text-muted-foreground"
+                                ? "text-emerald-200"
+                                : "text-white/50"
                           } ${
                             isActive
                               ? "before:absolute before:inset-0 before:-z-10 before:rounded-lg before:bg-primary/10 before:blur-xl before:opacity-70 before:content-['']"
                               : ""
-                          } ${isDone ? "bg-primary/5 border border-primary/10" : "border border-transparent"}`}
+                          } ${
+                            isDone
+                              ? "bg-emerald-500/10 border border-emerald-500/25"
+                              : isActive
+                                ? "bg-primary/5 border border-primary/20"
+                                : "border border-transparent"
+                          }`}
                         >
                           <div
                             className={`relative flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-500 ${
                               isDone
-                                ? "bg-primary/15 border-primary/40 text-primary"
+                                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
                                 : isActive
                                   ? "border-primary/60 text-primary shadow-[0_0_18px_hsl(var(--primary)/0.35)]"
-                                  : "border-white/10 text-muted-foreground"
+                                  : "border-white/10 text-white/40"
                             }`}
                           >
                             {isDone ? (
@@ -2124,12 +2130,12 @@ Analytics Summary:
                             ) : (
                               <div
                                 className={`h-2 w-2 rounded-full ${
-                                  isActive ? "bg-primary animate-pulse" : "bg-white/30"
+                                  isActive ? "bg-primary animate-pulse" : "bg-white/20"
                                 }`}
                               />
                             )}
                           </div>
-                          <span className={`text-sm font-medium ${isUpcoming ? "text-muted-foreground" : ""}`}>
+                          <span className={`text-sm font-medium ${isUpcoming ? "text-white/50" : ""}`}>
                             {step}
                           </span>
                         </div>

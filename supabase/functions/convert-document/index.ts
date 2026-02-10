@@ -36,6 +36,7 @@ import {
 } from '../_shared/financial-engine.ts';
 import { generateProfessionalExcel } from '../_shared/excel-generator.ts';
 import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
+import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 
 // ============= ADMIN WHITELIST (Server-Side Only) =============
 const ADMIN_EMAILS = ['inspirexali@gmail.com'];
@@ -755,18 +756,30 @@ Deno.serve(async (req) => {
     // ============= LAYER 5: PROFESSIONAL EXCEL EXPORT =============
     console.log('Generating professional Excel export...');
     
-    const totalCredits = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
-    const totalDebits = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
+    // Use minor-unit math for exact debit/credit totals (no float drift).
+    const totalCreditsMinor = sumMinorUnits(transactions.map((t) => t.credit || 0));
+    const totalDebitsMinor = sumMinorUnits(transactions.map((t) => t.debit || 0));
+    const totalCredits = fromMinorUnits(totalCreditsMinor);
+    const totalDebits = fromMinorUnits(totalDebitsMinor);
+    const netFlow = fromMinorUnits(totalCreditsMinor - totalDebitsMinor);
     
     // Category breakdown
-    const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
-    transactions.forEach(t => {
-      if (!categoryBreakdown[t.category]) {
-        categoryBreakdown[t.category] = { count: 0, totalDebit: 0, totalCredit: 0 };
+    const categoryBreakdownMinor: Record<string, { count: number; totalDebitMinor: number; totalCreditMinor: number }> = {};
+    transactions.forEach((t) => {
+      if (!categoryBreakdownMinor[t.category]) {
+        categoryBreakdownMinor[t.category] = { count: 0, totalDebitMinor: 0, totalCreditMinor: 0 };
       }
-      categoryBreakdown[t.category].count++;
-      categoryBreakdown[t.category].totalDebit += t.debit || 0;
-      categoryBreakdown[t.category].totalCredit += t.credit || 0;
+      categoryBreakdownMinor[t.category].count++;
+      categoryBreakdownMinor[t.category].totalDebitMinor += toMinorUnits(t.debit || 0);
+      categoryBreakdownMinor[t.category].totalCreditMinor += toMinorUnits(t.credit || 0);
+    });
+    const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
+    Object.entries(categoryBreakdownMinor).forEach(([category, data]) => {
+      categoryBreakdown[category] = {
+        count: data.count,
+        totalDebit: fromMinorUnits(data.totalDebitMinor),
+        totalCredit: fromMinorUnits(data.totalCreditMinor),
+      };
     });
 
     // Build underwriting analysis for response
@@ -804,7 +817,7 @@ Deno.serve(async (req) => {
       totalTransactions: transactions.length,
       totalCredits,
       totalDebits,
-      netFlow: totalCredits - totalDebits,
+      netFlow,
       duplicateCount,
       categoryBreakdown,
       riskAnalysis,
@@ -818,7 +831,7 @@ Deno.serve(async (req) => {
       analytics: {
         totalCredits,
         totalDebits,
-        netFlow: totalCredits - totalDebits,
+        netFlow,
         duplicateCount,
         categoryBreakdown,
       },
@@ -872,7 +885,7 @@ Deno.serve(async (req) => {
             max_dip_date: liquidityMetrics.maxDipDate,
             total_inflow: totalCredits,
             total_outflow: totalDebits,
-            net_cashflow: totalCredits - totalDebits,
+            net_cashflow: netFlow,
             foir_score: underwritingResult.foir.score,
             salary_credits: underwritingResult.salaryCredits,
             emi_debits: underwritingResult.emiDebits,

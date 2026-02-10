@@ -1,6 +1,14 @@
 // ============= PURE TYPESCRIPT FINANCIAL ENGINE =============
 // 100% Mathematical Accuracy - No AI, Just Math
 
+import { fromMinorUnits, toMinorUnits } from './money.ts';
+
+const roundTo = (value: number, decimals = 2): number => {
+  if (!Number.isFinite(value)) return 0;
+  const factor = 10 ** decimals;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
+};
+
 export interface Transaction {
   date: string;
   description: string;
@@ -103,13 +111,17 @@ export function reconcileBalances(transactions: Transaction[]): ReconciliationRe
     const currentDebit = transactions[i].debit || 0;
     
     // Formula: Balance[n-1] + Credit[n] - Debit[n] = Balance[n]
-    const expectedBalance = Math.round((prevBalance + currentCredit - currentDebit) * 100) / 100;
-    const actualBalance = transactions[i].balance || 0;
+    // Use minor-unit math for exact debit/credit + running balance reconciliation.
+    const expectedMinor = toMinorUnits(prevBalance) + toMinorUnits(currentCredit) - toMinorUnits(currentDebit);
+    const expectedBalance = fromMinorUnits(expectedMinor);
+    const actualMinor = toMinorUnits(transactions[i].balance || 0);
+    const actualBalance = fromMinorUnits(actualMinor);
     
     // Allow tolerance of 0.01 for floating point
-    const difference = Math.abs(expectedBalance - actualBalance);
+    const differenceMinor = Math.abs(expectedMinor - actualMinor);
+    const difference = fromMinorUnits(differenceMinor);
     
-    if (difference > 0.01) {
+    if (differenceMinor > 1) {
       const severity: 'low' | 'medium' | 'high' | 'critical' = 
         difference > 10000 ? 'critical' :
         difference > 1000 ? 'high' :
@@ -119,7 +131,7 @@ export function reconcileBalances(transactions: Transaction[]): ReconciliationRe
         rowIndex: i,
         expected: expectedBalance,
         actual: actualBalance,
-        difference: Math.round(difference * 100) / 100,
+        difference,
         severity,
       });
       
@@ -147,8 +159,10 @@ export function calculateFOIR(
   avgMonthlyIncome: number, 
   avgMonthlyEMI: number
 ): FOIRResult {
-  const score = avgMonthlyIncome > 0 
-    ? Math.round((avgMonthlyEMI / avgMonthlyIncome) * 10000) / 100 
+  const safeIncome = roundTo(avgMonthlyIncome);
+  const safeEmi = roundTo(avgMonthlyEMI);
+  const score = safeIncome > 0
+    ? roundTo((safeEmi / safeIncome) * 100, 2)
     : 0;
   
   const status: 'excellent' | 'good' | 'moderate' | 'high' = 
@@ -156,18 +170,18 @@ export function calculateFOIR(
     score <= 50 ? 'good' :
     score <= 65 ? 'moderate' : 'high';
   
-  const disposableIncome = Math.max(0, avgMonthlyIncome - avgMonthlyEMI);
-  const maxNewEMI = Math.round(disposableIncome * 0.5);
-  const loanEligibility = Math.round(maxNewEMI * 60); // 5-year tenure multiplier
+  const disposableIncome = roundTo(Math.max(0, safeIncome - safeEmi));
+  const maxNewEMI = roundTo(disposableIncome * 0.5);
+  const loanEligibility = roundTo(maxNewEMI * 60); // 5-year tenure multiplier
   
   return {
     score,
     status,
-    avgMonthlyIncome: Math.round(avgMonthlyIncome * 100) / 100,
-    avgMonthlyEMI: Math.round(avgMonthlyEMI * 100) / 100,
+    avgMonthlyIncome: safeIncome,
+    avgMonthlyEMI: safeEmi,
     maxNewEMI,
     loanEligibility,
-    disposableIncome: Math.round(disposableIncome * 100) / 100,
+    disposableIncome,
   };
 }
 
@@ -485,10 +499,14 @@ export function performUnderwritingAnalysis(
   
   // Calculate averages
   const months = Array.from(monthlyData.values());
-  const totalSalaryIncome = months.reduce((sum, m) => sum + m.salaries, 0);
-  const totalEMIOutflow = months.reduce((sum, m) => sum + m.emis, 0);
-  const avgMonthlyIncome = months.length > 0 ? totalSalaryIncome / months.length : 0;
-  const avgMonthlyEMI = months.length > 0 ? totalEMIOutflow / months.length : 0;
+  const totalSalary = months.reduce((sum, m) => sum + m.salaries, 0);
+  const totalEmi = months.reduce((sum, m) => sum + m.emis, 0);
+  const avgMonthlyIncome = months.length > 0
+    ? roundTo(totalSalary / months.length)
+    : 0;
+  const avgMonthlyEMI = months.length > 0
+    ? roundTo(totalEmi / months.length)
+    : 0;
   
   // Calculate FOIR
   const foir = calculateFOIR(avgMonthlyIncome, avgMonthlyEMI);
@@ -541,10 +559,18 @@ export function performUnderwritingAnalysis(
     },
     monthlyBreakdown: Array.from(monthlyData.entries()).map(([month, data]) => ({
       month,
-      salaryIncome: data.salaries,
-      emiOutflow: data.emis,
+      salaryIncome: roundTo(data.salaries),
+      emiOutflow: roundTo(data.emis),
     })),
-    emiByLoanType,
+    emiByLoanType: Object.fromEntries(
+      Object.entries(emiByLoanType).map(([loanType, data]) => [
+        loanType,
+        {
+          count: data.count,
+          totalAmount: roundTo(data.totalAmount),
+        },
+      ])
+    ),
   };
 }
 
@@ -564,15 +590,15 @@ export function analyzeLiquidity(transactions: Transaction[]): LiquidityAnalysis
   
   const minBalance = Math.min(...balances);
   const maxBalance = Math.max(...balances);
-  const avgBalance = balances.reduce((a, b) => a + b, 0) / balances.length;
+  const avgBalance = roundTo(balances.reduce((a, b) => a + b, 0) / balances.length);
   const minBalanceIndex = balances.indexOf(minBalance);
   const maxDipDate = transactions[minBalanceIndex]?.date || null;
   const zeroDays = transactions.filter(t => (t.balance || 0) <= 0).length;
   
   return {
-    minBalance: Math.round(minBalance * 100) / 100,
-    maxBalance: Math.round(maxBalance * 100) / 100,
-    avgBalance: Math.round(avgBalance * 100) / 100,
+    minBalance: roundTo(minBalance),
+    maxBalance: roundTo(maxBalance),
+    avgBalance,
     maxDipDate,
     zeroDays,
   };
