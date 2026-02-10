@@ -1330,10 +1330,8 @@ Analytics Summary:
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       // Reset spacing to avoid any unexpected letter spacing in PDF viewers
-      // @ts-expect-error - jsPDF exposes these setters
-      doc.setCharSpace?.(0);
-      // @ts-expect-error - jsPDF exposes these setters
-      doc.setWordSpacing?.(0);
+      (doc as any).setCharSpace?.(0);
+      (doc as any).setWordSpacing?.(0);
       doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, marginX, cursorY);
       cursorY += 16;
 
@@ -1402,7 +1400,6 @@ Analytics Summary:
           margin: { left: marginX, right: marginX },
         });
 
-        // @ts-expect-error - autoTable adds lastAutoTable to doc
         cursorY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 16 : cursorY + 24;
       }
 
