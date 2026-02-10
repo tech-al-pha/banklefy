@@ -200,9 +200,10 @@ Deno.serve(async (req) => {
 
   try {
     // Parse request
-    const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken, pdfPassword, pdfPageImages } = await req.json();
+    const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken, pdfPassword, pdfPageImages, clientId } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
     const ipAddress = getClientIp(req);
+    const trackingKey = ipAddress !== 'unknown' ? ipAddress : (clientId ? `client:${clientId}` : ipAddress);
 
     // Create Supabase admin client (service role for privileged operations)
     const supabaseAdmin = createClient(
@@ -412,7 +413,7 @@ Deno.serve(async (req) => {
     // ============= USAGE LIMITS ENFORCEMENT =============
     // Check usage limits - IP-based for anonymous, user-based for authenticated
     const { data: limitResult, error: limitError } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
-      p_ip_address: user ? null : ipAddress,
+      p_ip_address: user ? null : trackingKey,
       p_user_id: user ? user.id : null,
       p_timezone: userTimezone
     });
@@ -951,7 +952,7 @@ Deno.serve(async (req) => {
     const incrementBy = user ? (isPaidUser ? Math.max(1, pagesWithData) : 1) : 1;
     let remaining = conversionsLimit - conversionsUsed;
     const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
-      p_ip_address: user ? null : ipAddress,
+      p_ip_address: user ? null : trackingKey,
       p_user_id: user ? user.id : null,
       p_increment: incrementBy,
     });

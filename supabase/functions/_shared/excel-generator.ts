@@ -139,9 +139,16 @@ const TABLE_HEADERS = [
   'Duplicate Flag',
 ];
 
+const MONEY_FORMAT = '#,##0.00';
+
 function setCellStyle(ws: Worksheet, addr: string, style: SheetStyle) {
   if (!ws[addr]) return;
   ws[addr].s = { ...(ws[addr].s || {}), ...style };
+}
+
+function setCellFormat(ws: Worksheet, addr: string, format: string) {
+  if (!ws[addr]) return;
+  ws[addr].z = format;
 }
 
 function setRowStyle(ws: Worksheet, row: number, colCount: number, style: SheetStyle) {
@@ -258,6 +265,15 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   
   ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
   ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
+
+  // Ensure debit/credit/balance columns keep decimal precision in Excel.
+  for (let r = dataStartRow; r <= dataEndRow; r++) {
+    setCellFormat(ws, `D${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `E${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `F${r}`, MONEY_FORMAT);
+  }
+  setCellFormat(ws, debitAddr, MONEY_FORMAT);
+  setCellFormat(ws, creditAddr, MONEY_FORMAT);
   
   ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
   setRowStyle(ws, headerRowIndex, TABLE_HEADERS.length, headerStyle);
@@ -299,6 +315,14 @@ export function generateSimpleExcel(transactions: Transaction[]): ArrayBuffer {
   
   ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
   ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
+
+  for (let r = dataStartRow; r <= dataEndRow; r++) {
+    setCellFormat(ws, `D${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `E${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `F${r}`, MONEY_FORMAT);
+  }
+  setCellFormat(ws, debitAddr, MONEY_FORMAT);
+  setCellFormat(ws, creditAddr, MONEY_FORMAT);
   
   ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
   setRowStyle(ws, 0, TABLE_HEADERS.length, headerStyle);
@@ -357,6 +381,14 @@ export function generateMergedStatementsExcel(config: MergedExcelConfig): ExcelG
   
   ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
   ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
+
+  for (let r = dataStartRow; r <= dataEndRow; r++) {
+    setCellFormat(ws, `D${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `E${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `F${r}`, MONEY_FORMAT);
+  }
+  setCellFormat(ws, debitAddr, MONEY_FORMAT);
+  setCellFormat(ws, creditAddr, MONEY_FORMAT);
   
   ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
   setRowStyle(ws, headerRowIndex, TABLE_HEADERS.length, headerStyle);

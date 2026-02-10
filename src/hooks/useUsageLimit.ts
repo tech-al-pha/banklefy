@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { invokeEdgeFunction } from '@/lib/supabaseApi';
+import { getAnonymousClientId } from '@/lib/usageClient';
 
 interface UsageLimit {
   conversionsUsed: number;
@@ -41,6 +42,7 @@ export const useUsageLimit = () => {
       const accessToken = session?.access_token;
 
       // Use explicit REST call (deployment-agnostic)
+      const clientId = user ? null : getAnonymousClientId();
       const { data, error } = await invokeEdgeFunction<{
         conversionsUsed?: number;
         conversionsLimit?: number;
@@ -49,7 +51,7 @@ export const useUsageLimit = () => {
         isAuthenticated?: boolean;
         planType?: string;
       }>('check-usage-limit', {
-        body: { timezone },
+        body: { timezone, clientId: clientId ?? undefined },
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
 

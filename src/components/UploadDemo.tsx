@@ -19,6 +19,7 @@ import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
 import { AIStatusPanel } from "./AIStatusPanel";
 import akromedaLogo from "@/assets/akromeda-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
+import { getAnonymousClientId } from "@/lib/usageClient";
 import {
   Dialog,
   DialogContent,
@@ -226,6 +227,7 @@ interface BatchFilePayload {
 interface BatchRequestBody {
   files: BatchFilePayload[];
   timezone: string;
+  clientId?: string;
   pdfPassword?: string;
   recaptchaToken?: string;
 }
@@ -338,6 +340,31 @@ export const UploadDemo = () => {
       setSelectedFile(null);
     }
   }, [selectedFiles]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkPassword = async () => {
+      if (!selectedFile) return;
+      const isPdf = selectedFile.name.toLowerCase().endsWith('.pdf');
+      if (!isPdf) {
+        if (isMounted) setShowPasswordInput(false);
+        return;
+      }
+      try {
+        const requiresPassword = await detectPasswordProtectedPdf(selectedFile);
+        if (!isMounted) return;
+        setShowPasswordInput(requiresPassword);
+        if (requiresPassword) setPasswordError(false);
+      } catch {
+        // If detection fails, allow conversion flow to handle the error.
+      }
+    };
+
+    checkPassword();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedFile]);
 
   useEffect(() => {
     if (!converting) return;
@@ -458,6 +485,33 @@ export const UploadDemo = () => {
     };
   };
 
+  const detectPasswordProtectedPdf = async (file: File): Promise<boolean> => {
+    const pdfjsLib = await import('pdfjs-dist');
+
+    // IMPORTANT: Use bundled worker (same-origin). CDN worker can fail due to CORS/dynamic import.
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
+
+    const arrayBuffer = await file.arrayBuffer();
+    try {
+      const loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        password: '',
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: true,
+      });
+      const pdf = await loadingTask.promise;
+      await pdf.destroy?.();
+      return false;
+    } catch (err: unknown) {
+      const error = err as { name?: string; message?: string };
+      return (
+        error?.name === 'PasswordException' ||
+        String(error?.message || '').toLowerCase().includes('password')
+      );
+    }
+  };
+
   const pdfToPageImages = async (file: File, password?: string): Promise<string[]> => {
     const pdfjsLib = await import('pdfjs-dist');
 
@@ -555,6 +609,10 @@ export const UploadDemo = () => {
         fileName: fileToConvert.name,
         timezone,
       };
+      if (!user) {
+        const clientId = getAnonymousClientId();
+        if (clientId) requestBody.clientId = clientId;
+      }
 
       // Add PDF password if provided
       if (pdfPassword.trim()) {
@@ -839,6 +897,10 @@ Analytics Summary:
         files: [],
         timezone,
       };
+      if (!user) {
+        const clientId = getAnonymousClientId();
+        if (clientId) requestBody.clientId = clientId;
+      }
 
       if (pdfPassword.trim()) {
         requestBody.pdfPassword = pdfPassword.trim();

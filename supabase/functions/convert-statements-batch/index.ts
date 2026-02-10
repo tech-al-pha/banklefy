@@ -610,9 +610,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { files, timezone, recaptchaToken } = await req.json();
+    const { files, timezone, recaptchaToken, clientId } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
     const ipAddress = getClientIp(req);
+    const trackingKey = ipAddress !== 'unknown' ? ipAddress : (clientId ? `client:${clientId}` : ipAddress);
 
     if (!Array.isArray(files) || files.length === 0) {
       return new Response(
@@ -721,7 +722,7 @@ Deno.serve(async (req) => {
 
     // Usage limit checks (count each statement as a conversion)
     const { data: limitResult, error: limitError } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
-      p_ip_address: user ? null : ipAddress,
+      p_ip_address: user ? null : trackingKey,
       p_user_id: user ? user.id : null,
       p_timezone: userTimezone,
     });
@@ -1005,7 +1006,7 @@ Deno.serve(async (req) => {
     const incrementBy = isPaidUser ? pagesWithDataTotal : successes.length;
     let remaining = conversionsLimit - conversionsUsed;
     const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
-      p_ip_address: user ? null : ipAddress,
+      p_ip_address: user ? null : trackingKey,
       p_user_id: user ? user.id : null,
       p_increment: incrementBy,
     });

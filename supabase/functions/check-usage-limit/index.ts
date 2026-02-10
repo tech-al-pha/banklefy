@@ -97,13 +97,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { timezone } = await req.json();
+    const { timezone, clientId } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
 
     // Get client IP address securely
     const ipAddress = getClientIp(req);
+    const trackingKey = ipAddress !== 'unknown' ? ipAddress : (clientId ? `client:${clientId}` : ipAddress);
 
-    console.log('Checking usage limit for IP:', ipAddress, 'Timezone:', userTimezone);
+    console.log('Checking usage limit for IP:', trackingKey, 'Timezone:', userTimezone);
 
     // Create service role client for database operations
     const supabaseAdmin = createClient(
@@ -185,7 +186,7 @@ Deno.serve(async (req) => {
       // Anonymous user - STRICT IP-based tracking
       // This prevents abuse via multiple emails/browsers on same IP
       const { data: result, error } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
-        p_ip_address: ipAddress,
+        p_ip_address: trackingKey,
         p_user_id: null,
         p_timezone: userTimezone
       });
