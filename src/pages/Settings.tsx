@@ -363,7 +363,7 @@ const Settings = () => {
                   placeholder={t('settings.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-full sm:w-64 bg-background/50 border-primary/20"
+                  className="pl-10 w-full sm:w-64 border-primary/20"
                 />
               </div>
               <Button

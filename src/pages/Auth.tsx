@@ -11,6 +11,7 @@ import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
 import akromedaLogo from '@/assets/akromeda-logo.svg';
 import { useLanguage } from '@/contexts/LanguageContext';
+import Logo from '@/components/Logo';
 
 const emailSchema = z.string().email('Invalid email address').max(255);
 const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
@@ -299,17 +300,20 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
-      
-      {/* Back button */}
-      <button
-        onClick={() => navigate('/')}
-        className="text-glow-link absolute top-6 left-6 z-20 flex items-center gap-2 text-muted-foreground"
-      >
-        <ArrowLeft className="h-5 w-5" />
-        <span>{t('common.back')}</span>
-      </button>
-      
+    <div className="min-h-screen bg-background flex items-center justify-center p-6 pt-24 relative overflow-hidden">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
+        <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Logo />
+          <Button
+            variant="ghost"
+            onClick={() => navigate('/')}
+            className="back-pill w-full sm:w-auto"
+          >
+            <ArrowLeft size={18} /> {t('common.backToHome')}
+          </Button>
+        </div>
+      </nav>
+
       <div className="w-full max-w-md relative z-10">
         <div className="space-y-2 pt-2">
           <div className="flex justify-center mb-3">
@@ -338,7 +342,6 @@ export default function Auth() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
-                  className="bg-background/50"
                 />
               </div>
               <Button
@@ -387,7 +390,7 @@ export default function Auth() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         disabled={loading}
-                        className="bg-background/50 pr-10"
+                        className="pr-10"
                       />
                       <button
                         type="button"
@@ -414,7 +417,7 @@ export default function Auth() {
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         required
                         disabled={loading}
-                        className="bg-background/50 pr-10"
+                        className="pr-10"
                       />
                       <button
                         type="button"
@@ -459,7 +462,6 @@ export default function Auth() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
-                    className="bg-background/50"
                   />
                   {isReturningUser && mode === 'login' && (
                     <button
@@ -486,7 +488,7 @@ export default function Auth() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={loading}
-                      className="bg-background/50 pr-10"
+                      className="pr-10"
                     />
                     <button
                       type="button"
@@ -573,3 +575,6 @@ export default function Auth() {
     </div>
   );
 }
+
+
+

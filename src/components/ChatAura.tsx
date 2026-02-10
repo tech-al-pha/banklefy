@@ -26,6 +26,14 @@ interface Message {
   timestamp: Date;
 }
 
+interface RecentConversion {
+  id: string;
+  original_filename: string;
+  created_at: string;
+  result_path: string | null;
+  status: string;
+}
+
 interface ChatAuraProps {
   pdfContext?: string;
   pdfFileName?: string;
@@ -52,6 +60,8 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [chatUsed, setChatUsed] = useState(getChatUsage());
+  const [recentConversions, setRecentConversions] = useState<RecentConversion[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Load context from sessionStorage if props not provided (for cross-page access)
@@ -85,6 +95,64 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
     setMessages([greeting]);
   }, [effectivePdfContext, effectiveFileName, t]);
 
+  useEffect(() => {
+    if (!user) {
+      setRecentConversions([]);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadRecent = async () => {
+      setRecentLoading(true);
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from("conversions")
+        .select("id, original_filename, created_at, result_path, status")
+        .eq("user_id", user.id)
+        .gte("created_at", since)
+        .order("created_at", { ascending: false });
+
+      if (!isMounted) return;
+
+      if (!error) {
+        setRecentConversions(data || []);
+      }
+      setRecentLoading(false);
+    };
+
+    loadRecent();
+
+    const channel = supabase
+      .channel(`chat-aura-conversions-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversions", filter: `user_id=eq.${user.id}` },
+        () => {
+          loadRecent();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  const findConversionFromMessage = (message: string) => {
+    if (!recentConversions.length) return null;
+    const normalizedMessage = message.toLowerCase();
+    const normalize = (name: string) => name.toLowerCase().replace(/\.[^/.]+$/, "");
+    const candidates = [...recentConversions].sort(
+      (a, b) => b.original_filename.length - a.original_filename.length,
+    );
+    return candidates.find((conv) =>
+      normalizedMessage.includes(conv.original_filename.toLowerCase()) ||
+      normalizedMessage.includes(normalize(conv.original_filename))
+    ) || null;
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading || isLimitReached) return;
 
@@ -94,6 +162,8 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
       content: input.trim(),
       timestamp: new Date()
     };
+
+    const matchedConversion = findConversionFromMessage(userMessage.content);
 
     setMessages(prev => [...prev, userMessage]);
     setInput("");
@@ -116,6 +186,22 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
         body: {
           message: userMessage.content,
           pdfContext: effectivePdfContext || null,
+          recentConversions: recentConversions.map((conv) => ({
+            id: conv.id,
+            fileName: conv.original_filename,
+            createdAt: conv.created_at,
+            status: conv.status,
+            resultPath: conv.result_path,
+          })),
+          selectedConversion: matchedConversion
+            ? {
+                id: matchedConversion.id,
+                fileName: matchedConversion.original_filename,
+                createdAt: matchedConversion.created_at,
+                status: matchedConversion.status,
+                resultPath: matchedConversion.result_path,
+              }
+            : null,
           conversationHistory: messages.map(m => ({ role: m.role, content: m.content })),
           recaptchaToken: sessionToken ? null : recaptchaToken
         },
@@ -172,6 +258,13 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
             <div>
               <CardTitle className="text-lg font-semibold">Chat Aura</CardTitle>
               <p className="text-xs text-muted-foreground">{t('chatAura.subtitle')}</p>
+              {user && (
+                <p className="text-[11px] text-muted-foreground">
+                  {recentLoading
+                    ? "Syncing your last 24 hours..."
+                    : `${recentConversions.length} recent file${recentConversions.length === 1 ? "" : "s"} indexed.`}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -254,7 +347,7 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyPress}
                 disabled={isLoading}
-                className="flex-1 bg-background/50 border-primary/20"
+                className="flex-1 border-primary/20"
               />
               <Button 
                 onClick={handleSend} 

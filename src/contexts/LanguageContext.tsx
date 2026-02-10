@@ -29,7 +29,7 @@ const translations: Record<Language, Record<string, string>> = {
     'hero.titleLine1': 'Bank Statement',
     'hero.titleLine2': 'Converter',
     'hero.tagline': 'Professional Look | OCR-Powered | Instant Results',
-    'hero.subtitle': 'AI-powered OCR bank statement conversion with bank-level security, accurate data extraction, error detection, loan & fraud analysis, and multi-format export.',
+    'hero.subtitle': 'AI OCR that turns bank statements into clean, structured spreadsheets with secure processing, accurate extraction, and multi-format export.',
     'hero.uploadBtn': 'Upload Your Statement Now',
     'hero.pricingBtn': 'View Pricing',
     'hero.sampleReportBtn': 'Sample Report',
@@ -50,8 +50,8 @@ const translations: Record<Language, Record<string, string>> = {
     'features.accuracyDesc': 'AI-powered extraction is designed to reduce errors.',
     'features.fast': 'Lightning Fast',
     'features.fastDesc': 'Convert statements in seconds',
-    'features.secure': 'Bank-Grade Security',
-    'features.secureDesc': 'Your data is encrypted and protected',
+    'features.secure': 'Secure Processing',
+    'features.secureDesc': 'Encrypted in transit with access-controlled storage.',
     
     // Pricing
     'pricing.title': 'Pricing',
@@ -69,14 +69,14 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.help.item2': 'Password-protected PDFs: enter password before convert',
     'footer.help.item3': 'Daily limits: anonymous 2/day, free 5/day, paid by plan',
     'footer.help.item4': 'Accuracy tips: upload full pages, avoid blur',
-    'footer.help.item5': 'Need help? Email inspirexali@gmail.com',
+    'footer.help.item5': 'Need help? Contact support.',
     'footer.company': 'Company',
     'footer.about': 'About',
     'footer.privacy': 'Privacy Policy',
     'footer.terms': 'Terms & Conditions',
     'footer.cta.title': 'Ready to Transform Your',
     'footer.cta.subtitle': 'Financial Workflow?',
-    'footer.cta.desc': 'Join thousands of businesses and individuals who trust Akromeda for accurate, instant bank statement conversions.',
+    'footer.cta.desc': 'Built for teams and individuals who need accurate, instant bank statement conversions.',
     'footer.cta.btn': 'Start Converting Now',
     'footer.copyright': '© 2026 Akromeda. Created by Faizan Rizvi.',
     'footer.recaptcha.prefix': 'This site is protected by reCAPTCHA and the Google',
@@ -106,7 +106,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Features Directory Page
     'featuresPage.title': 'ALL FEATURES',
     'featuresPage.subtitle':
-      'Complete A–Z list of everything Akromeda offers — from AI-powered OCR to bank-grade security. Built for accuracy, speed, and enterprise-grade financial analysis.',
+      'Complete A-Z list of everything Akromeda offers - from AI-powered OCR to privacy-first processing. Built for accuracy, speed, and clear financial analysis.',
     'featuresPage.categories.core': 'Core Technology',
     'featuresPage.categories.financial': 'Financial Analysis',
     'featuresPage.categories.risk': 'Risk Analysis',
@@ -168,12 +168,12 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.chatAura.desc':
       'Ask questions about your statement and get insights on transactions, cash flow, and spending patterns.',
 
-    'featuresPage.items.encryption.title': 'BANK-GRADE ENCRYPTION',
+    'featuresPage.items.encryption.title': 'ENCRYPTION IN TRANSIT',
     'featuresPage.items.encryption.desc':
-      'Strong encryption during upload, processing, and download to protect sensitive financial data.',
-    'featuresPage.items.zeroRetention.title': 'ZERO DATA RETENTION',
+      'Data is encrypted during upload and transfer to protect sensitive financial data.',
+    'featuresPage.items.zeroRetention.title': '24-HOUR RETENTION',
     'featuresPage.items.zeroRetention.desc':
-      'Files are not retained after processing. You keep full control of your data.',
+      'Files and results are retained for up to 24 hours for download, then deleted.',
 
     'featuresPage.items.categorization.title': 'SMART CATEGORIZATION',
     'featuresPage.items.categorization.desc':
@@ -246,7 +246,7 @@ const translations: Record<Language, Record<string, string>> = {
     'privacyPage.whatItems.item3': 'Works instantly — no software installation required',
     'privacyPage.whatItems.item4': 'Designed with data privacy and security at its core',
     'privacyPage.contactTitle': 'Questions?',
-    'privacyPage.contactDescPrefix': 'For privacy questions, contact',
+    'privacyPage.contactDescPrefix': 'For privacy questions, contact support.',
     'privacyPage.footer': '(c) 2026 Akromeda. All rights reserved.',
 
     // Settings Page
@@ -324,14 +324,14 @@ const translations: Record<Language, Record<string, string>> = {
     'helpPage.sections.limits.title': 'Daily Limits',
     'helpPage.sections.accuracy.title': 'Accuracy Tips',
     'helpPage.sections.refunds.title': 'Refunds',
-    'helpPage.sections.refunds.desc': 'Refunds are available for paid conversions that fail or produce unusable output. Contact support with your order ID within 7 days.',
+    'helpPage.sections.refunds.desc': 'Refunds are available within 14 days for eligible plans. Refunds are not available if 35% or more of usage is consumed. Contact support with your order ID.',
     'helpPage.sections.contact.title': 'Contact Support',
-    'helpPage.sections.contact.desc': 'Need help? Email inspirexali@gmail.com',
-    'helpPage.cta.contact': 'Email Support',
+    'helpPage.sections.contact.desc': 'Need help? Contact support and share your order ID if available.',
+    'helpPage.cta.contact': 'Contact Support',
     'featuresPage.items.helpCenter.title': 'HELP CENTER',
     'featuresPage.items.helpCenter.desc': 'Step-by-step guidance on formats, limits, and troubleshooting for smooth conversions.',
     'featuresPage.items.refunds.title': 'REFUND POLICY',
-    'featuresPage.items.refunds.desc': 'No-questions-asked refunds within 7 days. See Pricing for details.',
+    'featuresPage.items.refunds.desc': 'Refunds within 14 days for eligible plans. See Pricing for details.',
     // (dailyLimits.desc already defined above)
     // Language
     'language': 'English',
@@ -375,8 +375,8 @@ const translations: Record<Language, Record<string, string>> = {
     'features.accuracyDesc': 'AI-powered extraction is designed to reduce errors.',
     'features.fast': '闪电般快速',
     'features.fastDesc': '几秒钟内转换对账单',
-    'features.secure': '银行级安全',
-    'features.secureDesc': '您的数据已加密并受保护',
+    'features.secure': 'Secure Processing',
+    'features.secureDesc': 'Encrypted in transit with access-controlled storage.',
     
     // Pricing
     'pricing.title': '价格',
@@ -395,7 +395,7 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.terms': '条款和条件',
     'footer.cta.title': '准备好改变您的',
     'footer.cta.subtitle': '财务工作流程？',
-    'footer.cta.desc': '加入数千家信任Akromeda进行准确、即时银行对账单转换的企业和个人。',
+    'footer.cta.desc': 'Built for teams and individuals who need accurate, instant bank statement conversions.',
     'footer.cta.btn': '立即开始转换',
     'footer.copyright': '© 2026 Akromeda。由Faizan Rizvi创建。',
     'footer.recaptcha.prefix': '本网站受 reCAPTCHA 保护，并受 Google 的',
@@ -423,7 +423,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Features Directory Page
     'featuresPage.title': '全部功能',
     'featuresPage.subtitle':
-      'Akromeda 提供从 AI OCR 到银行级安全的完整功能清单，专为准确性、速度与企业级金融分析而打造。',
+      'Complete A-Z list of everything Akromeda offers - from AI-powered OCR to privacy-first processing. Built for accuracy, speed, and clear financial analysis.',
     'featuresPage.categories.core': '核心技术',
     'featuresPage.categories.financial': '财务分析',
     'featuresPage.categories.risk': '风险分析',
@@ -485,12 +485,12 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.chatAura.desc':
       '对账单问答与洞察：交易、现金流、支出结构等。',
 
-    'featuresPage.items.encryption.title': '银行级加密',
+    'featuresPage.items.encryption.title': 'ENCRYPTION IN TRANSIT',
     'featuresPage.items.encryption.desc':
-      '上传、处理与下载全程加密，保护敏感财务数据。',
-    'featuresPage.items.zeroRetention.title': '零数据留存',
+      'Data is encrypted during upload and transfer to protect sensitive financial data.',
+    'featuresPage.items.zeroRetention.title': '24-HOUR RETENTION',
     'featuresPage.items.zeroRetention.desc':
-      '处理完成后不保留文件，数据由你掌控。',
+      'Files and results are retained for up to 24 hours for download, then deleted.',
 
     'featuresPage.items.categorization.title': '智能分类',
     'featuresPage.items.categorization.desc':
@@ -558,17 +558,17 @@ const translations: Record<Language, Record<string, string>> = {
     'privacyPage.whatItems.item3': '即开即用，无需安装软件',
     'privacyPage.whatItems.item4': '以隐私与安全为核心设计',
     'privacyPage.contactTitle': 'Questions?',
-    'privacyPage.contactDescPrefix': 'For privacy questions, contact',
+    'privacyPage.contactDescPrefix': 'For privacy questions, contact support.',
     'privacyPage.footer': '(c) 2026 Akromeda. All rights reserved.',
 
     'hero.tagline': '专业外观 | OCR驱动 | 即时结果',
-    'hero.subtitle': 'AI驱动OCR银行对账单转换，提供银行级安全、精准数据提取、错误检测、贷款与欺诈分析以及多格式导出。',
+    'hero.subtitle': 'AI OCR that turns bank statements into clean, structured spreadsheets with secure processing, accurate extraction, and multi-format export.',
     'footer.help.title': '帮助',
     'footer.help.item1': '支持文件：PDF、JPG、PNG（扫描/照片）',
     'footer.help.item2': '密码保护PDF：转换前输入密码',
     'footer.help.item3': '每日限额：匿名2/天，免费5/天，付费按套餐',
     'footer.help.item4': '准确性提示：上传完整页面，避免模糊',
-    'footer.help.item5': '需要帮助？请邮件联系 inspirexali@gmail.com',
+    'footer.help.item5': 'Need help? Contact support.',
     'footer.helpCenter': '帮助中心',
     'footer.blog': '博客',
     'footer.refunds': '退款政策',
@@ -578,7 +578,7 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.helpCenter.title': '帮助中心',
     'featuresPage.items.helpCenter.desc': '提供格式、限额和故障排查的分步指南，确保顺利转换。',
     'featuresPage.items.refunds.title': '退款政策',
-    'featuresPage.items.refunds.desc': 'No-questions-asked refunds within 7 days. See Pricing for details.',
+    'featuresPage.items.refunds.desc': 'Refunds within 14 days for eligible plans. See Pricing for details.',
     'helpPage.title': '帮助中心',
     'helpPage.subtitle': '这里是转换对账单所需的全部帮助。',
     'helpPage.sections.files.title': '支持的文件',
@@ -586,10 +586,10 @@ const translations: Record<Language, Record<string, string>> = {
     'helpPage.sections.limits.title': '每日限额',
     'helpPage.sections.accuracy.title': '准确性提示',
     'helpPage.sections.refunds.title': '退款',
-    'helpPage.sections.refunds.desc': '若付费转换失败或输出不可用，可在7天内提供订单号联系支持申请退款。',
+    'helpPage.sections.refunds.desc': 'Refunds are available within 14 days for eligible plans. Refunds are not available if 35% or more of usage is consumed. Contact support with your order ID.',
     'helpPage.sections.contact.title': '联系支持',
-    'helpPage.sections.contact.desc': '需要帮助？请邮件联系 inspirexali@gmail.com',
-    'helpPage.cta.contact': '联系支持',
+    'helpPage.sections.contact.desc': 'Need help? Contact support and share your order ID if available.',
+    'helpPage.cta.contact': 'Contact Support',
     'featuresPage.cta.desc': '立即开始：每天免费 2 次转换；注册后每天 5 次，解锁完整能力。',
     // Language
     'language': '简体',
@@ -633,8 +633,8 @@ const translations: Record<Language, Record<string, string>> = {
     'features.accuracyDesc': 'AI-powered extraction is designed to reduce errors.',
     'features.fast': '超高速',
     'features.fastDesc': '数秒で明細書を変換',
-    'features.secure': '銀行レベルのセキュリティ',
-    'features.secureDesc': 'データは暗号化され保護されています',
+    'features.secure': 'Secure Processing',
+    'features.secureDesc': 'Encrypted in transit with access-controlled storage.',
     
     // Pricing
     'pricing.title': '価格',
@@ -653,7 +653,7 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.terms': '利用規約',
     'footer.cta.title': '変革の準備はできましたか',
     'footer.cta.subtitle': '財務ワークフロー？',
-    'footer.cta.desc': '正確で即座の銀行明細書変換でAkromedaを信頼する何千もの企業や個人に参加しましょう。',
+    'footer.cta.desc': 'Built for teams and individuals who need accurate, instant bank statement conversions.',
     'footer.cta.btn': '今すぐ変換を開始',
     'footer.copyright': '© 2026 Akromeda。Faizan Rizviが作成。',
     'footer.recaptcha.prefix': 'このサイトはreCAPTCHAで保護され、Googleの',
@@ -681,7 +681,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Features Directory Page
     'featuresPage.title': '全機能',
     'featuresPage.subtitle':
-      'AI OCR から銀行レベルのセキュリティまで、Akromeda の機能をA〜Zで一覧化。精度・速度・企業向け分析に最適化されています。',
+      'Complete A-Z list of everything Akromeda offers - from AI-powered OCR to privacy-first processing. Built for accuracy, speed, and clear financial analysis.',
     'featuresPage.categories.core': 'コア技術',
     'featuresPage.categories.financial': '財務分析',
     'featuresPage.categories.risk': 'リスク分析',
@@ -734,10 +734,10 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.chatAura.title': 'Chat Aura AI アシスタント',
     'featuresPage.items.chatAura.desc': '取引や支出、キャッシュフローについて質問して洞察を得られます。',
 
-    'featuresPage.items.encryption.title': '銀行レベル暗号化',
-    'featuresPage.items.encryption.desc': 'アップロード〜ダウンロードまで暗号化で保護し、機密データを守ります。',
-    'featuresPage.items.zeroRetention.title': 'データ非保持',
-    'featuresPage.items.zeroRetention.desc': '処理完了後にファイルを保持しません。データはあなたの管理下にあります。',
+    'featuresPage.items.encryption.title': 'ENCRYPTION IN TRANSIT',
+    'featuresPage.items.encryption.desc': 'Data is encrypted during upload and transfer to protect sensitive financial data.',
+    'featuresPage.items.zeroRetention.title': '24-HOUR RETENTION',
+    'featuresPage.items.zeroRetention.desc': 'Files and results are retained for up to 24 hours for download, then deleted.',
 
     'featuresPage.items.categorization.title': 'スマート分類',
     'featuresPage.items.categorization.desc': '給与、EMI、公共料金、買い物、食費などに自動分類（カスタム可能）。',
@@ -802,17 +802,17 @@ const translations: Record<Language, Record<string, string>> = {
     'privacyPage.whatItems.item3': 'インストール不要で即利用',
     'privacyPage.whatItems.item4': 'プライバシーとセキュリティを中核に設計',
     'privacyPage.contactTitle': 'Questions?',
-    'privacyPage.contactDescPrefix': 'For privacy questions, contact',
+    'privacyPage.contactDescPrefix': 'For privacy questions, contact support.',
     'privacyPage.footer': '(c) 2026 Akromeda. All rights reserved.',
 
     'hero.tagline': 'プロ仕様 | OCR搭載 | 即時結果',
-    'hero.subtitle': 'AI搭載OCRで銀行明細を変換。銀行レベルのセキュリティ、正確なデータ抽出、エラー検出、融資・不正分析、複数形式の出力に対応。',
+    'hero.subtitle': 'AI OCR that turns bank statements into clean, structured spreadsheets with secure processing, accurate extraction, and multi-format export.',
     'footer.help.title': 'ヘルプ',
     'footer.help.item1': '対応形式：PDF、JPG、PNG（スキャン/写真）',
     'footer.help.item2': 'パスワード付きPDF：変換前にパスワードを入力',
     'footer.help.item3': '日次上限：匿名2/日、無料5/日、有料はプラン別',
     'footer.help.item4': '精度のコツ：ページ全体をアップロードし、ブレを避ける',
-    'footer.help.item5': 'サポート：inspirexali@gmail.com',
+    'footer.help.item5': 'Need help? Contact support.',
     'footer.helpCenter': 'ヘルプセンター',
     'footer.blog': 'ブログ',
     'footer.refunds': '返金ポリシー',
@@ -822,7 +822,7 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.helpCenter.title': 'ヘルプセンター',
     'featuresPage.items.helpCenter.desc': '対応形式、制限、トラブル対処をわかりやすく案内。',
     'featuresPage.items.refunds.title': '返金ポリシー',
-    'featuresPage.items.refunds.desc': 'No-questions-asked refunds within 7 days. See Pricing for details.',
+    'featuresPage.items.refunds.desc': 'Refunds within 14 days for eligible plans. See Pricing for details.',
     'helpPage.title': 'ヘルプセンター',
     'helpPage.subtitle': '明細変換に必要な情報をまとめています。',
     'helpPage.sections.files.title': '対応ファイル',
@@ -830,10 +830,10 @@ const translations: Record<Language, Record<string, string>> = {
     'helpPage.sections.limits.title': '日次上限',
     'helpPage.sections.accuracy.title': '精度のコツ',
     'helpPage.sections.refunds.title': '返金',
-    'helpPage.sections.refunds.desc': '有料変換の失敗や利用不可の出力の場合、注文IDを添えて7日以内にご連絡ください。',
+    'helpPage.sections.refunds.desc': 'Refunds are available within 14 days for eligible plans. Refunds are not available if 35% or more of usage is consumed. Contact support with your order ID.',
     'helpPage.sections.contact.title': 'サポートに連絡',
-    'helpPage.sections.contact.desc': 'サポートが必要ですか？inspirexali@gmail.com まで',
-    'helpPage.cta.contact': 'サポートに連絡',
+    'helpPage.sections.contact.desc': 'Need help? Contact support and share your order ID if available.',
+    'helpPage.cta.contact': 'Contact Support',
     'featuresPage.cta.desc': '毎日2回の無料変換から開始。登録で毎日5回に増え、フル機能を解放します。',
     // Language
     'language': '日本語',
@@ -877,8 +877,8 @@ const translations: Record<Language, Record<string, string>> = {
     'features.accuracyDesc': 'AI-powered extraction is designed to reduce errors.',
     'features.fast': 'Rapidez relámpago',
     'features.fastDesc': 'Convierte extractos en segundos',
-    'features.secure': 'Seguridad bancaria',
-    'features.secureDesc': 'Tus datos están encriptados y protegidos',
+    'features.secure': 'Secure Processing',
+    'features.secureDesc': 'Encrypted in transit with access-controlled storage.',
     
     // Pricing
     'pricing.title': 'Precios',
@@ -897,7 +897,7 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.terms': 'Términos y Condiciones',
     'footer.cta.title': '¿Listo para transformar tu',
     'footer.cta.subtitle': 'flujo de trabajo financiero?',
-    'footer.cta.desc': 'Únete a miles de empresas e individuos que confían en Akromeda para conversiones de extractos bancarios precisas e instantáneas.',
+    'footer.cta.desc': 'Built for teams and individuals who need accurate, instant bank statement conversions.',
     'footer.cta.btn': 'Comienza a convertir ahora',
     'footer.copyright': '© 2026 Akromeda. Creado por Faizan Rizvi.',
     'footer.recaptcha.prefix': 'Este sitio está protegido por reCAPTCHA y la',
@@ -925,7 +925,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Features Directory Page
     'featuresPage.title': 'TODAS LAS FUNCIONES',
     'featuresPage.subtitle':
-      'Lista completa A–Z de todo lo que ofrece Akromeda: desde OCR con IA hasta seguridad de nivel bancario. Diseñado para precisión, velocidad y análisis financiero empresarial.',
+      'Complete A-Z list of everything Akromeda offers - from AI-powered OCR to privacy-first processing. Built for accuracy, speed, and clear financial analysis.',
     'featuresPage.categories.core': 'Tecnología principal',
     'featuresPage.categories.financial': 'Análisis financiero',
     'featuresPage.categories.risk': 'Análisis de riesgo',
@@ -981,10 +981,10 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.chatAura.title': 'ASISTENTE IA CHAT AURA',
     'featuresPage.items.chatAura.desc': 'Haz preguntas y obtén insights sobre transacciones, gasto y cashflow.',
 
-    'featuresPage.items.encryption.title': 'ENCRIPTACIÓN NIVEL BANCARIO',
-    'featuresPage.items.encryption.desc': 'Protección cifrada durante subida, procesamiento y descarga.',
-    'featuresPage.items.zeroRetention.title': 'CERO RETENCIÓN DE DATOS',
-    'featuresPage.items.zeroRetention.desc': 'No retenemos tus archivos tras el procesamiento. Tú controlas tu información.',
+    'featuresPage.items.encryption.title': 'ENCRYPTION IN TRANSIT',
+    'featuresPage.items.encryption.desc': 'Data is encrypted during upload and transfer to protect sensitive financial data.',
+    'featuresPage.items.zeroRetention.title': '24-HOUR RETENTION',
+    'featuresPage.items.zeroRetention.desc': 'Files and results are retained for up to 24 hours for download, then deleted.',
 
     'featuresPage.items.categorization.title': 'CATEGORIZACIÓN INTELIGENTE',
     'featuresPage.items.categorization.desc':
@@ -1050,17 +1050,17 @@ const translations: Record<Language, Record<string, string>> = {
     'privacyPage.whatItems.item3': 'Funciona al instante — sin instalar software',
     'privacyPage.whatItems.item4': 'Diseñado con privacidad y seguridad como base',
     'privacyPage.contactTitle': 'Questions?',
-    'privacyPage.contactDescPrefix': 'For privacy questions, contact',
+    'privacyPage.contactDescPrefix': 'For privacy questions, contact support.',
     'privacyPage.footer': '(c) 2026 Akromeda. All rights reserved.',
 
     'hero.tagline': 'Aspecto profesional | OCR avanzado | Resultados instantáneos',
-    'hero.subtitle': 'Conversión de extractos bancarios con OCR con seguridad de nivel bancario, extracción precisa, detección de errores, análisis de préstamos y fraude, y exportación multiformato.',
+    'hero.subtitle': 'AI OCR that turns bank statements into clean, structured spreadsheets with secure processing, accurate extraction, and multi-format export.',
     'footer.help.title': 'Ayuda',
     'footer.help.item1': 'Archivos compatibles: PDF, JPG, PNG (escaneos y fotos)',
     'footer.help.item2': 'PDF con contraseña: ingresa la contraseña antes de convertir',
     'footer.help.item3': 'Límites diarios: anónimo 2/día, gratis 5/día, pago según plan',
     'footer.help.item4': 'Consejos de precisión: sube páginas completas, evita el desenfoque',
-    'footer.help.item5': '¿Necesitas ayuda? inspirexali@gmail.com',
+    'footer.help.item5': 'Need help? Contact support.',
     'footer.helpCenter': 'Centro de ayuda',
     'footer.blog': 'Blog',
     'footer.refunds': 'Política de reembolsos',
@@ -1070,7 +1070,7 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.helpCenter.title': 'CENTRO DE AYUDA',
     'featuresPage.items.helpCenter.desc': 'Guías sobre formatos, límites y solución de problemas para conversiones fluidas.',
     'featuresPage.items.refunds.title': 'POLÍTICA DE REEMBOLSOS',
-    'featuresPage.items.refunds.desc': 'No-questions-asked refunds within 7 days. See Pricing for details.',
+    'featuresPage.items.refunds.desc': 'Refunds within 14 days for eligible plans. See Pricing for details.',
     'helpPage.title': 'Centro de ayuda',
     'helpPage.subtitle': 'Todo lo que necesitas para convertir estados de cuenta sin problemas.',
     'helpPage.sections.files.title': 'Archivos compatibles',
@@ -1078,10 +1078,10 @@ const translations: Record<Language, Record<string, string>> = {
     'helpPage.sections.limits.title': 'Límites diarios',
     'helpPage.sections.accuracy.title': 'Consejos de precisión',
     'helpPage.sections.refunds.title': 'Reembolsos',
-    'helpPage.sections.refunds.desc': 'Reembolsos disponibles para conversiones pagadas fallidas o con resultado inutilizable. Contacta con tu ID de pedido dentro de 7 días.',
+    'helpPage.sections.refunds.desc': 'Refunds are available within 14 days for eligible plans. Refunds are not available if 35% or more of usage is consumed. Contact support with your order ID.',
     'helpPage.sections.contact.title': 'Contacto',
-    'helpPage.sections.contact.desc': '¿Necesitas ayuda? Escribe a inspirexali@gmail.com',
-    'helpPage.cta.contact': 'Contactar soporte',
+    'helpPage.sections.contact.desc': 'Need help? Contact support and share your order ID if available.',
+    'helpPage.cta.contact': 'Contact Support',
     'featuresPage.cta.desc': 'Empieza con 2 conversiones gratis al día. Regístrate para 5 al día y desbloquea todo.',
     // Language
     'language': 'Español',
@@ -1125,8 +1125,8 @@ const translations: Record<Language, Record<string, string>> = {
     'features.accuracyDesc': 'AI-powered extraction is designed to reduce errors.',
     'features.fast': 'Velocità fulminea',
     'features.fastDesc': 'Converti estratti in secondi',
-    'features.secure': 'Sicurezza bancaria',
-    'features.secureDesc': 'I tuoi dati sono crittografati e protetti',
+    'features.secure': 'Secure Processing',
+    'features.secureDesc': 'Encrypted in transit with access-controlled storage.',
     
     // Pricing
     'pricing.title': 'Prezzi',
@@ -1145,7 +1145,7 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.terms': 'Termini e condizioni',
     'footer.cta.title': 'Pronto a trasformare il tuo',
     'footer.cta.subtitle': 'flusso di lavoro finanziario?',
-    'footer.cta.desc': 'Unisciti a migliaia di aziende e privati che si affidano ad Akromeda per conversioni di estratti conto accurate e istantanee.',
+    'footer.cta.desc': 'Built for teams and individuals who need accurate, instant bank statement conversions.',
     'footer.cta.btn': 'Inizia a convertire ora',
     'footer.copyright': '© 2026 Akromeda. Creato da Faizan Rizvi.',
     'footer.recaptcha.prefix': 'Questo sito è protetto da reCAPTCHA e la',
@@ -1173,7 +1173,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Features Directory Page
     'featuresPage.title': 'TUTTE LE FUNZIONALITÀ',
     'featuresPage.subtitle':
-      'Elenco completo A–Z di tutto ciò che offre Akromeda: dall\'OCR con IA alla sicurezza di livello bancario. Creato per precisione, velocità e analisi finanziaria enterprise.',
+      'Complete A-Z list of everything Akromeda offers - from AI-powered OCR to privacy-first processing. Built for accuracy, speed, and clear financial analysis.',
     'featuresPage.categories.core': 'Tecnologia core',
     'featuresPage.categories.financial': 'Analisi finanziaria',
     'featuresPage.categories.risk': 'Analisi del rischio',
@@ -1228,10 +1228,10 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.chatAura.title': 'ASSISTENTE IA CHAT AURA',
     'featuresPage.items.chatAura.desc': 'Fai domande e ottieni insight su transazioni, spese e cashflow.',
 
-    'featuresPage.items.encryption.title': 'CIFRATURA LIVELLO BANCARIO',
-    'featuresPage.items.encryption.desc': 'Protezione cifrata durante upload, elaborazione e download.',
-    'featuresPage.items.zeroRetention.title': 'ZERO RETENTION',
-    'featuresPage.items.zeroRetention.desc': 'Non conserviamo i file dopo l\'elaborazione. Controllo totale dei dati.',
+    'featuresPage.items.encryption.title': 'ENCRYPTION IN TRANSIT',
+    'featuresPage.items.encryption.desc': 'Data is encrypted during upload and transfer to protect sensitive financial data.',
+    'featuresPage.items.zeroRetention.title': '24-HOUR RETENTION',
+    'featuresPage.items.zeroRetention.desc': 'Files and results are retained for up to 24 hours for download, then deleted.',
 
     'featuresPage.items.categorization.title': 'CATEGORIZZAZIONE SMART',
     'featuresPage.items.categorization.desc':
@@ -1297,17 +1297,17 @@ const translations: Record<Language, Record<string, string>> = {
     'privacyPage.whatItems.item3': 'Funziona subito — nessuna installazione',
     'privacyPage.whatItems.item4': 'Progettato con privacy e sicurezza al centro',
     'privacyPage.contactTitle': 'Questions?',
-    'privacyPage.contactDescPrefix': 'For privacy questions, contact',
+    'privacyPage.contactDescPrefix': 'For privacy questions, contact support.',
     'privacyPage.footer': '© 2026 Akromeda. Tutti i diritti riservati.',
 
     'hero.tagline': 'Aspetto professionale | OCR avanzato | Risultati immediati',
-    'hero.subtitle': 'Conversione con OCR di estratti conto con sicurezza di livello bancario, estrazione accurata, rilevamento errori, analisi prestiti e frodi, ed export multiformato.',
+    'hero.subtitle': 'AI OCR that turns bank statements into clean, structured spreadsheets with secure processing, accurate extraction, and multi-format export.',
     'footer.help.title': 'Aiuto',
     'footer.help.item1': 'File supportati: PDF, JPG, PNG (scansioni e foto)',
     'footer.help.item2': 'PDF protetti da password: inserisci la password prima di convertire',
     'footer.help.item3': 'Limiti giornalieri: anonimo 2/giorno, free 5/giorno, pagato secondo piano',
     'footer.help.item4': 'Suggerimenti: carica pagine intere, evita immagini sfocate',
-    'footer.help.item5': 'Serve aiuto? inspirexali@gmail.com',
+    'footer.help.item5': 'Need help? Contact support.',
     'footer.helpCenter': 'Centro assistenza',
     'footer.blog': 'Blog',
     'footer.refunds': 'Politica di rimborso',
@@ -1317,7 +1317,7 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.helpCenter.title': 'CENTRO ASSISTENZA',
     'featuresPage.items.helpCenter.desc': 'Guide su formati, limiti e risoluzione problemi per conversioni senza intoppi.',
     'featuresPage.items.refunds.title': 'POLITICA DI RIMBORSO',
-    'featuresPage.items.refunds.desc': 'No-questions-asked refunds within 7 days. See Pricing for details.',
+    'featuresPage.items.refunds.desc': 'Refunds within 14 days for eligible plans. See Pricing for details.',
     'helpPage.title': 'Centro assistenza',
     'helpPage.subtitle': 'Tutto ciò che serve per convertire estratti conto senza problemi.',
     'helpPage.sections.files.title': 'File supportati',
@@ -1325,10 +1325,10 @@ const translations: Record<Language, Record<string, string>> = {
     'helpPage.sections.limits.title': 'Limiti giornalieri',
     'helpPage.sections.accuracy.title': 'Suggerimenti di accuratezza',
     'helpPage.sections.refunds.title': 'Rimborsi',
-    'helpPage.sections.refunds.desc': 'Rimborsi disponibili per conversioni a pagamento fallite o con output inutilizzabile. Contatta il supporto con l\'ID ordine entro 7 giorni.',
+    'helpPage.sections.refunds.desc': 'Rimborsi entro 14 giorni per i piani idonei. Nessun rimborso se il 35% o piu dell\'uso e stato consumato. Contatta il supporto con il tuo ID ordine.',
     'helpPage.sections.contact.title': 'Contatta il supporto',
-    'helpPage.sections.contact.desc': 'Serve aiuto? Scrivi a inspirexali@gmail.com',
-    'helpPage.cta.contact': 'Contatta supporto',
+    'helpPage.sections.contact.desc': 'Need help? Contact support and share your order ID if available.',
+    'helpPage.cta.contact': 'Contact Support',
     'featuresPage.cta.desc': 'Inizia con 2 conversioni gratis al giorno. Registrati per 5 al giorno e sblocca tutto.',
     // Language
     'language': 'Italiano',
@@ -1372,8 +1372,8 @@ const translations: Record<Language, Record<string, string>> = {
     'features.accuracyDesc': 'الاستخراج المدعوم بالذكاء الاصطناعي مصمم لتقليل الأخطاء.',
     'features.fast': 'سرعة فائقة',
     'features.fastDesc': 'حوّل الكشوف في ثوانٍ',
-    'features.secure': 'أمان بمستوى البنوك',
-    'features.secureDesc': 'بياناتك مشفرة ومحميّة',
+    'features.secure': 'Secure Processing',
+    'features.secureDesc': 'Encrypted in transit with access-controlled storage.',
     
     // Pricing
     'pricing.title': 'الأسعار',
@@ -1392,7 +1392,7 @@ const translations: Record<Language, Record<string, string>> = {
     'footer.terms': 'الشروط والأحكام',
     'footer.cta.title': 'جاهز لتحويل',
     'footer.cta.subtitle': 'سير عملك المالي؟',
-    'footer.cta.desc': 'انضم إلى آلاف الشركات والأفراد الذين يثقون في Akromeda لتحويل كشوفات الحساب بدقة وفورًا.',
+    'footer.cta.desc': 'Built for teams and individuals who need accurate, instant bank statement conversions.',
     'footer.cta.btn': 'ابدأ التحويل الآن',
     'footer.copyright': '© 2026 Akromeda. من إنشاء Faizan Rizvi.',
     'footer.recaptcha.prefix': 'هذا الموقع محمي بواسطة reCAPTCHA و',
@@ -1420,7 +1420,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Features Directory Page
     'featuresPage.title': 'جميع الميزات',
     'featuresPage.subtitle':
-      'قائمة شاملة من الألف إلى الياء بكل ما يقدمه Akromeda — من OCR المدعوم بالذكاء الاصطناعي إلى الأمان بمستوى البنوك. مصمم للدقة والسرعة والتحليل المالي بمستوى المؤسسات.',
+      'Complete A-Z list of everything Akromeda offers - from AI-powered OCR to privacy-first processing. Built for accuracy, speed, and clear financial analysis.',
     'featuresPage.categories.core': 'التقنية الأساسية',
     'featuresPage.categories.financial': 'التحليل المالي',
     'featuresPage.categories.risk': 'تحليل المخاطر',
@@ -1482,12 +1482,12 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.chatAura.desc':
       'اسأل عن كشفك واحصل على رؤى حول المعاملات والتدفق النقدي وأنماط الإنفاق.',
 
-    'featuresPage.items.encryption.title': 'تشفير بمستوى البنوك',
+    'featuresPage.items.encryption.title': 'ENCRYPTION IN TRANSIT',
     'featuresPage.items.encryption.desc':
-      'تشفير قوي أثناء الرفع والمعالجة والتنزيل لحماية البيانات المالية الحساسة.',
-    'featuresPage.items.zeroRetention.title': 'عدم الاحتفاظ بالبيانات',
+      'Data is encrypted during upload and transfer to protect sensitive financial data.',
+    'featuresPage.items.zeroRetention.title': '24-HOUR RETENTION',
     'featuresPage.items.zeroRetention.desc':
-      'لا يتم الاحتفاظ بالملفات بعد المعالجة. أنت تتحكم بالكامل في بياناتك.',
+      'Files and results are retained for up to 24 hours for download, then deleted.',
 
     'featuresPage.items.categorization.title': 'تصنيف ذكي',
     'featuresPage.items.categorization.desc':
@@ -1554,7 +1554,7 @@ const translations: Record<Language, Record<string, string>> = {
     'privacyPage.whatItems.item3': 'تعمل فورًا — دون تثبيت برامج',
     'privacyPage.whatItems.item4': 'مصممة بخصوصية وأمان البيانات في جوهرها',
     'privacyPage.contactTitle': 'أسئلة؟',
-    'privacyPage.contactDescPrefix': 'للاستفسارات حول الخصوصية، تواصل مع',
+    'privacyPage.contactDescPrefix': 'For privacy questions, contact support.',
     'privacyPage.footer': '(c) 2026 Akromeda. جميع الحقوق محفوظة.',
 
     // Settings Page
@@ -1622,13 +1622,13 @@ const translations: Record<Language, Record<string, string>> = {
     'chatAura.signUp': 'سجّل',
 
     'hero.tagline': 'مظهر احترافي | OCR متقدم | نتائج فورية',
-    'hero.subtitle': 'تحويل كشوف الحساب بتقنية OCR مع أمان بمستوى البنوك، استخراج دقيق للبيانات، اكتشاف الأخطاء، تحليل القروض والاحتيال، وتصدير متعدد الصيغ.',
+    'hero.subtitle': 'AI OCR that turns bank statements into clean, structured spreadsheets with secure processing, accurate extraction, and multi-format export.',
     'footer.help.title': 'مساعدة',
     'footer.help.item1': 'الملفات المدعومة: PDF وJPG وPNG (مسح/صور)',
     'footer.help.item2': 'ملفات PDF المحمية بكلمة مرور: أدخل كلمة المرور قبل التحويل',
     'footer.help.item3': 'الحدود اليومية: مجهول 2/يوم، مجاني 5/يوم، والمدفوع حسب الخطة',
     'footer.help.item4': 'نصائح الدقة: ارفع الصفحات كاملة وتجنب التشويش',
-    'footer.help.item5': 'بحاجة للمساعدة؟ راسل inspirexali@gmail.com',
+    'footer.help.item5': 'Need help? Contact support.',
     'footer.helpCenter': 'مركز المساعدة',
     'footer.blog': 'المدونة',
     'footer.refunds': 'سياسة الاسترداد',
@@ -1638,7 +1638,7 @@ const translations: Record<Language, Record<string, string>> = {
     'featuresPage.items.helpCenter.title': 'مركز المساعدة',
     'featuresPage.items.helpCenter.desc': 'إرشادات حول الصيغ والحدود وحل المشاكل لضمان تحويل سلس.',
     'featuresPage.items.refunds.title': 'سياسة الاسترداد',
-    'featuresPage.items.refunds.desc': 'No-questions-asked refunds within 7 days. See Pricing for details.',
+    'featuresPage.items.refunds.desc': 'Refunds within 14 days for eligible plans. See Pricing for details.',
     'helpPage.title': 'مركز المساعدة',
     'helpPage.subtitle': 'كل ما تحتاجه لتحويل الكشوف بسلاسة.',
     'helpPage.sections.files.title': 'الملفات المدعومة',
@@ -1646,10 +1646,10 @@ const translations: Record<Language, Record<string, string>> = {
     'helpPage.sections.limits.title': 'الحدود اليومية',
     'helpPage.sections.accuracy.title': 'نصائح الدقة',
     'helpPage.sections.refunds.title': 'الاسترداد',
-    'helpPage.sections.refunds.desc': 'يتوفر الاسترداد للتحويلات المدفوعة التي تفشل أو تعطي ناتجًا غير قابل للاستخدام. تواصل خلال 7 أيام مع رقم الطلب.',
+    'helpPage.sections.refunds.desc': 'Refunds are available within 14 days for eligible plans. Refunds are not available if 35% or more of usage is consumed. Contact support with your order ID.',
     'helpPage.sections.contact.title': 'تواصل مع الدعم',
-    'helpPage.sections.contact.desc': 'هل تحتاج مساعدة؟ راسل inspirexali@gmail.com',
-    'helpPage.cta.contact': 'تواصل مع الدعم',
+    'helpPage.sections.contact.desc': 'Need help? Contact support and share your order ID if available.',
+    'helpPage.cta.contact': 'Contact Support',
     'featuresPage.cta.desc': 'ابدأ التحويل الآن مع تحويلين مجانيين يوميًا. سجّل للحصول على 5 تحويلات يوميًا وافتح القوة الكاملة لـ Akromeda.',
     // Language
     'language': 'العربية',
@@ -1705,4 +1705,25 @@ export const useLanguage = () => {
 };
 
 export { languageNames };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -17,6 +17,7 @@ import { FraudAlertPanel } from "./FraudAlertPanel";
 import { UnderwritingPanel } from "./UnderwritingPanel";
 import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
 import { AIStatusPanel } from "./AIStatusPanel";
+import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 import akromedaLogo from "@/assets/akromeda-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { getAnonymousClientId } from "@/lib/usageClient";
@@ -299,6 +300,7 @@ export const UploadDemo = () => {
   const dismissedEditedWarningsRef = useRef<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const { hasChatAuraAccess } = useSubscriptionTier();
   const navigate = useNavigate();
   const formatAmount = (
     value: number,
@@ -788,6 +790,10 @@ Analytics Summary:
         sessionStorage.setItem('chatAuraFileName', selectedFile?.name || 'Bank Statement');
       }
 
+      if (data?.conversionId) {
+        sessionStorage.setItem('chatAuraLastConversionId', data.conversionId);
+      }
+
       // Refresh usage limit after successful conversion
       refreshUsageLimit();
 
@@ -796,6 +802,7 @@ Analytics Summary:
         description: [
           `Extracted ${data?.transactions?.length || 0} transactions.`,
           formatRemaining(data?.remaining),
+          hasChatAuraAccess ? "Chat Aura wants to say something. Open Chat Aura to view it." : null,
         ]
           .filter(Boolean)
           .join(" "),
@@ -1049,6 +1056,7 @@ Analytics Summary:
         description: [
           `${results.length} ${pluralize(results.length, "statement")} converted.`,
           formatRemaining(data?.remaining),
+          hasChatAuraAccess ? "Chat Aura wants to say something. Open Chat Aura to view it." : null,
         ]
           .filter(Boolean)
           .join(" "),
@@ -2471,7 +2479,7 @@ Analytics Summary:
               {/* Supported Banks */}
               <div className="text-center pt-8 border-t border-muted">
                 <p className="text-sm text-muted-foreground mb-4">
-                  Supports 1000+ banks worldwide
+                  Compatible with most major banks worldwide
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {["HDFC Bank", "ICICI Bank", "Axis Bank", "State Bank of India", "IDBI Bank", "Yes Bank", "Kotak Bank", "Union Bank", "Bank of Baroda", "Punjab National Bank", "HSBC", "Citibank", "Deutsche Bank", "Chase Bank", "Bank of America", "Wells Fargo", "Santander", "BNP Paribas", "ING", "Barclays", "DBS Bank", "OCBC", "UOB", "China Construction Bank", "Agricultural Bank of China", "Bank of China", "ICBC", "Mitsubishi UFJ", "Sumitomo Mitsui", "Nomura"].map((bank) => (
@@ -2527,6 +2535,7 @@ Analytics Summary:
     </section>
   );
 };
+
 
 
 

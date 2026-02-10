@@ -206,13 +206,46 @@ export const useSettings = () => {
   }, [settings, toast]);
 
   const deleteAccount = useCallback(async () => {
-    // Note: Full account deletion requires admin action or edge function
-    // This is a placeholder that signs out the user
-    toast({
-      title: "Account deletion requested",
-      description: "Please contact support to complete account deletion.",
-    });
-  }, [toast]);
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Unable to delete account",
+        description: "Please sign in again and retry.",
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        throw new Error("Missing session token");
+      }
+
+      const { error } = await supabase.functions.invoke("delete-account", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      await supabase.auth.signOut();
+      toast({
+        title: "Account deleted",
+        description: "Your account and data have been removed.",
+      });
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Deletion failed",
+        description: getErrorMessage(error, "Could not delete account. Please try again."),
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [toast, user]);
 
   return {
     settings,

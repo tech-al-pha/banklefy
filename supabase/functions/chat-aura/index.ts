@@ -67,6 +67,20 @@ async function verifyRecaptcha(token: string): Promise<boolean> {
 interface ChatRequest {
   message: string;
   pdfContext?: string | null;
+  recentConversions?: Array<{
+    id: string;
+    fileName: string;
+    createdAt: string;
+    status?: string | null;
+    resultPath?: string | null;
+  }>;
+  selectedConversion?: {
+    id: string;
+    fileName: string;
+    createdAt: string;
+    status?: string | null;
+    resultPath?: string | null;
+  } | null;
   conversationHistory?: Array<{ role: string; content: string }>;
   recaptchaToken?: string | null;
 }

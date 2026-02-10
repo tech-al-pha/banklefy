@@ -139,11 +139,15 @@ const Terms = () => {
         <div className="container mx-auto max-w-4xl text-center space-y-6">
           <h2 className="text-3xl font-bold">Questions About These Terms?</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            If you have any questions about our Terms of Service, please contact us at{' '}
-            <a href="mailto:inspirexali@gmail.com" className="text-primary hover:underline">
-              inspirexali@gmail.com
-            </a>
+            If you have any questions about our Terms of Service, please contact support.
           </p>
+          <Button
+            size="lg"
+            className="bg-primary text-primary-foreground shadow-neon"
+            asChild
+          >
+            <a href="mailto:inspirexali@gmail.com">Contact Support</a>
+          </Button>
           <Button 
             size="lg" 
             className="back-pill"

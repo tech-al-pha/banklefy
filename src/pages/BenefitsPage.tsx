@@ -29,7 +29,7 @@ const benefits: Benefit[] = [
   {
     icon: TrendingUp,
     title: "Increased Efficiency",
-    description: "Process documents 10x faster with AI-powered analysis and automation.",
+    description: "Process documents faster with AI-powered analysis and automation.",
     category: "Performance",
   },
   {
@@ -40,14 +40,14 @@ const benefits: Benefit[] = [
   },
   {
     icon: Shield,
-    title: "Maximum Security",
-    description: "Enterprise-grade encryption ensures your sensitive documents stay protected.",
+    title: "Secure Processing",
+    description: "Encrypted in transit with access controls to protect sensitive documents.",
     category: "Security",
   },
   {
     icon: Lock,
     title: "Privacy First",
-    description: "Your data is yours. We never store or share your documents without consent.",
+    description: "Your data stays yours. Files are stored temporarily for processing and download.",
     category: "Security",
   },
   {
@@ -88,14 +88,14 @@ const benefits: Benefit[] = [
   },
   {
     icon: Award,
-    title: "Industry Leading Quality",
-    description: "Trusted by thousands of professionals for accurate and reliable analysis.",
+    title: "Reliable Quality",
+    description: "Built for professionals who need accurate and reliable analysis.",
     category: "Quality",
   },
   {
     icon: InfinityIcon,
-    title: "Unlimited Scalability",
-    description: "Handle projects of any size without performance degradation.",
+    title: "Scales With You",
+    description: "Handle growing workloads without slowing down your workflow.",
     category: "Scalability",
   },
 ];
@@ -143,8 +143,8 @@ const BenefitsPage = () => {
             Why Choose Us
           </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Discover the powerful benefits that make our platform the trusted choice for document
-            analysis and processing.
+            Discover the benefits that make our platform a strong choice for document analysis
+            and processing.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             {categories.map((cat) => (

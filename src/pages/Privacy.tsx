@@ -77,7 +77,7 @@ const Privacy = () => {
     {
       icon: Mail,
       title: "Contact & Data Requests",
-      content: "For privacy questions, contact inspirexali@gmail.com. We aim to respond within a reasonable time.",
+      content: "For privacy questions or data requests, contact support. We aim to respond within a reasonable time.",
     },
   ];
 
@@ -151,8 +151,15 @@ const Privacy = () => {
         <div className="container mx-auto max-w-4xl text-center space-y-6">
           <h2 className="text-3xl font-bold">{t('privacyPage.contactTitle')}</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            {t('privacyPage.contactDescPrefix')} <a href="mailto:inspirexali@gmail.com" className="text-primary hover:underline">inspirexali@gmail.com</a>
+            {t('privacyPage.contactDescPrefix')}
           </p>
+          <Button
+            size="lg"
+            className="bg-primary text-primary-foreground shadow-neon"
+            asChild
+          >
+            <a href="mailto:inspirexali@gmail.com">Contact Support</a>
+          </Button>
           <Button 
             size="lg" 
             className="back-pill"

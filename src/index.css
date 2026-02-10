@@ -65,16 +65,16 @@
   input,
   textarea,
   select {
-    color: var(--text-primary);
-    background-color: rgba(20, 20, 20, 0.92);
+    color: #f5f5f5;
+    background-color: rgba(18, 18, 18, 0.95);
     color-scheme: dark;
-    caret-color: var(--text-primary);
-    border-color: rgba(255, 255, 255, 0.16);
+    caret-color: #f5f5f5;
+    border-color: rgba(255, 255, 255, 0.2);
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.5);
   }
 
   html,
@@ -253,9 +253,7 @@
 
   .btn-glow:hover:not(:disabled),
   .btn-glow:focus-visible:not(:disabled) {
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.08),
-      0 0 16px rgba(255, 255, 255, 0.2);
+    box-shadow: none !important;
   }
 
   .excel-button {
@@ -372,17 +370,21 @@
     outline: none !important;
     color: var(--text-muted);
     text-decoration: none !important;
+    text-shadow: none;
     transition: color 200ms ease, text-shadow 200ms ease, filter 200ms ease;
   }
 
   .text-glow-link span {
-    color: inherit;
+    color: currentColor !important;
+    display: inline-block;
+    text-shadow: none;
+    transition: color 200ms ease, text-shadow 200ms ease;
   }
 
   .text-glow-link:hover,
   .text-glow-link:focus-visible {
-    color: var(--text-primary);
-    text-shadow: 0 0 4px rgba(255, 255, 255, 0.25);
+    color: #f8f8f8;
+    text-shadow: none;
     box-shadow: none !important;
     filter: none;
     outline: none !important;
@@ -390,7 +392,7 @@
 
   .text-glow-link:hover span,
   .text-glow-link:focus-visible span {
-    text-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+    text-shadow: 0 0 6px rgba(255, 255, 255, 0.32);
   }
 
   input:-webkit-autofill,
@@ -405,15 +407,15 @@
   input:-internal-autofill-selected,
   textarea:-internal-autofill-selected,
   select:-internal-autofill-selected {
-    box-shadow: 0 0 0 1000px rgba(15, 14, 14, 0.95) inset !important;
+    box-shadow: 0 0 0 1000px rgba(20, 20, 20, 0.96) inset !important;
     -webkit-text-fill-color: #ffffff !important;
     caret-color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.25) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
   }
 
   .text-glow-link:hover svg,
   .text-glow-link:focus-visible svg {
-    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.32));
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.25));
   }
 
   .skeleton-shimmer {
@@ -454,18 +456,14 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-weight: 600;
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.04),
-      0 0 12px rgba(255, 255, 255, 0.12) !important;
+    box-shadow: none !important;
   }
 
   .back-pill:hover,
   .back-pill:focus-visible {
     background: rgba(25, 25, 25, 0.78) !important;
     border-color: rgba(255, 255, 255, 0.45) !important;
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.12),
-      0 0 20px rgba(255, 255, 255, 0.25) !important;
+    box-shadow: none !important;
   }
 
   .surface-panel.elevated {

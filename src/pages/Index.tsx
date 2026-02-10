@@ -55,7 +55,7 @@ const Index = () => {
       >
         <div className="container mx-auto px-4 sm:px-6 py-1.5 sm:py-2.5">
           <div className="flex items-center justify-between">
-          <div className="ml-6 sm:ml-8">
+          <div className="ml-10 sm:ml-12">
             <Logo />
           </div>
           <div className="hidden lg:flex items-center gap-3">

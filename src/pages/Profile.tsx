@@ -28,6 +28,8 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState("");
   const [nameChanged, setNameChanged] = useState(false);
+  const authFlags = user as { email_confirmed_at?: string | null; confirmed_at?: string | null } | null;
+  const isVerified = Boolean(authFlags?.email_confirmed_at || authFlags?.confirmed_at);
 
   const fetchRecent = useCallback(async (showLoading = false) => {
     if (!user) return;
@@ -109,8 +111,9 @@ const Profile = () => {
           <div className="flex items-center gap-3">
             <Logo />
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate("/")} className="border-primary/50">
-            Back to Home
+          <Button variant="outline" size="sm" onClick={signOut} className="border-primary/50">
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
           </Button>
         </div>
       </nav>
@@ -124,7 +127,7 @@ const Profile = () => {
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Email</p>
                 <div className="flex items-center gap-2">
                   <p className="text-base font-semibold text-foreground">{user.email}</p>
-                  <Badge variant="secondary">Verified</Badge>
+                  {isVerified && <Badge variant="secondary">Verified</Badge>}
                 </div>
               </div>
               <div>
@@ -136,7 +139,6 @@ const Profile = () => {
                       setDisplayName(e.target.value);
                       setNameChanged(e.target.value !== (user?.user_metadata?.full_name || ""));
                     }}
-                    className="bg-background/50"
                     placeholder="Enter your name"
                   />
                   {nameChanged && (
@@ -155,9 +157,8 @@ const Profile = () => {
               </div>
             </div>
             <div className="mt-6">
-              <Button variant="outline" size="sm" onClick={signOut} className="border-primary/50">
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign Out
+              <Button variant="outline" size="sm" onClick={() => navigate("/")} className="border-primary/50">
+                Back to Home
               </Button>
             </div>
           </Card>

@@ -480,7 +480,12 @@ export default function Admin() {
                     <Shield className="mr-1 h-3 w-3" />
                     Admin
                   </Badge>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => navigate("/settings")}
+                  >
                     <Settings className="h-4 w-4" />
                     Settings
                   </Button>

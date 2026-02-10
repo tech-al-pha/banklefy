@@ -51,7 +51,7 @@ const AppRoutes = () => {
       "/features": {
         title: "Features | Akromeda Bank Statement Converter",
         description:
-          "Explore AI OCR, multilingual support, and bank-level security features for fast statement-to-Excel conversion.",
+          "Explore AI OCR, multilingual support, and secure processing for fast statement-to-Excel conversion.",
       },
       "/benefits": {
         title: "Benefits | Akromeda Statement Converter",
