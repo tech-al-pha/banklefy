@@ -304,10 +304,10 @@ export default function Auth() {
       {/* Back button */}
       <button
         onClick={() => navigate('/')}
-        className="btn-glow absolute top-6 left-6 z-20 flex items-center gap-2 text-muted-foreground"
+        className="no-hover-glow text-glow-link absolute top-6 left-6 z-20 flex items-center gap-2 text-muted-foreground"
       >
         <ArrowLeft className="h-5 w-5" />
-        <span>Back</span>
+        <span>{t('common.back')}</span>
       </button>
       
       <div className="w-full max-w-md relative z-10">
@@ -316,7 +316,7 @@ export default function Auth() {
             <img src={akromedaLogo} alt="Akromeda" className="h-20 w-20 md:h-24 md:w-24 object-contain" />
           </div>
           <div className="text-center text-xs uppercase tracking-[0.35em] text-muted-foreground">
-            Secure Access
+            {t('auth.secureAccess')}
           </div>
           <CardTitle className="text-center text-[1.65rem] md:text-[2.1rem] font-extrabold uppercase tracking-[0.09em] bg-gradient-to-r from-[#FFFFFF] via-[#B5B5B5] to-[#717171] bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
             Akromeda

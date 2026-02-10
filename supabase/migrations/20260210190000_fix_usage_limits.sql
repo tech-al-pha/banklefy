@@ -1,12 +1,80 @@
 -- Update usage limit functions to respect paid limits and support variable increments
 
--- Ensure free default is 5 conversions
-ALTER TABLE public.subscriptions
-  ALTER COLUMN conversions_limit SET DEFAULT 5;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'subscriptions'
+      AND column_name = 'conversions_limit'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.subscriptions ADD COLUMN conversions_limit int NOT NULL DEFAULT 5';
+  ELSE
+    EXECUTE 'ALTER TABLE public.subscriptions ALTER COLUMN conversions_limit SET DEFAULT 5';
+  END IF;
 
-UPDATE public.subscriptions
-SET conversions_limit = 5
-WHERE tier = 'free' AND conversions_limit < 5;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'subscriptions'
+      AND column_name = 'conversions_used'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.subscriptions ADD COLUMN conversions_used int NOT NULL DEFAULT 0';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'subscriptions'
+      AND column_name = 'last_reset_date'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.subscriptions ADD COLUMN last_reset_date date';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'subscriptions'
+      AND column_name = 'timezone'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.subscriptions ADD COLUMN timezone text';
+  END IF;
+END;
+$$;
+
+DO $$
+DECLARE
+  v_has_plan_type boolean := false;
+  v_has_tier boolean := false;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'subscriptions'
+      AND column_name = 'plan_type'
+  ) INTO v_has_plan_type;
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'subscriptions'
+      AND column_name = 'tier'
+  ) INTO v_has_tier;
+
+  IF v_has_plan_type THEN
+    EXECUTE 'UPDATE public.subscriptions SET conversions_limit = 5 WHERE plan_type = ''free'' AND conversions_limit < 5';
+  ELSIF v_has_tier THEN
+    EXECUTE 'UPDATE public.subscriptions SET conversions_limit = 5 WHERE tier = ''free'' AND conversions_limit < 5';
+  ELSE
+    EXECUTE 'UPDATE public.subscriptions SET conversions_limit = 5 WHERE conversions_limit < 5';
+  END IF;
+END;
+$$;
 
 DROP FUNCTION IF EXISTS public.check_and_reset_daily_limit(text, uuid, text);
 
@@ -26,27 +94,52 @@ DECLARE
   v_conversions integer;
   v_limit integer;
   v_needs_reset boolean := false;
-  v_tier subscription_tier;
   v_is_free boolean := false;
+  v_has_plan_type boolean := false;
+  v_has_tier boolean := false;
 BEGIN
   v_today := (now() AT TIME ZONE p_timezone)::date;
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'subscriptions'
+      AND column_name = 'plan_type'
+  ) INTO v_has_plan_type;
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'subscriptions'
+      AND column_name = 'tier'
+  ) INTO v_has_tier;
 
   IF p_user_id IS NOT NULL THEN
-    SELECT s.conversions_used, s.conversions_limit, s.last_reset_date::date, s.tier
-    INTO v_conversions, v_limit, v_last_reset, v_tier
+    SELECT s.conversions_used, s.conversions_limit, s.last_reset_date::date
+    INTO v_conversions, v_limit, v_last_reset
     FROM subscriptions s
     WHERE s.user_id = p_user_id;
 
     IF NOT FOUND THEN
-      INSERT INTO subscriptions (user_id, conversions_used, conversions_limit, last_reset_date, timezone, tier)
-      VALUES (p_user_id, 0, 5, v_today, p_timezone, 'free');
+      IF v_has_plan_type THEN
+        EXECUTE 'INSERT INTO subscriptions (user_id, plan_type, conversions_used, conversions_limit, last_reset_date, timezone)
+                 VALUES ($1, $2, 0, 5, $3, $4)'
+        USING p_user_id, 'free', v_today, p_timezone;
+      ELSIF v_has_tier THEN
+        EXECUTE 'INSERT INTO subscriptions (user_id, tier, conversions_used, conversions_limit, last_reset_date, timezone)
+                 VALUES ($1, $2, 0, 5, $3, $4)'
+        USING p_user_id, 'free', v_today, p_timezone;
+      ELSE
+        EXECUTE 'INSERT INTO subscriptions (user_id, conversions_used, conversions_limit, last_reset_date, timezone)
+                 VALUES ($1, 0, 5, $2, $3)'
+        USING p_user_id, v_today, p_timezone;
+      END IF;
       v_conversions := 0;
       v_limit := 5;
       v_last_reset := v_today;
-      v_tier := 'free';
     END IF;
 
-    v_is_free := (v_tier = 'free' AND v_limit <= 5);
+    v_is_free := (v_limit <= 5);
 
     IF v_is_free AND (v_last_reset IS NULL OR v_last_reset < v_today) THEN
       UPDATE subscriptions

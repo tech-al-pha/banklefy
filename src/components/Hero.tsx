@@ -30,12 +30,12 @@ export const Hero = () => {
             </h2>
             </div>
 
-            <div className="text-sm sm:text-lg md:text-xl font-semibold text-primary tracking-[0.06em] md:tracking-[0.1em] uppercase pt-1">
-            PROFESSIONAL LOOK | OCR-POWERED | INSTANT RESULTS
+            <div className="inline-flex flex-wrap items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[0.65rem] sm:text-xs md:text-sm font-semibold text-primary/80 tracking-[0.28em] uppercase shadow-[0_0_18px_rgba(255,255,255,0.08)]">
+              {t('hero.tagline')}
             </div>
 
-            <p className="text-sm md:text-lg text-muted-foreground max-w-2xl leading-relaxed opacity-70 italic mt-8 mb-12">
-            AI-powered OCR bank statement conversion with bank-level security, accurate data extraction, error detection, loan & fraud analysis, and multi-format export.
+            <p className="text-sm md:text-lg text-white/70 max-w-2xl leading-relaxed mt-6 mb-12">
+              {t('hero.subtitle')}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-start items-start sm:items-center mt-14 w-full max-w-2xl">

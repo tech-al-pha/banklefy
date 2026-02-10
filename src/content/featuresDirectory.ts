@@ -21,6 +21,8 @@ import {
   Layers,
   Database,
   CheckCircle2,
+  LifeBuoy,
+  BadgeDollarSign,
 } from "lucide-react";
 
 export type FeatureCategoryId =
@@ -165,6 +167,13 @@ export const featureItems: FeatureItem[] = [
     categoryId: "accessibility",
   },
   {
+    id: "help_center",
+    icon: LifeBuoy,
+    titleKey: "featuresPage.items.helpCenter.title",
+    descriptionKey: "featuresPage.items.helpCenter.desc",
+    categoryId: "accessibility",
+  },
+  {
     id: "instant_processing",
     icon: Zap,
     titleKey: "featuresPage.items.instantProcessing.title",
@@ -229,6 +238,13 @@ export const featureItems: FeatureItem[] = [
     icon: Clock,
     titleKey: "featuresPage.items.dailyLimits.title",
     descriptionKey: "featuresPage.items.dailyLimits.desc",
+    categoryId: "usage",
+  },
+  {
+    id: "refunds",
+    icon: BadgeDollarSign,
+    titleKey: "featuresPage.items.refunds.title",
+    descriptionKey: "featuresPage.items.refunds.desc",
     categoryId: "usage",
   },
 ];

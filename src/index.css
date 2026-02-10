@@ -167,17 +167,27 @@
     will-change: left, top, transform;
     transform: translateZ(0);
     transition: transform 220ms ease-out, border-color 220ms ease-out, box-shadow 220ms ease-out;
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 0 14px rgba(255, 255, 255, 0.18),
+      0 0 28px rgba(255, 255, 255, 0.08);
   }
 
   .luxury-cursor::before {
-    display: none;
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 70%);
+    filter: blur(6px);
+    opacity: 0.65;
   }
 
   .luxury-cursor.hover {
     transform: scale(1.15);
     border-color: var(--text-primary);
-    box-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
+    box-shadow:
+      0 0 22px rgba(255, 255, 255, 0.42),
+      0 0 48px rgba(255, 255, 255, 0.18);
   }
 
   .surface-panel {
