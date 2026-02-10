@@ -298,18 +298,6 @@ const Index = () => {
                     </button>
                   </li>
                 </ul>
-                <div className="mt-5">
-                  <p className="text-[0.7rem] uppercase tracking-[0.35em] text-muted-foreground/70">
-                    {t('footer.help.title')}
-                  </p>
-                  <ul className="mt-3 space-y-2 text-xs text-muted-foreground leading-relaxed">
-                    <li>{t('footer.help.item1')}</li>
-                    <li>{t('footer.help.item2')}</li>
-                    <li>{t('footer.help.item3')}</li>
-                    <li>{t('footer.help.item4')}</li>
-                    <li>{t('footer.help.item5')}</li>
-                  </ul>
-                </div>
               </div>
             </div>
             
@@ -339,14 +327,6 @@ const Index = () => {
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.terms')}
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => navigate('/help#refunds')}
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.refunds')}
                     </button>
                   </li>
                 </ul>

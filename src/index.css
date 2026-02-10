@@ -235,10 +235,10 @@
 
   .btn-glow:hover:not(:disabled),
   .btn-glow:focus-visible:not(:disabled),
-  button:hover:not(:disabled),
-  button:focus-visible:not(:disabled),
-  [role="button"]:hover:not([aria-disabled="true"]),
-  [role="button"]:focus-visible:not([aria-disabled="true"]) {
+  button:hover:not(:disabled):not(.text-glow-link):not(.no-hover-glow),
+  button:focus-visible:not(:disabled):not(.text-glow-link):not(.no-hover-glow),
+  [role="button"]:hover:not([aria-disabled="true"]):not(.text-glow-link):not(.no-hover-glow),
+  [role="button"]:focus-visible:not([aria-disabled="true"]):not(.text-glow-link):not(.no-hover-glow) {
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.08),
       0 0 16px rgba(255, 255, 255, 0.2);
@@ -360,11 +360,21 @@
     transition: color 200ms ease, text-shadow 200ms ease, filter 200ms ease;
   }
 
+  .text-glow-link span {
+    color: inherit;
+  }
+
   .text-glow-link:hover,
   .text-glow-link:focus-visible {
     color: var(--text-primary);
-    text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.25);
     box-shadow: none !important;
+    filter: none;
+  }
+
+  .text-glow-link:hover span,
+  .text-glow-link:focus-visible span {
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
   }
 
   .text-glow-link:hover svg,

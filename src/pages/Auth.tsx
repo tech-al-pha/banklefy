@@ -304,7 +304,7 @@ export default function Auth() {
       {/* Back button */}
       <button
         onClick={() => navigate('/')}
-        className="no-hover-glow text-glow-link absolute top-6 left-6 z-20 flex items-center gap-2 text-muted-foreground"
+        className="text-glow-link absolute top-6 left-6 z-20 flex items-center gap-2 text-muted-foreground"
       >
         <ArrowLeft className="h-5 w-5" />
         <span>{t('common.back')}</span>

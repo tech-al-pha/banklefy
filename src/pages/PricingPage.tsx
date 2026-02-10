@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check } from "lucide-react";
+import { BadgeDollarSign, Check } from "lucide-react";
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
@@ -406,6 +406,35 @@ const PricingPage = () => {
           </p>
           <div className="grid md:grid-cols-3 gap-8">
             {yearlyPlans.map(renderPlanCard)}
+          </div>
+        </section>
+
+        <section
+          id="refunds"
+          className="mt-14 glass-card p-6 sm:p-8 rounded-2xl border border-primary/10"
+        >
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+            <div className="rounded-full bg-primary/10 p-3 text-primary">
+              <BadgeDollarSign className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-white">Refund Policy</h2>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                If you want a refund, we will issue it. Request a refund within 7 days
+                of purchase and we will process it with no questions asked. This applies
+                to all paid plans. Email support with your order ID to start the refund.
+              </p>
+              <Button
+                className="mt-4 bg-primary text-primary-foreground shadow-neon"
+                asChild
+              >
+                <a
+                  href="mailto:inspirexali@gmail.com?subject=Akromeda%20Refund%20Request&body=Please%20include%3A%0A1)%20Order%20ID%0A2)%20Email%20used%20for%20payment%0A3)%20Plan%20name%20and%20date%0A4)%20Reason%20(optional)"
+                >
+                  Request Refund by Email
+                </a>
+              </Button>
+            </div>
           </div>
         </section>
 

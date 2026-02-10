@@ -1,6 +1,24 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, BadgeDollarSign, Clock, FileText, LifeBuoy, Lock, Mail, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BadgeDollarSign,
+  CheckCircle2,
+  Clock,
+  Download,
+  Eye,
+  FileText,
+  FileSpreadsheet,
+  LifeBuoy,
+  Lock,
+  Mail,
+  MessageCircle,
+  Monitor,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -21,30 +39,238 @@ const Help = () => {
     }
   }, [location.hash]);
 
-  const helpCards = [
+  const helpSections = [
     {
-      id: "files",
-      icon: FileText,
-      title: t("helpPage.sections.files.title"),
-      desc: t("footer.help.item1"),
+      id: "getting-started",
+      icon: Sparkles,
+      title: "Getting Started",
+      items: [
+        "Go to the home page and click the upload button or scroll to the demo.",
+        "Upload a clear statement file and wait for processing to complete.",
+        "Review the preview and download the results in your chosen format.",
+        "Use the Sample Report page to understand what the final output looks like.",
+        "Create an account to get higher daily limits and access your dashboard.",
+        "Keep the tab open until processing finishes.",
+      ],
     },
     {
-      id: "passwords",
+      id: "supported-files",
+      icon: FileText,
+      title: "Supported Files",
+      items: [
+        "PDF, JPG, and PNG files are supported (scans and photos).",
+        "Multi-page PDFs are supported. Keep pages in the correct order.",
+        "If a file fails to upload, try re-exporting or splitting large PDFs.",
+        "Avoid extremely low-resolution images; they reduce extraction quality.",
+        "Screenshots with UI overlays or notifications can reduce accuracy.",
+        "If the statement has very small text, use a higher-resolution scan.",
+      ],
+    },
+    {
+      id: "upload-tips",
+      icon: CheckCircle2,
+      title: "Upload Tips",
+      items: [
+        "Use flat, well-lit scans without shadows or glare.",
+        "Make sure all transaction tables are visible in the image.",
+        "Keep text upright; rotate pages before upload if needed.",
+        "Avoid cropping the header or footer where balances appear.",
+        "Use the original statement file whenever possible.",
+        "If a scan is faint, increase contrast before uploading.",
+      ],
+    },
+    {
+      id: "password-pdfs",
       icon: Lock,
-      title: t("helpPage.sections.password.title"),
-      desc: t("footer.help.item2"),
+      title: "Password-Protected PDFs",
+      items: [
+        "Enter the password before conversion to unlock the preview.",
+        "If the password is incorrect, you will be prompted to retry.",
+        "We do not store your PDF password.",
+        "If you do not know the password, export an unlocked copy first.",
+        "Bank statements with owner-level restrictions cannot be bypassed.",
+      ],
+    },
+    {
+      id: "preview",
+      icon: Eye,
+      title: "Preview and Page Selection",
+      items: [
+        "A preview is shown to confirm the file loaded correctly.",
+        "Use the page selector to confirm each page is readable.",
+        "If preview is blank, the file may be corrupted or unsupported.",
+        "Try a different PDF export if preview fails to render.",
+      ],
+    },
+    {
+      id: "processing",
+      icon: Clock,
+      title: "Processing Time",
+      items: [
+        "Most files are processed quickly, but large files may take longer.",
+        "Keep the page open while conversion runs.",
+        "Slow networks can delay uploads; try a stable connection.",
+        "If processing stalls, refresh and try again with the same file.",
+        "Large multi-page statements may take extra time to finish.",
+      ],
+    },
+    {
+      id: "exports",
+      icon: Download,
+      title: "Exports and Downloads",
+      items: [
+        "Export to Excel (.xlsx), CSV, DOCX, ODS, and PDF reports.",
+        "Download files immediately after conversion to avoid expiration.",
+        "If a download fails, refresh the page and retry the export.",
+        "For accounting tools, Excel or CSV is recommended.",
+        "PDF reports are best for sharing, Excel/CSV are best for analysis.",
+        "If files look empty, re-check the statement quality and retry.",
+      ],
+    },
+    {
+      id: "output-verification",
+      icon: FileSpreadsheet,
+      title: "Output Verification",
+      items: [
+        "Verify opening and closing balances first.",
+        "Compare total credits, debits, and net flow with the statement.",
+        "Check for duplicate rows if the statement has repeated headers.",
+        "If a value looks wrong, confirm the original page is readable.",
+        "For critical workflows, always review before submitting.",
+      ],
+    },
+    {
+      id: "accuracy",
+      icon: CheckCircle2,
+      title: "Accuracy Tips",
+      items: [
+        "Upload full pages with minimal blur or compression artifacts.",
+        "Prefer scans over photos when possible.",
+        "Keep page order correct for multi-page statements.",
+        "If totals look off, recheck the input file for missing pages.",
+        "If amounts are merged into one column, try a cleaner export.",
+        "Handwritten or stamped text may reduce accuracy.",
+      ],
+    },
+    {
+      id: "data-formatting",
+      icon: FileText,
+      title: "Data Formatting",
+      items: [
+        "Dates and amounts are extracted from visible statement tables.",
+        "If your bank uses unusual layouts, verify column alignment.",
+        "Merged rows or split descriptions may need manual review.",
+        "Use the PDF report for summaries and the Excel/CSV for raw data.",
+        "Debit and credit columns follow the statement layout when possible.",
+        "Negative values are preserved as they appear in the statement.",
+      ],
+    },
+    {
+      id: "errors",
+      icon: AlertTriangle,
+      title: "Errors and Troubleshooting",
+      items: [
+        'If you see "CAPTCHA not ready," refresh and try again.',
+        "If the PDF fails to load, the file may be corrupted. Re-export and retry.",
+        "If no transactions appear, check that the statement is readable and not rotated.",
+        "If you get a network error, retry after a few minutes.",
+        "If you hit a daily limit, sign in or wait for reset.",
+        "If preview loads but export fails, refresh and re-export.",
+      ],
     },
     {
       id: "limits",
       icon: Clock,
-      title: t("helpPage.sections.limits.title"),
-      desc: t("footer.help.item3"),
+      title: "Daily Limits and Usage",
+      items: [
+        "Anonymous users get 2 conversions per day.",
+        "Signed-in users get 5 conversions per day.",
+        "Paid plans increase your limits based on the plan.",
+        "Limits reset at midnight in your local time zone.",
+        "If you need more, upgrade on the Pricing page.",
+      ],
     },
     {
-      id: "accuracy",
-      icon: Sparkles,
-      title: t("helpPage.sections.accuracy.title"),
-      desc: t("footer.help.item4"),
+      id: "account",
+      icon: ShieldCheck,
+      title: "Account and Sign In",
+      items: [
+        "Create an account to track usage and unlock higher limits.",
+        "Use the Forgot Password option if you cannot sign in.",
+        "Keep your email address accurate for receipts and support.",
+        "Sign out from the profile menu if using a shared device.",
+        "If login fails, double-check your email and password.",
+      ],
+    },
+    {
+      id: "billing",
+      icon: BadgeDollarSign,
+      title: "Billing and Plans",
+      items: [
+        "One-time, monthly, and yearly plans are available on the Pricing page.",
+        "Payments are processed securely via Razorpay.",
+        "Refund details and requests are handled from the Pricing page.",
+        "Keep your order ID for faster support.",
+        "If payment fails, retry after a minute or use a different method.",
+      ],
+    },
+    {
+      id: "security",
+      icon: ShieldCheck,
+      title: "Security and Privacy",
+      items: [
+        "Data is encrypted in transit.",
+        "Files and results are kept for up to 24 hours for download.",
+        "reCAPTCHA is used to prevent abuse.",
+        "Do not upload credentials or passwords, only statements.",
+        "Sensitive data should be reviewed before sharing outputs.",
+      ],
+    },
+    {
+      id: "chat-aura",
+      icon: MessageCircle,
+      title: "Chat Aura",
+      items: [
+        "Ask questions about your statement and get quick insights.",
+        "Guests get 1 chat interaction per session. Sign in for more.",
+        "Best results when a statement is uploaded first.",
+        "If responses look off, re-check the statement quality.",
+        "Use specific questions like totals, categories, or unusual debits.",
+      ],
+    },
+    {
+      id: "browser",
+      icon: Monitor,
+      title: "Browser and Device Tips",
+      items: [
+        "Use the latest version of Chrome, Edge, or Firefox.",
+        "Enable JavaScript and allow cookies for the app to work.",
+        "Desktop browsers are best for very large PDFs.",
+        "Mobile works for quick conversions but large files may be slower.",
+      ],
+    },
+    {
+      id: "mobile",
+      icon: Smartphone,
+      title: "Mobile Scans",
+      items: [
+        "Use a scanning app for clearer results than camera photos.",
+        "Hold the phone steady and keep the page flat.",
+        "Avoid reflections on glossy paper.",
+        "Check that all corners are visible before upload.",
+      ],
+    },
+    {
+      id: "support",
+      icon: LifeBuoy,
+      title: "Contact Support",
+      items: [
+        "Email support for account, billing, or conversion issues.",
+        "Include your order ID and file name when possible.",
+        "Describe the issue and attach a screenshot if relevant.",
+        "We reply as quickly as possible during business hours.",
+        "Add your browser and device details for faster troubleshooting.",
+      ],
     },
   ];
 
@@ -78,39 +304,30 @@ const Help = () => {
         </section>
 
         <section className="grid gap-6 md:grid-cols-2">
-          {helpCards.map((card) => {
-            const Icon = card.icon;
+          {helpSections.map((section) => {
+            const Icon = section.icon;
             return (
-              <div key={card.id} id={card.id} className="glass-card p-6 rounded-2xl border border-primary/10">
+              <div
+                key={section.id}
+                id={section.id}
+                className="glass-card p-6 rounded-2xl border border-primary/10"
+              >
                 <div className="flex items-start gap-4">
                   <div className="rounded-full bg-primary/10 p-3 text-primary">
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">{card.title}</h3>
-                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{card.desc}</p>
+                    <h3 className="text-lg font-bold text-white">{section.title}</h3>
+                    <ul className="mt-3 space-y-2 text-sm text-muted-foreground leading-relaxed">
+                      {section.items.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               </div>
             );
           })}
-        </section>
-
-        <section
-          id="refunds"
-          className="mt-10 glass-card p-6 sm:p-8 rounded-2xl border border-primary/10"
-        >
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-            <div className="rounded-full bg-primary/10 p-3 text-primary">
-              <BadgeDollarSign className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">{t("helpPage.sections.refunds.title")}</h2>
-              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                {t("helpPage.sections.refunds.desc")}
-              </p>
-            </div>
-          </div>
         </section>
 
         <section
