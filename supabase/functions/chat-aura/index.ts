@@ -8,8 +8,8 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
 
   const allowedOrigins = [
     envOrigin,
-    'https://akromeda.lovable.app',
-    'https://akromeda.vercel.app',
+    'https://banklefy.lovable.app',
+    'https://banklefy.vercel.app',
     'http://localhost:8080',
     'http://localhost:5173',
     'http://localhost:3000',
@@ -34,7 +34,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     return requestOrigin;
   }
 
-  return allowedOrigins[0] || 'https://akromeda.vercel.app';
+  return allowedOrigins[0] || 'https://banklefy.vercel.app';
 };
 
 const getCorsHeaders = (req: Request) => ({
@@ -137,10 +137,10 @@ Deno.serve(async (req) => {
     }
 
     // Build system prompt
-    let systemPrompt = `You are Chat Aura, an intelligent financial assistant for Akromeda.
+    let systemPrompt = `You are Chat Aura, an intelligent financial assistant for Banklefy.
 You help users understand bank statements and financial documents.
 Be concise, helpful, and professional. Use simple language.
-If asked about features, explain Akromeda converts bank statement PDFs to Excel with AI-powered categorization.
+If asked about features, explain Banklefy converts bank statement PDFs to Excel with AI-powered categorization.
 
 When answering questions about an uploaded document, ALWAYS include precise location hints (page numbers, table names, row/column or cell references, or section/heading names) where the information can be found. When possible, quote a short excerpt (1-2 lines) and then provide the location hint, e.g. "(Page 3, Table: Transactions)". Keep the answer actionable and point the user to where to look in the converted Excel or original PDF.`;
 

@@ -36,7 +36,7 @@ const AppRoutes = () => {
 
   useEffect(() => {
     const defaultMeta = {
-      title: "Bank Statement Converter to Excel | AI OCR Parser | Akromeda",
+      title: "Bank Statement Converter to Excel | AI OCR Parser | Banklefy",
       description:
         "Convert bank statements to Excel with AI-powered OCR. Support for 50+ languages, PDF & scanned documents. Fast, secure, accurate bank statement parser.",
     };
@@ -44,65 +44,65 @@ const AppRoutes = () => {
     const metaByPath: Record<string, { title: string; description: string }> = {
       "/": defaultMeta,
       "/pricing": {
-        title: "Pricing | Akromeda Bank Statement Converter",
+        title: "Pricing | Banklefy Bank Statement Converter",
         description:
           "Simple pricing for AI bank statement conversion. Free and paid plans with higher limits and premium exports.",
       },
       "/features": {
-        title: "Features | Akromeda Bank Statement Converter",
+        title: "Features | Banklefy Bank Statement Converter",
         description:
           "Explore AI OCR, multilingual support, and secure processing for fast statement-to-Excel conversion.",
       },
       "/benefits": {
-        title: "Benefits | Akromeda Statement Converter",
+        title: "Benefits | Banklefy Statement Converter",
         description:
-          "See how Akromeda reduces manual work, speeds reconciliation, and improves accuracy for finance teams.",
+          "See how Banklefy reduces manual work, speeds reconciliation, and improves accuracy for finance teams.",
       },
       "/about": {
-        title: "About Akromeda",
+        title: "About Banklefy",
         description:
-          "Akromeda delivers secure, accurate bank statement conversion with AI OCR and modern financial workflows.",
+          "Banklefy delivers secure, accurate bank statement conversion with AI OCR and modern financial workflows.",
       },
       "/sample-report": {
-        title: "Sample Report | Akromeda",
+        title: "Sample Report | Banklefy",
         description:
           "Preview a clean, structured Excel report generated from a bank statement.",
       },
       "/privacy": {
-        title: "Privacy Policy | Akromeda",
-        description: "Learn how Akromeda handles data privacy and document security.",
+        title: "Privacy Policy | Banklefy",
+        description: "Learn how Banklefy handles data privacy and document security.",
       },
       "/terms": {
-        title: "Terms of Service | Akromeda",
-        description: "Review the terms of service for using Akromeda.",
+        title: "Terms of Service | Banklefy",
+        description: "Review the terms of service for using Banklefy.",
       },
       "/auth": {
-        title: "Sign In | Akromeda",
+        title: "Sign In | Banklefy",
         description: "Sign in or create an account to convert bank statements.",
       },
       "/dashboard": {
-        title: "Dashboard | Akromeda",
+        title: "Dashboard | Banklefy",
         description: "Manage processed pages and download Excel exports.",
       },
       "/settings": {
-        title: "Settings | Akromeda",
+        title: "Settings | Banklefy",
         description: "Manage your account settings and preferences.",
       },
       "/profile": {
-        title: "Profile | Akromeda",
+        title: "Profile | Banklefy",
         description: "View your account details and recent page usage.",
       },
       "/help": {
-        title: "Help Center | Akromeda",
+        title: "Help Center | Banklefy",
         description:
           "Get help with supported formats, password-protected PDFs, daily limits, and refund requests.",
       },
       "/blog": {
-        title: "Blog | Akromeda",
-        description: "Product updates, tutorials, and announcements from Akromeda.",
+        title: "Blog | Banklefy",
+        description: "Product updates, tutorials, and announcements from Banklefy.",
       },
       "/admin": {
-        title: "Admin Console | Akromeda",
+        title: "Admin Console | Banklefy",
         description: "Administrative dashboard for system status and operations.",
       },
     };

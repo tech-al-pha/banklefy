@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, Users, FileText, TrendingUp, Calendar, Shield, RefreshCw, BarChart3, ShieldAlert, Database, KeyRound, Settings, Server } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import akromedaLogo from '@/assets/akromeda-logo.svg';
+import banklefyLogo from '@/assets/banklefy-logo.svg';
 import { getEdgeFunctionUrl } from '@/lib/supabaseApi';
 
 interface UserProfile {
@@ -369,9 +369,9 @@ export default function Admin() {
             <div className="flex h-full flex-col">
               <div className="px-6 py-6">
                 <div className="flex items-center gap-3">
-                  <img src={akromedaLogo} alt="Akromeda" className="h-10 w-10" />
+                  <img src={banklefyLogo} alt="Banklefy" className="h-10 w-10" />
                   <div className="flex flex-col">
-                    <span className="text-lg font-semibold text-foreground">Akromeda</span>
+                    <span className="text-lg font-semibold text-foreground">Banklefy</span>
                     <span className="text-xs text-muted-foreground">Admin Console</span>
                   </div>
                 </div>

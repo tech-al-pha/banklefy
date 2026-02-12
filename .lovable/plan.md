@@ -111,7 +111,7 @@ JSON            | XML (paid only)
 ```
 
 **DOCX**: New format
-- Professional Word document with Akromeda branding
+- Professional Word document with Banklefy branding
 - Financial summary table
 - FOIR analysis section
 - Transaction list table

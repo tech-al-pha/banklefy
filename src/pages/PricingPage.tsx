@@ -234,7 +234,7 @@ const PricingPage = () => {
         key: checkoutKey,
         amount: order.amount,
         currency: order.currency,
-        name: "Akromeda",
+        name: "Banklefy",
         description: plan.description,
         order_id: order.id,
         prefill: {
@@ -427,7 +427,7 @@ const PricingPage = () => {
                 asChild
               >
                 <a
-                  href="mailto:inspirexali@gmail.com?subject=Akromeda%20Refund%20Request&body=Please%20include%3A%0A1)%20Order%20ID%0A2)%20Email%20used%20for%20payment%0A3)%20Plan%20name%20and%20date%0A4)%20Reason%20(optional)"
+                  href="mailto:inspirexali@gmail.com?subject=Banklefy%20Refund%20Request&body=Please%20include%3A%0A1)%20Order%20ID%0A2)%20Email%20used%20for%20payment%0A3)%20Plan%20name%20and%20date%0A4)%20Reason%20(optional)"
                 >
                   Request Refund by Email
                 </a>
@@ -453,7 +453,7 @@ const PricingPage = () => {
             className="border-primary/40 text-white backdrop-blur-lg px-10 h-14 font-black uppercase tracking-widest"
           >
             <a
-              href="https://mail.google.com/mail/?view=cm&fs=1&to=inspirexali@gmail.com&su=Akromeda%20Enterprise%20Pricing"
+              href="https://mail.google.com/mail/?view=cm&fs=1&to=inspirexali@gmail.com&su=Banklefy%20Enterprise%20Pricing"
               target="_blank"
               rel="noreferrer"
             >

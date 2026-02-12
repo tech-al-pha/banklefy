@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   premiumExcelExport: true, // Default to premium
 };
 
-const STORAGE_KEY = 'akromeda_user_settings';
+const STORAGE_KEY = 'banklefy_user_settings';
 
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (error instanceof Error && error.message) return error.message;
@@ -184,7 +184,7 @@ export const useSettings = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `akromeda-data-export-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `banklefy-data-export-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

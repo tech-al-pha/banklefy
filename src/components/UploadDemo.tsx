@@ -18,7 +18,7 @@ import { UnderwritingPanel } from "./UnderwritingPanel";
 import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
 import { AIStatusPanel } from "./AIStatusPanel";
 import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
-import akromedaLogo from "@/assets/akromeda-logo.svg";
+import banklefyLogo from "@/assets/banklefy-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { getAnonymousClientId } from "@/lib/usageClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -1662,7 +1662,7 @@ Analytics Summary:
           properties: {},
           children: [
             new Paragraph({
-              text: 'AKROMEDA',
+              text: 'BANKLEFY',
               heading: HeadingLevel.TITLE,
               alignment: AlignmentType.CENTER,
             }),

@@ -1,6 +1,6 @@
 import { lazy } from "react";
 
-const CHUNK_RELOAD_KEY = "akromeda-chunk-reload";
+const CHUNK_RELOAD_KEY = "banklefy-chunk-reload";
 
 const isChunkLoadError = (error: unknown) => {
   if (!(error instanceof Error)) return false;

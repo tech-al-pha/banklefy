@@ -50,8 +50,8 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
 
   const allowedOrigins = [
     envOrigin,
-    'https://akromeda.lovable.app',
-    'https://akromeda.vercel.app',
+    'https://banklefy.lovable.app',
+    'https://banklefy.vercel.app',
     'http://localhost:8080',
     'http://localhost:5173',
     'http://localhost:3000',
@@ -76,7 +76,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     return requestOrigin;
   }
 
-  return allowedOrigins[0] || 'https://akromeda.vercel.app';
+  return allowedOrigins[0] || 'https://banklefy.vercel.app';
 };
 
 const getCorsHeaders = (req: Request) => ({

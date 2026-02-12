@@ -6,10 +6,10 @@ import Logo from "@/components/Logo";
 const posts = [
   {
     id: "launch",
-    title: "Introducing Akromeda: Bank Statement to Excel in Minutes",
+    title: "Introducing Banklefy: Bank Statement to Excel in Minutes",
     date: "Feb 12, 2026",
     excerpt:
-      "Akromeda converts bank statements into clean spreadsheets with AI OCR, built for speed, accuracy, and secure processing.",
+      "Banklefy converts bank statements into clean spreadsheets with AI OCR, built for speed, accuracy, and secure processing.",
     cta: "Read more",
   },
   {
@@ -25,7 +25,7 @@ const posts = [
     title: "Privacy by Default: 24-Hour Retention and Secure Handling",
     date: "Feb 7, 2026",
     excerpt:
-      "A short overview of how Akromeda stores files temporarily for download and protects sensitive financial data.",
+      "A short overview of how Banklefy stores files temporarily for download and protects sensitive financial data.",
     cta: "Read more",
   },
 ];
@@ -55,10 +55,10 @@ const Blog = () => {
             Blog
           </div>
           <h1 className="mt-6 text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-white">
-            Akromeda Blog
+            Banklefy Blog
           </h1>
           <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
-            Updates, tutorials, and product announcements from the Akromeda team.
+            Updates, tutorials, and product announcements from the Banklefy team.
           </p>
           <div className="mt-6 flex flex-wrap gap-3 justify-center">
             <Button className="bg-primary text-primary-foreground shadow-neon" onClick={() => navigate("/features")}>

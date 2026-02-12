@@ -3,7 +3,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
 import "./index.css";
 
-const STORAGE_KEY = "akromeda_user_settings";
+const STORAGE_KEY = "banklefy_user_settings";
 
 const applyInitialTheme = () => {
   try {

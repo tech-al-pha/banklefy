@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'akromeda_anonymous_client_id';
+const STORAGE_KEY = 'banklefy_anonymous_client_id';
 
 export const getAnonymousClientId = (): string | null => {
   if (typeof window === 'undefined') return null;

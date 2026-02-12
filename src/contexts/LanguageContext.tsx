@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'; // Akromeda Language System
+import React, { createContext, useContext, useState, useEffect } from 'react'; // Banklefy Language System
 import { languageNames, translations, type Language } from "./languageData";
 export type { Language } from "./languageData";
 

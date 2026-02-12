@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { FileSpreadsheet, ArrowLeft, Loader2, Home } from "lucide-react";
 import { format } from "date-fns";
-import akromedaLogo from "@/assets/akromeda-logo.svg";
+import banklefyLogo from "@/assets/banklefy-logo.svg";
 
 interface Conversion {
   id: string;
@@ -159,9 +159,9 @@ const Dashboard = () => {
                 Back
               </Button>
               <div className="flex items-center gap-2">
-                <img src={akromedaLogo} alt="Akromeda" className="h-10 w-10 md:h-12 md:w-12" />
+                <img src={banklefyLogo} alt="Banklefy" className="h-10 w-10 md:h-12 md:w-12" />
                 <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                  Akromeda Dashboard
+                  Banklefy Dashboard
                 </span>
               </div>
             </div>

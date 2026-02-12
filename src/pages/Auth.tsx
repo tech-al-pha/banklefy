@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
-import akromedaLogo from '@/assets/akromeda-logo.svg';
+import banklefyLogo from '@/assets/banklefy-logo.svg';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Logo from '@/components/Logo';
 
@@ -19,7 +19,7 @@ const passwordSchema = z.string().min(8, 'Password must be at least 8 characters
 type AuthMode = 'login' | 'signup' | 'forgot' | 'reset';
 
 // Key for storing remembered email
-const REMEMBERED_EMAIL_KEY = 'akromeda_remembered_email';
+const REMEMBERED_EMAIL_KEY = 'banklefy_remembered_email';
 
 export default function Auth() {
   const { t } = useLanguage();
@@ -317,13 +317,13 @@ export default function Auth() {
       <div className="w-full max-w-md relative z-10">
         <div className="space-y-2 pt-2">
           <div className="flex justify-center mb-3">
-            <img src={akromedaLogo} alt="Akromeda" className="h-20 w-20 md:h-24 md:w-24 object-contain" />
+            <img src={banklefyLogo} alt="Banklefy" className="h-20 w-20 md:h-24 md:w-24 object-contain" />
           </div>
           <div className="text-center text-xs uppercase tracking-[0.35em] text-muted-foreground">
             {t('auth.secureAccess')}
           </div>
           <CardTitle className="text-center text-[1.65rem] md:text-[2.1rem] font-extrabold uppercase tracking-[0.09em] bg-gradient-to-r from-[#FFFFFF] via-[#B5B5B5] to-[#717171] bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
-            Akromeda
+            Banklefy
           </CardTitle>
           <CardDescription className="text-center text-muted-foreground/90">
             {getCardDescription()}

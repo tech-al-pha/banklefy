@@ -2,7 +2,7 @@
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ChatAura } from "@/components/ChatAura";
-import akromedaLogo from "@/assets/akromeda-logo.svg";
+import banklefyLogo from "@/assets/banklefy-logo.svg";
 
 const ChatPage = () => {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ const ChatPage = () => {
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <img src={akromedaLogo} alt="Akromeda" className="h-10 w-10" />
+              <img src={banklefyLogo} alt="Banklefy" className="h-10 w-10" />
               <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
                 Chat Aura
               </h1>

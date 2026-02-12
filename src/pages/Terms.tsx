@@ -10,7 +10,7 @@ const Terms = () => {
     {
       icon: FileText,
       title: "Acceptance of Terms",
-      content: "By accessing or using Akromeda, you agree to these Terms. If you do not agree, do not use the service.",
+      content: "By accessing or using Banklefy, you agree to these Terms. If you do not agree, do not use the service.",
     },
     {
       icon: CheckCircle,
@@ -55,7 +55,7 @@ const Terms = () => {
     {
       icon: Scale,
       title: "Limitation of Liability",
-      content: "To the maximum extent permitted by law, Akromeda is not liable for indirect, incidental, or consequential damages, or for loss of data or profits. If liability is found, it will be limited to the amount you paid for the service in the 12 months before the claim, if any.",
+      content: "To the maximum extent permitted by law, Banklefy is not liable for indirect, incidental, or consequential damages, or for loss of data or profits. If liability is found, it will be limited to the amount you paid for the service in the 12 months before the claim, if any.",
     },
     {
       icon: Scale,
@@ -99,7 +99,7 @@ const Terms = () => {
             Terms of Service
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Please read these terms and conditions carefully before using Akromeda.
+            Please read these terms and conditions carefully before using Banklefy.
           </p>
           <p className="text-sm text-muted-foreground">
             Last updated: February 7, 2026
@@ -161,7 +161,7 @@ const Terms = () => {
       {/* Footer */}
       <footer className="border-t border-primary/20 py-8 px-6">
         <div className="container mx-auto text-center text-xs text-muted-foreground tracking-[0.2em] uppercase">
-          <p>© 2026 Akromeda | All rights reserved</p>
+          <p>© 2026 Banklefy | All rights reserved</p>
         </div>
       </footer>
     </div>
