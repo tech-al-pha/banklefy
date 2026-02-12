@@ -123,7 +123,7 @@ const Index = () => {
               <Button
                 variant="outline"
                 size="sm"
-                className="border-primary/50 text-foreground transition-colors"
+                className="border-primary/50 bg-[#141414] text-foreground transition-colors btn-target-glow"
                 onClick={handleAuthClick}
               >
                 {user ? "Profile" : t('nav.signIn')}

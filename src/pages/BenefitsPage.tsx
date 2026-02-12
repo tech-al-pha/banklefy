@@ -203,7 +203,7 @@ const BenefitsPage = () => {
             <Button
               onClick={() => navigate("/pricing")}
               variant="outline"
-              className="border-primary/50 text-primary font-bold uppercase tracking-wider px-8"
+              className="border-primary/50 bg-[#141414] text-primary font-bold uppercase tracking-wider px-8 btn-target-glow"
             >
               View Pricing
             </Button>

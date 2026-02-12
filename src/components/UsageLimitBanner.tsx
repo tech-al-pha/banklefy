@@ -32,10 +32,15 @@ export const UsageLimitBanner = ({
   const { t } = useLanguage();
   const planLabel = formatPlanLabel(planType);
   const normalizedPlan = (planType || "free").toLowerCase();
-  const isPaidPlan = isAuthenticated && normalizedPlan !== "free";
+  const isUnlimitedPlan = normalizedPlan === "unlimited";
   const isPerPagePlan = normalizedPlan.startsWith("per_page");
   const isMonthlyPlan = normalizedPlan.startsWith("monthly") || normalizedPlan === "daily";
   const isYearlyPlan = normalizedPlan.startsWith("yearly") || normalizedPlan === "business";
+  const isKnownPaidPlan = isPerPagePlan || isMonthlyPlan || isYearlyPlan || isUnlimitedPlan;
+  const isFreeMode = !isKnownPaidPlan && (!isAuthenticated || normalizedPlan === "free" || limit <= 5);
+  const isPaidPlan = !isFreeMode;
+  const conversionLabel = remaining === 1 ? "conversion" : "conversions";
+  const pageLabel = remaining === 1 ? "page" : "pages";
 
   const formatTemplate = (templateKey: string, values: Record<string, string | number>) =>
     t(templateKey).replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
@@ -78,7 +83,10 @@ export const UsageLimitBanner = ({
       return formatTemplate("upload.limit.paid.plan", { limit });
     })();
 
-    const limitTitle = isAuthenticated && isPaidPlan ? t("upload.limit.usage.title") : t("upload.limit.daily.title");
+    const freeMessage = isAuthenticated
+      ? `You have used all ${limit} daily conversions. Your free limit resets at midnight.`
+      : `You have used all ${limit} free daily conversions. Sign up for 5 conversions/day or choose a plan.`;
+    const limitTitle = isPaidPlan ? t("upload.limit.usage.title") : t("upload.limit.daily.title");
 
     return (
       <Alert variant="destructive" className="mb-6">
@@ -86,9 +94,7 @@ export const UsageLimitBanner = ({
         <AlertTitle>{limitTitle}</AlertTitle>
         <AlertDescription className="mt-2">
           <p className="mb-3">
-            {isAuthenticated
-              ? (isPaidPlan ? paidMessage : formatTemplate("upload.limit.daily.authFree", { limit }))
-              : formatTemplate("upload.limit.daily.anon", { limit })}
+            {isPaidPlan ? paidMessage : freeMessage}
           </p>
           {!isAuthenticated && (
             <Button
@@ -111,8 +117,20 @@ export const UsageLimitBanner = ({
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Crown className="h-4 w-4 text-primary" />
         <span>
-          <strong className="text-primary">{remaining}</strong>{" "}
-          {formatTemplate("upload.remaining.counterSuffix", { limit })}
+          {isUnlimitedPlan ? (
+            "Unlimited pages remaining."
+          ) : (
+            <>
+              <strong className="text-primary">{remaining}</strong>{" "}
+              {isFreeMode
+                ? `of ${limit} ${conversionLabel} remaining today`
+                : isPerPagePlan
+                  ? `of ${limit} ${pageLabel} remaining in your pack`
+                  : isYearlyPlan
+                    ? `of ${limit} ${pageLabel} remaining this year`
+                    : `of ${limit} ${pageLabel} remaining this month`}
+            </>
+          )}
           {planLabel && planLabel !== "Free" ? ` - ${planLabel}` : ""}
         </span>
       </div>
@@ -123,10 +141,11 @@ export const UsageLimitBanner = ({
           onClick={() => navigate('/auth')}
           className="text-glow-link no-hover-glow text-primary p-0 h-auto font-medium w-full sm:w-auto justify-start sm:justify-center"
         >
-          {t("upload.remaining.signupMore")} →
+          {t("upload.remaining.signupMore")}{" ->"}
         </Button>
       )}
     </div>
   );
 };
+
 

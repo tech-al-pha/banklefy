@@ -21,7 +21,6 @@ import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 import akromedaLogo from "@/assets/akromeda-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { getAnonymousClientId } from "@/lib/usageClient";
-import { getDefaultDailyLimit } from "@/lib/usageLimits";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Dialog,
@@ -91,30 +90,41 @@ export const UploadDemo = () => {
     count === 1 ? singular : plural;
   const formatRemaining = (remaining?: number) => {
     if (remaining === null || remaining === undefined) return "";
-    const label = pluralize(remaining, "page");
     const normalizedPlan = (planType ?? "free").toLowerCase();
-    if (normalizedPlan === "unlimited") {
+    const isUnlimitedPlan = normalizedPlan === "unlimited";
+    const isPerPagePlan = normalizedPlan.startsWith("per_page");
+    const isMonthlyPlan = normalizedPlan.startsWith("monthly") || normalizedPlan === "daily";
+    const isYearlyPlan = normalizedPlan.startsWith("yearly") || normalizedPlan === "business";
+    const isKnownPaidPlan = isPerPagePlan || isMonthlyPlan || isYearlyPlan || isUnlimitedPlan;
+    const isFreeMode = !isKnownPaidPlan && (!isAuthenticated || normalizedPlan === "free" || (conversionsLimit ?? 0) <= 5);
+
+    const conversionLabel = pluralize(remaining, "conversion");
+    const pageLabel = pluralize(remaining, "page");
+
+    if (isFreeMode) {
+      return `${remaining} ${conversionLabel} remaining today.`;
+    }
+    if (isUnlimitedPlan) {
       return "Unlimited pages remaining.";
     }
-    if (normalizedPlan.startsWith("monthly") || normalizedPlan === "daily") {
-      return `${remaining} ${label} remaining this month.`;
+    if (isMonthlyPlan) {
+      return `${remaining} ${pageLabel} remaining this month.`;
     }
-    if (normalizedPlan.startsWith("yearly") || normalizedPlan === "business") {
-      return `${remaining} ${label} remaining this year.`;
+    if (isYearlyPlan) {
+      return `${remaining} ${pageLabel} remaining this year.`;
     }
-    if (normalizedPlan.startsWith("per_page")) {
-      return `${remaining} ${label} remaining in your pack.`;
+    if (isPerPagePlan) {
+      return `${remaining} ${pageLabel} remaining in your pack.`;
     }
-    return `${remaining} ${label} remaining today.`;
+    return `${remaining} ${pageLabel} remaining.`;
   };
-  const formatTemplate = (template: string, values: Record<string, string | number>) =>
-    template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [converting, setConverting] = useState(false);
   const [conversionResult, setConversionResult] = useState<{ id: string | null; resultPath: string | null; excelData?: string } | null>(null);
-  const [batchResults, setBatchResults] = useState<Array<{ fileName: string; status: 'success' | 'error'; data?: { excelData?: string; resultPath?: string | null }; error?: string }>>([]);
+  const [singleDownloadFileName, setSingleDownloadFileName] = useState<string>("bank-statement.xlsx");
+  const [batchResults, setBatchResults] = useState<Array<{ fileName: string; downloadFileName?: string; status: 'success' | 'error'; data?: { excelData?: string; resultPath?: string | null }; error?: string }>>([]);
   const [mergeInfo, setMergeInfo] = useState<MergeInfo | null>(null);
   const [mergeResult, setMergeResult] = useState<{ excelData?: string; resultPath?: string | null; fileName: string } | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -160,16 +170,37 @@ export const UploadDemo = () => {
     if (typeof error === 'string') return error;
     return fallback;
   };
-    const {
-      remaining,
-      conversionsLimit,
-      limitReached,
-      isAuthenticated,
-      loading: usageLimitLoading,
-      refresh: refreshUsageLimit,
-      getTimezone,
-      planType
-    } = useUsageLimit();
+  const sanitizeFileBaseName = (value?: string | null, fallback = "bank-statement") => {
+    const source = (value ?? "").trim();
+    const noExtension = source.replace(/\.[^/.\\]+$/, "");
+    const safe = noExtension
+      .replace(/[<>:"/\\|?*]/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/\.+$/g, "")
+      .trim();
+    return safe || fallback;
+  };
+  const buildExcelDownloadName = (bankName?: string | null, fallbackName?: string | null) => {
+    const baseName = sanitizeFileBaseName(bankName || fallbackName);
+    return `${baseName}.xlsx`;
+  };
+  const {
+    remaining,
+    conversionsLimit,
+    limitReached,
+    isAuthenticated,
+    loading: usageLimitLoading,
+    refresh: refreshUsageLimit,
+    getTimezone,
+    planType
+  } = useUsageLimit();
+  const normalizedPlanType = (planType ?? "free").toLowerCase();
+  const isUnlimitedUsagePlan = normalizedPlanType === "unlimited";
+  const isPerPageUsagePlan = normalizedPlanType.startsWith("per_page");
+  const isMonthlyUsagePlan = normalizedPlanType.startsWith("monthly") || normalizedPlanType === "daily";
+  const isYearlyUsagePlan = normalizedPlanType.startsWith("yearly") || normalizedPlanType === "business";
+  const isKnownPaidUsagePlan = isPerPageUsagePlan || isMonthlyUsagePlan || isYearlyUsagePlan || isUnlimitedUsagePlan;
+  const isFreeUsageMode = !isKnownPaidUsagePlan && (!isAuthenticated || normalizedPlanType === "free" || conversionsLimit <= 5);
 
   // reCAPTCHA v3 for anonymous users - runs invisibly in background
   const { executeRecaptcha } = useRecaptcha();
@@ -252,11 +283,8 @@ export const UploadDemo = () => {
   }, [converting, showProgress]);
 
   const MAX_PDF_RENDER_PAGES = 120;
-  const defaultDailyLimit = getDefaultDailyLimit(isAuthenticated);
-  const maxPdfRenderPages = Math.min(
-    MAX_PDF_RENDER_PAGES,
-    Math.max(1, usageLimitLoading ? defaultDailyLimit : (remaining ?? conversionsLimit ?? defaultDailyLimit)),
-  );
+  const FREE_MAX_PDF_PAGES_PER_FILE = 15;
+  const maxPdfRenderPages = isFreeUsageMode ? FREE_MAX_PDF_PAGES_PER_FILE : MAX_PDF_RENDER_PAGES;
   const getPdfPageCount = async (file: File, password?: string): Promise<number | null> => {
     const pdfjsLib = await import('pdfjs-dist');
     pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
@@ -328,12 +356,26 @@ export const UploadDemo = () => {
   };
 
   const showLimitReachedDialog = () => {
-    const title = t("upload.limit.daily.title");
-    const isPaidPlan = Boolean(planType && planType !== "free");
-    const template = isAuthenticated
-      ? (isPaidPlan ? t("upload.limit.daily.authPaid") : t("upload.limit.daily.authFree"))
-      : t("upload.limit.daily.anon");
-    const message = formatTemplate(template, { limit: Math.max(0, conversionsLimit ?? 0) });
+    const limit = Math.max(0, conversionsLimit ?? 0);
+    const title = isFreeUsageMode ? t("upload.limit.daily.title") : t("upload.limit.usage.title");
+    let message = "";
+
+    if (isFreeUsageMode) {
+      message = isAuthenticated
+        ? `You have used all ${limit} daily conversions. Your free limit resets at midnight.`
+        : `You have used all ${limit} free daily conversions. Sign up for 5 conversions/day or choose a plan.`;
+    } else if (isPerPageUsagePlan) {
+      message = `You have used all ${limit} pages in your current pack. Purchase another pack to continue.`;
+    } else if (isYearlyUsagePlan) {
+      message = `You have used all ${limit} pages for this year. Your usage resets at the start of next year.`;
+    } else if (isMonthlyUsagePlan) {
+      message = `You have used all ${limit} pages for this month. Your usage resets at the start of next month.`;
+    } else if (isUnlimitedUsagePlan) {
+      message = "Your plan is unlimited. Please refresh and try again.";
+    } else {
+      message = `You have used all ${limit} pages in your plan.`;
+    }
+
     openLimitDialog({
       title,
       message,
@@ -342,14 +384,11 @@ export const UploadDemo = () => {
     });
   };
 
-  const showPageLimitDialog = (totalPages: number, remainingPages: number, limit: number) => {
+  const showSelectionLimitDialog = (selectedFilesCount: number, remainingCount: number, limit: number) => {
     const title = t("upload.limit.page.title");
-    const template = isAuthenticated ? t("upload.limit.page.auth") : t("upload.limit.page.anon");
-    const message = formatTemplate(template, {
-      total: totalPages,
-      remaining: remainingPages,
-      limit,
-    });
+    const message = isFreeUsageMode
+      ? `You selected ${selectedFilesCount} files, but only ${remainingCount} conversion${remainingCount === 1 ? "" : "s"} are left today (daily limit ${limit}).`
+      : `You selected files beyond your remaining quota. Remaining: ${remainingCount}, limit: ${limit}.`;
     openLimitDialog({
       title,
       message,
@@ -391,7 +430,7 @@ export const UploadDemo = () => {
 
       if (!usageLimitLoading) {
         const candidateFiles = [...selectedFiles, ...newFiles];
-        const { total, unknown, overCap, maxSingle } = await getTotalPages(candidateFiles);
+        const { unknown, overCap, maxSingle } = await getTotalPages(candidateFiles);
         if (overCap) {
           toast({
             variant: "destructive",
@@ -403,10 +442,23 @@ export const UploadDemo = () => {
           }
           return;
         }
-        const remainingPages = Math.max(0, remaining ?? 0);
+
+        if (!unknown && isFreeUsageMode && maxSingle > FREE_MAX_PDF_PAGES_PER_FILE) {
+          toast({
+            variant: "destructive",
+            title: "Free tier file limit",
+            description: `Free tier allows up to ${FREE_MAX_PDF_PAGES_PER_FILE} pages per PDF. One selected file has ${maxSingle} pages.`,
+          });
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+
+        const remainingCount = Math.max(0, remaining ?? 0);
         const limit = Math.max(0, conversionsLimit ?? 0);
-        if (!unknown && total > remainingPages) {
-          showPageLimitDialog(total, remainingPages, limit);
+        if (isFreeUsageMode && candidateFiles.length > remainingCount) {
+          showSelectionLimitDialog(candidateFiles.length, remainingCount, limit);
           if (fileInputRef.current) {
             fileInputRef.current.value = '';
           }
@@ -505,8 +557,15 @@ export const UploadDemo = () => {
     });
 
     const pdf = await loadingTask.promise;
-    // Safety cap to prevent huge payloads/timeouts
-    const pageCount = Math.min(pdf.numPages, maxPdfRenderPages);
+    if (pdf.numPages > maxPdfRenderPages) {
+      await pdf.destroy?.();
+      if (isFreeUsageMode) {
+        throw new Error(`Free tier supports PDFs up to ${FREE_MAX_PDF_PAGES_PER_FILE} pages per file.`);
+      }
+      throw new Error(`This PDF has ${pdf.numPages} pages. The current maximum supported per file is ${MAX_PDF_RENDER_PAGES} pages.`);
+    }
+
+    const pageCount = pdf.numPages;
 
     const images: string[] = [];
     for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
@@ -525,6 +584,7 @@ export const UploadDemo = () => {
       images.push(canvas.toDataURL('image/jpeg', 0.82));
     }
 
+    await pdf.destroy?.();
     return images;
   };
 
@@ -715,6 +775,7 @@ export const UploadDemo = () => {
         resultPath: data.resultPath,
         excelData: data.excelData,
       });
+      setSingleDownloadFileName(buildExcelDownloadName(data?.bankInfo?.bankName, fileToConvert.name));
 
       if (data?.transactions && Array.isArray(data.transactions)) {
         setTransactions(data.transactions);
@@ -852,6 +913,15 @@ Analytics Summary:
       return;
     }
 
+    if (isFreeUsageMode) {
+      const remainingConversions = Math.max(0, remaining ?? 0);
+      const limit = Math.max(0, conversionsLimit ?? 0);
+      if (selectedFiles.length > remainingConversions) {
+        showSelectionLimitDialog(selectedFiles.length, remainingConversions, limit);
+        return;
+      }
+    }
+
     setUploading(true);
     setCurrencyCode('');
     setBatchResults([]);
@@ -986,12 +1056,23 @@ Analytics Summary:
 
       const results = data?.separate?.results || [];
       const failures = data?.separate?.failures || [];
-      setBatchResults([
-        ...results.map((result) => ({
+      const fileNameUsage = new Map<string, number>();
+      const successResults = results.map((result) => {
+        const baseName = sanitizeFileBaseName(result.bankInfo?.bankName, sanitizeFileBaseName(result.fileName));
+        const occurrence = (fileNameUsage.get(baseName) ?? 0) + 1;
+        fileNameUsage.set(baseName, occurrence);
+        const uniqueBaseName = occurrence > 1 ? `${baseName}_${occurrence}` : baseName;
+
+        return {
           fileName: result.fileName,
+          downloadFileName: `${uniqueBaseName}.xlsx`,
           status: 'success' as const,
           data: { excelData: result.excelData, resultPath: result.resultPath ?? null },
-        })),
+        };
+      });
+
+      setBatchResults([
+        ...successResults,
         ...failures.map((failure) => ({ fileName: failure.fileName, status: 'error' as const, error: failure.error })),
       ]);
 
@@ -1000,7 +1081,7 @@ Analytics Summary:
         setMergeResult({
           excelData: data.merge.excelData,
           resultPath: data.merge.resultPath ?? null,
-          fileName: data.merge.fileName || `merged_${Date.now()}.xlsx`,
+          fileName: buildExcelDownloadName(data?.bankInfo?.bankName, data.merge.fileName || "merged-statements"),
         });
       }
 
@@ -1112,7 +1193,7 @@ Analytics Summary:
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `converted_${Date.now()}.xlsx`;
+      a.download = singleDownloadFileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1166,7 +1247,7 @@ Analytics Summary:
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `${result.fileName}.xlsx`;
+          a.download = result.downloadFileName || buildExcelDownloadName(undefined, result.fileName);
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -1689,6 +1770,7 @@ Analytics Summary:
                 limit={conversionsLimit}
                 isAuthenticated={isAuthenticated}
                 limitReached={limitReached}
+                planType={planType}
               />
             )}
 
@@ -1767,7 +1849,7 @@ Analytics Summary:
                                 e.stopPropagation();
                                 setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
                               }}
-                              className="text-destructive"
+                              className="text-white/85 hover:text-white"
                               aria-label={`Remove ${file.name}`}
                               title={`Remove ${file.name}`}
                             >
@@ -1895,18 +1977,18 @@ Analytics Summary:
 
               {/* Error Panel with Retry */}
               {lastError && (selectedFile || selectedFiles.length > 0) && !converting && !uploading && (
-                <div className="p-4 bg-destructive/10 border-2 border-destructive/30 rounded-xl space-y-3" role="alert" aria-live="assertive">
+                <div className="p-4 bg-[#141414] border border-white/20 rounded-xl space-y-3" role="alert" aria-live="assertive">
                   <div className="flex items-start gap-3">
-                    <XCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+                    <XCircle className="h-5 w-5 text-[#787878] mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="font-semibold text-destructive">Conversion Failed</p>
+                      <p className="font-semibold text-[#d3d3d3]">Conversion Failed</p>
                       <p className="text-sm text-muted-foreground mt-1">{lastError.message}</p>
                     </div>
                   </div>
                   {lastError.canRetry && (
                     <Button
                       variant="outline"
-                      className="w-full border-destructive/50 text-destructive"
+                      className="w-full border-[#787878] bg-[#787878] text-[#141414] hover:bg-[#6f6f6f] hover:text-[#141414]"
                       onClick={() => {
                         setLastError(null);
                         if (selectedFiles.length === 1) {

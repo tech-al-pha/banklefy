@@ -15,15 +15,15 @@ export const Hero = () => {
       <div className="relative z-10 container mx-auto px-4 sm:px-6 text-left">
         <div className="max-w-6xl mx-auto grid gap-10 md:grid-cols-[1.1fr_0.9fr] items-center pt-16">
           <div className="flex flex-col items-start space-y-6 md:-ml-6 lg:-ml-10">
-            <div className="flex flex-col items-start leading-tight">
+            <div className="flex flex-col items-start leading-tight overflow-visible">
             <h1
-              className="font-bold tracking-tight max-w-[18ch] mt-4 outline-title font-lequire"
+              className="font-bold tracking-tight max-w-[18ch] mt-4 font-lequire hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[1.02]"
               style={{ fontSize: "clamp(2.5rem, 5vw, 5.5rem)", textWrap: "balance" }}
             >
               {t('hero.titleLine1')}
             </h1>
             <h2
-              className="font-black uppercase tracking-tight leading-[0.95] outline-title-thick font-lequire mt-2"
+              className="font-black uppercase tracking-tight font-lequire mt-2 hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#6a6a6a] bg-clip-text text-transparent leading-[0.98]"
               style={{ fontSize: "clamp(3.2rem, 8.6vw, 8.4rem)", textWrap: "balance" }}
             >
               {t('hero.titleLine2')}
@@ -34,7 +34,7 @@ export const Hero = () => {
               {t('hero.tagline')}
             </div>
 
-            <p className="text-sm md:text-lg text-white/70 max-w-2xl leading-relaxed mt-6 mb-12">
+            <p className="text-sm md:text-lg text-white/70 max-w-2xl leading-relaxed mt-6 mb-12 italic">
               {t('hero.subtitle')}
             </p>
 
@@ -51,7 +51,7 @@ export const Hero = () => {
             <Button 
               size="lg" 
               variant="outline"
-              className="w-full sm:w-auto border-primary/40 bg-surface-elevated/80 text-primary backdrop-blur-xl shadow-none transition-all duration-300 px-8"
+              className="w-full sm:w-auto border-primary/40 bg-[#141414] text-primary backdrop-blur-xl shadow-none transition-all duration-300 px-8 btn-target-glow"
               onClick={() => navigate("/sample-report")}
             >
               {t('hero.sampleReportBtn')}

@@ -39,7 +39,7 @@ import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts
 
 // ============= ADMIN WHITELIST (Server-Side Only) =============
 const ADMIN_EMAILS = ['inspirexali@gmail.com'];
-const MAX_PAGES_FREE = 5; // Max pages for free/normal users
+const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
 const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
 const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${30 * 1024 * 1024}`); // 30MB
@@ -719,8 +719,6 @@ Deno.serve(async (req) => {
       pageCounts.push(pageCount);
     }
 
-    const totalPageCount = pageCounts.reduce((sum, count) => sum + count, 0);
-
     // Usage limit checks (count each statement as a conversion)
     const { data: limitResult, error: limitError } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
       p_ip_address: user ? null : trackingKey,
@@ -739,53 +737,11 @@ Deno.serve(async (req) => {
     const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
     const conversionsUsed = usageInfo?.conversions_used ?? 0;
     const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 5 : 2);
-    const isPaidUser = !!user && conversionsLimit > 5;
-    const remainingToday = Math.max(0, conversionsLimit - conversionsUsed);
-
     const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
-    const usageEstimate = Math.max(1, totalPageCount);
-    if (!isAdmin && conversionsUsed + usageEstimate > conversionsLimit) {
-      let errorMessage = 'Free limit reached. Please sign up to continue.';
-      if (user) {
-        errorMessage = isPaidUser
-          ? `You have reached your usage limit of ${conversionsLimit} pages.`
-          : `You have reached your daily limit of ${conversionsLimit} pages.`;
-      } else if (remainingToday > 0) {
-        errorMessage = `These files contain ${usageEstimate} pages, but you only have ${remainingToday} free page${remainingToday === 1 ? '' : 's'} left today. Please sign up or choose a plan.`;
-      } else if (usageEstimate > conversionsLimit) {
-        errorMessage = `These files contain ${usageEstimate} pages, but anonymous free access allows ${conversionsLimit} pages per day. Please sign up or choose a plan.`;
-      }
-
-      return new Response(
-        JSON.stringify({
-          error: errorMessage,
-          status: 'anonymous_limit_reached',
-          limitReached: true,
-          isAuthenticated: !!user,
-          signupRequired: !user,
-        }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Page limit enforcement
-    const planLimits: Record<string, number> = {
-      'monthly_basic': 300,
-      'monthly_pro': 1000,
-      'monthly_enterprise': 4500,
-      'yearly_lite': 5000,
-      'yearly_full': 15000,
-      'yearly_pro': 65000,
-      'per_page': 1,
-    };
-
     const isSpecialUser = user?.email === 'inspirexali@gmail.com';
-    let userPlanLimit = MAX_PAGES_FREE;
     let userPlanType = 'free';
     let pagesUsedThisMonth = 0;
-    let totalPagesAfterConversion = totalPageCount;
-    let isMonthlyPlan = false;
-    let isYearlyPlan = false;
+    const userPlanLimit = conversionsLimit;
 
     if (!isSpecialUser && user) {
       const { data: subData, error: subError } = await supabase
@@ -794,23 +750,74 @@ Deno.serve(async (req) => {
         .eq('user_id', user.id)
         .single();
 
-      if (!subError && subData && subData.plan_type) {
-        userPlanType = subData.plan_type;
+      if (subError) {
+        console.error('Failed to load subscription plan type:', subError);
+      } else if (subData) {
+        userPlanType = subData.plan_type || userPlanType;
         pagesUsedThisMonth = subData.pages_used_this_month || 0;
-        userPlanLimit = planLimits[subData.plan_type] || conversionsLimit || MAX_PAGES_FREE;
       }
+    }
 
-      isMonthlyPlan = userPlanType.startsWith('monthly');
-      isYearlyPlan = userPlanType.startsWith('yearly');
-      totalPagesAfterConversion = pagesUsedThisMonth + totalPageCount;
-      if (!isAdmin && (isMonthlyPlan || isYearlyPlan) && totalPagesAfterConversion > userPlanLimit) {
+    const normalizedPlanType = userPlanType.toLowerCase();
+    const isMonthlyPlan = normalizedPlanType.startsWith('monthly') || normalizedPlanType === 'daily';
+    const isYearlyPlan = normalizedPlanType.startsWith('yearly') || normalizedPlanType === 'business';
+    const isPerPagePlan = normalizedPlanType.startsWith('per_page');
+    const isPaidPlan = !!user && (isMonthlyPlan || isYearlyPlan || isPerPagePlan || conversionsLimit > 5);
+    const isFreeMode = !isPaidPlan;
+    const remainingQuota = Math.max(0, conversionsLimit - conversionsUsed);
+
+    // Free mode: enforce a 15-page max per PDF before processing.
+    if (!isAdmin && !isSpecialUser && isFreeMode) {
+      const maxDetectedPages = pageCounts.reduce((max, count) => Math.max(max, count), 0);
+      if (maxDetectedPages > FREE_MAX_PDF_PAGES_PER_FILE) {
         return new Response(
           JSON.stringify({
-            error: `Your ${userPlanType} plan allows ${userPlanLimit} pages per month. You have ${pagesUsedThisMonth} pages used and these PDFs have ${totalPageCount} pages.`,
+            error: `Free tier allows up to ${FREE_MAX_PDF_PAGES_PER_FILE} PDF pages per file. One selected file has ${maxDetectedPages} pages.`,
+            status: 'pdf_too_complex',
+            pagesDetected: maxDetectedPages,
+            maxPagesAllowed: FREE_MAX_PDF_PAGES_PER_FILE,
+            limitReached: true,
+            isAuthenticated: !!user,
+            signupRequired: !user,
+            planType: userPlanType,
+          }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Quota pre-check:
+    // - Free mode uses conversion count (1 file = 1 conversion).
+    // - Paid mode uses pages, but page charge is known only after OCR, so here we only reject if no quota remains.
+    if (!isAdmin && !isSpecialUser) {
+      if (isFreeMode) {
+        const usageEstimate = Math.max(1, files.length);
+        if ((conversionsUsed + usageEstimate) > conversionsLimit) {
+          const remainingConversions = Math.max(0, conversionsLimit - conversionsUsed);
+          const errorMessage = user
+            ? `You can convert ${conversionsLimit} files per day on free tier. You have ${remainingConversions} conversion${remainingConversions === 1 ? '' : 's'} left today.`
+            : `You can convert ${conversionsLimit} files per day for free. You have ${remainingConversions} conversion${remainingConversions === 1 ? '' : 's'} left today.`;
+
+          return new Response(
+            JSON.stringify({
+              error: errorMessage,
+              status: 'anonymous_limit_reached',
+              limitReached: true,
+              isAuthenticated: !!user,
+              signupRequired: !user,
+              planType: userPlanType,
+            }),
+            { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } else if (remainingQuota < 1) {
+        return new Response(
+          JSON.stringify({
+            error: `You have reached your usage limit of ${conversionsLimit} pages.`,
             status: 'page_limit_exceeded',
-            pagesDetected: totalPageCount,
-            pagesUsed: pagesUsedThisMonth,
-            planLimit: userPlanLimit,
+            limitReached: true,
+            pagesUsed: conversionsUsed,
+            planLimit: conversionsLimit,
             planType: userPlanType,
           }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -822,6 +829,8 @@ Deno.serve(async (req) => {
     const successes: ProcessedStatement[] = [];
     const failures: Array<{ fileName: string; error: string }> = [];
     const statementData: StatementData[] = [];
+    const paidRemainingQuota = Math.max(0, conversionsLimit - conversionsUsed);
+    let paidPagesConsumed = 0;
 
     for (const file of files as StatementPayload[]) {
       const sanitizedName = sanitizeFileName(file.fileName);
@@ -830,6 +839,17 @@ Deno.serve(async (req) => {
       const isPdf = lowerName.endsWith('.pdf');
 
       try {
+        if (!isAdmin && !isSpecialUser && !isFreeMode) {
+          const remainingPagesBeforeFile = paidRemainingQuota - paidPagesConsumed;
+          if (remainingPagesBeforeFile <= 0) {
+            failures.push({
+              fileName: sanitizedName,
+              error: `No page credits left in your ${isYearlyPlan ? 'yearly' : isMonthlyPlan ? 'monthly' : 'current'} plan.`,
+            });
+            continue;
+          }
+        }
+
         // Retrieve bytes (for validation and non-PDF extraction)
         let bytes = new Uint8Array();
         if (user && file.fileId) {
@@ -893,6 +913,29 @@ Deno.serve(async (req) => {
           pdfPageImages: file.pdfPageImages,
           categoryCorrections,
         });
+
+        if (!isAdmin && !isSpecialUser && !isFreeMode) {
+          const remainingPagesBeforeFile = paidRemainingQuota - paidPagesConsumed;
+          const pagesToCharge = Math.max(1, pagesWithData);
+          if (pagesToCharge > remainingPagesBeforeFile) {
+            const periodLabel = isYearlyPlan ? 'year' : isMonthlyPlan ? 'month' : 'plan';
+            const message = `This file has data on ${pagesToCharge} page${pagesToCharge === 1 ? '' : 's'}, but only ${remainingPagesBeforeFile} page${remainingPagesBeforeFile === 1 ? '' : 's'} remain in your ${periodLabel}.`;
+
+            failures.push({ fileName: sanitizedName, error: message });
+            if (conversionRecord) {
+              await supabase
+                .from('conversions')
+                .update({
+                  status: 'failed',
+                  completed_at: new Date().toISOString(),
+                  error_message: message,
+                })
+                .eq('id', conversionRecord.id);
+            }
+            continue;
+          }
+          paidPagesConsumed += pagesToCharge;
+        }
 
         // Upload result for authenticated users
         let resultPath: string | null = null;
@@ -1026,9 +1069,10 @@ Deno.serve(async (req) => {
     }
 
     const pagesWithDataTotal = successes.reduce((sum, s) => sum + (s.pagesWithData || 1), 0);
+    const successfulConversions = successes.length;
 
     // Update page usage once per batch based on pages that actually contained data
-    if (user && !isSpecialUser && (isMonthlyPlan || isYearlyPlan)) {
+    if (user && !isSpecialUser && !isFreeMode && (isMonthlyPlan || isYearlyPlan)) {
       const updatedPagesUsed = pagesUsedThisMonth + pagesWithDataTotal;
       const { error: updateError } = await supabase
         .from('subscriptions')
@@ -1043,17 +1087,19 @@ Deno.serve(async (req) => {
     }
 
     // Increment usage count based on plan
-    const incrementBy = Math.max(1, pagesWithDataTotal);
-    let remaining = conversionsLimit - conversionsUsed;
-    const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
-      p_ip_address: user ? null : trackingKey,
-      p_user_id: user ? user.id : null,
-      p_increment: incrementBy,
-    });
-    if (incrementError) {
-      console.error('Error incrementing usage after success:', incrementError);
-    } else {
-      remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
+    const incrementBy = isFreeMode ? successfulConversions : pagesWithDataTotal;
+    let remaining = Math.max(0, conversionsLimit - conversionsUsed);
+    if (incrementBy > 0) {
+      const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
+        p_ip_address: user ? null : trackingKey,
+        p_user_id: user ? user.id : null,
+        p_increment: incrementBy,
+      });
+      if (incrementError) {
+        console.error('Error incrementing usage after success:', incrementError);
+      } else {
+        remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
+      }
     }
 
     const primaryBankInfo = successes.find((s) => s.bankMetadata)?.bankMetadata;

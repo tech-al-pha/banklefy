@@ -1,5 +1,5 @@
 diff --git a/node_modules/tailwindcss/lib/corePlugins.js b/node_modules/tailwindcss/lib/corePlugins.js
-index bf5d083..9544459 100644
+index bf5d083..e26351b 100644
 --- a/node_modules/tailwindcss/lib/corePlugins.js
 +++ b/node_modules/tailwindcss/lib/corePlugins.js
 @@ -552,7 +552,9 @@ let cssBackdropFilterValue = [
@@ -8,13 +8,13 @@ index bf5d083..9544459 100644
      preflight: ({ addBase  })=>{
 -        let preflightStyles = _postcss.default.parse(_fs.default.readFileSync(_path.join(__dirname, "./css/preflight.css"), "utf8"));
 +        let preflightStyles = _postcss.default.parse(_fs.default.readFileSync(_path.join(__dirname, "./css/preflight.css"), "utf8"), {
-+            from: undefined
++            from: _path.join(__dirname, "./css/preflight.css")
 +        });
          addBase([
              _postcss.default.comment({
                  text: `! tailwindcss v${_packagejson.version} | MIT License | https://tailwindcss.com`
 diff --git a/node_modules/tailwindcss/lib/lib/generateRules.js b/node_modules/tailwindcss/lib/lib/generateRules.js
-index 7b3d219..040960a 100644
+index 7b3d219..b48ca5a 100644
 --- a/node_modules/tailwindcss/lib/lib/generateRules.js
 +++ b/node_modules/tailwindcss/lib/lib/generateRules.js
 @@ -495,7 +495,9 @@ function isParsableCssValue(property, value) {
@@ -23,8 +23,35 @@ index 7b3d219..040960a 100644
      try {
 -        _postcss.default.parse(`a{${property}:${value}}`).toResult();
 +        _postcss.default.parse(`a{${property}:${value}}`, {
-+            from: undefined
++            from: "tailwindcss://generate-rules"
 +        }).toResult();
          return true;
      } catch (err) {
          return false;
+diff --git a/node_modules/tailwindcss/src/corePlugins.js b/node_modules/tailwindcss/src/corePlugins.js
+index b73c672..af441d8 100644
+--- a/node_modules/tailwindcss/src/corePlugins.js
++++ b/node_modules/tailwindcss/src/corePlugins.js
+@@ -566,7 +566,8 @@ let cssBackdropFilterValue = [
+ export let corePlugins = {
+   preflight: ({ addBase }) => {
+     let preflightStyles = postcss.parse(
+-      fs.readFileSync(path.join(__dirname, './css/preflight.css'), 'utf8')
++      fs.readFileSync(path.join(__dirname, './css/preflight.css'), 'utf8'),
++      { from: path.join(__dirname, './css/preflight.css') }
+     )
+ 
+     addBase([
+diff --git a/node_modules/tailwindcss/src/lib/generateRules.js b/node_modules/tailwindcss/src/lib/generateRules.js
+index ba2e305..9a02ee7 100644
+--- a/node_modules/tailwindcss/src/lib/generateRules.js
++++ b/node_modules/tailwindcss/src/lib/generateRules.js
+@@ -491,7 +491,7 @@ function isParsableCssValue(property, value) {
+   }
+ 
+   try {
+-    postcss.parse(`a{${property}:${value}}`).toResult()
++    postcss.parse(`a{${property}:${value}}`, { from: 'tailwindcss://generate-rules' }).toResult()
+     return true
+   } catch (err) {
+     return false

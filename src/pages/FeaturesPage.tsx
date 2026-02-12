@@ -119,7 +119,7 @@ const FeaturesPage = () => {
             <Button 
               variant="outline"
               onClick={() => navigate('/auth')}
-              className="border-primary/50 text-primary font-bold px-6 py-4 sm:px-8 sm:py-6 text-base sm:text-lg"
+              className="border-primary/50 bg-[#141414] text-primary font-bold px-6 py-4 sm:px-8 sm:py-6 text-base sm:text-lg btn-target-glow"
             >
               {t('featuresPage.cta.signUp')}
             </Button>

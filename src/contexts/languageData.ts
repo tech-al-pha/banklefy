@@ -1400,8 +1400,8 @@ export const translations: Record<Language, Record<string, string>> = {
 
 export const languageNames: Record<Language, string> = {
   "en": "English",
-  "ar": "Arabic",
-  "zh": "Chinese",
-  "es": "Spanish",
-  "hi": "Hindi"
+  "ar": "العربية",
+  "zh": "中文",
+  "es": "Español",
+  "hi": "हिन्दी"
 };

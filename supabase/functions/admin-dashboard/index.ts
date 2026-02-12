@@ -103,11 +103,39 @@ Deno.serve(async (req) => {
 
     // ============= FETCH ALL DATA WITH SERVICE ROLE =============
 
-    // Fetch all profiles
+    // Fetch all auth users (source of truth for registered accounts)
+    const allAuthUsers: Array<{
+      id: string;
+      email: string | null;
+      created_at: string;
+    }> = [];
+    let page = 1;
+    const perPage = 1000;
+
+    while (true) {
+      const { data, error: usersError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+      if (usersError) {
+        console.error('Auth users query error:', usersError);
+        throw new Error('Failed to fetch auth users');
+      }
+
+      const users = data?.users ?? [];
+      allAuthUsers.push(
+        ...users.map((u) => ({
+          id: u.id,
+          email: u.email ?? null,
+          created_at: u.created_at ?? new Date(0).toISOString(),
+        }))
+      );
+
+      if (!data?.nextPage) break;
+      page = data.nextPage;
+    }
+
+    // Fetch all profiles (optional enrichment)
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
-      .select('id, email, full_name, created_at')
-      .order('created_at', { ascending: false });
+      .select('id, full_name, created_at');
 
     if (profilesError) {
       console.error('Profiles query error:', profilesError);
@@ -156,11 +184,21 @@ Deno.serve(async (req) => {
     }
 
     // ============= COMBINE & ENRICH DATA =============
-    const enrichedUsers = profiles?.map(profile => ({
-      ...profile,
-      subscription: subscriptions?.find(s => s.user_id === profile.id) || null,
-      role: roles?.find(r => r.user_id === profile.id)?.role || 'user',
-    })) || [];
+    const profileById = new Map((profiles || []).map((p) => [p.id, p]));
+    const subByUserId = new Map((subscriptions || []).map((s) => [s.user_id, s]));
+    const roleByUserId = new Map((roles || []).map((r) => [r.user_id, r.role]));
+
+    const enrichedUsers = allAuthUsers.map((user) => {
+      const profile = profileById.get(user.id);
+      return {
+        id: user.id,
+        email: user.email || '',
+        full_name: profile?.full_name ?? null,
+        created_at: user.created_at || profile?.created_at || new Date(0).toISOString(),
+        subscription: subByUserId.get(user.id) || null,
+        role: roleByUserId.get(user.id) || 'user',
+      };
+    });
 
     // Calculate conversion stats with tolerant status handling
     const today = new Date().toISOString().split('T')[0];

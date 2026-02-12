@@ -295,6 +295,17 @@
   .btn-glow:focus-visible:not(:disabled) {
     box-shadow: none !important;
   }
+  .btn-target-glow {
+    transition: box-shadow 220ms ease, border-color 220ms ease, filter 220ms ease;
+  }
+  .btn-target-glow:hover:not(:disabled),
+  .btn-target-glow:focus-visible:not(:disabled) {
+    border-color: rgba(240, 240, 240, 0.65) !important;
+    box-shadow:
+      0 0 10px rgba(255, 255, 255, 0.12),
+      0 0 24px rgba(255, 255, 255, 0.2) !important;
+    filter: brightness(1.05);
+  }
 
   .excel-button {
     background: #22c55e !important;

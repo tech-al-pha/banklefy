@@ -27,7 +27,7 @@ const monthlyPlans: Plan[] = [
     planId: "monthly_basic",
     category: "monthly",
     name: "Monthly Basic",
-    price: "INR 899",
+    price: "$9",
     amountInRupee: 899,
     unit: "/month",
     description: "Perfect for regular analysis",
@@ -38,7 +38,7 @@ const monthlyPlans: Plan[] = [
     planId: "monthly_pro",
     category: "monthly",
     name: "Monthly Pro",
-    price: "INR 1899",
+    price: "$19",
     amountInRupee: 1899,
     unit: "/month",
     description: "Most popular for professionals",
@@ -50,7 +50,7 @@ const monthlyPlans: Plan[] = [
     planId: "monthly_enterprise",
     category: "monthly",
     name: "Monthly Enterprise",
-    price: "INR 3899",
+    price: "$39",
     amountInRupee: 3899,
     unit: "/month",
     description: "For heavy users and teams",
@@ -64,7 +64,7 @@ const yearlyPlans: Plan[] = [
     planId: "yearly_lite",
     category: "yearly",
     name: "Yearly Lite",
-    price: "INR 8999",
+    price: "$99",
     amountInRupee: 8999,
     unit: "/year",
     description: "Great for regular users",
@@ -76,7 +76,7 @@ const yearlyPlans: Plan[] = [
     planId: "yearly_full",
     category: "yearly",
     name: "Yearly Full",
-    price: "INR 18999",
+    price: "$199",
     amountInRupee: 18999,
     unit: "/year",
     description: "Best value for professionals",
@@ -89,7 +89,7 @@ const yearlyPlans: Plan[] = [
     planId: "yearly_pro",
     category: "yearly",
     name: "Yearly Pro",
-    price: "INR 37999",
+    price: "$399",
     amountInRupee: 37999,
     unit: "/year",
     description: "Maximum savings for power users",
@@ -104,7 +104,7 @@ const perPagePlans: Plan[] = [
     planId: "per_page_lite",
     category: "perPage",
     name: "Lite",
-    price: "INR 89",
+    price: "$1",
     amountInRupee: 89,
     unit: "/conversion",
     description: "Quick single conversion",
@@ -115,7 +115,7 @@ const perPagePlans: Plan[] = [
     planId: "per_page_standard",
     category: "perPage",
     name: "Standard",
-    price: "INR 179",
+    price: "$2",
     amountInRupee: 179,
     unit: "/conversion",
     description: "Popular for small batches",
@@ -127,7 +127,7 @@ const perPagePlans: Plan[] = [
     planId: "per_page_power",
     category: "perPage",
     name: "Power",
-    price: "INR 299",
+    price: "$3",
     amountInRupee: 299,
     unit: "/conversion",
     description: "For larger batches",
@@ -301,7 +301,7 @@ const PricingPage = () => {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Billed in INR {plan.amountInRupee.toLocaleString("en-IN")}
+              ~₹{plan.amountInRupee.toLocaleString("en-IN")} INR
             </p>
           </div>
 
@@ -312,8 +312,8 @@ const PricingPage = () => {
           )}
 
           {plan.savings && (
-            <div className="py-2 px-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <p className="text-sm font-bold text-green-400">{plan.savings}</p>
+            <div className="py-2 px-4 rounded-full border border-[#1f5b3a] bg-[#0f1f16] shadow-none">
+              <p className="text-sm font-semibold text-[#7CFFA8]">{plan.savings}</p>
             </div>
           )}
 

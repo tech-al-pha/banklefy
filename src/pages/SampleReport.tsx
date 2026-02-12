@@ -120,7 +120,7 @@ export default function SampleReport() {
                 </p>
                 <h2 className="text-2xl font-semibold text-white">Akromeda Statement</h2>
               </div>
-              <ShieldCheck className="h-8 w-8 text-primary" />
+              <ShieldCheck className="h-8 w-8 text-[#7CFF9C] drop-shadow-[0_0_10px_rgba(124,255,156,0.35)]" />
             </div>
 
             <div className="mt-6 space-y-4">

@@ -238,14 +238,20 @@ const Settings = () => {
       title: t('settings.privacy.delete'),
       description: t('settings.privacy.deleteDesc'),
       category: "privacy",
-      icon: <Trash2 className="h-5 w-5 text-destructive" />,
+      tone: "danger",
+      icon: <Trash2 className="h-5 w-5 text-red-300" />,
       component: (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" size="sm">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-400/40 text-red-300 hover:text-red-200 hover:border-red-300/60"
+            >
+              <Trash2 className="h-4 w-4 mr-2 text-red-300" />
               {t('settings.privacy.deleteAccount')}
             </Button>
-          </AlertDialogTrigger>
+            </AlertDialogTrigger>
           <AlertDialogContent className="bg-background border-border">
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
@@ -275,6 +281,7 @@ const Settings = () => {
     updateSetting,
     handleExportData,
     handleDeleteAccount,
+    navigate,
   ]);
 
   const categories = [
@@ -318,11 +325,11 @@ const Settings = () => {
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                  <div className={item.tone === "danger" ? "p-2 rounded-lg bg-red-500/10 text-red-300" : "p-2 rounded-lg bg-primary/10 text-primary"}>
                     {item.icon}
                   </div>
                   <div>
-                    <h4 className="font-medium text-foreground">{item.title}</h4>
+                    <h4 className={item.tone === "danger" ? "font-medium text-red-300" : "font-medium text-foreground"}>{item.title}</h4>
                     <p className="text-sm text-muted-foreground">{item.description}</p>
                   </div>
                 </div>
@@ -370,7 +377,7 @@ const Settings = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => navigate('/')}
-                className="border-primary/50 text-foreground w-full sm:w-auto"
+                className="border-primary/50 bg-[#141414] text-foreground w-full sm:w-auto btn-target-glow"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 {t('settings.backToHome')}
