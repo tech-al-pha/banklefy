@@ -39,15 +39,15 @@ import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts
 
 // ============= ADMIN WHITELIST (Server-Side Only) =============
 const ADMIN_EMAILS = ['inspirexali@gmail.com'];
-const MAX_PAGES_FREE = 6; // Max pages for free/normal users
-const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '60');
+const MAX_PAGES_FREE = 5; // Max pages for free/normal users
+const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
 const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${30 * 1024 * 1024}`); // 30MB
 
 // ============= DEPLOYMENT-AGNOSTIC CORS =============
 const getAllowedOrigin = (requestOrigin: string | null): string => {
   const envOrigin = Deno.env.get('ALLOWED_ORIGIN');
-  
+
   const allowedOrigins = [
     envOrigin,
     'https://akromeda.lovable.app',
@@ -56,27 +56,27 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     'http://localhost:5173',
     'http://localhost:3000',
   ].filter(Boolean) as string[];
-  
+
   if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
     return requestOrigin;
   }
-  
+
   const lovableAppPattern = /^https:\/\/[a-z0-9-]+\.lovable\.app$/;
   const lovableProjectPattern = /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/;
   if (requestOrigin && (lovableAppPattern.test(requestOrigin) || lovableProjectPattern.test(requestOrigin))) {
     return requestOrigin;
   }
-  
+
   const vercelPattern = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
   if (requestOrigin && vercelPattern.test(requestOrigin)) {
     return requestOrigin;
   }
-  
+
   if (envOrigin === '*' && requestOrigin) {
     return requestOrigin;
   }
-  
-  return requestOrigin || allowedOrigins[0] || '*';
+
+  return allowedOrigins[0] || 'https://akromeda.vercel.app';
 };
 
 const getCorsHeaders = (req: Request) => ({
@@ -222,7 +222,8 @@ type ProcessedStatement = {
   fileName: string;
   transactions: Transaction[];
   bankMetadata?: BankMetadata;
-  excelBase64: string;
+  excelBase64?: string;
+  resultPath?: string | null;
   pagesWithData: number;
   totals: {
     totalCredits: number;
@@ -739,17 +740,25 @@ Deno.serve(async (req) => {
     const conversionsUsed = usageInfo?.conversions_used ?? 0;
     const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 5 : 2);
     const isPaidUser = !!user && conversionsLimit > 5;
+    const remainingToday = Math.max(0, conversionsLimit - conversionsUsed);
 
     const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
-    const usageEstimate = isPaidUser ? totalPageCount : files.length;
+    const usageEstimate = Math.max(1, totalPageCount);
     if (!isAdmin && conversionsUsed + usageEstimate > conversionsLimit) {
+      let errorMessage = 'Free limit reached. Please sign up to continue.';
+      if (user) {
+        errorMessage = isPaidUser
+          ? `You have reached your usage limit of ${conversionsLimit} pages.`
+          : `You have reached your daily limit of ${conversionsLimit} pages.`;
+      } else if (remainingToday > 0) {
+        errorMessage = `These files contain ${usageEstimate} pages, but you only have ${remainingToday} free page${remainingToday === 1 ? '' : 's'} left today. Please sign up or choose a plan.`;
+      } else if (usageEstimate > conversionsLimit) {
+        errorMessage = `These files contain ${usageEstimate} pages, but anonymous free access allows ${conversionsLimit} pages per day. Please sign up or choose a plan.`;
+      }
+
       return new Response(
         JSON.stringify({
-          error: user
-            ? (isPaidUser
-                ? `You have reached your usage limit of ${conversionsLimit}.`
-                : `You have reached your daily limit of ${conversionsLimit} conversions.`)
-            : 'Free limit reached. Please sign up to continue.',
+          error: errorMessage,
           status: 'anonymous_limit_reached',
           limitReached: true,
           isAuthenticated: !!user,
@@ -775,6 +784,8 @@ Deno.serve(async (req) => {
     let userPlanType = 'free';
     let pagesUsedThisMonth = 0;
     let totalPagesAfterConversion = totalPageCount;
+    let isMonthlyPlan = false;
+    let isYearlyPlan = false;
 
     if (!isSpecialUser && user) {
       const { data: subData, error: subError } = await supabase
@@ -786,11 +797,13 @@ Deno.serve(async (req) => {
       if (!subError && subData && subData.plan_type) {
         userPlanType = subData.plan_type;
         pagesUsedThisMonth = subData.pages_used_this_month || 0;
-        userPlanLimit = planLimits[subData.plan_type] || MAX_PAGES_FREE;
+        userPlanLimit = planLimits[subData.plan_type] || conversionsLimit || MAX_PAGES_FREE;
       }
 
+      isMonthlyPlan = userPlanType.startsWith('monthly');
+      isYearlyPlan = userPlanType.startsWith('yearly');
       totalPagesAfterConversion = pagesUsedThisMonth + totalPageCount;
-      if (!isAdmin && totalPagesAfterConversion > userPlanLimit) {
+      if (!isAdmin && (isMonthlyPlan || isYearlyPlan) && totalPagesAfterConversion > userPlanLimit) {
         return new Response(
           JSON.stringify({
             error: `Your ${userPlanType} plan allows ${userPlanLimit} pages per month. You have ${pagesUsedThisMonth} pages used and these PDFs have ${totalPageCount} pages.`,
@@ -881,21 +894,21 @@ Deno.serve(async (req) => {
           categoryCorrections,
         });
 
-        const excelBase64 = bufferToBase64(excelBuffer);
-
         // Upload result for authenticated users
         let resultPath: string | null = null;
+        let uploadResultError: unknown = null;
         if (user && conversionRecord) {
           resultPath = `${user.id}/results/${conversionRecord.id}.xlsx`;
-          const { error: uploadResultError } = await supabase.storage
+          const { error } = await supabase.storage
             .from('bank-statements')
             .upload(resultPath, excelBuffer, {
               contentType: 'application/octet-stream',
               upsert: false,
             });
 
-          if (uploadResultError) {
-            console.error('Failed to upload result:', uploadResultError);
+          if (error) {
+            console.error('Failed to upload result:', error);
+            uploadResultError = error;
             resultPath = null;
           }
 
@@ -910,11 +923,15 @@ Deno.serve(async (req) => {
             .eq('id', conversionRecord.id);
         }
 
+        const shouldIncludeBase64 = !user || !resultPath;
+        const excelBase64 = shouldIncludeBase64 ? bufferToBase64(excelBuffer) : undefined;
+
         successes.push({
           fileName: sanitizedName,
           transactions,
           bankMetadata,
           excelBase64,
+          resultPath,
           pagesWithData,
           totals,
         });
@@ -957,6 +974,7 @@ Deno.serve(async (req) => {
       available: boolean;
       reasons: string[];
       excelData?: string;
+      resultPath?: string | null;
       statementPeriod?: string;
       duplicatesRemoved?: number;
       totals?: { totalDebit: number; totalCredit: number; finalBalance: number | null };
@@ -974,10 +992,32 @@ Deno.serve(async (req) => {
         transactions: merged.mergedTransactions,
         totals: merged.totals,
       });
+      let mergeResultPath: string | null = null;
+
+      if (user) {
+        mergeResultPath = `${user.id}/results/merged_${Date.now()}.xlsx`;
+        const { error } = await supabase.storage
+          .from('bank-statements')
+          .upload(mergeResultPath, mergedExcel.buffer, {
+            contentType: 'application/octet-stream',
+            upsert: false,
+          });
+
+        if (error) {
+          console.error('Failed to upload merged result:', error);
+          mergeResultPath = null;
+        }
+      }
+
+      const mergeExcelBase64 = (!user || !mergeResultPath)
+        ? bufferToBase64(mergedExcel.buffer)
+        : undefined;
+
       mergePayload = {
         available: true,
         reasons: [],
-        excelData: bufferToBase64(mergedExcel.buffer),
+        excelData: mergeExcelBase64,
+        resultPath: mergeResultPath,
         statementPeriod: merged.statementPeriod,
         duplicatesRemoved: merged.duplicatesRemoved,
         totals: merged.totals,
@@ -988,7 +1028,7 @@ Deno.serve(async (req) => {
     const pagesWithDataTotal = successes.reduce((sum, s) => sum + (s.pagesWithData || 1), 0);
 
     // Update page usage once per batch based on pages that actually contained data
-    if (user && !isSpecialUser) {
+    if (user && !isSpecialUser && (isMonthlyPlan || isYearlyPlan)) {
       const updatedPagesUsed = pagesUsedThisMonth + pagesWithDataTotal;
       const { error: updateError } = await supabase
         .from('subscriptions')
@@ -998,12 +1038,12 @@ Deno.serve(async (req) => {
       if (updateError) {
         console.error('Failed to update pages used:', updateError);
       } else {
-        console.log(`Updated pages used for user ${user.id}: ${updatedPagesUsed}/${userPlanLimit}`);
+        console.log(`Updated pages used: ${updatedPagesUsed}/${userPlanLimit}`);
       }
     }
 
     // Increment usage count based on plan
-    const incrementBy = isPaidUser ? pagesWithDataTotal : successes.length;
+    const incrementBy = Math.max(1, pagesWithDataTotal);
     let remaining = conversionsLimit - conversionsUsed;
     const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
       p_ip_address: user ? null : trackingKey,
@@ -1025,6 +1065,7 @@ Deno.serve(async (req) => {
           results: successes.map((s) => ({
             fileName: s.fileName,
             excelData: s.excelBase64,
+            resultPath: s.resultPath,
             totals: s.totals,
             bankInfo: s.bankMetadata,
           })),
@@ -1051,3 +1092,5 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+

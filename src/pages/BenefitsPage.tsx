@@ -13,7 +13,6 @@ import {
   Lock,
   Clock,
   Lightbulb,
-  Users,
   Award,
   Infinity as InfinityIcon,
 } from "lucide-react";
@@ -81,12 +80,6 @@ const benefits: Benefit[] = [
     category: "Flexibility",
   },
   {
-    icon: Users,
-    title: "Team Collaboration",
-    description: "Coming Soon - Share analysis with team members and collaborate in real-time.",
-    category: "Collaboration",
-  },
-  {
     icon: Award,
     title: "Reliable Quality",
     description: "Built for professionals who need accurate and reliable analysis.",
@@ -106,7 +99,6 @@ const categories = [
   "Accessibility",
   "Intelligence",
   "Flexibility",
-  "Collaboration",
   "Quality",
   "Scalability",
 ];

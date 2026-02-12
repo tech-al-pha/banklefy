@@ -1,4 +1,4 @@
-// ============= STATEMENT EXCEL GENERATOR =============
+﻿// ============= STATEMENT EXCEL GENERATOR =============
 // Focused on strict data preservation and required schema only.
 
 import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
@@ -262,7 +262,7 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   const creditCol = 'E';
   const debitAddr = `${debitCol}${totalRowIndex + 1}`;
   const creditAddr = `${creditCol}${totalRowIndex + 1}`;
-  
+
   ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
   ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
 
@@ -274,7 +274,7 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
   }
   setCellFormat(ws, debitAddr, MONEY_FORMAT);
   setCellFormat(ws, creditAddr, MONEY_FORMAT);
-  
+
   ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
   setRowStyle(ws, headerRowIndex, TABLE_HEADERS.length, headerStyle);
   
@@ -312,7 +312,7 @@ export function generateSimpleExcel(transactions: Transaction[]): ArrayBuffer {
   const creditCol = 'E';
   const debitAddr = `${debitCol}${totalRowIndex + 1}`;
   const creditAddr = `${creditCol}${totalRowIndex + 1}`;
-  
+
   ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
   ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
 
@@ -323,7 +323,7 @@ export function generateSimpleExcel(transactions: Transaction[]): ArrayBuffer {
   }
   setCellFormat(ws, debitAddr, MONEY_FORMAT);
   setCellFormat(ws, creditAddr, MONEY_FORMAT);
-  
+
   ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
   setRowStyle(ws, 0, TABLE_HEADERS.length, headerStyle);
   
@@ -378,7 +378,7 @@ export function generateMergedStatementsExcel(config: MergedExcelConfig): ExcelG
   const creditCol = 'E';
   const debitAddr = `${debitCol}${totalRowIndex + 1}`;
   const creditAddr = `${creditCol}${totalRowIndex + 1}`;
-  
+
   ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
   ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
 
@@ -389,7 +389,7 @@ export function generateMergedStatementsExcel(config: MergedExcelConfig): ExcelG
   }
   setCellFormat(ws, debitAddr, MONEY_FORMAT);
   setCellFormat(ws, creditAddr, MONEY_FORMAT);
-  
+
   ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
   setRowStyle(ws, headerRowIndex, TABLE_HEADERS.length, headerStyle);
   

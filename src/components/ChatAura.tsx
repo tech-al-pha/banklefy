@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
@@ -42,13 +42,21 @@ interface ChatAuraProps {
 
 // Session-based usage tracking (resets on refresh)
 const getChatUsage = () => {
-  const stored = sessionStorage.getItem("chatAuraUsage");
-  return stored ? parseInt(stored, 10) : 0;
+  try {
+    const stored = sessionStorage.getItem("chatAuraUsage");
+    return stored ? parseInt(stored, 10) : 0;
+  } catch {
+    return 0;
+  }
 };
 
 const incrementChatUsage = () => {
   const current = getChatUsage();
-  sessionStorage.setItem("chatAuraUsage", String(current + 1));
+  try {
+    sessionStorage.setItem("chatAuraUsage", String(current + 1));
+  } catch {
+    // Ignore sessionStorage failures (privacy mode/quota)
+  }
   return current + 1;
 };
 
@@ -64,9 +72,17 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
   const [recentLoading, setRecentLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const safeSessionGet = (key: string) => {
+    try {
+      return sessionStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  };
+
   // Load context from sessionStorage if props not provided (for cross-page access)
-  const storedContext = sessionStorage.getItem('chatAuraContext');
-  const storedFileName = sessionStorage.getItem('chatAuraFileName');
+  const storedContext = safeSessionGet('chatAuraContext');
+  const storedFileName = safeSessionGet('chatAuraFileName');
   
   const effectivePdfContext = pdfContext || storedContext;
   const effectiveFileName = pdfFileName || storedFileName;
@@ -87,7 +103,7 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
     const greeting: Message = {
       id: "greeting",
       role: "assistant",
-      content: effectivePdfContext 
+      content: effectivePdfContext
         ? t('chatAura.greetingWithPdf').replace('{fileName}', effectiveFileName || 'document')
         : t('chatAura.greeting'),
       timestamp: new Date()

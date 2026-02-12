@@ -5,26 +5,26 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 // Import modular processors
-import { 
-  classifyDocument, 
+import {
+  classifyDocument,
   callGroqVisionOCR,
   type RawTransaction,
   type BankMetadata,
 } from '../_shared/ocr-processor.ts';
-import { 
+import {
   CATEGORY_LIST,
   type ProcessedTransaction,
 } from '../_shared/categorizer.ts';
-import { 
+import {
   performExtraction,
   performCategorization,
   generateStatusReport,
   type AIProcessingStatus,
 } from '../_shared/ai-orchestrator.ts';
-import { 
-  reconcileBalances, 
-  detectDuplicates, 
-  detectHighRiskTransactions, 
+import {
+  reconcileBalances,
+  detectDuplicates,
+  detectHighRiskTransactions,
   detectCircularTrading,
   performUnderwritingAnalysis,
   analyzeLiquidity,
@@ -40,8 +40,8 @@ import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts
 
 // ============= ADMIN WHITELIST (Server-Side Only) =============
 const ADMIN_EMAILS = ['inspirexali@gmail.com'];
-const MAX_PAGES_FREE = 6; // Max pages for free/normal users
-const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '60');
+const MAX_PAGES_FREE = 5; // Max pages for free/normal users
+const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
 const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${30 * 1024 * 1024}`); // 30MB
 
@@ -50,7 +50,7 @@ const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES
 // and the frontend can be hosted anywhere (Vercel, Netlify, Cloudflare, etc.)
 const getAllowedOrigin = (requestOrigin: string | null): string => {
   const envOrigin = Deno.env.get('ALLOWED_ORIGIN');
-  
+
   const allowedOrigins = [
     envOrigin,
     'https://akromeda.lovable.app',
@@ -59,30 +59,30 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     'http://localhost:5173',
     'http://localhost:3000',
   ].filter(Boolean) as string[];
-  
+
   if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
     return requestOrigin;
   }
-  
+
   // Allow *.lovable.app and *.lovableproject.com
   const lovableAppPattern = /^https:\/\/[a-z0-9-]+\.lovable\.app$/;
   const lovableProjectPattern = /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/;
   if (requestOrigin && (lovableAppPattern.test(requestOrigin) || lovableProjectPattern.test(requestOrigin))) {
     return requestOrigin;
   }
-  
+
   // Allow *.vercel.app (Vercel previews)
   const vercelPattern = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
   if (requestOrigin && vercelPattern.test(requestOrigin)) {
     return requestOrigin;
   }
-  
+
   // Allow any origin if ALLOWED_ORIGIN is set to '*'
   if (envOrigin === '*' && requestOrigin) {
     return requestOrigin;
   }
-  
-  return requestOrigin || allowedOrigins[0] || '*';
+
+  return allowedOrigins[0] || 'https://akromeda.vercel.app';
 };
 
 const getCorsHeaders = (req: Request) => ({
@@ -151,8 +151,8 @@ const getClientIp = (req: Request): string => {
     const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
     return ips[0] || 'unknown';
   }
-  return req.headers.get('cf-connecting-ip') || 
-         req.headers.get('x-real-ip') || 
+  return req.headers.get('cf-connecting-ip') ||
+         req.headers.get('x-real-ip') ||
          'unknown';
 };
 
@@ -193,7 +193,7 @@ const estimateBase64Bytes = (base64: string): number => {
 // ============= MAIN HANDLER =============
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
-  
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -217,17 +217,17 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     let user = null;
     let supabase = supabaseAdmin;
-    
+
     if (authHeader && authHeader.startsWith('Bearer ') && authHeader !== 'Bearer null') {
       const token = authHeader.replace('Bearer ', '');
-      
+
       // Validate token using admin client for secure server-side verification
       const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
-      
+
       if (!authError && authUser) {
         user = authUser;
-        console.log('Authenticated user detected:', { userId: user.id, email: user.email });
-        
+        console.log('Authenticated user detected');
+
         // Create user-scoped client for RLS-protected operations
         supabase = createClient(
           Deno.env.get('SUPABASE_URL') ?? '',
@@ -244,14 +244,14 @@ Deno.serve(async (req) => {
     // Authenticated users with valid tokens COMPLETELY SKIP reCAPTCHA
     if (!user) {
       console.log('Anonymous user detected - reCAPTCHA required');
-      
+
       if (!recaptchaToken) {
         return new Response(
           JSON.stringify({ error: 'CAPTCHA verification required for anonymous users' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
+
       const isValidCaptcha = await verifyRecaptcha(recaptchaToken);
       if (!isValidCaptcha) {
         return new Response(
@@ -264,10 +264,10 @@ Deno.serve(async (req) => {
       console.log('Authenticated user - reCAPTCHA SKIPPED');
     }
 
-    console.log('Processing conversion:', { 
-      isAuthenticated: !!user, 
-      ipAddress: user ? 'hidden' : ipAddress,
-      timezone: userTimezone 
+    console.log('Processing conversion:', {
+      isAuthenticated: !!user,
+      client: user ? 'authenticated' : 'anonymous',
+      timezone: userTimezone,
     });
 
     // Validate request
@@ -434,20 +434,28 @@ Deno.serve(async (req) => {
 
     // Check if admin (bypass limits for simple PDFs)
     const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
-    console.log('Admin check:', { isAdmin, email: user?.email });
+    console.log('Admin check:', { isAdmin });
 
     const isPaidUser = !!user && conversionsLimit > 5;
-    const usageEstimate = isPaidUser ? pageCount : 1;
+    const usageEstimate = Math.max(1, pageCount);
+    const remainingToday = Math.max(0, conversionsLimit - conversionsUsed);
 
     // Enforce limits (admin bypasses for simple PDFs)
     if (!isAdmin && (conversionsUsed + usageEstimate) > conversionsLimit) {
+      let errorMessage = 'Free limit reached. Please sign up to continue.';
+      if (user) {
+        errorMessage = isPaidUser
+          ? `You have reached your usage limit of ${conversionsLimit} pages.`
+          : `You have reached your daily limit of ${conversionsLimit} pages.`;
+      } else if (remainingToday > 0) {
+        errorMessage = `This document has ${usageEstimate} pages, but you only have ${remainingToday} free page${remainingToday === 1 ? '' : 's'} left today. Please sign up or choose a plan.`;
+      } else if (usageEstimate > conversionsLimit) {
+        errorMessage = `This document has ${usageEstimate} pages, but anonymous free access allows ${conversionsLimit} pages per day. Please sign up or choose a plan.`;
+      }
+
       return new Response(
         JSON.stringify({
-          error: user 
-            ? (isPaidUser
-                ? `You have reached your usage limit of ${conversionsLimit}.`
-                : `You have reached your daily limit of ${conversionsLimit} conversions.`)
-            : 'Free limit reached. Please sign up to continue.',
+          error: errorMessage,
           status: 'anonymous_limit_reached',
           limitReached: true,
           isAuthenticated: !!user,
@@ -460,7 +468,7 @@ Deno.serve(async (req) => {
     // ============= PAGE LIMIT ENFORCEMENT =============
     // Check PDF page count for non-admin users
     // Each plan has specific page limits
-    
+
     // Plan page limits
     const planLimits: Record<string, number> = {
       'monthly_basic': 300,
@@ -471,18 +479,20 @@ Deno.serve(async (req) => {
       'yearly_pro': 65000,
       'per_page': 1, // per page plan users
     };
-    
+
     // Check if user is special admin user (no limits)
     const isSpecialUser = user?.email === 'inspirexali@gmail.com';
-    
+
     // Variables for plan tracking (defined outside block for scope access)
     let userPlanLimit = MAX_PAGES_FREE;
     let userPlanType = 'free';
     let pagesUsedThisMonth = 0;
     let totalPagesAfterConversion = pageCount;
-    
+    let isMonthlyPlan = false;
+    let isYearlyPlan = false;
+
     if (isSpecialUser) {
-      console.log('Special user detected - unlimited pages allowed:', user?.email);
+      console.log('Special user detected - unlimited pages allowed');
     } else {
       // Check user's plan and page limit
       if (user) {
@@ -491,28 +501,30 @@ Deno.serve(async (req) => {
           .select('plan_type, pages_used_this_month')
           .eq('user_id', user.id)
           .single();
-        
+
         if (!subError && subData && subData.plan_type) {
           userPlanType = subData.plan_type;
           pagesUsedThisMonth = subData.pages_used_this_month || 0;
-          userPlanLimit = planLimits[subData.plan_type] || MAX_PAGES_FREE;
+          userPlanLimit = planLimits[subData.plan_type] || conversionsLimit || MAX_PAGES_FREE;
         }
       }
-      
+
+      isMonthlyPlan = userPlanType.startsWith('monthly');
+      isYearlyPlan = userPlanType.startsWith('yearly');
       totalPagesAfterConversion = pagesUsedThisMonth + pageCount;
-      
-      console.log('Page limit check:', { 
-        pageCount, 
-        isAdmin, 
-        userPlanType, 
+
+      console.log('Page limit check:', {
+        pageCount,
+        isAdmin,
+        userPlanType,
         userPlanLimit,
         pagesUsedThisMonth,
         totalAfterThisConversion: totalPagesAfterConversion,
-        isPdf 
+        isPdf
       });
 
       // Check if pages exceed the plan limit
-      if (!isAdmin && totalPagesAfterConversion > userPlanLimit) {
+      if (!isAdmin && (isMonthlyPlan || isYearlyPlan) && totalPagesAfterConversion > userPlanLimit) {
         return new Response(
           JSON.stringify({
             error: `Your ${userPlanType} plan allows ${userPlanLimit} pages per month. You have ${pagesUsedThisMonth} pages used and this PDF has ${pageCount} pages.`,
@@ -551,10 +563,10 @@ Deno.serve(async (req) => {
 
     // ============= LAYER 1: SMART DOCUMENT ROUTER =============
     console.log('Starting multi-layered AI conversion for:', fileName);
-    
+
     let extractedText = '';
     let rawTransactions: RawTransaction[] = [];
-    
+
     // ============= LAYER 2: INTELLIGENT PROCESSING ROUTER =============
     const classification = classifyDocument(extractedText, bytes, fileName);
     console.log('Document classification:', classification);
@@ -656,14 +668,14 @@ Deno.serve(async (req) => {
       // Generate error report for debugging
       const errorDetails = [];
       const status = extractionResult.status;
-      
+
       if (status.groqVision.used && !status.groqVision.success) {
         errorDetails.push(`Groq Vision: ${status.groqVision.error}`);
       }
       if (status.groqText.used && !status.groqText.success) {
         errorDetails.push(`Groq Text: ${status.groqText.error}`);
       }
-      
+
       console.error('All AI services failed:', errorDetails.join(' | '));
       throw new Error(`No transactions found. AI Status: ${errorDetails.join(' | ')}`);
     }
@@ -671,10 +683,10 @@ Deno.serve(async (req) => {
     // ============= LAYER 3: SPECIALIZED CATEGORIZATION =============
     // Mistral is BEST for categorization, Groq as backup, Pattern as fallback
     console.log('=== Starting Specialized Categorization ===');
-    
+
     const categorizationResult = await performCategorization(rawTransactions, extractionResult.status);
     const categorizedTransactions = categorizationResult.transactions;
-    
+
     // Log final status
     console.log(generateStatusReport(categorizationResult.status));
 
@@ -697,26 +709,26 @@ Deno.serve(async (req) => {
 
     // ============= LAYER 4: FINANCIAL ENGINE (Pure TypeScript) =============
     console.log('Starting financial analysis...');
-    
+
     // Balance Reconciliation
     const reconciliation = reconcileBalances(transactions);
     console.log(`Balance reconciliation: ${reconciliation.mismatches.length} mismatches, integrity: ${reconciliation.integrityScore}`);
-    
+
     // Duplicate Detection
     const duplicateCount = detectDuplicates(transactions);
     console.log(`Duplicate detection: ${duplicateCount} duplicates found`);
-    
+
     // High-Risk Transaction Detection
     const riskTransactions = detectHighRiskTransactions(transactions);
     console.log(`High-risk detection: ${riskTransactions.length} risk types found`);
-    
+
     // Circular Trading Detection
     const circularResult = detectCircularTrading(transactions);
     if (circularResult) {
       riskTransactions.push(circularResult);
     }
     console.log(`Circular trading: ${circularResult ? circularResult.indices.length : 0} transactions flagged`);
-    
+
     // Fetch user's category corrections for behavioral learning
     let categoryCorrections: Map<string, string> | undefined;
     if (user) {
@@ -725,7 +737,7 @@ Deno.serve(async (req) => {
         .select('description_pattern, corrected_category, weight')
         .eq('user_id', user.id)
         .order('weight', { ascending: false });
-      
+
       if (corrections && corrections.length > 0) {
         categoryCorrections = new Map();
         corrections.forEach((c: { description_pattern: string; corrected_category: string }) => {
@@ -734,14 +746,14 @@ Deno.serve(async (req) => {
         console.log(`Loaded ${corrections.length} category corrections for user`);
       }
     }
-    
+
     // FOIR and Underwriting Analysis
     const underwritingResult = performUnderwritingAnalysis(transactions, categoryCorrections);
     console.log(`FOIR Analysis: score=${underwritingResult.foir.score}%, status=${underwritingResult.foir.status}`);
-    
+
     // Liquidity Analysis
     const liquidityMetrics = analyzeLiquidity(transactions);
-    
+
     // Generate Fraud Alerts
     const fraudAlerts = generateFraudAlerts(
       reconciliation,
@@ -749,21 +761,21 @@ Deno.serve(async (req) => {
       liquidityMetrics,
       transactions.length
     );
-    
+
     // Calculate Final Integrity Score
     const integrityScore = calculateIntegrityScore(reconciliation, riskTransactions, liquidityMetrics);
     console.log(`Analysis complete. Integrity score: ${integrityScore}, Fraud alerts: ${fraudAlerts.length}`);
 
     // ============= LAYER 5: PROFESSIONAL EXCEL EXPORT =============
     console.log('Generating professional Excel export...');
-    
+
     // Use minor-unit math for exact debit/credit totals (no float drift).
     const totalCreditsMinor = sumMinorUnits(transactions.map((t) => t.credit || 0));
     const totalDebitsMinor = sumMinorUnits(transactions.map((t) => t.debit || 0));
     const totalCredits = fromMinorUnits(totalCreditsMinor);
     const totalDebits = fromMinorUnits(totalDebitsMinor);
     const netFlow = fromMinorUnits(totalCreditsMinor - totalDebitsMinor);
-    
+
     // Category breakdown
     const categoryBreakdownMinor: Record<string, { count: number; totalDebitMinor: number; totalCreditMinor: number }> = {};
     transactions.forEach((t) => {
@@ -843,7 +855,7 @@ Deno.serve(async (req) => {
       bankInfo, // NEW: Pass bank metadata
     });
     const excelBuffer = excelResult.buffer;
-    
+
     let resultPath = null;
 
     // Upload for authenticated users
@@ -872,7 +884,7 @@ Deno.serve(async (req) => {
             result_path: resultPath,
           })
           .eq('id', conversion.id);
-          
+
         // Store risk analysis
         await supabaseAdmin
           .from('risk_analysis')
@@ -892,7 +904,7 @@ Deno.serve(async (req) => {
             emi_debits: underwritingResult.emiDebits,
             risk_flags: riskAnalysis.riskFlags,
           });
-          
+
         // Store fraud alerts
         for (const alert of fraudAlerts) {
           await supabaseAdmin
@@ -910,15 +922,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Convert Excel buffer to base64 for anonymous users
-    const excelBytes = new Uint8Array(excelBuffer);
-    let excelBase64 = '';
-    const excelChunkSize = 8192;
-    for (let i = 0; i < excelBytes.length; i += excelChunkSize) {
-      const chunk = excelBytes.subarray(i, i + excelChunkSize);
-      excelBase64 += String.fromCharCode(...chunk);
+    // Convert Excel buffer to base64 only when needed (anonymous or upload failed)
+    let excelBase64: string | null = null;
+    if (!user || !resultPath) {
+      const excelBytes = new Uint8Array(excelBuffer);
+      let excelBinary = '';
+      const excelChunkSize = 8192;
+      for (let i = 0; i < excelBytes.length; i += excelChunkSize) {
+        const chunk = excelBytes.subarray(i, i + excelChunkSize);
+        excelBinary += String.fromCharCode(...chunk);
+      }
+      excelBase64 = btoa(excelBinary);
     }
-    excelBase64 = btoa(excelBase64);
 
     console.log(`Conversion complete. ${transactions.length} transactions processed.`);
     console.log('=== Final AI Processing Report ===');
@@ -933,7 +948,7 @@ Deno.serve(async (req) => {
     };
 
     // Update monthly page usage based on pages that actually contained data
-    if (user && !isSpecialUser) {
+    if (user && !isSpecialUser && (isMonthlyPlan || isYearlyPlan)) {
       const pagesToAdd = Math.max(1, pagesWithData);
       const updatedPagesUsed = pagesUsedThisMonth + pagesToAdd;
       const { error: updateError } = await supabase
@@ -944,12 +959,12 @@ Deno.serve(async (req) => {
       if (updateError) {
         console.error('Failed to update pages used:', updateError);
       } else {
-        console.log(`Updated pages used for user ${user.id}: ${updatedPagesUsed}/${userPlanLimit}`);
+        console.log(`Updated pages used: ${updatedPagesUsed}/${userPlanLimit}`);
       }
     }
 
     // Increment usage count ONLY after successful conversion (prevents wasting credits/limit on failures)
-    const incrementBy = user ? (isPaidUser ? Math.max(1, pagesWithData) : 1) : 1;
+    const incrementBy = Math.max(1, pagesWithData);
     let remaining = conversionsLimit - conversionsUsed;
     const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
       p_ip_address: user ? null : trackingKey,
@@ -959,7 +974,7 @@ Deno.serve(async (req) => {
     if (incrementError) {
       console.error('Error incrementing usage after success:', incrementError);
     } else {
-      remaining = conversionsLimit - conversionsUsed - incrementBy;
+      remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
     }
 
     return new Response(
@@ -970,8 +985,7 @@ Deno.serve(async (req) => {
         transactions: transactions,
         analytics: analytics,
         bankInfo,
-        // Always return excelData - storage upload may fail due to MIME restrictions
-        excelData: excelBase64,
+        excelData: excelBase64 ?? undefined,
         message: 'Conversion completed successfully',
         remaining,
         isAuthenticated: !!user,
@@ -988,3 +1002,5 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Logo from "@/components/Logo";
 import { Loader2, LogOut } from "lucide-react";
+import { formatPlanLabel } from "@/lib/planLabels";
 
 interface RecentConversion {
   id: string;
@@ -168,10 +169,10 @@ const Profile = () => {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Plan</p>
-                <p className="text-base font-semibold text-foreground">{planType || "free"}</p>
+                <p className="text-base font-semibold text-foreground">{formatPlanLabel(planType)}</p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Conversions Today</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Pages Today</p>
                 <p className="text-base font-semibold text-foreground">
                   {conversionsUsed}/{conversionsLimit}
                 </p>
@@ -186,7 +187,7 @@ const Profile = () => {
           <Card className="p-6 glass-card">
             <h2 className="text-xl font-semibold mb-4">Last 24 Hours</h2>
             {recent.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No conversions in the last 24 hours.</p>
+              <p className="text-sm text-muted-foreground">No pages processed in the last 24 hours.</p>
             ) : (
               <div className="space-y-3">
                 {recent.map((item) => (

@@ -1,8 +1,8 @@
-import { LandingPageContent } from "@/components/LandingPageContent";
+﻿import { LandingPageContent } from "@/components/LandingPageContent";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Shield, Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -61,82 +61,76 @@ const Index = () => {
           <div className="hidden lg:flex items-center gap-3">
               
               {/* Pricing Button */}
-              <button
-                type="button"
-                onClick={() => navigate('/pricing')}
+              <Link
+                to="/pricing"
                 className="text-glow-link text-xs font-medium"
               >
                 <CircleDollarSign className="h-3 w-3" />
                 <span>{t('nav.pricing')}</span>
-              </button>
+              </Link>
 
               {/* Benefits Button */}
-              <button
-                type="button"
-                onClick={() => navigate('/benefits')}
+              <Link
+                to="/benefits"
                 className="text-glow-link text-xs font-medium"
               >
                 <Gift className="h-3 w-3" />
                 <span>{t('nav.benefits')}</span>
-              </button>
+              </Link>
 
               {/* Features Button */}
-              <button
-                type="button"
-                onClick={() => navigate('/features')}
+              <Link
+                to="/features"
                 className="text-glow-link text-xs font-medium"
               >
                 <Sparkles className="h-3 w-3" />
                 <span>{t('nav.features')}</span>
-              </button>
+              </Link>
 
               {user && (
-                <button
-                  type="button"
-                  onClick={() => navigate('/chat')}
+                <Link
+                  to="/chat"
                   className="text-glow-link text-xs font-medium"
                 >
                   <MessageCircle className="h-3 w-3" />
                   <span>{t('nav.chatAura')}</span>
-                </button>
+                </Link>
               )}
 
               {user && (
-                <button
-                  type="button"
-                  onClick={() => navigate('/settings')}
+                <Link
+                  to="/settings"
                   className="text-glow-link text-xs font-medium"
                 >
                   <Settings className="h-3 w-3" />
                   <span>{t('nav.settings')}</span>
-                </button>
+                </Link>
               )}
 
               {isAdmin && (
-                <button
-                  type="button"
-                  onClick={() => navigate('/admin')}
+                <Link
+                  to="/admin"
                   className="text-glow-link text-xs font-medium"
                 >
                   <Shield className="h-3 w-3" />
                   <span>{t('nav.admin')}</span>
-                </button>
+                </Link>
               )}
 
               {/* Language Selector */}
               <LanguageSelector />
 
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 className="border-primary/50 text-foreground transition-colors"
                 onClick={handleAuthClick}
               >
                 {user ? "Profile" : t('nav.signIn')}
               </Button>
 
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 className="bg-primary text-primary-foreground shadow-neon transition-transform active:scale-95"
                 onClick={() => {
                   scrollToId("demo");
@@ -170,46 +164,54 @@ const Index = () => {
 
                     <SheetClose asChild>
                       <Button
+                        asChild
                         variant="ghost"
                         className="justify-start gap-2 text-muted-foreground"
-                        onClick={() => navigate('/pricing')}
                       >
-                        <CircleDollarSign className="h-4 w-4" />
-                        {t('nav.pricing')}
+                        <Link to="/pricing">
+                          <CircleDollarSign className="h-4 w-4" />
+                          {t('nav.pricing')}
+                        </Link>
                       </Button>
                     </SheetClose>
 
                     <SheetClose asChild>
                       <Button
+                        asChild
                         variant="ghost"
                         className="justify-start gap-2 text-muted-foreground"
-                        onClick={() => navigate('/benefits')}
                       >
-                        <Gift className="h-4 w-4" />
-                        {t('nav.benefits')}
+                        <Link to="/benefits">
+                          <Gift className="h-4 w-4" />
+                          {t('nav.benefits')}
+                        </Link>
                       </Button>
                     </SheetClose>
 
                     <SheetClose asChild>
                       <Button
+                        asChild
                         variant="ghost"
                         className="justify-start gap-2 text-muted-foreground"
-                        onClick={() => navigate('/features')}
                       >
-                        <Sparkles className="h-4 w-4" />
-                        {t('nav.features')}
+                        <Link to="/features">
+                          <Sparkles className="h-4 w-4" />
+                          {t('nav.features')}
+                        </Link>
                       </Button>
                     </SheetClose>
 
                     {user && (
                       <SheetClose asChild>
                         <Button
+                          asChild
                           variant="ghost"
                           className="justify-start gap-2 text-muted-foreground"
-                          onClick={() => navigate('/chat')}
                         >
-                          <MessageCircle className="h-4 w-4" />
-                          {t('nav.chatAura')}
+                          <Link to="/chat">
+                            <MessageCircle className="h-4 w-4" />
+                            {t('nav.chatAura')}
+                          </Link>
                         </Button>
                       </SheetClose>
                     )}
@@ -217,12 +219,14 @@ const Index = () => {
                     {user && (
                       <SheetClose asChild>
                         <Button
+                          asChild
                           variant="ghost"
                           className="justify-start gap-2 text-muted-foreground"
-                          onClick={() => navigate('/settings')}
                         >
-                          <Settings className="h-4 w-4" />
-                          {t('nav.settings')}
+                          <Link to="/settings">
+                            <Settings className="h-4 w-4" />
+                            {t('nav.settings')}
+                          </Link>
                         </Button>
                       </SheetClose>
                     )}
@@ -230,12 +234,14 @@ const Index = () => {
                     {isAdmin && (
                       <SheetClose asChild>
                         <Button
+                          asChild
                           variant="ghost"
                           className="justify-start gap-2 text-muted-foreground"
-                          onClick={() => navigate('/admin')}
                         >
-                          <Shield className="h-4 w-4" />
-                          {t('nav.admin')}
+                          <Link to="/admin">
+                            <Shield className="h-4 w-4" />
+                            {t('nav.admin')}
+                          </Link>
                         </Button>
                       </SheetClose>
                     )}
@@ -290,28 +296,28 @@ const Index = () => {
                 <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.product')}</h4>
                 <ul className="space-y-3 text-sm text-muted-foreground">
                   <li>
-                    <button 
-                      onClick={() => navigate('/features')}
+                    <Link
+                      to="/features"
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.features')}
-                    </button>
+                    </Link>
                   </li>
                   <li>
-                    <button
-                      onClick={() => navigate('/help')}
+                    <Link
+                      to="/help"
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.helpCenter')}
-                    </button>
+                    </Link>
                   </li>
                   <li>
-                    <button
-                      onClick={() => navigate('/blog')}
+                    <Link
+                      to="/blog"
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.blog')}
-                    </button>
+                    </Link>
                   </li>
                 </ul>
               </div>
@@ -322,28 +328,28 @@ const Index = () => {
                 <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.company')}</h4>
                 <ul className="space-y-3 text-sm text-muted-foreground">
                   <li>
-                    <button 
-                      onClick={() => navigate('/about')}
+                    <Link
+                      to="/about"
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.about')}
-                    </button>
+                    </Link>
                   </li>
                   <li>
-                    <button 
-                      onClick={() => navigate('/privacy')}
+                    <Link
+                      to="/privacy"
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.privacy')}
-                    </button>
+                    </Link>
                   </li>
                   <li>
-                    <button 
-                      onClick={() => navigate('/terms')}
+                    <Link
+                      to="/terms"
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.terms')}
-                    </button>
+                    </Link>
                   </li>
                 </ul>
               </div>

@@ -63,7 +63,7 @@ const Dashboard = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: getErrorMessage(error, "Failed to load conversion history."),
+        description: getErrorMessage(error, "Failed to load processing history."),
       });
     } finally {
       setLoading(false);
@@ -192,7 +192,7 @@ const Dashboard = () => {
       <div className="container mx-auto px-4 sm:px-6 pt-28 pb-16 relative z-10">
         <div className="max-w-7xl mx-auto space-y-10">
           <div>
-            <h1 className="text-4xl font-bold mb-2">Conversion History</h1>
+            <h1 className="text-4xl font-bold mb-2">Processing History</h1>
             <p className="text-muted-foreground">
               View and download all your converted bank statements in Excel format.
               For CSV, DOCX, and ODS exports, use the converter on the home page.
@@ -202,7 +202,7 @@ const Dashboard = () => {
           <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
             {conversions.length === 0 ? (
               <div className="p-12 text-center">
-                <p className="text-muted-foreground mb-4">No conversions yet</p>
+                <p className="text-muted-foreground mb-4">No pages processed yet</p>
                 <Button onClick={() => navigate("/")}>
                   Start Converting
                 </Button>

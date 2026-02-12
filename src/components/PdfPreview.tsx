@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+﻿import { useEffect, useState, useRef, useCallback } from "react";
 import { FileText, ChevronLeft, ChevronRight, Lock, Eye, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,12 +45,12 @@ interface PdfJsError {
   message?: string;
 }
 
-export const PdfPreview = ({ 
-  file, 
-  password, 
-  onPasswordChange, 
+export const PdfPreview = ({
+  file,
+  password,
+  onPasswordChange,
   passwordError,
-  onPasswordError 
+  onPasswordError
 }: PdfPreviewProps) => {
   const [loading, setLoading] = useState(true);
   const [pageCount, setPageCount] = useState(0);

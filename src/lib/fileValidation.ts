@@ -19,10 +19,23 @@ export type ValidatedFile = z.infer<typeof fileSchema>;
 
 export const validateFile = (file: File): { success: boolean; error?: string; data?: ValidatedFile } => {
   try {
+    const lowerName = file.name.toLowerCase();
+    const inferredType = lowerName.endsWith('.pdf')
+      ? 'application/pdf'
+      : lowerName.endsWith('.png')
+        ? 'image/png'
+        : (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg'))
+          ? 'image/jpeg'
+          : file.type;
+    const isGenericType = !file.type ||
+      file.type === 'application/octet-stream' ||
+      file.type === 'application/unknown' ||
+      file.type === 'binary/octet-stream';
+    const resolvedType = isGenericType ? inferredType : file.type;
     const validated = fileSchema.parse({
       name: sanitizeFilename(file.name),
       size: file.size,
-      type: file.type
+      type: resolvedType
     });
     return { success: true, data: validated };
   } catch (error) {

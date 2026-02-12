@@ -32,7 +32,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     return requestOrigin;
   }
 
-  return requestOrigin || allowedOrigins[0] || '*';
+  return allowedOrigins[0] || 'https://akromeda.vercel.app';
 };
 
 const getCorsHeaders = (req: Request) => ({
@@ -41,13 +41,21 @@ const getCorsHeaders = (req: Request) => ({
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 });
 
-const normalizeNumber = (value: unknown): number | null => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const parsed = parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
+type PlanPricing = {
+  amount: number;
+  currency: string;
+};
+
+const PLAN_PRICING: Record<string, PlanPricing> = {
+  per_page_lite: { amount: 89, currency: 'INR' },
+  per_page_standard: { amount: 179, currency: 'INR' },
+  per_page_power: { amount: 299, currency: 'INR' },
+  monthly_basic: { amount: 899, currency: 'INR' },
+  monthly_pro: { amount: 1899, currency: 'INR' },
+  monthly_enterprise: { amount: 3899, currency: 'INR' },
+  yearly_lite: { amount: 8999, currency: 'INR' },
+  yearly_full: { amount: 18999, currency: 'INR' },
+  yearly_pro: { amount: 37999, currency: 'INR' },
 };
 
 const buildNotes = (planId: string, userId: string, extra?: Record<string, unknown>) => {
@@ -116,16 +124,15 @@ Deno.serve(async (req) => {
     Deno.env.get('RAZERPAY_SITE_KEY') ||
     Deno.env.get('RAZORPAY_SITE_KEY') ||
     Deno.env.get('RAZORPAY_KEY_ID');
-  const amountValue = normalizeNumber(body.amount);
-  const currency = typeof body.currency === 'string' && body.currency.trim() ? body.currency.trim().toUpperCase() : 'INR';
+  const pricing = PLAN_PRICING[planId];
   const extraNotes = body.notes && typeof body.notes === 'object' ? (body.notes as Record<string, unknown>) : undefined;
 
   if (!planId) {
     return respond(req, 400, { error: 'Plan identifier (planId) is required.' });
   }
 
-  if (amountValue === null || amountValue <= 0) {
-    return respond(req, 400, { error: 'Amount must be a positive number.' });
+  if (!pricing) {
+    return respond(req, 400, { error: 'Unknown plan selected.' });
   }
 
   if (!razorpayKeyId) {
@@ -151,7 +158,7 @@ Deno.serve(async (req) => {
   }
 
   const userId = authData.user.id;
-  
+
   // Receipt must be <= 40 chars for Razorpay
   const shortId = crypto.randomUUID().slice(0, 8);
   const receipt =
@@ -159,7 +166,8 @@ Deno.serve(async (req) => {
       ? body.receipt.trim()
       : `akro-${planId.slice(0, 12)}-${shortId}`;
 
-  const amountInPaise = Math.round(amountValue * 100);
+  const amountInPaise = Math.round(pricing.amount * 100);
+  const currency = pricing.currency;
 
   const orderPayload = {
     amount: amountInPaise,
@@ -220,3 +228,5 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+

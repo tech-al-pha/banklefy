@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import { Shield, ArrowLeft, FileText, CheckCircle, AlertCircle, Scale, Zap, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Logo from "@/components/Logo";
@@ -148,8 +148,8 @@ const Terms = () => {
           >
             <a href="mailto:inspirexali@gmail.com">Contact Support</a>
           </Button>
-          <Button 
-            size="lg" 
+          <Button
+            size="lg"
             className="back-pill"
             onClick={() => navigate('/')}
           >

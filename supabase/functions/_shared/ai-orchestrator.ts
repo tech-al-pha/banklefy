@@ -1,4 +1,4 @@
-// ============= SPECIALIZED AI ORCHESTRATOR =============
+﻿// ============= SPECIALIZED AI ORCHESTRATOR =============
 // Routes tasks to the best AI for each job, with error tracking
 // IMPORTANT: Gemini removed - Groq Vision only for OCR, rule-based for everything else
 
@@ -89,7 +89,7 @@ export async function performExtraction(
               {
                 role: 'system',
                 content: `Extract ALL transactions from this bank statement text.
-                
+
 Return JSON array with: date (YYYY-MM-DD), refNumber (as shown in the document), description, debit (number), credit (number), balance (number).
 If refNumber is not present for a row, return an empty string.
 Ignore headers, footers, summaries, opening/closing balance lines, and page-break artifacts.

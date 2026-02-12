@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, Crown } from "lucide-react";
+import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, Crown, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,8 @@ import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 import akromedaLogo from "@/assets/akromeda-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { getAnonymousClientId } from "@/lib/usageClient";
+import { getDefaultDailyLimit } from "@/lib/usageLimits";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Dialog,
   DialogContent,
@@ -43,195 +45,16 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-// Enhanced Transaction interface with Universal Schema
-interface Transaction {
-  date: string;
-  description: string;
-  category: string;
-  debit: number;
-  credit: number;
-  balance: number;
-  refNumber?: string;
-  isDuplicate?: boolean;
-  duplicateGroup?: number | null;
-  balanceMismatch?: boolean;
-  expectedBalance?: number | null;
-  riskFlag?: string | null;
-  // Legacy fields for backward compatibility
-  amount?: number;
-  type?: string;
-}
-
-interface FraudAlertDetail {
-  rowIndex: number;
-  expected?: number;
-  actual?: number;
-  difference?: number;
-}
-
-interface FraudAlertTransaction {
-  date?: string;
-  description?: string;
-  amount?: number;
-}
-
-interface FraudAlertMetadata {
-  details?: FraudAlertDetail[];
-  transactions?: FraudAlertTransaction[];
-  transferCount?: number;
-  pattern?: string;
-  totalAmount?: number;
-}
-
-interface FraudAlert {
-  type: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  description: string;
-  affectedRows: number[];
-  metadata: FraudAlertMetadata;
-}
-
-interface RiskAnalysis {
-  integrityScore: number;
-  balanceMismatches: number;
-  averageDailyBalance: number;
-  maxDip: { amount: number; date: string | null };
-  maxPeak: number;
-  riskFlags: { type: string; count: number }[];
-  fraudAlerts: FraudAlert[];
-}
-
-interface UnderwritingAnalysis {
-  salaryCredits: { date: string; amount: number; description: string }[];
-  emiDebits: { date: string; amount: number; description: string; loanType: string }[];
-  monthlyBreakdown: { month: string; salaryIncome: number; emiOutflow: number }[];
-  summary: {
-    avgMonthlyIncome: number;
-    avgMonthlyEMI: number;
-    foirScore: number;
-    foirStatus: 'excellent' | 'good' | 'moderate' | 'high';
-    emiByLoanType: Record<string, { count: number; totalAmount: number }>;
-    totalSalaryDetected: number;
-    totalEMIDetected: number;
-  };
-  eligibility: {
-    status: 'excellent' | 'good' | 'moderate' | 'poor' | 'ineligible';
-    message: string;
-    factors: string[];
-    maxNewEMI: number;
-    estimatedLoanEligibility: number;
-  };
-}
-
-interface Analytics {
-  totalTransactions: number;
-  totalCredits: number;
-  totalDebits: number;
-  netFlow: number;
-  duplicateCount: number;
-  categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }>;
-  riskAnalysis?: RiskAnalysis;
-  underwriting?: UnderwritingAnalysis;
-}
-
-type AiStatus = {
-  groqVision?: { success: boolean; time?: number; error?: string };
-  groqText?: { success: boolean; time?: number; error?: string };
-  mistral?: { success: boolean; time?: number; error?: string };
-  gemini?: { success: boolean; time?: number; error?: string };
-  lovable?: { success: boolean; time?: number; error?: string };
-  patternFallback?: { success: boolean; time?: number; error?: string };
-};
-
-interface BankInfo {
-  bankName?: string;
-  accountNumber?: string;
-  accountHolder?: string;
-  currency?: string;
-  iban?: string;
-  ifsc?: string;
-  swift?: string;
-  routingNumber?: string;
-  sortCode?: string;
-  bsb?: string;
-  micr?: string;
-  statementPeriod?: string;
-  openingBalance?: number;
-  closingBalance?: number;
-}
-
-interface MultiStatementResult {
-  fileName: string;
-  excelData: string;
-  totals?: { totalCredits: number; totalDebits: number };
-  bankInfo?: BankInfo;
-}
-
-interface MergeTotals {
-  totalDebit: number;
-  totalCredit: number;
-  finalBalance: number | null;
-}
-
-interface MergeInfo {
-  available: boolean;
-  reasons: string[];
-  statementPeriod?: string;
-  duplicatesRemoved?: number;
-  totals?: MergeTotals;
-  excelData?: string;
-  fileName?: string;
-}
-
-interface MultiConversionResponse {
-  success: boolean;
-  separate: {
-    results: MultiStatementResult[];
-    failures?: Array<{ fileName: string; error: string }>;
-  };
-  merge: MergeInfo;
-  remaining?: number;
-  analytics?: Analytics;
-  transactions?: Transaction[];
-  planType?: string;
-  bankInfo?: BankInfo;
-  error?: string;
-  message?: string;
-  limitReached?: boolean;
-  requiresPassword?: boolean;
-}
-
-interface ConversionResponse {
-  conversionId?: string | null;
-  resultPath?: string | null;
-  excelData?: string;
-  transactions?: Transaction[];
-  analytics?: Analytics;
-  bankInfo?: BankInfo;
-  aiStatus?: AiStatus;
-  remaining?: number;
-  limitReached?: boolean;
-  requiresPassword?: boolean;
-  error?: string;
-  message?: string;
-}
-
-interface BatchFilePayload {
-  fileName: string;
-  fileId?: string;
-  fileData?: string;
-  pdfPageImages?: string[];
-  pdfPassword?: string;
-}
-
-interface BatchRequestBody {
-  files: BatchFilePayload[];
-  timezone: string;
-  clientId?: string;
-  pdfPassword?: string;
-  recaptchaToken?: string;
-}
+import type {
+  Transaction,
+  Analytics,
+  AiStatus,
+  MergeInfo,
+  MultiConversionResponse,
+  ConversionResponse,
+  BatchFilePayload,
+  BatchRequestBody,
+} from "./uploadDemo/types";
 
 // Category color mapping
 const categoryColors: Record<string, string> = {
@@ -263,21 +86,37 @@ const conversionSteps = [
 
 export const UploadDemo = () => {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const pluralize = (count: number, singular: string, plural = `${singular}s`) =>
     count === 1 ? singular : plural;
   const formatRemaining = (remaining?: number) => {
     if (remaining === null || remaining === undefined) return "";
-    const label = pluralize(remaining, "conversion");
+    const label = pluralize(remaining, "page");
+    const normalizedPlan = (planType ?? "free").toLowerCase();
+    if (normalizedPlan === "unlimited") {
+      return "Unlimited pages remaining.";
+    }
+    if (normalizedPlan.startsWith("monthly") || normalizedPlan === "daily") {
+      return `${remaining} ${label} remaining this month.`;
+    }
+    if (normalizedPlan.startsWith("yearly") || normalizedPlan === "business") {
+      return `${remaining} ${label} remaining this year.`;
+    }
+    if (normalizedPlan.startsWith("per_page")) {
+      return `${remaining} ${label} remaining in your pack.`;
+    }
     return `${remaining} ${label} remaining today.`;
   };
+  const formatTemplate = (template: string, values: Record<string, string | number>) =>
+    template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [converting, setConverting] = useState(false);
   const [conversionResult, setConversionResult] = useState<{ id: string | null; resultPath: string | null; excelData?: string } | null>(null);
-  const [batchResults, setBatchResults] = useState<Array<{ fileName: string; status: 'success' | 'error'; data?: { excelData: string }; error?: string }>>([]);
+  const [batchResults, setBatchResults] = useState<Array<{ fileName: string; status: 'success' | 'error'; data?: { excelData?: string; resultPath?: string | null }; error?: string }>>([]);
   const [mergeInfo, setMergeInfo] = useState<MergeInfo | null>(null);
-  const [mergeResult, setMergeResult] = useState<{ excelData: string; fileName: string } | null>(null);
+  const [mergeResult, setMergeResult] = useState<{ excelData?: string; resultPath?: string | null; fileName: string } | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [currencyCode, setCurrencyCode] = useState<string>('');
@@ -293,6 +132,11 @@ export const UploadDemo = () => {
   const [editedPdfWarning, setEditedPdfWarning] = useState<{ fileName: string; reason: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [showLimitDialog, setShowLimitDialog] = useState(false);
+  const [limitDialogTitle, setLimitDialogTitle] = useState("Daily Limit Reached");
+  const [limitDialogMessage, setLimitDialogMessage] = useState("");
+  const [limitDialogShowSignup, setLimitDialogShowSignup] = useState(false);
+  const [limitDialogShowPricing, setLimitDialogShowPricing] = useState(false);
   const [progressStep, setProgressStep] = useState(0);
   const [showProgress, setShowProgress] = useState(false);
   const pdfPasswordHelpId = "pdf-password-help";
@@ -316,17 +160,17 @@ export const UploadDemo = () => {
     if (typeof error === 'string') return error;
     return fallback;
   };
-    const { 
-      remaining, 
-      conversionsLimit, 
-      limitReached, 
-      isAuthenticated, 
+    const {
+      remaining,
+      conversionsLimit,
+      limitReached,
+      isAuthenticated,
       loading: usageLimitLoading,
       refresh: refreshUsageLimit,
       getTimezone,
       planType
     } = useUsageLimit();
-  
+
   // reCAPTCHA v3 for anonymous users - runs invisibly in background
   const { executeRecaptcha } = useRecaptcha();
 
@@ -407,14 +251,121 @@ export const UploadDemo = () => {
     return () => window.clearTimeout(timeout);
   }, [converting, showProgress]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const MAX_PDF_RENDER_PAGES = 120;
+  const defaultDailyLimit = getDefaultDailyLimit(isAuthenticated);
+  const maxPdfRenderPages = Math.min(
+    MAX_PDF_RENDER_PAGES,
+    Math.max(1, usageLimitLoading ? defaultDailyLimit : (remaining ?? conversionsLimit ?? defaultDailyLimit)),
+  );
+  const getPdfPageCount = async (file: File, password?: string): Promise<number | null> => {
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        password: password || undefined,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: true,
+      });
+      const pdf = await loadingTask.promise;
+      const count = pdf.numPages;
+      await pdf.destroy?.();
+      return count;
+    } catch (err: unknown) {
+      const error = err as { name?: string; message?: string };
+      if (
+        error?.name === 'PasswordException' ||
+        String(error?.message || '').toLowerCase().includes('password')
+      ) {
+        return null;
+      }
+      return null;
+    }
+  };
+
+  const getFilePageCount = async (file: File): Promise<number | null> => {
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) return 1;
+    const count = await getPdfPageCount(file, pdfPassword.trim() || undefined);
+    if (count === null) return null;
+    return count;
+  };
+
+  const getTotalPages = async (files: File[]): Promise<{ total: number; unknown: boolean; overCap: boolean; maxSingle: number }> => {
+    let total = 0;
+    let unknown = false;
+    let overCap = false;
+    let maxSingle = 0;
+    for (const file of files) {
+      const pages = await getFilePageCount(file);
+      if (pages === null) {
+        unknown = true;
+        continue;
+      }
+      total += pages;
+      if (pages > MAX_PDF_RENDER_PAGES) {
+        overCap = true;
+        maxSingle = Math.max(maxSingle, pages);
+      }
+    }
+    return { total, unknown, overCap, maxSingle };
+  };
+
+  const openLimitDialog = (options: {
+    title: string;
+    message: string;
+    showSignup: boolean;
+    showPricing: boolean;
+  }) => {
+    setLimitDialogTitle(options.title);
+    setLimitDialogMessage(options.message);
+    setLimitDialogShowSignup(options.showSignup);
+    setLimitDialogShowPricing(options.showPricing);
+    setShowLimitDialog(true);
+  };
+
+  const showLimitReachedDialog = () => {
+    const title = t("upload.limit.daily.title");
+    const isPaidPlan = Boolean(planType && planType !== "free");
+    const template = isAuthenticated
+      ? (isPaidPlan ? t("upload.limit.daily.authPaid") : t("upload.limit.daily.authFree"))
+      : t("upload.limit.daily.anon");
+    const message = formatTemplate(template, { limit: Math.max(0, conversionsLimit ?? 0) });
+    openLimitDialog({
+      title,
+      message,
+      showSignup: !isAuthenticated,
+      showPricing: true,
+    });
+  };
+
+  const showPageLimitDialog = (totalPages: number, remainingPages: number, limit: number) => {
+    const title = t("upload.limit.page.title");
+    const template = isAuthenticated ? t("upload.limit.page.auth") : t("upload.limit.page.anon");
+    const message = formatTemplate(template, {
+      total: totalPages,
+      remaining: remainingPages,
+      limit,
+    });
+    openLimitDialog({
+      title,
+      message,
+      showSignup: !isAuthenticated,
+      showPricing: true,
+    });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const newFiles: File[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      
+
       // Validate each file
       const validation = validateFile(file);
       if (!validation.success) {
@@ -425,18 +376,51 @@ export const UploadDemo = () => {
         });
         continue;
       }
-      
+
       newFiles.push(file);
     }
 
     if (newFiles.length > 0) {
+      if (limitReached) {
+        showLimitReachedDialog();
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+
+      if (!usageLimitLoading) {
+        const candidateFiles = [...selectedFiles, ...newFiles];
+        const { total, unknown, overCap, maxSingle } = await getTotalPages(candidateFiles);
+        if (overCap) {
+          toast({
+            variant: "destructive",
+            title: "PDF too large",
+            description: `This PDF has ${maxSingle} pages. The current maximum supported per file is ${MAX_PDF_RENDER_PAGES} pages. Please split the PDF and try again.`,
+          });
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+        const remainingPages = Math.max(0, remaining ?? 0);
+        const limit = Math.max(0, conversionsLimit ?? 0);
+        if (!unknown && total > remainingPages) {
+          showPageLimitDialog(total, remainingPages, limit);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+      }
+
       setSelectedFiles((prev) => [...prev, ...newFiles]);
       setPasswordError(false);
       setPdfPassword('');
       setShowPasswordInput(false);
       setShowPassword(false);
       setEditedPdfWarning(null);
-      
+
       toast({
         title: "Files Selected",
         description: `${newFiles.length} ${pluralize(newFiles.length, "file")} added - Ready to convert`,
@@ -446,16 +430,7 @@ export const UploadDemo = () => {
 
   const handleUploadClick = () => {
     if (limitReached) {
-      toast({
-        variant: "destructive",
-        title: "Limit reached",
-        description: isAuthenticated 
-          ? "You've reached your daily limit. Try again tomorrow!"
-          : "Sign up for a free account to get more conversions!",
-      });
-      if (!isAuthenticated) {
-        navigate('/auth');
-      }
+      showLimitReachedDialog();
       return;
     }
     fileInputRef.current?.click();
@@ -531,8 +506,7 @@ export const UploadDemo = () => {
 
     const pdf = await loadingTask.promise;
     // Safety cap to prevent huge payloads/timeouts
-    const MAX_PAGES = 10;
-    const pageCount = Math.min(pdf.numPages, MAX_PAGES);
+    const pageCount = Math.min(pdf.numPages, maxPdfRenderPages);
 
     const images: string[] = [];
     for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
@@ -560,7 +534,7 @@ export const UploadDemo = () => {
     setBatchResults([]);
     setMergeInfo(null);
     setMergeResult(null);
-    
+
     const fileToConvert = fileOverride ?? selectedFile;
 
     if (!fileToConvert) {
@@ -573,16 +547,7 @@ export const UploadDemo = () => {
     }
 
     if (limitReached) {
-      toast({
-        variant: "destructive",
-        title: "Limit reached",
-        description: isAuthenticated 
-          ? "You've reached your daily limit. Try again tomorrow!"
-          : "Sign up for a free account to get more conversions!",
-      });
-      if (!isAuthenticated) {
-        navigate('/auth');
-      }
+      showLimitReachedDialog();
       return;
     }
 
@@ -683,16 +648,16 @@ export const UploadDemo = () => {
       // IMPORTANT: Get fresh session to avoid stale token issues
       // If user is logged in but session is stale, refresh it first
       let accessToken: string | undefined;
-      
+
       if (user) {
         // User is authenticated - get fresh token
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        
+
         if (sessionError || !sessionData.session) {
           // Session might be stale, try to refresh
           console.log('Session stale or missing, attempting refresh...');
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-          
+
           if (refreshError || !refreshData.session) {
             console.error('Failed to refresh session:', refreshError);
             // User appears logged in but session is invalid - still allow conversion
@@ -712,7 +677,7 @@ export const UploadDemo = () => {
 
       if (functionError) {
         let message = functionError.message || 'Conversion failed';
-        
+
         // Check if we got structured error data
         if (data && typeof data === 'object') {
           const payload: Partial<ConversionResponse> = data;
@@ -750,11 +715,11 @@ export const UploadDemo = () => {
         resultPath: data.resultPath,
         excelData: data.excelData,
       });
-      
+
       if (data?.transactions && Array.isArray(data.transactions)) {
         setTransactions(data.transactions);
       }
-      
+
       if (data?.analytics) {
         setAnalytics(data.analytics);
       }
@@ -770,11 +735,11 @@ export const UploadDemo = () => {
       if (data?.transactions && Array.isArray(data.transactions)) {
         // Create a concise text representation of the extracted data
         const extractedSummary = `Bank Statement Extracted Data:
-        
+
 Total Transactions: ${data.transactions.length}
 
 Transactions:
-${data.transactions.map((t: Transaction, i: number) => 
+${data.transactions.map((t: Transaction, i: number) =>
   i < 50 ? `${t.date} | ${t.description} | Category: ${t.category} | Debit: ${t.debit} | Credit: ${t.credit} | Balance: ${t.balance}` : ''
 ).filter(Boolean).join('\n')}
 ${data.transactions.length > 50 ? `\n... and ${data.transactions.length - 50} more transactions` : ''}
@@ -785,13 +750,21 @@ Analytics Summary:
 - Total Debits: ${formatCurrencyValue(truncateDecimals(data.analytics.totalDebits), responseCurrency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 - Net Flow: ${formatCurrencyValue(truncateDecimals(data.analytics.netFlow), responseCurrency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 ` : ''}`;
-        
-        sessionStorage.setItem('chatAuraContext', extractedSummary);
-        sessionStorage.setItem('chatAuraFileName', selectedFile?.name || 'Bank Statement');
+
+        try {
+          sessionStorage.setItem('chatAuraContext', extractedSummary);
+          sessionStorage.setItem('chatAuraFileName', selectedFile?.name || 'Bank Statement');
+        } catch {
+          // Ignore sessionStorage failures (privacy mode/quota)
+        }
       }
 
       if (data?.conversionId) {
-        sessionStorage.setItem('chatAuraLastConversionId', data.conversionId);
+        try {
+          sessionStorage.setItem('chatAuraLastConversionId', data.conversionId);
+        } catch {
+          // Ignore sessionStorage failures (privacy mode/quota)
+        }
       }
 
       // Refresh usage limit after successful conversion
@@ -819,7 +792,7 @@ Analytics Summary:
     } catch (error: unknown) {
       console.error('Conversion error:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-      
+
       // Check if it's a password-related error
       if (errorMessage.toLowerCase().includes('password') ||
           errorMessage.toLowerCase().includes('encrypted') ||
@@ -875,16 +848,7 @@ Analytics Summary:
     }
 
     if (limitReached) {
-      toast({
-        variant: "destructive",
-        title: "Limit reached",
-        description: isAuthenticated
-          ? "You've reached your daily limit. Try again tomorrow!"
-          : "Sign up for a free account to get more conversions!",
-      });
-      if (!isAuthenticated) {
-        navigate('/auth');
-      }
+      showLimitReachedDialog();
       return;
     }
 
@@ -1023,14 +987,19 @@ Analytics Summary:
       const results = data?.separate?.results || [];
       const failures = data?.separate?.failures || [];
       setBatchResults([
-        ...results.map((result) => ({ fileName: result.fileName, status: 'success' as const, data: { excelData: result.excelData } })),
+        ...results.map((result) => ({
+          fileName: result.fileName,
+          status: 'success' as const,
+          data: { excelData: result.excelData, resultPath: result.resultPath ?? null },
+        })),
         ...failures.map((failure) => ({ fileName: failure.fileName, status: 'error' as const, error: failure.error })),
       ]);
 
       setMergeInfo(data?.merge || null);
-      if (data?.merge?.available && data?.merge?.excelData) {
+      if (data?.merge?.available && (data.merge.excelData || data.merge.resultPath)) {
         setMergeResult({
           excelData: data.merge.excelData,
+          resultPath: data.merge.resultPath ?? null,
           fileName: data.merge.fileName || `merged_${Date.now()}.xlsx`,
         });
       }
@@ -1172,14 +1141,28 @@ Analytics Summary:
     try {
       // Download each file individually
       for (const result of batchResults) {
-        if (result.status === 'success' && result.data?.excelData) {
+        if (result.status !== 'success') continue;
+
+        let blob: Blob | null = null;
+
+        if (result.data?.excelData) {
           const binaryString = atob(result.data.excelData);
           const bytes = new Uint8Array(binaryString.length);
           for (let i = 0; i < binaryString.length; i++) {
             bytes[i] = binaryString.charCodeAt(i);
           }
-          
-          const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        } else if (result.data?.resultPath && user) {
+          const { data: fileData, error } = await supabase.storage
+            .from('bank-statements')
+            .download(result.data.resultPath);
+          if (error || !fileData) {
+            throw error || new Error('Failed to download file');
+          }
+          blob = fileData;
+        }
+
+        if (blob) {
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -1188,7 +1171,7 @@ Analytics Summary:
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          
+
           // Small delay between downloads
           await new Promise(resolve => setTimeout(resolve, 500));
         }
@@ -1216,13 +1199,29 @@ Analytics Summary:
 
     setMergeDownloading(true);
     try {
-      const binaryString = atob(mergeResult.excelData);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      let blob: Blob | null = null;
+
+      if (mergeResult.excelData) {
+        const binaryString = atob(mergeResult.excelData);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      } else if (mergeResult.resultPath && user) {
+        const { data: fileData, error } = await supabase.storage
+          .from('bank-statements')
+          .download(mergeResult.resultPath);
+        if (error || !fileData) {
+          throw error || new Error('Failed to download file');
+        }
+        blob = fileData;
       }
 
-      const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      if (!blob) {
+        throw new Error('No merged file available to download.');
+      }
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -1253,16 +1252,16 @@ Analytics Summary:
 
     // Simple CSV with only essential columns: Date, Description, Debit, Credit, Balance
     const headers = ['Date', 'Description', 'Debit', 'Credit', 'Balance'];
-    
+
     // Calculate totals
     const totalDebit = sumMoney(transactions.map((t) => t.debit || 0));
     const totalCredit = sumMoney(transactions.map((t) => t.credit || 0));
     const totalDebitDisplay = totalDebit.toFixed(2);
     const totalCreditDisplay = totalCredit.toFixed(2);
-    
+
     const csvRows = [
       headers.join(','),
-      ...transactions.map(t => 
+      ...transactions.map(t =>
         [
           t.date || '',
           `"${(t.description || '').replace(/"/g, '""')}"`,
@@ -1299,7 +1298,12 @@ Analytics Summary:
     try {
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
-      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      type JsPdfWithExtras = InstanceType<typeof jsPDF> & {
+        setCharSpace?: (value: number) => void;
+        setWordSpacing?: (value: number) => void;
+        lastAutoTable?: { finalY?: number };
+      };
+      const doc = new jsPDF({ unit: "pt", format: "a4" }) as JsPdfWithExtras;
 
       const marginX = 40;
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -1338,8 +1342,8 @@ Analytics Summary:
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       // Reset spacing to avoid any unexpected letter spacing in PDF viewers
-      (doc as any).setCharSpace?.(0);
-      (doc as any).setWordSpacing?.(0);
+      doc.setCharSpace?.(0);
+      doc.setWordSpacing?.(0);
       doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, marginX, cursorY);
       cursorY += 16;
 
@@ -1408,7 +1412,7 @@ Analytics Summary:
           margin: { left: marginX, right: marginX },
         });
 
-        cursorY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 16 : cursorY + 24;
+        cursorY = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 16 : cursorY + 24;
       }
 
       const tableRows = transactions.slice(0, 100).map((t) => [
@@ -1700,7 +1704,7 @@ Analytics Summary:
               />
 
               {/* Upload Zone - Dark Brown Theme */}
-              <div 
+              <div
                 onClick={handleUploadClick}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -1713,38 +1717,38 @@ Analytics Summary:
                 aria-disabled={limitReached}
                 data-hover
                 className={`subtle-border-glow bg-[#191919]/80 border-2 border-primary/20 hover:border-primary/40 rounded-xl p-6 sm:p-10 md:p-12 text-center transition-all duration-500 cursor-pointer group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                  limitReached 
-                    ? 'opacity-50 cursor-not-allowed' 
+                  limitReached
+                    ? 'opacity-50 cursor-not-allowed'
                     : ''
                 }`}
               >
                 {/* Inner glow effect */}
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/5 via-transparent to-primary/3 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                
+
                 <div className="space-y-6 relative z-10">
                   {/* Icon with premium glow */}
                   <div className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 ${
-                    limitReached 
-                      ? 'bg-muted/10' 
+                    limitReached
+                      ? 'bg-muted/10'
                       : 'bg-primary/20 group-hover:scale-110 group-hover:shadow-neon'
                   }`}>
                     <Upload className={`w-10 h-10 transition-all duration-300 ${
-                      limitReached 
-                        ? 'text-muted-foreground utility-icon-muted' 
+                      limitReached
+                        ? 'text-muted-foreground utility-icon-muted'
                         : 'text-primary'
                     }`} />
                   </div>
-                  
+
                   <div className="space-y-3">
                     <p className="text-xl font-semibold tracking-wide text-white">
-                      {selectedFiles.length > 0 
-                        ? `${selectedFiles.length} ${pluralize(selectedFiles.length, "file")} selected` 
+                      {selectedFiles.length > 0
+                        ? `${selectedFiles.length} ${pluralize(selectedFiles.length, "file")} selected`
                         : "Drop your bank statements here"}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {limitReached 
-                        ? "Daily limit reached" 
-                        : "or click to browse files • Supports PDF, PNG, JPG/JPEG • Upload multiple files"}
+                      {limitReached
+                        ? "Daily limit reached"
+                        : "or click to browse files | Supports PDF, PNG, JPG/JPEG | Upload multiple files"}
                     </p>
                   </div>
 
@@ -1776,7 +1780,7 @@ Analytics Summary:
 
                   {/* Choose File button - Orange circle removed */}
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <Button 
+                    <Button
                       className="bg-primary text-primary-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto active:bg-primary active:text-primary-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1787,7 +1791,7 @@ Analytics Summary:
                       {limitReached ? "Limit Reached" : "Add Files"}
                     </Button>
                     {selectedFiles.length > 0 && (
-                      <Button 
+                      <Button
                         className="bg-accent text-accent-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1813,7 +1817,7 @@ Analytics Summary:
                         <p id={pdfPasswordHelpId} className="text-xs text-white/60">This PDF is password protected. Enter the password to continue.</p>
                       </div>
                     </div>
-                    
+
                     <div className="relative">
                       <label htmlFor="pdf-password" className="sr-only">PDF password</label>
                       <Input
@@ -1839,7 +1843,7 @@ Analytics Summary:
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    
+
                     {passwordError && (
                       <p id={pdfPasswordErrorId} role="alert" className="text-sm text-red-300 flex items-center gap-1">
                         <AlertTriangle className="h-4 w-4" />
@@ -2017,7 +2021,7 @@ Analytics Summary:
                      </p>
                    )}
                    <p className="text-xs text-muted-foreground">Successfully converted: {batchResults.filter(r => r.status === 'success').length}/{batchResults.length}</p>
-                   
+
                    {/* Additional Export Options for Batch */}
                    <div className="flex flex-wrap gap-2 justify-center pt-2">
                     <Button
@@ -2232,7 +2236,7 @@ Analytics Summary:
                     <PieChart className="w-5 h-5 text-primary" />
                     Financial Analytics
                   </h3>
-                  
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <Card className={`p-4 !bg-[#191919] ${toneClasses[creditTone].border}`}>
                       <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[creditTone].text}`}>
@@ -2243,7 +2247,7 @@ Analytics Summary:
                         {formatAmount(truncateDecimals(analytics.totalCredits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </Card>
-                    
+
                     <Card className={`p-4 !bg-[#191919] ${toneClasses[debitTone].border}`}>
                       <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[debitTone].text}`}>
                         <TrendingDown className={`w-4 h-4 ${toneClasses[debitTone].text}`} />
@@ -2253,7 +2257,7 @@ Analytics Summary:
                         {formatAmount(truncateDecimals(analytics.totalDebits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </Card>
-                    
+
                     <Card className={`p-4 !bg-[#191919] ${toneClasses[netFlowTone].border}`}>
                       <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[netFlowTone].text}`}>
                         {analytics.netFlow >= 0 ? <TrendingUp className={`w-4 h-4 ${toneClasses[netFlowTone].text}`} /> : <TrendingDown className={`w-4 h-4 ${toneClasses[netFlowTone].text}`} />}
@@ -2263,7 +2267,7 @@ Analytics Summary:
                         {formatAmount(truncateDecimals(analytics.netFlow), { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'always' })}
                       </p>
                     </Card>
-                    
+
                     {analytics.duplicateCount > 0 && (
                       <Card className="p-4 !bg-[#191919] border-orange-500/30">
                         <div className="flex items-center gap-2 text-sm tone-moderate-text mb-1">
@@ -2285,9 +2289,9 @@ Analytics Summary:
                         .sort((a, b) => b[1].count - a[1].count)
                         .slice(0, 8)
                         .map(([category, data]) => (
-                          <Badge 
-                            key={category} 
-                            variant="outline" 
+                          <Badge
+                            key={category}
+                            variant="outline"
                             className={`${categoryColors[category] || categoryColors['Other']} border`}
                           >
                             {category}: {data.count}
@@ -2324,7 +2328,7 @@ Analytics Summary:
                       </span>
                     </div>
                   </div>
-                  
+
                   <Card className="overflow-hidden !bg-[#191919] border-primary/20">
                     <div className="overflow-x-auto">
                       <ScrollArea className="h-[400px] min-w-[720px]">
@@ -2343,15 +2347,15 @@ Analytics Summary:
                           {transactions
                             .filter(t => !showDuplicatesOnly || t.isDuplicate)
                             .map((transaction, index) => (
-                            <TableRow 
-                              key={index} 
+                            <TableRow
+                              key={index}
                               className={`${
-                                transaction.balanceMismatch 
-                                  ? 'bg-red-500/10 border-l-2 border-l-red-500' 
-                                  : transaction.riskFlag 
+                                transaction.balanceMismatch
+                                  ? 'bg-red-500/10 border-l-2 border-l-red-500'
+                                  : transaction.riskFlag
                                     ? 'bg-orange-500/5 border-l-2 border-l-orange-500'
-                                    : transaction.isDuplicate 
-                                      ? 'bg-yellow-500/5 border-l-2 border-l-yellow-500' 
+                                    : transaction.isDuplicate
+                                      ? 'bg-yellow-500/5 border-l-2 border-l-yellow-500'
                                       : ''
                               }`}
                             >
@@ -2394,8 +2398,8 @@ Analytics Summary:
                                 {transaction.description}
                               </TableCell>
                               <TableCell>
-                                <Badge 
-                                  variant="outline" 
+                                <Badge
+                                  variant="outline"
                                   className={`text-xs ${categoryColors[transaction.category] || categoryColors['Other']} border`}
                                 >
                                   {transaction.category}
@@ -2483,7 +2487,7 @@ Analytics Summary:
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {["HDFC Bank", "ICICI Bank", "Axis Bank", "State Bank of India", "IDBI Bank", "Yes Bank", "Kotak Bank", "Union Bank", "Bank of Baroda", "Punjab National Bank", "HSBC", "Citibank", "Deutsche Bank", "Chase Bank", "Bank of America", "Wells Fargo", "Santander", "BNP Paribas", "ING", "Barclays", "DBS Bank", "OCBC", "UOB", "China Construction Bank", "Agricultural Bank of China", "Bank of China", "ICBC", "Mitsubishi UFJ", "Sumitomo Mitsui", "Nomura"].map((bank) => (
-                    <span 
+                    <span
                       key={bank}
                       className="px-3 py-1 text-xs rounded-full bg-muted/50 text-muted-foreground transition-all"
                     >
@@ -2496,6 +2500,47 @@ Analytics Summary:
           </div>
         </div>
       </div>
+
+      {/* Upload Limit Dialog */}
+      <Dialog open={showLimitDialog} onOpenChange={setShowLimitDialog}>
+        <DialogContent className="bg-card border-primary/20">
+          <DialogHeader>
+            <DialogTitle>{limitDialogTitle}</DialogTitle>
+            <DialogDescription className="space-y-4 pt-4">
+              <p>{limitDialogMessage}</p>
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                {limitDialogShowSignup && (
+                  <Button
+                    className="bg-primary text-primary-foreground"
+                    onClick={() => {
+                      setShowLimitDialog(false);
+                      navigate('/auth');
+                    }}
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    Sign Up
+                  </Button>
+                )}
+                {limitDialogShowPricing && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowLimitDialog(false);
+                      navigate('/pricing');
+                    }}
+                  >
+                    <Crown className="mr-2 h-4 w-4" />
+                    View Plans
+                  </Button>
+                )}
+                <Button variant="ghost" onClick={() => setShowLimitDialog(false)}>
+                  Close
+                </Button>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
 
       {/* Premium Upgrade Dialog */}
       <Dialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
@@ -2511,7 +2556,7 @@ Analytics Summary:
                 Upgrade your plan to unlock DOCX and ODS exports for your financial data.
               </p>
               <div className="flex flex-col sm:flex-row gap-2 pt-4">
-                <Button 
+                <Button
                   className="bg-primary text-primary-foreground"
                   onClick={() => {
                     setShowUpgradeDialog(false);
@@ -2521,7 +2566,7 @@ Analytics Summary:
                   <Crown className="mr-2 h-4 w-4" />
                   View Plans
                 </Button>
-                <Button 
+                <Button
                   variant="outline"
                   onClick={() => setShowUpgradeDialog(false)}
                 >

@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 // CORS headers for deployment-agnostic access
 const getAllowedOrigin = (requestOrigin: string | null): string => {
   const envOrigin = Deno.env.get('ALLOWED_ORIGIN');
-  
+
   const allowedOrigins = [
     envOrigin,
     'https://akromeda.lovable.app',
@@ -12,27 +12,27 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     'http://localhost:5173',
     'http://localhost:3000',
   ].filter(Boolean) as string[];
-  
+
   if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
     return requestOrigin;
   }
-  
+
   const lovableAppPattern = /^https:\/\/[a-z0-9-]+\.lovable\.app$/;
   const lovableProjectPattern = /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/;
   if (requestOrigin && (lovableAppPattern.test(requestOrigin) || lovableProjectPattern.test(requestOrigin))) {
     return requestOrigin;
   }
-  
+
   const vercelPattern = /^https:\/\/[a-z0-9-]+\.vercel\.app$/;
   if (requestOrigin && vercelPattern.test(requestOrigin)) {
     return requestOrigin;
   }
-  
+
   if (envOrigin === '*' && requestOrigin) {
     return requestOrigin;
   }
-  
-  return requestOrigin || allowedOrigins[0] || '*';
+
+  return allowedOrigins[0] || 'https://akromeda.vercel.app';
 };
 
 const getCorsHeaders = (req: Request) => ({
@@ -43,7 +43,7 @@ const getCorsHeaders = (req: Request) => ({
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
-  
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    
+
     // Create admin client with service role for full access
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
 
     // Validate the user's token
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    
+
     if (authError || !user) {
       console.error('Auth error:', authError?.message);
       return new Response(
@@ -92,17 +92,17 @@ Deno.serve(async (req) => {
     }
 
     if (!isAdmin) {
-      console.warn('Non-admin user attempted to access admin dashboard:', user.email);
+      console.warn('Non-admin user attempted to access admin dashboard.');
       return new Response(
         JSON.stringify({ error: 'Forbidden - Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Admin access granted for:', user.email);
+    console.log('Admin access granted.');
 
     // ============= FETCH ALL DATA WITH SERVICE ROLE =============
-    
+
     // Fetch all profiles
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
@@ -233,3 +233,5 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+

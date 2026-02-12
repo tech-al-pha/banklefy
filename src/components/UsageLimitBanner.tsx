@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Crown, User, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { formatPlanLabel } from "@/lib/planLabels";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface UsageLimitBannerProps {
   remaining: number;
@@ -27,6 +29,16 @@ export const UsageLimitBanner = ({
   planType = 'free',
 }: UsageLimitBannerProps) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const planLabel = formatPlanLabel(planType);
+  const normalizedPlan = (planType || "free").toLowerCase();
+  const isPaidPlan = isAuthenticated && normalizedPlan !== "free";
+  const isPerPagePlan = normalizedPlan.startsWith("per_page");
+  const isMonthlyPlan = normalizedPlan.startsWith("monthly") || normalizedPlan === "daily";
+  const isYearlyPlan = normalizedPlan.startsWith("yearly") || normalizedPlan === "business";
+
+  const formatTemplate = (templateKey: string, values: Record<string, string | number>) =>
+    t(templateKey).replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
 
   // PDF too complex / page limit exceeded
   if (status === 'pdf_too_complex') {
@@ -45,7 +57,7 @@ export const UsageLimitBanner = ({
             className="bg-primary text-primary-foreground"
           >
             <Crown className="mr-2 h-4 w-4" />
-            Upgrade to Premium
+            {t("upload.limit.upgradeCta")}
           </Button>
         </AlertDescription>
       </Alert>
@@ -53,15 +65,30 @@ export const UsageLimitBanner = ({
   }
 
   if (limitReached || status === 'anonymous_limit_reached') {
+    const paidMessage = (() => {
+      if (isPerPagePlan) {
+        return formatTemplate("upload.limit.paid.pack", { limit });
+      }
+      if (isMonthlyPlan) {
+        return formatTemplate("upload.limit.paid.month", { limit });
+      }
+      if (isYearlyPlan) {
+        return formatTemplate("upload.limit.paid.year", { limit });
+      }
+      return formatTemplate("upload.limit.paid.plan", { limit });
+    })();
+
+    const limitTitle = isAuthenticated && isPaidPlan ? t("upload.limit.usage.title") : t("upload.limit.daily.title");
+
     return (
       <Alert variant="destructive" className="mb-6">
         <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Daily Limit Reached</AlertTitle>
+        <AlertTitle>{limitTitle}</AlertTitle>
         <AlertDescription className="mt-2">
           <p className="mb-3">
             {isAuthenticated
-              ? `You've used all ${limit} of your daily conversions. Your limit resets at midnight.`
-              : 'Free limit reached. Please sign up to continue.'}
+              ? (isPaidPlan ? paidMessage : formatTemplate("upload.limit.daily.authFree", { limit }))
+              : formatTemplate("upload.limit.daily.anon", { limit })}
           </p>
           {!isAuthenticated && (
             <Button
@@ -70,7 +97,7 @@ export const UsageLimitBanner = ({
               className="bg-primary text-primary-foreground"
             >
               <User className="mr-2 h-4 w-4" />
-              Sign up for 5 free conversions!
+              {t("upload.limit.signupCta")}
             </Button>
           )}
         </AlertDescription>
@@ -84,7 +111,9 @@ export const UsageLimitBanner = ({
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Crown className="h-4 w-4 text-primary" />
         <span>
-          <strong className="text-primary">{remaining}</strong> of {limit} {planType && planType !== 'free' ? `${planType}` : 'free'} conversions remaining
+          <strong className="text-primary">{remaining}</strong>{" "}
+          {formatTemplate("upload.remaining.counterSuffix", { limit })}
+          {planLabel && planLabel !== "Free" ? ` - ${planLabel}` : ""}
         </span>
       </div>
       {!isAuthenticated && (
@@ -94,9 +123,10 @@ export const UsageLimitBanner = ({
           onClick={() => navigate('/auth')}
           className="text-glow-link no-hover-glow text-primary p-0 h-auto font-medium w-full sm:w-auto justify-start sm:justify-center"
         >
-          Sign up for more →
+          {t("upload.remaining.signupMore")} →
         </Button>
       )}
     </div>
   );
 };
+

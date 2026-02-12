@@ -60,10 +60,9 @@ export default function SampleReport() {
             Back to Home
           </Button>
 
-          <Button className="bg-primary text-primary-foreground shadow-neon">
-            <Download className="mr-2 h-4 w-4" />
-            Download Samples
-          </Button>
+          <div className="rounded-full border border-primary/20 bg-surface-elevated/70 px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            Samples are ready below
+          </div>
         </div>
 
         <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">

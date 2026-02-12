@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import { Shield, Lock, Eye, Trash2, FileCheck, Globe, Brain, ArrowLeft, CheckCircle, Database, AlertCircle, Users, Server, LockOpen, Mail } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -160,8 +160,8 @@ const Privacy = () => {
           >
             <a href="mailto:inspirexali@gmail.com">Contact Support</a>
           </Button>
-          <Button 
-            size="lg" 
+          <Button
+            size="lg"
             className="back-pill"
             onClick={() => navigate('/')}
           >

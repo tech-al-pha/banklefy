@@ -34,7 +34,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     return requestOrigin;
   }
 
-  return requestOrigin || allowedOrigins[0] || '*';
+  return allowedOrigins[0] || 'https://akromeda.vercel.app';
 };
 
 const getCorsHeaders = (req: Request) => ({
@@ -226,3 +226,5 @@ When answering questions about an uploaded document, ALWAYS include precise loca
     );
   }
 });
+
+

@@ -1,4 +1,4 @@
--- Update daily conversion limits: anonymous = 2, authenticated free = 5
+﻿-- Update daily conversion limits: anonymous = 2, authenticated free = 5
 -- Remove first-day bonus logic and align trigger defaults
 
 DO $$
@@ -82,14 +82,14 @@ BEGIN
       AND table_name = 'subscriptions'
       AND column_name = 'tier'
   ) INTO v_has_tier;
-  
+
   IF p_user_id IS NOT NULL THEN
     -- Registered user - check subscriptions table
     SELECT s.conversions_used, s.conversions_limit, s.last_reset_date::date
     INTO v_conversions, v_limit, v_last_reset
     FROM subscriptions s
     WHERE s.user_id = p_user_id;
-    
+
     IF NOT FOUND THEN
       -- Create new subscription for user - default 5 daily conversions
       IF v_has_plan_type THEN
@@ -109,12 +109,12 @@ BEGIN
       v_limit := 5;
       v_last_reset := v_today;
     END IF;
-    
+
     -- Check if reset needed (new day)
     IF v_last_reset < v_today THEN
       UPDATE subscriptions
-      SET conversions_used = 0, 
-          last_reset_date = v_today, 
+      SET conversions_used = 0,
+          last_reset_date = v_today,
           timezone = p_timezone,
           conversions_limit = 5
       WHERE user_id = p_user_id;
@@ -128,7 +128,7 @@ BEGIN
     INTO v_conversions, v_limit, v_last_reset
     FROM anonymous_usage a
     WHERE a.ip_address = p_ip_address;
-    
+
     IF NOT FOUND THEN
       INSERT INTO anonymous_usage (ip_address, conversions_count, last_reset_date, timezone)
       VALUES (p_ip_address, 0, v_today, p_timezone);
@@ -136,7 +136,7 @@ BEGIN
       v_limit := 2;
       v_last_reset := v_today;
     END IF;
-    
+
     IF v_last_reset < v_today THEN
       UPDATE anonymous_usage
       SET conversions_count = 0, last_reset_date = v_today, timezone = p_timezone
@@ -145,7 +145,7 @@ BEGIN
       v_needs_reset := true;
     END IF;
   END IF;
-  
+
   RETURN QUERY SELECT v_conversions, v_limit, v_needs_reset;
 END;
 $$;
@@ -167,10 +167,10 @@ BEGIN
     new.email,
     coalesce(new.raw_user_meta_data->>'full_name', '')
   );
-  
+
   INSERT INTO public.user_roles (user_id, role)
   VALUES (new.id, 'user');
-  
+
   SELECT EXISTS (
     SELECT 1
     FROM information_schema.columns
@@ -199,7 +199,7 @@ BEGIN
              VALUES ($1, 5, 0)'
     USING new.id;
   END IF;
-  
+
   RETURN new;
 END;
 $$;

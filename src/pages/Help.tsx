@@ -183,10 +183,10 @@ const Help = () => {
       icon: Clock,
       title: "Daily Limits and Usage",
       items: [
-        "Anonymous users get 2 conversions per day.",
-        "Signed-in users get 5 conversions per day.",
+        "Anonymous users get 2 pages per day.",
+        "Signed-in users get 5 pages per day.",
         "Paid plans increase your limits based on the plan.",
-        "Limits reset at midnight in your local time zone.",
+        "Free and anonymous limits reset at midnight in your local time zone. Paid plans reset with their billing cycle.",
         "If you need more, upgrade on the Pricing page.",
       ],
     },
@@ -246,7 +246,7 @@ const Help = () => {
         "Use the latest version of Chrome, Edge, or Firefox.",
         "Enable JavaScript and allow cookies for the app to work.",
         "Desktop browsers are best for very large PDFs.",
-        "Mobile works for quick conversions but large files may be slower.",
+        "Mobile works for quick page processing but large files may be slower.",
       ],
     },
     {

@@ -1,4 +1,4 @@
-// ============= MISTRAL CATEGORIZATION PROCESSOR =============
+﻿// ============= MISTRAL CATEGORIZATION PROCESSOR =============
 // Using Mistral for categorization & text cleaning (best for structured output)
 
 export interface MistralCategorizationResult {
@@ -199,12 +199,12 @@ export async function callMistralCategorizer(
         }
         return 0;
       };
-      
+
       // Use original values if Mistral returned 0 but original had a value
       const debit = parseAmount(t.debit) || parseAmount(original?.debit);
       const credit = parseAmount(t.credit) || parseAmount(original?.credit);
       const balance = parseAmount(t.balance, true) || parseAmount(original?.balance, true);
-      
+
       const rawDate = original?.date || t.date || '';
       const rawDescription = original?.description || original?.narration || t.description || t.narration || '';
 

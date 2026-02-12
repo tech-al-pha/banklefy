@@ -115,7 +115,7 @@ const Settings = () => {
             variant="outline" 
             size="sm" 
             className="border-primary/50 text-primary"
-            onClick={() => toast({ title: "Coming Soon", description: "Premium plans will be available soon!" })}
+            onClick={() => navigate('/pricing')}
           >
             {t('settings.usage.upgrade')}
           </Button>

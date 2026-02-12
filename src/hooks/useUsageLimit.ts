@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { invokeEdgeFunction } from '@/lib/supabaseApi';
 import { getAnonymousClientId } from '@/lib/usageClient';
+import { getDefaultDailyLimit } from '@/lib/usageLimits';
 
 interface UsageLimit {
   conversionsUsed: number;
@@ -16,12 +17,13 @@ interface UsageLimit {
 
 export const useUsageLimit = () => {
   const { user, session } = useAuth();
+  const defaultLimit = getDefaultDailyLimit(!!user);
   const [usageLimit, setUsageLimit] = useState<UsageLimit>({
     conversionsUsed: 0,
-    conversionsLimit: 100,
-    remaining: 100,
+    conversionsLimit: defaultLimit,
+    remaining: defaultLimit,
     limitReached: false,
-    isAuthenticated: false,
+    isAuthenticated: !!user,
     loading: true,
     error: null,
   });
@@ -59,10 +61,12 @@ export const useUsageLimit = () => {
         throw error;
       }
 
+      const resolvedLimit = data.conversionsLimit ?? defaultLimit;
+      const resolvedUsed = data.conversionsUsed ?? 0;
       setUsageLimit({
-        conversionsUsed: data.conversionsUsed ?? 0,
-        conversionsLimit: data.conversionsLimit ?? (user ? 5 : 2),
-        remaining: data.remaining ?? 0,
+        conversionsUsed: resolvedUsed,
+        conversionsLimit: resolvedLimit,
+        remaining: data.remaining ?? Math.max(0, resolvedLimit - resolvedUsed),
         limitReached: data.limitReached ?? false,
         isAuthenticated: data.isAuthenticated ?? !!user,
         loading: false,
@@ -78,7 +82,7 @@ export const useUsageLimit = () => {
         error: message,
       }));
     }
-  }, [user, session?.access_token]);
+  }, [user, session?.access_token, defaultLimit]);
 
   useEffect(() => {
     checkUsageLimit();

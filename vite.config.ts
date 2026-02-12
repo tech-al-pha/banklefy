@@ -8,7 +8,6 @@ export default defineConfig(({ mode }) => {
   // Avoid noisy warnings in CI/local builds when caniuse-lite is stale.
   // Updating is still recommended when network access is available.
   process.env.BROWSERSLIST_IGNORE_OLD_DATA ??= "true";
-
   return ({
   server: {
     host: "::",

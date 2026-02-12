@@ -41,7 +41,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
   }
   
   // Default fallback
-  return requestOrigin || allowedOrigins[0] || '*';
+  return allowedOrigins[0] || 'https://akromeda.vercel.app';
 };
 
 const getCorsHeaders = (req: Request) => ({
@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
     const ipAddress = getClientIp(req);
     const trackingKey = ipAddress !== 'unknown' ? ipAddress : (clientId ? `client:${clientId}` : ipAddress);
 
-    console.log('Checking usage limit for IP:', trackingKey, 'Timezone:', userTimezone);
+    console.log('Checking usage limit', { timezone: userTimezone });
 
     // Create service role client for database operations
     const supabaseAdmin = createClient(
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
       
       if (!authError && authUser) {
         user = authUser;
-        console.log('Authenticated user detected:', { userId: user.id, email: user.email });
+        console.log('Authenticated user detected');
       } else {
         console.log('Token validation failed:', authError?.message || 'Invalid token');
       }
@@ -140,21 +140,31 @@ Deno.serve(async (req) => {
       // Registered user - check subscription
       isAuthenticated = true;
       
-      // Check if user is admin/special user (no limits)
-      if (user.email === 'inspirexali@gmail.com') {
-        console.log('Special user detected - unlimited access:', user.email);
-        return new Response(
-          JSON.stringify({
-            conversionsUsed: 0,
-            conversionsLimit: 999999, // Unlimited
-            remaining: 999999,
-            limitReached: false,
-            isAuthenticated: true,
-            planType: 'unlimited',
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+    // Check if user has an admin role (no limits)
+    const { data: roleData, error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    if (roleError) {
+      console.error('Failed to fetch user roles:', roleError);
+    }
+
+    const isAdmin = Array.isArray(roleData) && roleData.some((role) => role.role === 'admin');
+    if (isAdmin) {
+      console.log('Admin role detected - unlimited access');
+      return new Response(
+        JSON.stringify({
+          conversionsUsed: 0,
+          conversionsLimit: 999999, // Unlimited
+          remaining: 999999,
+          limitReached: false,
+          isAuthenticated: true,
+          planType: 'unlimited',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
       
       const { data: result, error } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
         p_ip_address: null,
@@ -227,3 +237,5 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+

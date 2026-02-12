@@ -28,7 +28,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     return requestOrigin;
   }
 
-  return requestOrigin || allowedOrigins[0] || '*';
+  return allowedOrigins[0] || 'https://akromeda.vercel.app';
 };
 
 const getCorsHeaders = (req: Request) => ({
@@ -136,58 +136,48 @@ Deno.serve(async (req) => {
     return respond(req, 403, { error: 'Order does not belong to this user.' });
   }
 
-  // Update order status
-  await supabaseAdmin
-    .from('razorpay_orders')
-    .update({ status: 'paid' })
-    .eq('id', order.id);
-
-  // Insert payment record
-  const { error: paymentError } = await supabaseAdmin.from('razorpay_payments').insert({
-    user_id: userId,
-    order_id: order.id,
-    razorpay_payment_id,
-    razorpay_order_id,
-    razorpay_signature,
-    amount: order.amount,
-    currency: order.currency,
-    status: 'captured',
-    plan_id: order.plan_id,
-    metadata: { verified_at: new Date().toISOString() },
-  });
-
-  if (paymentError) {
-    console.error('Failed to insert payment', paymentError);
+  if (order.status === 'paid') {
+    return respond(req, 200, {
+      success: true,
+      alreadyProcessed: true,
+      message: 'Order already marked as paid.',
+      plan_id: order.plan_id,
+      pages_added: 0,
+    });
   }
 
   // Update user subscription based on plan
   const planId = order.plan_id as string;
   const pagesToAdd = PLAN_PAGES[planId] || 0;
 
-  if (pagesToAdd > 0) {
-    const { data: subscription } = await supabaseAdmin
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+  const { data: processResult, error: processError } = await supabaseAdmin.rpc('process_razorpay_payment', {
+    p_user_id: userId,
+    p_order_id: order.id,
+    p_razorpay_payment_id: razorpay_payment_id,
+    p_razorpay_order_id: razorpay_order_id,
+    p_razorpay_signature: razorpay_signature,
+    p_amount: order.amount,
+    p_currency: order.currency,
+    p_plan_id: planId,
+    p_pages_to_add: pagesToAdd,
+  });
 
-    if (subscription) {
-      const newLimit = subscription.conversions_limit + pagesToAdd;
-      await supabaseAdmin
-        .from('subscriptions')
-        .update({ 
-          conversions_limit: newLimit,
-          tier: planId.startsWith('yearly') ? 'business' : planId.startsWith('monthly') ? 'daily' : 'free',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
-    }
+  if (processError) {
+    console.error('Failed to process payment', processError);
+    return respond(req, 500, { error: 'Failed to finalize payment.' });
   }
+
+  const result = processResult && processResult.length > 0 ? processResult[0] : null;
+  const alreadyProcessed = !!result?.already_processed;
+  const pagesAdded = Number(result?.pages_added ?? 0);
 
   return respond(req, 200, {
     success: true,
-    message: 'Payment verified successfully.',
+    message: alreadyProcessed ? 'Payment already verified.' : 'Payment verified successfully.',
+    alreadyProcessed,
     plan_id: planId,
-    pages_added: pagesToAdd,
+    pages_added: pagesAdded,
   });
 });
+
+

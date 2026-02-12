@@ -400,7 +400,7 @@ export default function Admin() {
                   onClick={() => setActiveSection('conversions')}
                 >
                   <FileText className="h-4 w-4" />
-                  Conversions
+                  Pages
                 </Button>
                 <Button
                   variant="ghost"
@@ -461,7 +461,7 @@ export default function Admin() {
                   <h1 className="text-2xl font-semibold text-foreground">
                     {activeSection === 'overview' && 'Overview'}
                     {activeSection === 'users' && 'User Management'}
-                    {activeSection === 'conversions' && 'Conversions'}
+                    {activeSection === 'conversions' && 'Pages'}
                     {activeSection === 'security' && 'Security Center'}
                     {activeSection === 'system' && 'System Status'}
                     {activeSection === 'api' && 'API Status'}
@@ -469,7 +469,7 @@ export default function Admin() {
                   <p className="text-sm text-muted-foreground">
                     {activeSection === 'overview' && 'At-a-glance performance, usage, and activity.'}
                     {activeSection === 'users' && 'Manage accounts, roles, and subscription tiers.'}
-                    {activeSection === 'conversions' && 'Monitor daily volumes and conversion health.'}
+                    {activeSection === 'conversions' && 'Monitor daily page volume and processing health.'}
                     {activeSection === 'security' && 'Audit access, roles, and sensitive operations.'}
                     {activeSection === 'system' && 'Track infrastructure and operational signals.'}
                     {activeSection === 'api' && 'API limits, failures, and degraded services only.'}
@@ -516,7 +516,7 @@ export default function Admin() {
           <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Conversions
+                Total Pages
               </CardTitle>
               <FileText className="h-4 w-4 text-secondary" />
             </CardHeader>
@@ -531,14 +531,14 @@ export default function Admin() {
           <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Today's Conversions
+                Today's Pages
               </CardTitle>
               <Calendar className="h-4 w-4 text-accent" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{stats.todayCount}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Conversions today
+                Pages today
               </p>
             </CardContent>
           </Card>
@@ -570,7 +570,7 @@ export default function Admin() {
             <CardContent>
               <div className="text-3xl font-bold text-foreground">{anonymousSummary.totalIPs}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {anonymousSummary.totalConversions} total conversions
+                {anonymousSummary.totalConversions} total pages
               </p>
             </CardContent>
           </Card>
@@ -579,7 +579,7 @@ export default function Admin() {
         {/* Daily Stats Chart */}
         <Card className="bg-card/60 backdrop-blur-lg border-primary/20">
           <CardHeader>
-            <CardTitle>Conversions - Last 7 Days</CardTitle>
+            <CardTitle>Pages - Last 7 Days</CardTitle>
             <CardDescription>Daily conversion activity</CardDescription>
           </CardHeader>
           <CardContent>
@@ -752,7 +752,7 @@ export default function Admin() {
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[2fr_1fr]">
             <Card className="bg-card/70 backdrop-blur-lg border-primary/20">
               <CardHeader>
-                <CardTitle>Conversion Throughput</CardTitle>
+                <CardTitle>Page Throughput</CardTitle>
                 <CardDescription>Daily activity and volume</CardDescription>
               </CardHeader>
               <CardContent>
@@ -779,7 +779,7 @@ export default function Admin() {
 
             <Card className="bg-card/70 backdrop-blur-lg border-primary/20">
               <CardHeader>
-                <CardTitle>Conversion Health</CardTitle>
+                <CardTitle>Page Health</CardTitle>
                 <CardDescription>System-level success rate</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -792,7 +792,7 @@ export default function Admin() {
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-primary/10 bg-background/40 px-4 py-3">
                   <div>
-                    <p className="text-sm text-muted-foreground">Failed Conversions</p>
+                    <p className="text-sm text-muted-foreground">Failed Pages</p>
                     <p className="text-2xl font-semibold text-foreground">{stats.failed}</p>
                   </div>
                   <ShieldAlert className="h-6 w-6 text-red-500" />
@@ -891,12 +891,12 @@ export default function Admin() {
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="rounded-xl border border-primary/10 bg-background/40 p-4">
-                  <p className="text-sm text-muted-foreground">Conversions (7d)</p>
+                  <p className="text-sm text-muted-foreground">Pages (7d)</p>
                   <p className="text-lg font-semibold text-foreground">{last7dTotal}</p>
                   <p className="text-xs text-muted-foreground">Total last 7 days</p>
                 </div>
                 <div className="rounded-xl border border-primary/10 bg-background/40 p-4">
-                  <p className="text-sm text-muted-foreground">Avg Daily Conversions</p>
+                  <p className="text-sm text-muted-foreground">Avg Daily Pages</p>
                   <p className="text-lg font-semibold text-foreground">{last7dAverage}</p>
                   <p className="text-xs text-muted-foreground">7-day average</p>
                 </div>
@@ -912,7 +912,7 @@ export default function Admin() {
                   <p className="text-lg font-semibold text-foreground">
                     {stats.total > 0 ? Math.round((anonymousSummary.totalConversions / stats.total) * 100) : 0}%
                   </p>
-                  <p className="text-xs text-muted-foreground">Of total conversions</p>
+                  <p className="text-xs text-muted-foreground">Of total pages</p>
                 </div>
               </CardContent>
             </Card>
@@ -942,7 +942,7 @@ export default function Admin() {
                 <div className="flex items-center justify-between rounded-lg border border-primary/10 bg-background/40 px-3 py-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Settings className="h-4 w-4" />
-                    Today's conversions
+                    Today's pages
                   </div>
                   <Badge variant="outline">{stats.todayCount}</Badge>
                 </div>
@@ -1033,7 +1033,7 @@ export default function Admin() {
             <Card className="bg-card/70 backdrop-blur-lg border-primary/20 xl:col-span-2">
               <CardHeader>
                 <CardTitle>Recent API Errors</CardTitle>
-                <CardDescription>Latest failed API-related conversions</CardDescription>
+                <CardDescription>Latest failed API-related pages</CardDescription>
               </CardHeader>
               <CardContent>
                 {apiStatus?.recentErrors?.length ? (

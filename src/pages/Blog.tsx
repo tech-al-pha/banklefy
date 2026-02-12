@@ -3,6 +3,33 @@ import { ArrowLeft, PenSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Logo from "@/components/Logo";
 
+const posts = [
+  {
+    id: "launch",
+    title: "Introducing Akromeda: Bank Statement to Excel in Minutes",
+    date: "Feb 12, 2026",
+    excerpt:
+      "Akromeda converts bank statements into clean spreadsheets with AI OCR, built for speed, accuracy, and secure processing.",
+    cta: "Read more",
+  },
+  {
+    id: "accuracy",
+    title: "How We Improve OCR Accuracy on Low-Quality Scans",
+    date: "Feb 10, 2026",
+    excerpt:
+      "Learn practical tips for clearer results, plus the AI checks we run to reduce errors in transaction tables.",
+    cta: "Read more",
+  },
+  {
+    id: "privacy",
+    title: "Privacy by Default: 24-Hour Retention and Secure Handling",
+    date: "Feb 7, 2026",
+    excerpt:
+      "A short overview of how Akromeda stores files temporarily for download and protects sensitive financial data.",
+    cta: "Read more",
+  },
+];
+
 const Blog = () => {
   const navigate = useNavigate();
 
@@ -43,10 +70,26 @@ const Blog = () => {
           </div>
         </section>
 
-        <section className="glass-card border border-primary/20 rounded-2xl p-8 text-center">
-          <p className="text-muted-foreground">
-            No posts yet. Check back soon for the first update.
-          </p>
+        <section className="grid gap-6 md:grid-cols-3">
+          {posts.map((post) => (
+            <article
+              key={post.id}
+              className="glass-card border border-primary/20 rounded-2xl p-6 flex flex-col gap-4"
+            >
+              <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                {post.date}
+              </div>
+              <h2 className="text-xl font-bold text-white">{post.title}</h2>
+              <p className="text-sm text-muted-foreground">{post.excerpt}</p>
+              <Button
+                variant="outline"
+                className="border-primary/40 text-foreground w-fit"
+                onClick={() => navigate("/features")}
+              >
+                {post.cta}
+              </Button>
+            </article>
+          ))}
         </section>
       </main>
     </div>

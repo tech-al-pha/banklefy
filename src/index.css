@@ -50,12 +50,53 @@
     min-height: 100vh;
     background: var(--background);
     color: var(--text-body);
-    font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
+    font-family:
+      "Space Grotesk",
+      "Inter",
+      "Segoe UI",
+      "Noto Sans",
+      "Arial Unicode MS",
+      system-ui,
+      sans-serif;
     letter-spacing: 0.01em;
     line-height: 1.6;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     cursor: none;
+  }
+
+  html[lang="ar"] body {
+    font-family:
+      "Noto Sans Arabic",
+      "Noto Naskh Arabic",
+      "Segoe UI",
+      "Tahoma",
+      "Arial",
+      sans-serif;
+    letter-spacing: 0;
+  }
+
+  html[lang="zh"] body {
+    font-family:
+      "Noto Sans SC",
+      "Microsoft YaHei",
+      "PingFang SC",
+      "Hiragino Sans GB",
+      "WenQuanYi Micro Hei",
+      "Segoe UI",
+      sans-serif;
+    letter-spacing: 0;
+  }
+
+  html[lang="hi"] body {
+    font-family:
+      "Noto Sans Devanagari",
+      "Mangal",
+      "Kohinoor Devanagari",
+      "Hind",
+      "Segoe UI",
+      sans-serif;
+    letter-spacing: 0;
   }
 
   html {
@@ -77,9 +118,9 @@
     color: rgba(255, 255, 255, 0.5);
   }
 
-  html,
-  body,
-  * {
+  html.luxury-cursor-active,
+  html.luxury-cursor-active body,
+  html.luxury-cursor-active * {
     cursor: none !important;
   }
 
@@ -140,26 +181,25 @@
     font: inherit;
   }
 
-  /* Hard-hide reCAPTCHA badge + iframe + all injected elements */
-  .grecaptcha-badge,
-  .grecaptcha-badge *,
-  iframe[src*="recaptcha"],
-  iframe[title*="reCAPTCHA"],
-  div[style*="recaptcha"],
-  iframe[src*="google.com/recaptcha"],
-  iframe[src*="recaptcha/api2"],
-  div > div > iframe[src*="recaptcha"] {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    width: 0 !important;
-    height: 0 !important;
-    overflow: hidden !important;
-    position: absolute !important;
-    left: -9999px !important;
-    top: -9999px !important;
-    pointer-events: none !important;
-    z-index: -1 !important;
+  html[lang="ar"] .font-lequire,
+  html[lang="ar"] .font-noir,
+  html[lang="zh"] .font-lequire,
+  html[lang="zh"] .font-noir,
+  html[lang="hi"] .font-lequire,
+  html[lang="hi"] .font-noir {
+    font-family: inherit !important;
+    letter-spacing: normal;
+  }
+
+  /* reCAPTCHA badge: keep visible but compact */
+  .grecaptcha-badge {
+    visibility: visible !important;
+    opacity: 1 !important;
+    transform: scale(0.85);
+    transform-origin: right bottom;
+    right: 12px !important;
+    bottom: 12px !important;
+    z-index: 40 !important;
   }
 }
 

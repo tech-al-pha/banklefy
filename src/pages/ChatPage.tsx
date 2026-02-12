@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ChatAura } from "@/components/ChatAura";
@@ -19,9 +19,9 @@ const ChatPage = () => {
                 Chat Aura
               </h1>
             </div>
-            <Button 
-              variant="ghost" 
-              onClick={() => navigate('/')} 
+            <Button
+              variant="ghost"
+              onClick={() => navigate('/')}
               className="back-pill w-full sm:w-auto"
             >
               <ArrowLeft size={18} /> Back to Home

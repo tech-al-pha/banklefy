@@ -1,4 +1,4 @@
-// ============= PURE TYPESCRIPT FINANCIAL ENGINE =============
+﻿// ============= PURE TYPESCRIPT FINANCIAL ENGINE =============
 // 100% Mathematical Accuracy - No AI, Just Math
 
 import { fromMinorUnits, toMinorUnits } from './money.ts';
@@ -104,29 +104,29 @@ export interface LiquidityAnalysis {
 // ============= BALANCE RECONCILIATION ENGINE =============
 export function reconcileBalances(transactions: Transaction[]): ReconciliationResult {
   const mismatches: BalanceMismatch[] = [];
-  
+
   for (let i = 1; i < transactions.length; i++) {
     const prevBalance = transactions[i - 1].balance || 0;
     const currentCredit = transactions[i].credit || 0;
     const currentDebit = transactions[i].debit || 0;
-    
+
     // Formula: Balance[n-1] + Credit[n] - Debit[n] = Balance[n]
     // Use minor-unit math for exact debit/credit + running balance reconciliation.
     const expectedMinor = toMinorUnits(prevBalance) + toMinorUnits(currentCredit) - toMinorUnits(currentDebit);
     const expectedBalance = fromMinorUnits(expectedMinor);
     const actualMinor = toMinorUnits(transactions[i].balance || 0);
     const actualBalance = fromMinorUnits(actualMinor);
-    
+
     // Allow tolerance of 0.01 for floating point
     const differenceMinor = Math.abs(expectedMinor - actualMinor);
     const difference = fromMinorUnits(differenceMinor);
-    
+
     if (differenceMinor > 1) {
-      const severity: 'low' | 'medium' | 'high' | 'critical' = 
+      const severity: 'low' | 'medium' | 'high' | 'critical' =
         difference > 10000 ? 'critical' :
         difference > 1000 ? 'high' :
         difference > 100 ? 'medium' : 'low';
-      
+
       mismatches.push({
         rowIndex: i,
         expected: expectedBalance,
@@ -156,7 +156,7 @@ export function reconcileBalances(transactions: Transaction[]): ReconciliationRe
 
 // ============= FOIR CALCULATOR ENGINE =============
 export function calculateFOIR(
-  avgMonthlyIncome: number, 
+  avgMonthlyIncome: number,
   avgMonthlyEMI: number
 ): FOIRResult {
   const safeIncome = roundTo(avgMonthlyIncome);
@@ -164,16 +164,16 @@ export function calculateFOIR(
   const score = safeIncome > 0
     ? roundTo((safeEmi / safeIncome) * 100, 2)
     : 0;
-  
-  const status: 'excellent' | 'good' | 'moderate' | 'high' = 
+
+  const status: 'excellent' | 'good' | 'moderate' | 'high' =
     score <= 30 ? 'excellent' :
     score <= 50 ? 'good' :
     score <= 65 ? 'moderate' : 'high';
-  
+
   const disposableIncome = roundTo(Math.max(0, safeIncome - safeEmi));
   const maxNewEMI = roundTo(disposableIncome * 0.5);
   const loanEligibility = roundTo(maxNewEMI * 60); // 5-year tenure multiplier
-  
+
   return {
     score,
     status,
@@ -189,7 +189,7 @@ export function calculateFOIR(
 export function detectDuplicates(transactions: Transaction[]): number {
   const duplicateMap = new Map<string, { transaction: Transaction; groupId: number }>();
   let duplicateCount = 0;
-  
+
   transactions.forEach((t, i) => {
     // Create a key based on Date + Reference No + Amount (per statement rules)
     const debitVal = Number(t.debit || 0);
@@ -198,7 +198,7 @@ export function detectDuplicates(transactions: Transaction[]): number {
     const refKey = (t.refNumber || '').toString();
     if (!refKey) return;
     const key = `${t.date}_${refKey}_${amount}`;
-    
+
     if (duplicateMap.has(key)) {
       const existing = duplicateMap.get(key)!;
       const groupId = existing.groupId;
@@ -472,31 +472,31 @@ export function performUnderwritingAnalysis(
   categoryCorrections?: Map<string, string>
 ): UnderwritingResult {
   const { salaryCredits, emiDebits } = detectSalaryAndEMI(transactions, categoryCorrections);
-  
+
   // Build monthly breakdown
   const monthlyData = new Map<string, { salaries: number; emis: number }>();
-  
+
   transactions.forEach(t => {
     const month = t.date.substring(0, 7);
     if (!monthlyData.has(month)) {
       monthlyData.set(month, { salaries: 0, emis: 0 });
     }
   });
-  
+
   salaryCredits.forEach(s => {
     const month = s.date.substring(0, 7);
     const existing = monthlyData.get(month) || { salaries: 0, emis: 0 };
     existing.salaries += s.amount;
     monthlyData.set(month, existing);
   });
-  
+
   emiDebits.forEach(e => {
     const month = e.date.substring(0, 7);
     const existing = monthlyData.get(month) || { salaries: 0, emis: 0 };
     existing.emis += e.amount;
     monthlyData.set(month, existing);
   });
-  
+
   // Calculate averages
   const months = Array.from(monthlyData.values());
   const totalSalary = months.reduce((sum, m) => sum + m.salaries, 0);
@@ -507,7 +507,7 @@ export function performUnderwritingAnalysis(
   const avgMonthlyEMI = months.length > 0
     ? roundTo(totalEmi / months.length)
     : 0;
-  
+
   // Calculate FOIR
   const foir = calculateFOIR(avgMonthlyIncome, avgMonthlyEMI);
   
@@ -577,7 +577,7 @@ export function performUnderwritingAnalysis(
 // ============= LIQUIDITY ANALYSIS =============
 export function analyzeLiquidity(transactions: Transaction[]): LiquidityAnalysis {
   const balances = transactions.map(t => t.balance || 0);
-  
+
   if (balances.length === 0) {
     return {
       minBalance: 0,
@@ -587,14 +587,14 @@ export function analyzeLiquidity(transactions: Transaction[]): LiquidityAnalysis
       zeroDays: 0,
     };
   }
-  
+
   const minBalance = Math.min(...balances);
   const maxBalance = Math.max(...balances);
   const avgBalance = roundTo(balances.reduce((a, b) => a + b, 0) / balances.length);
   const minBalanceIndex = balances.indexOf(minBalance);
   const maxDipDate = transactions[minBalanceIndex]?.date || null;
   const zeroDays = transactions.filter(t => (t.balance || 0) <= 0).length;
-  
+
   return {
     minBalance: roundTo(minBalance),
     maxBalance: roundTo(maxBalance),

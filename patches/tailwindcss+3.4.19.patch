@@ -1,0 +1,30 @@
+diff --git a/node_modules/tailwindcss/lib/corePlugins.js b/node_modules/tailwindcss/lib/corePlugins.js
+index bf5d083..9544459 100644
+--- a/node_modules/tailwindcss/lib/corePlugins.js
++++ b/node_modules/tailwindcss/lib/corePlugins.js
+@@ -552,7 +552,9 @@ let cssBackdropFilterValue = [
+ ].join(" ");
+ let corePlugins = {
+     preflight: ({ addBase  })=>{
+-        let preflightStyles = _postcss.default.parse(_fs.default.readFileSync(_path.join(__dirname, "./css/preflight.css"), "utf8"));
++        let preflightStyles = _postcss.default.parse(_fs.default.readFileSync(_path.join(__dirname, "./css/preflight.css"), "utf8"), {
++            from: undefined
++        });
+         addBase([
+             _postcss.default.comment({
+                 text: `! tailwindcss v${_packagejson.version} | MIT License | https://tailwindcss.com`
+diff --git a/node_modules/tailwindcss/lib/lib/generateRules.js b/node_modules/tailwindcss/lib/lib/generateRules.js
+index 7b3d219..040960a 100644
+--- a/node_modules/tailwindcss/lib/lib/generateRules.js
++++ b/node_modules/tailwindcss/lib/lib/generateRules.js
+@@ -495,7 +495,9 @@ function isParsableCssValue(property, value) {
+         return false;
+     }
+     try {
+-        _postcss.default.parse(`a{${property}:${value}}`).toResult();
++        _postcss.default.parse(`a{${property}:${value}}`, {
++            from: undefined
++        }).toResult();
+         return true;
+     } catch (err) {
+         return false;

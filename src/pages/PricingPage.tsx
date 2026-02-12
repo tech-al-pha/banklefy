@@ -27,7 +27,7 @@ const monthlyPlans: Plan[] = [
     planId: "monthly_basic",
     category: "monthly",
     name: "Monthly Basic",
-    price: "$9",
+    price: "INR 899",
     amountInRupee: 899,
     unit: "/month",
     description: "Perfect for regular analysis",
@@ -38,7 +38,7 @@ const monthlyPlans: Plan[] = [
     planId: "monthly_pro",
     category: "monthly",
     name: "Monthly Pro",
-    price: "$19",
+    price: "INR 1899",
     amountInRupee: 1899,
     unit: "/month",
     description: "Most popular for professionals",
@@ -50,7 +50,7 @@ const monthlyPlans: Plan[] = [
     planId: "monthly_enterprise",
     category: "monthly",
     name: "Monthly Enterprise",
-    price: "$39",
+    price: "INR 3899",
     amountInRupee: 3899,
     unit: "/month",
     description: "For heavy users and teams",
@@ -64,7 +64,7 @@ const yearlyPlans: Plan[] = [
     planId: "yearly_lite",
     category: "yearly",
     name: "Yearly Lite",
-    price: "$99",
+    price: "INR 8999",
     amountInRupee: 8999,
     unit: "/year",
     description: "Great for regular users",
@@ -76,7 +76,7 @@ const yearlyPlans: Plan[] = [
     planId: "yearly_full",
     category: "yearly",
     name: "Yearly Full",
-    price: "$199",
+    price: "INR 18999",
     amountInRupee: 18999,
     unit: "/year",
     description: "Best value for professionals",
@@ -89,7 +89,7 @@ const yearlyPlans: Plan[] = [
     planId: "yearly_pro",
     category: "yearly",
     name: "Yearly Pro",
-    price: "$399",
+    price: "INR 37999",
     amountInRupee: 37999,
     unit: "/year",
     description: "Maximum savings for power users",
@@ -104,7 +104,7 @@ const perPagePlans: Plan[] = [
     planId: "per_page_lite",
     category: "perPage",
     name: "Lite",
-    price: "$1",
+    price: "INR 89",
     amountInRupee: 89,
     unit: "/conversion",
     description: "Quick single conversion",
@@ -115,7 +115,7 @@ const perPagePlans: Plan[] = [
     planId: "per_page_standard",
     category: "perPage",
     name: "Standard",
-    price: "$2",
+    price: "INR 179",
     amountInRupee: 179,
     unit: "/conversion",
     description: "Popular for small batches",
@@ -127,7 +127,7 @@ const perPagePlans: Plan[] = [
     planId: "per_page_power",
     category: "perPage",
     name: "Power",
-    price: "$3",
+    price: "INR 299",
     amountInRupee: 299,
     unit: "/conversion",
     description: "For larger batches",
@@ -203,8 +203,6 @@ const PricingPage = () => {
       const { data, error } = await supabase.functions.invoke("razorpay-order", {
         body: {
           planId: plan.planId,
-          amount: plan.amountInRupee,
-          currency: "INR",
           razorpayKeyId: razorpaySiteKey,
           notes: {
             planName: plan.name,
@@ -303,7 +301,7 @@ const PricingPage = () => {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              ~₹{plan.amountInRupee.toLocaleString("en-IN")} INR
+              Billed in INR {plan.amountInRupee.toLocaleString("en-IN")}
             </p>
           </div>
 
@@ -339,7 +337,7 @@ const PricingPage = () => {
             onClick={() => handlePlanPurchase(plan)}
             disabled={isProcessing}
           >
-            {isProcessing ? "Opening checkout…" : "Choose Plan"}
+            {isProcessing ? "Opening checkout..." : "Choose Plan"}
           </Button>
         </div>
       </Card>
@@ -372,7 +370,7 @@ const PricingPage = () => {
             </span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Choose your perfect plan. One-time conversions, monthly subscriptions, or yearly savings.
+            Choose your perfect plan. One-time page packs, monthly subscriptions, or yearly savings.
           </p>
         </section>
 
@@ -448,19 +446,20 @@ const PricingPage = () => {
             </div>
           </div>
           <br />
-          <a
-            href="https://mail.google.com/mail/?view=cm&fs=1&to=inspirexali@gmail.com&su=Akromeda%20Enterprise%20Pricing"
-            target="_blank"
-            rel="noreferrer"
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
+            className="border-primary/40 text-white backdrop-blur-lg px-10 h-14 font-black uppercase tracking-widest"
           >
-            <Button
-              variant="outline"
-              size="lg"
-              className="border-primary/40 text-white backdrop-blur-lg px-10 h-14 font-black uppercase tracking-widest"
+            <a
+              href="https://mail.google.com/mail/?view=cm&fs=1&to=inspirexali@gmail.com&su=Akromeda%20Enterprise%20Pricing"
+              target="_blank"
+              rel="noreferrer"
             >
               Contact Sales
-            </Button>
-          </a>
+            </a>
+          </Button>
         </section>
       </main>
     </div>
@@ -468,4 +467,5 @@ const PricingPage = () => {
 };
 
 export default PricingPage;
+
 

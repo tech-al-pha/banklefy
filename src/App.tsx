@@ -82,7 +82,7 @@ const AppRoutes = () => {
       },
       "/dashboard": {
         title: "Dashboard | Akromeda",
-        description: "Manage conversions and download Excel exports.",
+        description: "Manage processed pages and download Excel exports.",
       },
       "/settings": {
         title: "Settings | Akromeda",
@@ -90,7 +90,7 @@ const AppRoutes = () => {
       },
       "/profile": {
         title: "Profile | Akromeda",
-        description: "View your account details and recent conversions.",
+        description: "View your account details and recent page usage.",
       },
       "/help": {
         title: "Help Center | Akromeda",

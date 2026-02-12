@@ -71,7 +71,7 @@ export const Hero = () => {
                 loop
                 muted
                 playsInline
-                preload="auto"
+                preload="metadata"
               />
             </div>
           </div>
