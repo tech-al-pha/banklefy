@@ -1,4 +1,7 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import {
+  createClient,
+  type SupabaseClient,
+} from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const getAllowedOrigin = (requestOrigin: string | null): string => {
   const envOrigin = Deno.env.get("ALLOWED_ORIGIN");
@@ -40,7 +43,10 @@ const getCorsHeaders = (req: Request) => ({
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 });
 
-const removeUserFiles = async (supabaseAdmin: ReturnType<typeof createClient>, userId: string) => {
+const removeUserFiles = async (
+  supabaseAdmin: SupabaseClient<any, "public", any>,
+  userId: string,
+) => {
   const bucket = "bank-statements";
 
   const removeFromFolder = async (folder: string) => {
