@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/supabaseApi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,23 +13,31 @@ import { Badge } from "@/components/ui/badge";
 import Logo from "@/components/Logo";
 import { Loader2, LogOut } from "lucide-react";
 import { formatPlanLabel } from "@/lib/planLabels";
+import { useToast } from "@/hooks/use-toast";
 
 interface RecentConversion {
   id: string;
   original_filename: string;
   status: string;
   created_at: string;
+  completed_at?: string | null;
+  result_path?: string | null;
+  file_path?: string;
 }
 
 const Profile = () => {
-  const { user, signOut } = useAuth();
+  const { user, session, signOut } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { conversionsUsed, conversionsLimit, remaining, planType, loading: usageLoading } = useUsageLimit();
   const { profileData, updateProfile, sendPasswordReset, saving } = useSettings();
   const [recent, setRecent] = useState<RecentConversion[]>([]);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState("");
   const [nameChanged, setNameChanged] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const workbookCache = useState(() => new Map<string, ArrayBuffer>())[0];
   const authFlags = user as { email_confirmed_at?: string | null; confirmed_at?: string | null } | null;
   const isVerified = Boolean(authFlags?.email_confirmed_at || authFlags?.confirmed_at);
 
@@ -40,7 +49,7 @@ const Profile = () => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await supabase
       .from("conversions")
-      .select("id, original_filename, status, created_at")
+      .select("id, original_filename, status, created_at, completed_at, result_path, file_path")
       .eq("user_id", user.id)
       .gte("created_at", since)
       .order("created_at", { ascending: false });
@@ -94,6 +103,215 @@ const Profile = () => {
   const handlePasswordReset = async () => {
     if (user?.email) {
       await sendPasswordReset(user.email);
+    }
+  };
+
+  const sanitizeFileBaseName = (value?: string | null, fallback = "bank-statement") => {
+    const source = (value ?? "").trim();
+    const noExtension = source.replace(/\.[^/.\\]+$/, "");
+    const safe = noExtension
+      .replace(/[<>:"/\\|?*]/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/\.+$/g, "")
+      .trim();
+    return safe || fallback;
+  };
+
+  const getExpiryLabel = (createdAt: string) => {
+    const expiresAt = new Date(new Date(createdAt).getTime() + 24 * 60 * 60 * 1000);
+    const msLeft = expiresAt.getTime() - Date.now();
+    if (msLeft <= 0) return "Expired";
+    const hours = Math.floor(msLeft / (1000 * 60 * 60));
+    const mins = Math.floor((msLeft % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${mins}m left`;
+  };
+
+  const fetchResultBuffer = async (item: RecentConversion) => {
+    if (!item.result_path) {
+      throw new Error("Result not available yet.");
+    }
+    const cached = workbookCache.get(item.id);
+    if (cached) return cached;
+
+    const { data, error } = await supabase.storage
+      .from("bank-statements")
+      .download(item.result_path);
+
+    if (error || !data) {
+      throw new Error(error?.message || "Failed to download result file.");
+    }
+    const buffer = await data.arrayBuffer();
+    workbookCache.set(item.id, buffer);
+    return buffer;
+  };
+
+  const downloadExcel = async (item: RecentConversion) => {
+    try {
+      setDownloadingId(item.id);
+      const buffer = await fetchResultBuffer(item);
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${sanitizeFileBaseName(item.original_filename)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Download failed",
+        description: error instanceof Error ? error.message : "Failed to download file.",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const downloadAsCsv = async (item: RecentConversion) => {
+    try {
+      setDownloadingId(item.id);
+      const buffer = await fetchResultBuffer(item);
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const csv = XLSX.utils.sheet_to_csv(sheet);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${sanitizeFileBaseName(item.original_filename)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "CSV export failed",
+        description: error instanceof Error ? error.message : "Failed to export CSV.",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const downloadAsOds = async (item: RecentConversion) => {
+    try {
+      setDownloadingId(item.id);
+      const buffer = await fetchResultBuffer(item);
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const wbout = XLSX.write(workbook, { bookType: "ods", type: "array" });
+      const blob = new Blob([wbout], { type: "application/vnd.oasis.opendocument.spreadsheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${sanitizeFileBaseName(item.original_filename)}.ods`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "ODS export failed",
+        description: error instanceof Error ? error.message : "Failed to export ODS.",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const downloadAsDocx = async (item: RecentConversion) => {
+    try {
+      setDownloadingId(item.id);
+      const buffer = await fetchResultBuffer(item);
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: (string | number)[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as (string | number)[][];
+      const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel } = await import("docx");
+
+      const safeRows = rows.slice(0, 100);
+      const header = safeRows[0] ?? [];
+      const bodyRows = safeRows.slice(1);
+
+      const headerRow = new TableRow({
+        children: header.map((cell) =>
+          new TableCell({
+            children: [new Paragraph({ children: [new TextRun({ text: String(cell ?? ""), bold: true })] })],
+          })
+        ),
+      });
+
+      const dataRows = bodyRows.map((row) =>
+        new TableRow({
+          children: header.map((_, idx) =>
+            new TableCell({ children: [new Paragraph(String(row[idx] ?? ""))] })
+          ),
+        })
+      );
+
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: [
+              new Paragraph({ text: "Banklefy Export", heading: HeadingLevel.HEADING_1 }),
+              new Table({ rows: [headerRow, ...dataRows] }),
+            ],
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${sanitizeFileBaseName(item.original_filename)}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "DOCX export failed",
+        description: error instanceof Error ? error.message : "Failed to export DOCX.",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDeleteConversion = async (item: RecentConversion) => {
+    if (!session?.access_token) {
+      toast({
+        variant: "destructive",
+        title: "Not authorized",
+        description: "Please sign in again to delete this file.",
+      });
+      return;
+    }
+    try {
+      setDeletingId(item.id);
+      const { error } = await invokeEdgeFunction("delete-conversion", {
+        body: { conversionId: item.id },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (error) throw error;
+      setRecent((prev) => prev.filter((c) => c.id !== item.id));
+      toast({ title: "Deleted", description: "File and data deleted successfully." });
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Delete failed",
+        description: error instanceof Error ? error.message : "Failed to delete conversion.",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -195,8 +413,37 @@ const Profile = () => {
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{item.original_filename}</p>
                       <p className="text-xs text-muted-foreground">{format(new Date(item.created_at), "MMM d, yyyy HH:mm")}</p>
+                      <p className="text-[11px] text-muted-foreground">{getExpiryLabel(item.created_at)}</p>
                     </div>
-                    <span className="text-xs text-muted-foreground">{item.status}</span>
+                    <div className="flex flex-wrap items-center gap-2 justify-end">
+                      {item.status === "completed" && item.result_path ? (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => downloadExcel(item)} disabled={downloadingId === item.id}>
+                            {downloadingId === item.id ? "Downloading..." : "Excel"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => downloadAsCsv(item)} disabled={downloadingId === item.id}>
+                            CSV
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => downloadAsOds(item)} disabled={downloadingId === item.id}>
+                            ODS
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => downloadAsDocx(item)} disabled={downloadingId === item.id}>
+                            DOCX
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{item.status}</span>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-500/40 text-red-300 hover:text-red-200"
+                        onClick={() => handleDeleteConversion(item)}
+                        disabled={deletingId === item.id}
+                      >
+                        {deletingId === item.id ? "Deleting..." : "Delete"}
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
