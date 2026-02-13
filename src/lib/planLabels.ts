@@ -5,7 +5,6 @@ const normalizePlanType = (planType?: string): string => {
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
-  admin: 'Admin',
   unlimited: 'Unlimited',
   per_page_lite: 'Lite (One-time)',
   per_page_standard: 'Standard (One-time)',
@@ -30,9 +29,6 @@ export const getPlanResetMessage = (planType?: string): string => {
 
   if (normalized === 'free') {
     return 'Your daily limit resets at midnight.';
-  }
-  if (normalized === 'admin') {
-    return 'There is no limit for admin.';
   }
   if (normalized === 'unlimited') {
     return 'Your plan has no usage limits.';

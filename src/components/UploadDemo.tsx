@@ -91,8 +91,7 @@ export const UploadDemo = () => {
   const formatRemaining = (remaining?: number) => {
     if (remaining === null || remaining === undefined) return "";
     const normalizedPlan = (planType ?? "free").toLowerCase();
-    const isAdminPlan = normalizedPlan === "admin";
-    const isUnlimitedPlan = normalizedPlan === "unlimited" || isAdminPlan;
+    const isUnlimitedPlan = normalizedPlan === "unlimited";
     const isPerPagePlan = normalizedPlan.startsWith("per_page");
     const isMonthlyPlan = normalizedPlan.startsWith("monthly") || normalizedPlan === "daily";
     const isYearlyPlan = normalizedPlan.startsWith("yearly") || normalizedPlan === "business";
@@ -104,9 +103,6 @@ export const UploadDemo = () => {
 
     if (isFreeMode) {
       return `${remaining} ${conversionLabel} remaining today.`;
-    }
-    if (isAdminPlan) {
-      return "There is no limit for admin.";
     }
     if (isUnlimitedPlan) {
       return "Unlimited pages remaining.";
@@ -199,8 +195,7 @@ export const UploadDemo = () => {
     planType
   } = useUsageLimit();
   const normalizedPlanType = (planType ?? "free").toLowerCase();
-  const isAdminUsagePlan = normalizedPlanType === "admin";
-  const isUnlimitedUsagePlan = normalizedPlanType === "unlimited" || isAdminUsagePlan;
+  const isUnlimitedUsagePlan = normalizedPlanType === "unlimited";
   const isPerPageUsagePlan = normalizedPlanType.startsWith("per_page");
   const isMonthlyUsagePlan = normalizedPlanType.startsWith("monthly") || normalizedPlanType === "daily";
   const isYearlyUsagePlan = normalizedPlanType.startsWith("yearly") || normalizedPlanType === "business";
@@ -375,8 +370,6 @@ export const UploadDemo = () => {
       message = `You have used all ${limit} pages for this year. Your usage resets at the start of next year.`;
     } else if (isMonthlyUsagePlan) {
       message = `You have used all ${limit} pages for this month. Your usage resets at the start of next month.`;
-    } else if (isAdminUsagePlan) {
-      message = "There is no limit for admin.";
     } else if (isUnlimitedUsagePlan) {
       message = "Your plan is unlimited. Please refresh and try again.";
     } else {
@@ -2669,6 +2662,7 @@ Analytics Summary:
     </section>
   );
 };
+
 
 
 

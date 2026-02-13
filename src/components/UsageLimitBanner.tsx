@@ -32,8 +32,7 @@ export const UsageLimitBanner = ({
   const { t } = useLanguage();
   const planLabel = formatPlanLabel(planType);
   const normalizedPlan = (planType || "free").toLowerCase();
-  const isAdminPlan = normalizedPlan === "admin";
-  const isUnlimitedPlan = normalizedPlan === "unlimited" || isAdminPlan;
+  const isUnlimitedPlan = normalizedPlan === "unlimited";
   const isPerPagePlan = normalizedPlan.startsWith("per_page");
   const isMonthlyPlan = normalizedPlan.startsWith("monthly") || normalizedPlan === "daily";
   const isYearlyPlan = normalizedPlan.startsWith("yearly") || normalizedPlan === "business";
@@ -118,9 +117,7 @@ export const UsageLimitBanner = ({
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Crown className="h-4 w-4 text-primary" />
         <span>
-          {isAdminPlan ? (
-            "There is no limit for admin."
-          ) : isUnlimitedPlan ? (
+          {isUnlimitedPlan ? (
             "Unlimited pages remaining."
           ) : (
             <>
@@ -134,7 +131,7 @@ export const UsageLimitBanner = ({
                     : `of ${limit} ${pageLabel} remaining this month`}
             </>
           )}
-          {!isAdminPlan && planLabel && planLabel !== "Free" ? ` - ${planLabel}` : ""}
+          {planLabel && planLabel !== "Free" ? ` - ${planLabel}` : ""}
         </span>
       </div>
       {!isAuthenticated && (
