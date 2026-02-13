@@ -71,7 +71,8 @@ export const Hero = () => {
                 loop
                 muted
                 playsInline
-                preload="metadata"
+                preload="none"
+                poster="/og-banklefy.jpg"
               />
             </div>
           </div>
