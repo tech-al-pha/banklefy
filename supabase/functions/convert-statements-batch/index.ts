@@ -739,8 +739,8 @@ Deno.serve(async (req) => {
     let isAdmin = false;
     if (user) {
       const { data: roleData, error: roleError } = await supabaseAdmin.rpc('has_role', {
-        p_user_id: user.id,
-        p_role: 'admin',
+        _user_id: user.id,
+        _role: 'admin',
       });
       if (roleError) {
         console.error('Failed to verify admin role:', roleError);
@@ -1147,4 +1147,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
