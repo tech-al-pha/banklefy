@@ -37,6 +37,7 @@ import {
 import { generateProfessionalExcel } from '../_shared/excel-generator.ts';
 import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
+import { getTrackingKey } from '../_shared/client-id.ts';
 
 const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
 const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
@@ -143,17 +144,6 @@ const sanitizeError = (error: unknown): string => {
   return 'An unexpected error occurred. Please try again later.';
 };
 
-const getClientIp = (req: Request): string => {
-  const forwarded = req.headers.get('x-forwarded-for');
-  if (forwarded) {
-    const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
-    return ips[0] || 'unknown';
-  }
-  return req.headers.get('cf-connecting-ip') ||
-         req.headers.get('x-real-ip') ||
-         'unknown';
-};
-
 async function verifyRecaptcha(token: string): Promise<boolean> {
   const secretKey = Deno.env.get('RECAPTCHA_SECRET_KEY');
   if (!secretKey) {
@@ -200,8 +190,9 @@ Deno.serve(async (req) => {
     // Parse request
     const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken, pdfPassword, pdfPageImages, clientId } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
-    const ipAddress = getClientIp(req);
-    const trackingKey = ipAddress !== 'unknown' ? ipAddress : (clientId ? `client:${clientId}` : ipAddress);
+    
+    // Robust client tracking to prevent bypasses
+    const trackingKey = await getTrackingKey(req, clientId);
 
     // Create Supabase admin client (service role for privileged operations)
     const supabaseAdmin = createClient(

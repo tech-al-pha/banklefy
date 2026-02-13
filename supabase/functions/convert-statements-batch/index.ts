@@ -36,6 +36,7 @@ import {
   type StatementData,
 } from '../_shared/multi-statement.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
+import { getTrackingKey } from '../_shared/client-id.ts';
 
 // ============= ADMIN ROLE (Server-Side Only) =============
 const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
@@ -131,17 +132,6 @@ const sanitizeError = (error: unknown): string => {
     }
   }
   return 'An unexpected error occurred. Please try again later.';
-};
-
-const getClientIp = (req: Request): string => {
-  const forwarded = req.headers.get('x-forwarded-for');
-  if (forwarded) {
-    const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
-    return ips[0] || 'unknown';
-  }
-  return req.headers.get('cf-connecting-ip') ||
-         req.headers.get('x-real-ip') ||
-         'unknown';
 };
 
 async function verifyRecaptcha(token: string): Promise<boolean> {

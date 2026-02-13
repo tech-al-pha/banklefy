@@ -50,6 +50,8 @@ const getCorsHeaders = (req: Request) => ({
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 });
 
+import { getTrackingKey } from '../_shared/client-id.ts';
+
 // Sanitize error messages to prevent information leakage
 const sanitizeError = (error: unknown): string => {
   if (error instanceof Error) {
@@ -65,20 +67,6 @@ const sanitizeError = (error: unknown): string => {
     }
   }
   return 'An unexpected error occurred. Please try again later.';
-};
-
-// Get client IP address (use leftmost IP in chain as original client)
-const getClientIp = (req: Request): string => {
-  const forwarded = req.headers.get('x-forwarded-for');
-  if (forwarded) {
-    // Use the leftmost IP (original client)
-    const ips = forwarded.split(',').map(ip => ip.trim()).filter(Boolean);
-    return ips[0] || 'unknown';
-  }
-  // Fallback to other headers
-  return req.headers.get('cf-connecting-ip') || 
-         req.headers.get('x-real-ip') || 
-         'unknown';
 };
 
 // Validate timezone to prevent injection attacks (defense in depth)
@@ -100,11 +88,10 @@ Deno.serve(async (req) => {
     const { timezone, clientId } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
 
-    // Get client IP address securely
-    const ipAddress = getClientIp(req);
-    const trackingKey = ipAddress !== 'unknown' ? ipAddress : (clientId ? `client:${clientId}` : ipAddress);
+    // Robust client tracking to prevent bypasses
+    const trackingKey = await getTrackingKey(req, clientId);
 
-    console.log('Checking usage limit', { timezone: userTimezone });
+    console.log('Checking usage limit', { timezone: userTimezone, trackingKey: trackingKey.substring(0, 8) + '...' });
 
     // Create service role client for database operations
     const supabaseAdmin = createClient(
