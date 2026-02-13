@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
           remaining: 999999,
           limitReached: false,
           isAuthenticated: true,
-          planType: 'unlimited',
+          planType: 'admin',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -237,5 +237,4 @@ Deno.serve(async (req) => {
     );
   }
 });
-
 
