@@ -8,11 +8,11 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { LuxuryCursor } from "@/components/LuxuryCursor";
 import { Loader2 } from "lucide-react";
 import { Suspense, useEffect } from "react";
-import Index from "./pages/Index";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
+const Index = lazyWithRetry(() => import("./pages/Index"));
 const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"));
 const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
 const Terms = lazyWithRetry(() => import("./pages/Terms"));

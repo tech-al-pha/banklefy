@@ -37,8 +37,7 @@ import {
 } from '../_shared/multi-statement.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 
-// ============= ADMIN WHITELIST (Server-Side Only) =============
-const ADMIN_EMAILS = ['inspirexali@gmail.com'];
+// ============= ADMIN ROLE (Server-Side Only) =============
 const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
 const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
@@ -737,13 +736,23 @@ Deno.serve(async (req) => {
     const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
     const conversionsUsed = usageInfo?.conversions_used ?? 0;
     const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 5 : 2);
-    const isAdmin = user && ADMIN_EMAILS.includes(user.email?.toLowerCase() || '');
-    const isSpecialUser = user?.email === 'inspirexali@gmail.com';
+    let isAdmin = false;
+    if (user) {
+      const { data: roleData, error: roleError } = await supabaseAdmin.rpc('has_role', {
+        p_user_id: user.id,
+        p_role: 'admin',
+      });
+      if (roleError) {
+        console.error('Failed to verify admin role:', roleError);
+      } else {
+        isAdmin = !!roleData;
+      }
+    }
     let userPlanType = 'free';
     let pagesUsedThisMonth = 0;
     const userPlanLimit = conversionsLimit;
 
-    if (!isSpecialUser && user) {
+    if (user && !isAdmin) {
       const { data: subData, error: subError } = await supabase
         .from('subscriptions')
         .select('plan_type, pages_used_this_month')
@@ -767,7 +776,7 @@ Deno.serve(async (req) => {
     const remainingQuota = Math.max(0, conversionsLimit - conversionsUsed);
 
     // Free mode: enforce a 15-page max per PDF before processing.
-    if (!isAdmin && !isSpecialUser && isFreeMode) {
+    if (!isAdmin && isFreeMode) {
       const maxDetectedPages = pageCounts.reduce((max, count) => Math.max(max, count), 0);
       if (maxDetectedPages > FREE_MAX_PDF_PAGES_PER_FILE) {
         return new Response(
@@ -789,7 +798,7 @@ Deno.serve(async (req) => {
     // Quota pre-check:
     // - Free mode uses conversion count (1 file = 1 conversion).
     // - Paid mode uses pages, but page charge is known only after OCR, so here we only reject if no quota remains.
-    if (!isAdmin && !isSpecialUser) {
+    if (!isAdmin) {
       if (isFreeMode) {
         const usageEstimate = Math.max(1, files.length);
         if ((conversionsUsed + usageEstimate) > conversionsLimit) {
@@ -839,7 +848,7 @@ Deno.serve(async (req) => {
       const isPdf = lowerName.endsWith('.pdf');
 
       try {
-        if (!isAdmin && !isSpecialUser && !isFreeMode) {
+        if (!isAdmin && !isFreeMode) {
           const remainingPagesBeforeFile = paidRemainingQuota - paidPagesConsumed;
           if (remainingPagesBeforeFile <= 0) {
             failures.push({
@@ -914,7 +923,7 @@ Deno.serve(async (req) => {
           categoryCorrections,
         });
 
-        if (!isAdmin && !isSpecialUser && !isFreeMode) {
+        if (!isAdmin && !isFreeMode) {
           const remainingPagesBeforeFile = paidRemainingQuota - paidPagesConsumed;
           const pagesToCharge = Math.max(1, pagesWithData);
           if (pagesToCharge > remainingPagesBeforeFile) {
@@ -1072,7 +1081,7 @@ Deno.serve(async (req) => {
     const successfulConversions = successes.length;
 
     // Update page usage once per batch based on pages that actually contained data
-    if (user && !isSpecialUser && !isFreeMode && (isMonthlyPlan || isYearlyPlan)) {
+    if (user && !isAdmin && !isFreeMode && (isMonthlyPlan || isYearlyPlan)) {
       const updatedPagesUsed = pagesUsedThisMonth + pagesWithDataTotal;
       const { error: updateError } = await supabase
         .from('subscriptions')
@@ -1138,5 +1147,4 @@ Deno.serve(async (req) => {
     );
   }
 });
-
 

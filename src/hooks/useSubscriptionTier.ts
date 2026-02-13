@@ -7,6 +7,7 @@ type SubscriptionTier = "free" | "daily" | "business";
 export const useSubscriptionTier = () => {
   const { user } = useAuth();
   const [tier, setTier] = useState<SubscriptionTier | null>(null);
+  const [planType, setPlanType] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export const useSubscriptionTier = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("tier")
+        .select("tier, plan_type")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -33,8 +34,10 @@ export const useSubscriptionTier = () => {
       if (error) {
         console.error("Failed to load subscription tier:", error);
         setTier("free");
+        setPlanType(null);
       } else {
         setTier((data?.tier as SubscriptionTier) ?? "free");
+        setPlanType(typeof data?.plan_type === "string" ? data.plan_type : null);
       }
 
       setLoading(false);
@@ -47,8 +50,15 @@ export const useSubscriptionTier = () => {
     };
   }, [user]);
 
-  const hasChatAuraAccess =
-    !!user && (user.email === "inspirexali@gmail.com" || (tier !== null && tier !== "free"));
+  const normalizedPlan = (planType ?? "").toLowerCase();
+  const isPaidPlan =
+    normalizedPlan.startsWith("per_page") ||
+    normalizedPlan.startsWith("monthly") ||
+    normalizedPlan.startsWith("yearly") ||
+    normalizedPlan === "daily" ||
+    normalizedPlan === "business";
 
-  return { tier, loading, hasChatAuraAccess };
+  const hasChatAuraAccess = !!user && (isPaidPlan || (tier !== null && tier !== "free"));
+
+  return { tier, planType, loading, hasChatAuraAccess };
 };

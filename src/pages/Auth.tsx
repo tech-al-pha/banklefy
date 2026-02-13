@@ -258,22 +258,29 @@ export default function Auth() {
             return;
           }
 
-          // Try to persist consent flag if possible
-          try {
-            // If user is signed in immediately, update user metadata
-            await supabase.auth.updateUser({ data: { terms_accepted: 'true' } });
-          } catch (e) {
-            // ignore errors - not critical
-          }
-
           // Remember this email for next time
           localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim());
 
-          toast({
-            title: t('auth.accountCreated'),
-            description: t('auth.canUse'),
-          });
-          navigate('/');
+          if (data?.session) {
+            // Try to persist consent flag if possible (only when session exists)
+            try {
+              await supabase.auth.updateUser({ data: { terms_accepted: 'true' } });
+            } catch {
+              // ignore errors - not critical
+            }
+
+            toast({
+              title: t('auth.accountCreated'),
+              description: t('auth.canUse'),
+            });
+            navigate('/');
+          } else {
+            toast({
+              title: 'Verify your email',
+              description: 'We sent a verification link. Please verify and then sign in.',
+            });
+            setMode('login');
+          }
         }
     } catch (error: unknown) {
       toast({

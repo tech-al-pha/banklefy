@@ -1,15 +1,19 @@
-﻿import { LandingPageContent } from "@/components/LandingPageContent";
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate } from "react-router-dom";
 import { Shield, Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
+
+const LandingPageContent = lazyWithRetry(() =>
+  import("@/components/LandingPageContent").then((module) => ({ default: module.LandingPageContent })),
+);
 
 const Index = () => {
   const { user } = useAuth();
@@ -277,7 +281,15 @@ const Index = () => {
       </nav>
 
       <main id="main-content" tabIndex={-1}>
-        <LandingPageContent />
+        <Suspense
+          fallback={
+            <div className="min-h-[60vh] flex items-center justify-center text-muted-foreground">
+              <span className="text-sm">Loading content?</span>
+            </div>
+          }
+        >
+          <LandingPageContent />
+        </Suspense>
       </main>
 
       {/* Footer */}

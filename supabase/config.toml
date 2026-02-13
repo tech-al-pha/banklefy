@@ -7,20 +7,32 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.chat-aura]
-verify_jwt = false
+verify_jwt = true
 
 [functions.health-check]
 verify_jwt = false
 
 [functions.admin-dashboard]
-verify_jwt = false
+verify_jwt = true
 
 [functions.api-status]
-verify_jwt = false
+verify_jwt = true
 
 [functions.convert-statements-batch]
 verify_jwt = false
 
 [functions.razorpay-order]
-verify_jwt = false
+verify_jwt = true
+
+[functions.razorpay-verify]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.delete-conversion]
+verify_jwt = true
+
+[functions.purge-expired-conversions]
+verify_jwt = true
 

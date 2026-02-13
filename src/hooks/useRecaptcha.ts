@@ -12,9 +12,7 @@ declare global {
 }
 
 // reCAPTCHA v3 site key - runs invisibly in background
-const RECAPTCHA_SITE_KEY =
-  (import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined) ??
-  '6LddTDssAAAAAIZSSRGVJTOq__hjo4AiGAxC0x_U';
+const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
 
 let recaptchaLoadPromise: Promise<void> | null = null;
 
@@ -23,10 +21,14 @@ const ensureRecaptchaLoaded = async (): Promise<void> => {
     throw new Error('reCAPTCHA can only load in a browser environment');
   }
 
-  if (window.grecaptcha) {
-    await new Promise<void>((resolve) => window.grecaptcha!.ready(resolve));
-    return;
-  }
+    if (!RECAPTCHA_SITE_KEY) {
+      throw new Error('Missing VITE_RECAPTCHA_SITE_KEY');
+    }
+
+    if (window.grecaptcha) {
+      await new Promise<void>((resolve) => window.grecaptcha!.ready(resolve));
+      return;
+    }
 
   if (recaptchaLoadPromise) {
     return recaptchaLoadPromise;
@@ -99,6 +101,13 @@ export const useRecaptcha = () => {
   useEffect(() => {
     let isMounted = true;
 
+    if (!RECAPTCHA_SITE_KEY) {
+      console.warn('[reCAPTCHA] Missing VITE_RECAPTCHA_SITE_KEY. Skipping load.');
+      return () => {
+        isMounted = false;
+      };
+    }
+
     ensureRecaptchaLoaded()
       .then(() => {
         if (isMounted) {
@@ -118,7 +127,10 @@ export const useRecaptcha = () => {
   const executeRecaptcha = useCallback(async (action: string = 'convert'): Promise<string | null> => {
     try {
       await ensureRecaptchaLoaded();
-      const token = await window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action });
+    if (!RECAPTCHA_SITE_KEY) {
+      throw new Error('Missing VITE_RECAPTCHA_SITE_KEY');
+    }
+    const token = await window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action });
       return token;
     } catch (error) {
       console.error('reCAPTCHA execution failed:', error);

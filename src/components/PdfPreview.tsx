@@ -3,7 +3,7 @@ import { FileText, ChevronLeft, ChevronRight, Lock, Eye, Loader2 } from "lucide-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { PDFJS_WORKER_SRC } from "@/lib/pdfWorker";
+import { getPdfWorkerSrc } from "@/lib/pdfWorker";
 
 interface PdfPreviewProps {
   file: File;
@@ -71,7 +71,7 @@ export const PdfPreview = ({
       const pdfjsLib = (await import('pdfjs-dist')) as PdfJsModule;
 
       // Use bundled worker (same-origin) to avoid cross-origin loading issues.
-      pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
       const arrayBuffer = await file.arrayBuffer();
       

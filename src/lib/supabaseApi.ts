@@ -4,6 +4,8 @@
  * works on any static host (Vercel, Netlify, Cloudflare Pages, etc.).
  */
 
+import { supabase } from "@/integrations/supabase/client";
+
 // Read from Vite env vars (works both in dev and production builds)
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -53,10 +55,13 @@ export async function invokeEdgeFunction<TResponse = unknown, TBody = unknown>(
 ): Promise<InvokeResult<TResponse>> {
   const url = getEdgeFunctionUrl(functionName);
 
+  const { data: { session } } = await supabase.auth.getSession();
+  const authToken = session?.access_token ?? SUPABASE_ANON_KEY;
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    Authorization: `Bearer ${authToken}`,
     ...options.headers,
   };
 

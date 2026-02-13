@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeFunction } from "@/lib/supabaseApi";
 import { useAuth } from "@/hooks/useAuth";
 import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
-import { PDFJS_WORKER_SRC } from "@/lib/pdfWorker";
+import { getPdfWorkerSrc } from "@/lib/pdfWorker";
 import { useNavigate } from "react-router-dom";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { UsageLimitBanner } from "./UsageLimitBanner";
@@ -287,7 +287,7 @@ export const UploadDemo = () => {
   const maxPdfRenderPages = isFreeUsageMode ? FREE_MAX_PDF_PAGES_PER_FILE : MAX_PDF_RENDER_PAGES;
   const getPdfPageCount = async (file: File, password?: string): Promise<number | null> => {
     const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -518,7 +518,7 @@ export const UploadDemo = () => {
     const pdfjsLib = await import('pdfjs-dist');
 
     // IMPORTANT: Use bundled worker (same-origin). CDN worker can fail due to CORS/dynamic import.
-    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
     const arrayBuffer = await file.arrayBuffer();
     try {
@@ -545,7 +545,7 @@ export const UploadDemo = () => {
     const pdfjsLib = await import('pdfjs-dist');
 
     // IMPORTANT: Use bundled worker (same-origin). CDN worker can fail due to CORS/dynamic import.
-    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
     const arrayBuffer = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({
