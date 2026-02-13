@@ -331,17 +331,19 @@ export default function Auth() {
         </div>
         <div className="pb-8 pt-6">
           {mode === 'forgot' && (
-            <form onSubmit={handleForgotPassword} className="space-y-4">
+            <form onSubmit={handleForgotPassword} className="space-y-4" autoComplete="on">
               <div className="space-y-2">
                 <Label htmlFor="email">{t('auth.email')}</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
+                  autoComplete="email"
                 />
               </div>
               <Button
@@ -384,6 +386,7 @@ export default function Auth() {
                     <div className="relative">
                       <Input
                         id="password"
+                        name="new-password"
                         type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
                         value={password}
@@ -391,6 +394,7 @@ export default function Auth() {
                         required
                         disabled={loading}
                         className="pr-10"
+                        autoComplete="new-password"
                       />
                       <button
                         type="button"
@@ -411,6 +415,7 @@ export default function Auth() {
                     <div className="relative">
                       <Input
                         id="confirmPassword"
+                        name="confirmPassword"
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder="••••••••"
                         value={confirmPassword}
@@ -418,6 +423,7 @@ export default function Auth() {
                         required
                         disabled={loading}
                         className="pr-10"
+                        autoComplete="new-password"
                       />
                       <button
                         type="button"
@@ -451,17 +457,19 @@ export default function Auth() {
 
           {(mode === 'login' || mode === 'signup') && (
             <>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
                 <div className="space-y-2">
                   <Label htmlFor="email">{t('auth.email')}</Label>
                   <Input
                     id="email"
+                    name="email"
                     type="email"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
+                    autoComplete="email"
                   />
                   {isReturningUser && mode === 'login' && (
                     <button
@@ -482,6 +490,7 @@ export default function Auth() {
                   <div className="relative">
                     <Input
                       id="password"
+                      name="password"
                       type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
                       value={password}
@@ -489,6 +498,7 @@ export default function Auth() {
                       required
                       disabled={loading}
                       className="pr-10"
+                      autoComplete={mode === 'login' ? "current-password" : "new-password"}
                     />
                     <button
                       type="button"
@@ -575,6 +585,3 @@ export default function Auth() {
     </div>
   );
 }
-
-
-

@@ -4,10 +4,19 @@ export const LuxuryCursor = () => {
   const cursorRef = useRef<HTMLDivElement>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [isEnabled, setIsEnabled] = useState(false);
   const positionRef = useRef({ x: -100, y: -100 });
   const rafRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const finePointer = window.matchMedia?.("(pointer: fine)").matches ?? false;
+    const hoverCapable = window.matchMedia?.("(hover: hover)").matches ?? false;
+    setIsEnabled(finePointer && hoverCapable);
+  }, []);
+
+  useEffect(() => {
+    if (!isEnabled) return;
     const root = document.documentElement;
     root.classList.add("luxury-cursor-active");
     const styleId = "force-cursor-none";
@@ -79,9 +88,9 @@ export const LuxuryCursor = () => {
         styleEl.parentNode.removeChild(styleEl);
       }
     };
-  }, []);
+  }, [isEnabled]);
 
-  if (!isVisible) return null;
+  if (!isEnabled || !isVisible) return null;
 
   return (
     <div

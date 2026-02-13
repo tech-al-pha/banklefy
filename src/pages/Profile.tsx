@@ -330,9 +330,13 @@ const Profile = () => {
           <div className="flex items-center gap-3">
             <Logo />
           </div>
-          <Button variant="outline" size="sm" onClick={signOut} className="border-primary/50">
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign Out
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/")}
+            className="border-primary/50 bg-[#141414]"
+          >
+            Back to Home
           </Button>
         </div>
       </nav>
@@ -376,8 +380,14 @@ const Profile = () => {
               </div>
             </div>
             <div className="mt-6">
-              <Button variant="outline" size="sm" onClick={() => navigate("/")} className="border-primary/50">
-                Back to Home
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={signOut}
+                className="border-primary/50 bg-[#141414]"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
               </Button>
             </div>
           </Card>
