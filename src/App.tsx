@@ -36,9 +36,9 @@ const AppRoutes = () => {
 
   useEffect(() => {
     const defaultMeta = {
-      title: "Bank Statement Converter to Excel | AI OCR Parser | Banklefy",
+      title: "Bank Statement Converter to Excel & CSV | Fast AI OCR | Banklefy",
       description:
-        "Convert bank statements to Excel with AI-powered OCR. Support for 50+ languages, PDF & scanned documents. Fast, secure, accurate bank statement parser.",
+        "Convert bank statement PDFs to Excel or CSV in seconds. Accurate AI OCR, multi-bank support, secure processing, instant export.",
     };
 
     const metaByPath: Record<string, { title: string; description: string }> = {
@@ -46,17 +46,17 @@ const AppRoutes = () => {
       "/pricing": {
         title: "Pricing | Banklefy Bank Statement Converter",
         description:
-          "Simple pricing for AI bank statement conversion. Free and paid plans with higher limits and premium exports.",
+          "Transparent pricing for AI bank statement conversion. Free trials and paid plans with higher limits and premium exports.",
       },
       "/features": {
         title: "Features | Banklefy Bank Statement Converter",
         description:
-          "Explore AI OCR, multilingual support, and secure processing for fast statement-to-Excel conversion.",
+          "Explore AI OCR, PDF to Excel/CSV, multilingual support, and secure processing for fast conversions.",
       },
       "/benefits": {
         title: "Benefits | Banklefy Statement Converter",
         description:
-          "See how Banklefy reduces manual work, speeds reconciliation, and improves accuracy for finance teams.",
+          "Reduce manual work, speed reconciliation, and improve accuracy with AI bank statement conversion.",
       },
       "/about": {
         title: "About Banklefy",
