@@ -181,7 +181,22 @@ const normalizeTransaction = (raw: Record<string, unknown>): RawTransaction => {
     raw.memo ??
     raw.particulars;
 
-  const ref =
+  const extractRefFromText = (text?: string | null): string | undefined => {
+    if (!text) return undefined;
+    const value = String(text);
+    const patterns = [
+      /(?:ref(?:erence)?|ref no|txn|transaction|utr|rrn|imps|neft|upi|rtgs|id|tr ref)[:\-\s#]*([A-Za-z0-9\/\-]{5,})/i,
+    ];
+    for (const pattern of patterns) {
+      const match = value.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return undefined;
+  };
+
+  let ref =
     raw.refNumber ??
     raw.refNo ??
     raw.referenceNo ??
@@ -193,6 +208,12 @@ const normalizeTransaction = (raw: Record<string, unknown>): RawTransaction => {
     raw.txnId ??
     raw.txnID ??
     raw.id;
+  if (ref === undefined || ref === null || String(ref).trim() === '') {
+    const refFromDesc = extractRefFromText(pickString(descriptionRaw));
+    if (refFromDesc) {
+      ref = refFromDesc;
+    }
+  }
 
   return {
     date: pickString(dateRaw)?.trim() || 'Unknown',
