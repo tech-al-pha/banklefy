@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, Users, FileText, TrendingUp, Calendar, Shield, RefreshCw, BarChart3, ShieldAlert, Database, KeyRound, Settings, Server } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import banklefyLogo from '@/assets/banklefy-logo.svg';
-import { getEdgeFunctionUrl } from '@/lib/supabaseApi';
+import { invokeEdgeFunction } from '@/lib/supabaseApi';
 
 interface UserProfile {
   id: string;
@@ -188,43 +188,33 @@ export default function Admin() {
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
     try {
-      // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        throw new Error('No valid session');
+      const { data, error } = await invokeEdgeFunction<{
+        success?: boolean;
+        error?: string;
+        users?: UserProfile[];
+        stats?: ConversionStats;
+        dailyStats?: DailyStats[];
+        anonymousSummary?: AnonymousSummary;
+      }>('admin-dashboard');
+
+      if (error) {
+        throw error;
       }
 
-      // Call the admin-dashboard edge function with service_role access
-      const response = await fetch(getEdgeFunctionUrl('admin-dashboard'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to load dashboard data');
       }
 
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to load dashboard data');
-      }
-
-      setUsers(data.users || []);
-      setStats(data.stats || {
+      setUsers(data?.users || []);
+      setStats(data?.stats || {
         total: 0,
         completed: 0,
         processing: 0,
         failed: 0,
         todayCount: 0,
       });
-      setDailyStats(data.dailyStats || []);
-      setAnonymousSummary(data.anonymousSummary || { totalIPs: 0, totalConversions: 0 });
+      setDailyStats(data?.dailyStats || []);
+      setAnonymousSummary(data?.anonymousSummary || { totalIPs: 0, totalConversions: 0 });
 
     } catch (error: unknown) {
       const message = getErrorMessage(error, 'Failed to load dashboard data.');
@@ -243,27 +233,13 @@ export default function Admin() {
     setApiLoading(true);
     setApiError(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('No valid session');
+      const { data, error } = await invokeEdgeFunction<ApiStatusPayload & { success?: boolean; error?: string }>('api-status');
+      if (error) {
+        throw error;
       }
 
-      const response = await fetch(getEdgeFunctionUrl('api-status'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to load API status');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to load API status');
       }
 
       setApiStatus(data);

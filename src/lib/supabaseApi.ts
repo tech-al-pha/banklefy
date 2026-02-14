@@ -1,29 +1,9 @@
 /**
- * Deployment-agnostic Supabase Edge Function helper.
- * Uses explicit REST URLs instead of supabase.functions.invoke() so the app
- * works on any static host (Vercel, Netlify, Cloudflare Pages, etc.).
+ * Supabase Edge Function helper.
+ * Uses supabase.functions.invoke() for auth-safe, consistent calls.
  */
 
 import { supabase } from "@/integrations/supabase/client";
-
-// Read from Vite env vars (works both in dev and production builds)
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn(
-    '[supabaseApi] Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Edge function calls will fail.'
-  );
-}
-
-/**
- * Build the full REST URL for a Supabase Edge Function.
- */
-export function getEdgeFunctionUrl(functionName: string): string {
-  // Ensure no trailing slash on base URL
-  const base = SUPABASE_URL?.replace(/\/$/, '') ?? '';
-  return `${base}/functions/v1/${functionName}`;
-}
 
 export interface InvokeOptions<TBody = unknown> {
   body?: TBody;
@@ -53,43 +33,21 @@ export async function invokeEdgeFunction<TResponse = unknown, TBody = unknown>(
   functionName: string,
   options: InvokeOptions<TBody> = {}
 ): Promise<InvokeResult<TResponse>> {
-  const url = getEdgeFunctionUrl(functionName);
-
-  const { data: { session } } = await supabase.auth.getSession();
-  const authToken = session?.access_token ?? SUPABASE_ANON_KEY;
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${authToken}`,
-    ...options.headers,
-  };
-
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
+    const { data, error } = await supabase.functions.invoke<TResponse>(functionName, {
+      body: options.body,
+      headers: options.headers,
     });
 
-    // Try to parse JSON regardless of status
-    let data: TResponse | null = null;
-    const text = await response.text();
-    try {
-      data = text ? JSON.parse(text) : null;
-    } catch {
-      // Not JSON
-    }
-
-    if (!response.ok) {
+    if (error) {
       const message = extractErrorMessage(
-        data,
-        `Request failed with status ${response.status}`
+        (error as unknown) ?? null,
+        error.message || 'Edge function request failed'
       );
-      return { data, error: new Error(message), response };
+      return { data: data ?? null, error: new Error(message), response: null };
     }
 
-    return { data, error: null, response };
+    return { data: data ?? null, error: null, response: null };
   } catch (err) {
     return { data: null, error: err as Error, response: null };
   }
