@@ -6,6 +6,7 @@ export type CurrencyFormatOptions = {
   useGrouping?: boolean;
   signDisplay?: CurrencySignDisplay;
   locale?: string;
+  showSymbol?: boolean;
 };
 
 const CURRENCY_ALIASES: Record<string, string> = {
@@ -59,6 +60,7 @@ export const formatCurrencyValue = (
   const code = normalizeCurrencyCode(currencyCode);
   const locale = options.locale ?? defaultLocaleForCurrency(code);
   const signDisplay = options.signDisplay ?? 'auto';
+  const showSymbol = options.showSymbol ?? true;
   const sign =
     signDisplay === 'never'
       ? ''
@@ -72,7 +74,7 @@ export const formatCurrencyValue = (
     maximumFractionDigits: options.maximumFractionDigits,
     useGrouping: options.useGrouping ?? true,
   }).format(Math.abs(amount));
-  if (!code) return `${sign}${formatted}`;
+  if (!code || !showSymbol) return `${sign}${formatted}`;
   const symbol = getCurrencySymbol(code, locale);
   const spacer = symbol && symbol.length > 1 ? ' ' : '';
   return `${sign}${symbol}${spacer}${formatted}`;

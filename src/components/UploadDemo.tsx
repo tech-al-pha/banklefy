@@ -237,7 +237,13 @@ export const UploadDemo = () => {
     progressStep,
     showProgress,
   } = state;
-  const setSelectedFiles = (value: File[]) => dispatch({ type: "set", payload: { selectedFiles: value } });
+  const setSelectedFiles = (value: File[] | ((prev: File[]) => File[])) =>
+    dispatch({
+      type: "set",
+      payload: {
+        selectedFiles: typeof value === "function" ? value(state.selectedFiles) : value,
+      },
+    });
   const setSelectedFile = (value: File | null) => dispatch({ type: "set", payload: { selectedFile: value } });
   const setUploading = (value: boolean) => dispatch({ type: "set", payload: { uploading: value } });
   const setConverting = (value: boolean) => dispatch({ type: "set", payload: { converting: value } });
@@ -295,6 +301,10 @@ export const UploadDemo = () => {
     value: number,
     options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
   ) => formatCurrencyValue(value ?? 0, currencyCode, options);
+  const formatAmountNoSymbol = (
+    value: number,
+    options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
+  ) => formatCurrencyValue(value ?? 0, currencyCode, { ...options, showSymbol: false });
   const truncateDecimals = (value: number, decimals = 2) => {
     const factor = 10 ** decimals;
     if (!Number.isFinite(value)) return 0;
@@ -2009,7 +2019,7 @@ Analytics Summary:
                         Total Credits
                       </div>
                       <p className={`text-2xl font-bold ${toneClasses[creditTone].text}`}>
-                        {formatAmount(truncateDecimals(analytics.totalCredits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatAmountNoSymbol(truncateDecimals(analytics.totalCredits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </Card>
 
@@ -2019,7 +2029,7 @@ Analytics Summary:
                         Total Debits
                       </div>
                       <p className={`text-2xl font-bold ${toneClasses[debitTone].text}`}>
-                        {formatAmount(truncateDecimals(analytics.totalDebits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatAmountNoSymbol(truncateDecimals(analytics.totalDebits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </Card>
 
@@ -2029,7 +2039,7 @@ Analytics Summary:
                         Net Flow
                       </div>
                       <p className={`text-2xl font-bold ${toneClasses[netFlowTone].text}`}>
-                        {formatAmount(truncateDecimals(analytics.netFlow), { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'always' })}
+                        {formatAmountNoSymbol(truncateDecimals(analytics.netFlow), { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'always' })}
                       </p>
                     </Card>
 
