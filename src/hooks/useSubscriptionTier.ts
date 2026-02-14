@@ -5,6 +5,14 @@ import { isPaidPlan } from "@/lib/entitlements";
 
 type SubscriptionTier = "free" | "daily" | "business";
 
+const deriveTierFromPlanType = (planType?: string | null): SubscriptionTier => {
+  const normalized = (planType ?? "free").toLowerCase();
+  if (normalized.startsWith("monthly") || normalized === "daily") return "daily";
+  if (normalized.startsWith("yearly") || normalized.startsWith("per_page") || normalized === "business") return "business";
+  if (normalized === "unlimited") return "business";
+  return "free";
+};
+
 export const useSubscriptionTier = () => {
   const { user } = useAuth();
   const [tier, setTier] = useState<SubscriptionTier | null>(null);
@@ -44,8 +52,9 @@ export const useSubscriptionTier = () => {
         setTier("free");
         setPlanType(null);
       } else {
-        setTier((data?.tier as SubscriptionTier) ?? "free");
-        setPlanType(typeof data?.plan_type === "string" ? data.plan_type : null);
+        const nextPlanType = typeof data?.plan_type === "string" ? data.plan_type : null;
+        setPlanType(nextPlanType);
+        setTier(deriveTierFromPlanType(nextPlanType) ?? (data?.tier as SubscriptionTier) ?? "free");
       }
 
       setLoading(false);

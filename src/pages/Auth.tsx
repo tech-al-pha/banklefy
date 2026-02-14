@@ -37,6 +37,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [recoverySessionReady, setRecoverySessionReady] = useState(false);
+  const [awaitingVerification, setAwaitingVerification] = useState(false);
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -75,10 +76,10 @@ export default function Auth() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (user && mode !== 'reset') {
+    if (user && mode !== 'reset' && !awaitingVerification) {
       navigate('/');
     }
-  }, [user, navigate, mode]);
+  }, [user, navigate, mode, awaitingVerification]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,6 +181,7 @@ export default function Auth() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     
     try {
       emailSchema.parse(email);
@@ -219,6 +221,7 @@ export default function Auth() {
 
         // Remember this email for next time
         localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim());
+        setAwaitingVerification(false);
 
         toast({
           title: t('auth.welcome'),
@@ -273,13 +276,17 @@ export default function Auth() {
               title: t('auth.accountCreated'),
               description: t('auth.canUse'),
             });
+            setAwaitingVerification(false);
             navigate('/');
           } else {
             toast({
               title: 'Verify your email',
               description: 'We sent a verification link. Please verify and then sign in.',
             });
+            setAwaitingVerification(true);
             setMode('login');
+            setPassword('');
+            setConfirmPassword('');
           }
         }
     } catch (error: unknown) {

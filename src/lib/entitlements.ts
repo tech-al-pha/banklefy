@@ -12,19 +12,19 @@ export const isPaidPlan = ({ planType, tier, conversionsLimit, isAuthenticated }
   const normalizedPlan = normalizePlanType(planType);
 
   if (normalizedPlan && normalizedPlan !== 'free') {
-    if (
+    return (
       normalizedPlan === 'unlimited' ||
       normalizedPlan.startsWith('per_page') ||
       normalizedPlan.startsWith('monthly') ||
       normalizedPlan.startsWith('yearly') ||
       normalizedPlan === 'daily' ||
       normalizedPlan === 'business'
-    ) {
-      return true;
-    }
+    );
   }
 
-  if (tier && tier !== 'free') return true;
+  if (tier && tier !== 'free') {
+    return true;
+  }
 
   if (typeof conversionsLimit === 'number') {
     return (isAuthenticated ?? true) && conversionsLimit > 5;
