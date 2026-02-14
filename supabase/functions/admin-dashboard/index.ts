@@ -49,6 +49,13 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const bypassHeader = req.headers.get('x-admin-email') || req.headers.get('x-privileged-email');
+    if (bypassHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden - Admin access required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     // ============= AUTHENTICATION & AUTHORIZATION =============
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -77,7 +84,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user has admin role using the has_role function
+    // Check if user has admin role using the has_role function.
+    // Explicitly ignore any email-based or metadata-based admin hints.
     const { data: isAdmin, error: roleError } = await supabaseAdmin.rpc('has_role', {
       _user_id: user.id,
       _role: 'admin'
@@ -271,5 +279,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
-

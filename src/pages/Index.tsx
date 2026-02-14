@@ -1,5 +1,5 @@
 ﻿import { Button } from "@/components/ui/button";
-import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate } from "react-router-dom";
 import { Shield, Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
@@ -158,6 +158,10 @@ const Index = () => {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="bg-surface-elevated/95 border-primary/20 w-[320px]">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Navigation</SheetTitle>
+                    <SheetDescription>Mobile menu</SheetDescription>
+                  </SheetHeader>
                   <div className="mt-10 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">

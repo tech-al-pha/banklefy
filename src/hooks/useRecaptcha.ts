@@ -12,7 +12,11 @@ declare global {
 }
 
 // reCAPTCHA v3 site key - runs invisibly in background
-const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
+const RAW_RECAPTCHA_SITE_KEY = (import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined) ?? '';
+const RECAPTCHA_SITE_KEY = RAW_RECAPTCHA_SITE_KEY.trim();
+const isRecaptchaConfigured =
+  RECAPTCHA_SITE_KEY.length > 0 &&
+  RECAPTCHA_SITE_KEY !== 'your-recaptcha-site-key';
 
 let recaptchaLoadPromise: Promise<void> | null = null;
 
@@ -21,7 +25,7 @@ const ensureRecaptchaLoaded = async (): Promise<void> => {
     throw new Error('reCAPTCHA can only load in a browser environment');
   }
 
-    if (!RECAPTCHA_SITE_KEY) {
+    if (!isRecaptchaConfigured) {
       throw new Error('Missing VITE_RECAPTCHA_SITE_KEY');
     }
 
@@ -101,7 +105,7 @@ export const useRecaptcha = () => {
   useEffect(() => {
     let isMounted = true;
 
-    if (!RECAPTCHA_SITE_KEY) {
+    if (!isRecaptchaConfigured) {
       console.warn('[reCAPTCHA] Missing VITE_RECAPTCHA_SITE_KEY. Skipping load.');
       return () => {
         isMounted = false;
@@ -127,7 +131,7 @@ export const useRecaptcha = () => {
   const executeRecaptcha = useCallback(async (action: string = 'convert'): Promise<string | null> => {
     try {
       await ensureRecaptchaLoaded();
-    if (!RECAPTCHA_SITE_KEY) {
+    if (!isRecaptchaConfigured) {
       throw new Error('Missing VITE_RECAPTCHA_SITE_KEY');
     }
     const token = await window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action });
@@ -141,6 +145,6 @@ export const useRecaptcha = () => {
   return {
     isLoaded,
     executeRecaptcha,
-    siteKey: RECAPTCHA_SITE_KEY,
+    siteKey: isRecaptchaConfigured ? RECAPTCHA_SITE_KEY : undefined,
   };
 };

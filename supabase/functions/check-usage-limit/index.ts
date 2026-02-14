@@ -85,6 +85,13 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const bypassHeader = req.headers.get('x-admin-email') || req.headers.get('x-privileged-email');
+    if (bypassHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     const { timezone } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
 
@@ -127,7 +134,7 @@ Deno.serve(async (req) => {
       // Registered user - check subscription
       isAuthenticated = true;
       
-    // Check if user has an admin role (no limits)
+    // Check if user has an admin role (no limits). No email-based bypass allowed.
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
@@ -224,4 +231,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-

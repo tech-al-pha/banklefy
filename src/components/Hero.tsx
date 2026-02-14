@@ -11,19 +11,19 @@ export const Hero = () => {
   return (
     <section className="relative min-h-[70vh] flex items-center justify-center pt-8 pb-10 bg-transparent">
 
-      <div className="relative z-10 mx-auto w-full max-w-[1400px] px-0 sm:px-2 text-left">
+      <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 sm:px-2 text-left">
         <div className="max-w-none mx-auto grid gap-10 md:grid-cols-[1.1fr_0.9fr] items-center pt-16">
           <div className="flex flex-col items-start space-y-6">
             <div className="flex flex-col items-start leading-tight overflow-visible">
             <h1
-              className="font-bold tracking-tight max-w-[18ch] mt-4 font-lequire hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[1.02]"
-              style={{ fontSize: "clamp(2.8rem, 5.4vw, 6rem)", textWrap: "balance" }}
+              className="w-full font-bold tracking-tight max-w-[18ch] mt-4 font-lequire hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[1.02] break-words"
+              style={{ fontSize: "clamp(2.3rem, 7.2vw, 6rem)", textWrap: "balance" }}
             >
               {t('hero.titleLine1')}
             </h1>
             <h2
-              className="font-black uppercase tracking-tight font-lequire mt-2 hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#6a6a6a] bg-clip-text text-transparent leading-[0.98]"
-              style={{ fontSize: "clamp(3.6rem, 9.2vw, 9.2rem)", textWrap: "balance" }}
+              className="w-full font-black uppercase tracking-tight font-lequire mt-2 hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#6a6a6a] bg-clip-text text-transparent leading-[0.98] break-words"
+              style={{ fontSize: "clamp(3rem, 12vw, 9.2rem)", textWrap: "balance" }}
             >
               {t('hero.titleLine2')}
             </h2>
