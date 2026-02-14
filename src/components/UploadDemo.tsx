@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, Crown, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useRef, useEffect } from "react";
+import { useReducer, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeFunction } from "@/lib/supabaseApi";
 import { useAuth } from "@/hooks/useAuth";
@@ -85,6 +85,89 @@ const conversionSteps = [
   "Done",
 ];
 
+type UploadDemoState = {
+  selectedFiles: File[];
+  selectedFile: File | null;
+  uploading: boolean;
+  converting: boolean;
+  conversionResult: { id: string | null; resultPath: string | null; excelData?: string } | null;
+  singleDownloadFileName: string;
+  batchResults: Array<{ fileName: string; downloadFileName?: string; status: 'success' | 'error'; data?: { excelData?: string; resultPath?: string | null }; error?: string }>;
+  mergeInfo: MergeInfo | null;
+  mergeResult: { excelData?: string; resultPath?: string | null; fileName: string } | null;
+  transactions: Transaction[];
+  analytics: Analytics | null;
+  currencyCode: string;
+  aiStatus: AiStatus | null;
+  downloading: boolean;
+  batchDownloading: boolean;
+  mergeDownloading: boolean;
+  showDuplicatesOnly: boolean;
+  pdfPassword: string;
+  showPasswordInput: boolean;
+  passwordError: boolean;
+  lastError: { message: string; canRetry: boolean } | null;
+  editedPdfWarning: { fileName: string; reason: string } | null;
+  showPassword: boolean;
+  showUpgradeDialog: boolean;
+  showLimitDialog: boolean;
+  limitDialogTitle: string;
+  limitDialogMessage: string;
+  limitDialogShowSignup: boolean;
+  limitDialogShowPricing: boolean;
+  progressStep: number;
+  showProgress: boolean;
+};
+
+const initialUploadState: UploadDemoState = {
+  selectedFiles: [],
+  selectedFile: null,
+  uploading: false,
+  converting: false,
+  conversionResult: null,
+  singleDownloadFileName: "bank-statement.xlsx",
+  batchResults: [],
+  mergeInfo: null,
+  mergeResult: null,
+  transactions: [],
+  analytics: null,
+  currencyCode: "",
+  aiStatus: null,
+  downloading: false,
+  batchDownloading: false,
+  mergeDownloading: false,
+  showDuplicatesOnly: false,
+  pdfPassword: "",
+  showPasswordInput: false,
+  passwordError: false,
+  lastError: null,
+  editedPdfWarning: null,
+  showPassword: false,
+  showUpgradeDialog: false,
+  showLimitDialog: false,
+  limitDialogTitle: "Daily Limit Reached",
+  limitDialogMessage: "",
+  limitDialogShowSignup: false,
+  limitDialogShowPricing: false,
+  progressStep: 0,
+  showProgress: false,
+};
+
+type UploadDemoAction =
+  | { type: "set"; payload: Partial<UploadDemoState> }
+  | { type: "reset" };
+
+const uploadDemoReducer = (state: UploadDemoState, action: UploadDemoAction): UploadDemoState => {
+  switch (action.type) {
+    case "set":
+      return { ...state, ...action.payload };
+    case "reset":
+      return { ...initialUploadState };
+    default:
+      return state;
+  }
+};
+
 export const UploadDemo = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -120,37 +203,87 @@ export const UploadDemo = () => {
     }
     return `${remaining} ${pageLabel} remaining.`;
   };
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [converting, setConverting] = useState(false);
-  const [conversionResult, setConversionResult] = useState<{ id: string | null; resultPath: string | null; excelData?: string } | null>(null);
-  const [singleDownloadFileName, setSingleDownloadFileName] = useState<string>("bank-statement.xlsx");
-  const [batchResults, setBatchResults] = useState<Array<{ fileName: string; downloadFileName?: string; status: 'success' | 'error'; data?: { excelData?: string; resultPath?: string | null }; error?: string }>>([]);
-  const [mergeInfo, setMergeInfo] = useState<MergeInfo | null>(null);
-  const [mergeResult, setMergeResult] = useState<{ excelData?: string; resultPath?: string | null; fileName: string } | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [currencyCode, setCurrencyCode] = useState<string>('');
-  const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
-  const [downloading, setDownloading] = useState(false);
-  const [batchDownloading, setBatchDownloading] = useState(false);
-  const [mergeDownloading, setMergeDownloading] = useState(false);
-  const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
-  const [pdfPassword, setPdfPassword] = useState('');
-  const [showPasswordInput, setShowPasswordInput] = useState(false);
-  const [passwordError, setPasswordError] = useState(false);
-  const [lastError, setLastError] = useState<{ message: string; canRetry: boolean } | null>(null);
-  const [editedPdfWarning, setEditedPdfWarning] = useState<{ fileName: string; reason: string } | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
-  const [showLimitDialog, setShowLimitDialog] = useState(false);
-  const [limitDialogTitle, setLimitDialogTitle] = useState("Daily Limit Reached");
-  const [limitDialogMessage, setLimitDialogMessage] = useState("");
-  const [limitDialogShowSignup, setLimitDialogShowSignup] = useState(false);
-  const [limitDialogShowPricing, setLimitDialogShowPricing] = useState(false);
-  const [progressStep, setProgressStep] = useState(0);
-  const [showProgress, setShowProgress] = useState(false);
+  const [state, dispatch] = useReducer(uploadDemoReducer, initialUploadState);
+  const {
+    selectedFiles,
+    selectedFile,
+    uploading,
+    converting,
+    conversionResult,
+    singleDownloadFileName,
+    batchResults,
+    mergeInfo,
+    mergeResult,
+    transactions,
+    analytics,
+    currencyCode,
+    aiStatus,
+    downloading,
+    batchDownloading,
+    mergeDownloading,
+    showDuplicatesOnly,
+    pdfPassword,
+    showPasswordInput,
+    passwordError,
+    lastError,
+    editedPdfWarning,
+    showPassword,
+    showUpgradeDialog,
+    showLimitDialog,
+    limitDialogTitle,
+    limitDialogMessage,
+    limitDialogShowSignup,
+    limitDialogShowPricing,
+    progressStep,
+    showProgress,
+  } = state;
+  const setSelectedFiles = (value: File[]) => dispatch({ type: "set", payload: { selectedFiles: value } });
+  const setSelectedFile = (value: File | null) => dispatch({ type: "set", payload: { selectedFile: value } });
+  const setUploading = (value: boolean) => dispatch({ type: "set", payload: { uploading: value } });
+  const setConverting = (value: boolean) => dispatch({ type: "set", payload: { converting: value } });
+  const setConversionResult = (value: UploadDemoState["conversionResult"]) =>
+    dispatch({ type: "set", payload: { conversionResult: value } });
+  const setSingleDownloadFileName = (value: string) =>
+    dispatch({ type: "set", payload: { singleDownloadFileName: value } });
+  const setBatchResults = (value: UploadDemoState["batchResults"]) =>
+    dispatch({ type: "set", payload: { batchResults: value } });
+  const setMergeInfo = (value: MergeInfo | null) => dispatch({ type: "set", payload: { mergeInfo: value } });
+  const setMergeResult = (value: UploadDemoState["mergeResult"]) =>
+    dispatch({ type: "set", payload: { mergeResult: value } });
+  const setTransactions = (value: Transaction[]) => dispatch({ type: "set", payload: { transactions: value } });
+  const setAnalytics = (value: Analytics | null) => dispatch({ type: "set", payload: { analytics: value } });
+  const setCurrencyCode = (value: string) => dispatch({ type: "set", payload: { currencyCode: value } });
+  const setAiStatus = (value: AiStatus | null) => dispatch({ type: "set", payload: { aiStatus: value } });
+  const setDownloading = (value: boolean) => dispatch({ type: "set", payload: { downloading: value } });
+  const setBatchDownloading = (value: boolean) =>
+    dispatch({ type: "set", payload: { batchDownloading: value } });
+  const setMergeDownloading = (value: boolean) =>
+    dispatch({ type: "set", payload: { mergeDownloading: value } });
+  const setShowDuplicatesOnly = (value: boolean) =>
+    dispatch({ type: "set", payload: { showDuplicatesOnly: value } });
+  const setPdfPassword = (value: string) => dispatch({ type: "set", payload: { pdfPassword: value } });
+  const setShowPasswordInput = (value: boolean) =>
+    dispatch({ type: "set", payload: { showPasswordInput: value } });
+  const setPasswordError = (value: boolean) => dispatch({ type: "set", payload: { passwordError: value } });
+  const setLastError = (value: UploadDemoState["lastError"]) =>
+    dispatch({ type: "set", payload: { lastError: value } });
+  const setEditedPdfWarning = (value: UploadDemoState["editedPdfWarning"]) =>
+    dispatch({ type: "set", payload: { editedPdfWarning: value } });
+  const setShowPassword = (value: boolean) => dispatch({ type: "set", payload: { showPassword: value } });
+  const setShowUpgradeDialog = (value: boolean) =>
+    dispatch({ type: "set", payload: { showUpgradeDialog: value } });
+  const setShowLimitDialog = (value: boolean) =>
+    dispatch({ type: "set", payload: { showLimitDialog: value } });
+  const setLimitDialogTitle = (value: string) =>
+    dispatch({ type: "set", payload: { limitDialogTitle: value } });
+  const setLimitDialogMessage = (value: string) =>
+    dispatch({ type: "set", payload: { limitDialogMessage: value } });
+  const setLimitDialogShowSignup = (value: boolean) =>
+    dispatch({ type: "set", payload: { limitDialogShowSignup: value } });
+  const setLimitDialogShowPricing = (value: boolean) =>
+    dispatch({ type: "set", payload: { limitDialogShowPricing: value } });
+  const setProgressStep = (value: number) => dispatch({ type: "set", payload: { progressStep: value } });
+  const setShowProgress = (value: boolean) => dispatch({ type: "set", payload: { showProgress: value } });
   const pdfPasswordHelpId = "pdf-password-help";
   const pdfPasswordErrorId = "pdf-password-error";
   const dismissedEditedWarningsRef = useRef<Set<string>>(new Set());
