@@ -310,3 +310,111 @@ export const exportAsDOCX = async ({ transactions, toast, getErrorMessage }: Exp
     });
   }
 };
+
+const sanitizeLedgerName = (name: string): string => {
+  return name
+    .replace(/[
+	]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/[<>]/g, '')
+    .trim() || 'Suspense';
+};
+
+const formatTallyDate = (value?: string): string => {
+  if (!value) return '';
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) return `${match[1]}${match[2]}${match[3]}`;
+  const digits = trimmed.replace(/[^0-9]/g, '');
+  if (digits.length === 8) return digits;
+  return '';
+};
+
+const escapeXml = (value: string): string => {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+};
+
+export const exportAsTallyXml = ({ transactions, toast, getErrorMessage }: ExportContext) => {
+  if (transactions.length === 0) return;
+
+  try {
+    const bankLedger = 'Bank';
+
+    const vouchers = transactions.map((t) => {
+      const amount = (t.debit || t.credit || 0);
+      if (!amount) return '';
+      const isReceipt = (t.credit || 0) > 0;
+      const voucherType = isReceipt ? 'Receipt' : 'Payment';
+      const counterparty = sanitizeLedgerName(t.description || 'Suspense');
+      const narrationParts = [t.description, t.refNumber ? `Ref: ${t.refNumber}` : null].filter(Boolean);
+      const narration = escapeXml(narrationParts.join(' | '));
+      const date = formatTallyDate(t.date) || formatTallyDate(t.postingDate) || '';
+      const positiveAmount = Math.abs(amount).toFixed(2);
+      const bankAmount = isReceipt ? positiveAmount : `-${positiveAmount}`;
+      const counterpartyAmount = isReceipt ? `-${positiveAmount}` : positiveAmount;
+
+      return `
+    <TALLYMESSAGE xmlns:UDF="TallyUDF">
+      <VOUCHER VCHTYPE="${voucherType}" ACTION="Create">
+        <DATE>${date}</DATE>
+        <NARRATION>${narration}</NARRATION>
+        <REFERENCE>${escapeXml(t.refNumber || '')}</REFERENCE>
+        <ALLLEDGERENTRIES.LIST>
+          <LEDGERNAME>${escapeXml(bankLedger)}</LEDGERNAME>
+          <ISDEEMEDPOSITIVE>${isReceipt ? 'No' : 'Yes'}</ISDEEMEDPOSITIVE>
+          <AMOUNT>${bankAmount}</AMOUNT>
+        </ALLLEDGERENTRIES.LIST>
+        <ALLLEDGERENTRIES.LIST>
+          <LEDGERNAME>${escapeXml(counterparty)}</LEDGERNAME>
+          <ISDEEMEDPOSITIVE>${isReceipt ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
+          <AMOUNT>${counterpartyAmount}</AMOUNT>
+        </ALLLEDGERENTRIES.LIST>
+      </VOUCHER>
+    </TALLYMESSAGE>`;
+    }).filter(Boolean).join('');
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ENVELOPE>
+  <HEADER>
+    <TALLYREQUEST>Import Data</TALLYREQUEST>
+  </HEADER>
+  <BODY>
+    <IMPORTDATA>
+      <REQUESTDESC>
+        <REPORTNAME>Vouchers</REPORTNAME>
+      </REQUESTDESC>
+      <REQUESTDATA>${vouchers}
+      </REQUESTDATA>
+    </IMPORTDATA>
+  </BODY>
+</ENVELOPE>
+`;
+
+    const blob = new Blob([xml], { type: 'text/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tally_vouchers_${Date.now()}.xml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Tally XML Downloaded',
+      description: 'Import this XML into Tally Prime as Vouchers.',
+    });
+  } catch (error: unknown) {
+    console.error('Tally export error:', error);
+    toast({
+      variant: 'destructive',
+      title: 'Tally export failed',
+      description: getErrorMessage(error, 'Failed to export Tally XML.'),
+    });
+  }
+};

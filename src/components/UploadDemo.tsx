@@ -23,7 +23,7 @@ import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/curr
 import { getAnonymousClientId } from "@/lib/usageClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { detectEditedPdf, detectPasswordProtectedPdf, getTotalPages, pdfToPageImages } from "./uploadDemo/pdfUtils";
-import { exportAsCSV as exportCsv, exportAsDOCX as exportDocx, exportAsODS as exportOds, exportAsPDF as exportPdf } from "./uploadDemo/exporters";
+import { exportAsCSV as exportCsv, exportAsDOCX as exportDocx, exportAsODS as exportOds, exportAsPDF as exportPdf, exportAsTallyXml as exportTallyXml } from "./uploadDemo/exporters";
 import {
   Dialog,
   DialogContent,
@@ -347,6 +347,16 @@ export const UploadDemo = () => {
     });
   const exportAsDOCX = () =>
     exportDocx({
+      transactions,
+      analytics,
+      currencyCode,
+      toast,
+      getErrorMessage,
+      sumMoney,
+      truncateDecimals,
+    });
+  const exportAsTally = () =>
+    exportTallyXml({
       transactions,
       analytics,
       currencyCode,
@@ -1812,6 +1822,16 @@ Analytics Summary:
                     <Button
                       size="sm"
                       variant="outline"
+                      onClick={exportAsTally}
+                      disabled={transactions.length === 0}
+                      className="text-white"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Tally XML
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={exportAsPDF}
                       disabled={transactions.length === 0}
                       className="text-white"
@@ -1887,6 +1907,16 @@ Analytics Summary:
                     >
                       <FileText className="mr-2 h-5 w-5" />
                       CSV
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      onClick={exportAsTally}
+                      disabled={transactions.length === 0}
+                      className="text-white"
+                    >
+                      <FileText className="mr-2 h-5 w-5" />
+                      Tally XML
                     </Button>
                     <Button
                       size="lg"
