@@ -233,12 +233,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
                 <p className={`text-2xl font-bold ${foirColors[summary.foirStatus] ?? ''}`}>
                   {(foirScore ?? 0).toFixed(1)}%
                 </p>
-                <Progress 
-                  value={foirProgress} 
-                  className="h-1.5"
-                  // @ts-expect-error - custom indicator class for Progress
-                  indicatorClassName={foirProgressColor}
-                />
+                <Progress value={foirProgress} className="h-1.5" />
               </div>
             </TooltipTrigger>
             <TooltipContent className="max-w-[280px]">

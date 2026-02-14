@@ -313,12 +313,12 @@ export const exportAsDOCX = async ({ transactions, toast, getErrorMessage }: Exp
 
 const sanitizeLedgerName = (name: string): string => {
   return name
-    .replace(/[
-	]+/g, ' ')
+    .replace(/[\n\r\t]+/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .replace(/[<>]/g, '')
     .trim() || 'Suspense';
 };
+
 
 const formatTallyDate = (value?: string): string => {
   if (!value) return '';

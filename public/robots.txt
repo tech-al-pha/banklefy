@@ -15,4 +15,3 @@ Allow: /
 
 Sitemap: https://banklefy.vercel.app/sitemap.xml
 Sitemap: https://banklefy.lovable.app/sitemap-lovable.xml
-Sitemap: http://localhost:8080/sitemap-localhost.xml
