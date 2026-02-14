@@ -41,7 +41,7 @@ export const useSubscriptionTier = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("tier, plan_type")
+        .select("plan_type")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -54,7 +54,7 @@ export const useSubscriptionTier = () => {
       } else {
         const nextPlanType = typeof data?.plan_type === "string" ? data.plan_type : null;
         setPlanType(nextPlanType);
-        setTier(deriveTierFromPlanType(nextPlanType) ?? (data?.tier as SubscriptionTier) ?? "free");
+        setTier(deriveTierFromPlanType(nextPlanType));
       }
 
       setLoading(false);
