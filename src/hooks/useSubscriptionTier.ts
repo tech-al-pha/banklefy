@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { isPaidPlan } from "@/lib/entitlements";
 
 type SubscriptionTier = "free" | "daily" | "business";
 
@@ -50,15 +51,8 @@ export const useSubscriptionTier = () => {
     };
   }, [user]);
 
-  const normalizedPlan = (planType ?? "").toLowerCase();
-  const isPaidPlan =
-    normalizedPlan.startsWith("per_page") ||
-    normalizedPlan.startsWith("monthly") ||
-    normalizedPlan.startsWith("yearly") ||
-    normalizedPlan === "daily" ||
-    normalizedPlan === "business";
-
-  const hasChatAuraAccess = !!user && (isPaidPlan || (tier !== null && tier !== "free"));
+  const hasChatAuraAccess =
+    !!user && isPaidPlan({ planType, tier, isAuthenticated: true });
 
   return { tier, planType, loading, hasChatAuraAccess };
 };

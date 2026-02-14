@@ -18,6 +18,7 @@ import { UnderwritingPanel } from "./UnderwritingPanel";
 import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
 import { AIStatusPanel } from "./AIStatusPanel";
 import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
+import { isPaidPlan } from "@/lib/entitlements";
 import banklefyLogo from "@/assets/banklefy-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { getAnonymousClientId } from "@/lib/usageClient";
@@ -1538,7 +1539,11 @@ Analytics Summary:
   };
 
   // Check if user has premium access
-  const isPaidUser = planType && planType !== 'free';
+  const isPaidUser = isPaidPlan({
+    planType,
+    conversionsLimit,
+    isAuthenticated: isAuthenticated,
+  });
   const toneClasses = {
     excellent: { text: 'tone-excellent-text', border: 'tone-excellent-border' },
     good: { text: 'tone-good-text', border: 'tone-good-border' },
