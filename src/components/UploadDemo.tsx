@@ -8,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { invokeEdgeFunction } from "@/lib/supabaseApi";
 import { useAuth } from "@/hooks/useAuth";
 import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
-import { getPdfWorkerSrc } from "@/lib/pdfWorker";
 import { useNavigate } from "react-router-dom";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { UsageLimitBanner } from "./UsageLimitBanner";
@@ -23,6 +22,8 @@ import banklefyLogo from "@/assets/banklefy-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { getAnonymousClientId } from "@/lib/usageClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { detectEditedPdf, detectPasswordProtectedPdf, getTotalPages, pdfToPageImages } from "./uploadDemo/pdfUtils";
+import { exportAsCSV as exportCsv, exportAsDOCX as exportDocx, exportAsODS as exportOds, exportAsPDF as exportPdf } from "./uploadDemo/exporters";
 import {
   Dialog,
   DialogContent,
@@ -171,6 +172,46 @@ export const UploadDemo = () => {
     if (typeof error === 'string') return error;
     return fallback;
   };
+  const exportAsCSV = () =>
+    exportCsv({
+      transactions,
+      analytics,
+      currencyCode,
+      toast,
+      getErrorMessage,
+      sumMoney,
+      truncateDecimals,
+    });
+  const exportAsPDF = () =>
+    exportPdf({
+      transactions,
+      analytics,
+      currencyCode,
+      toast,
+      getErrorMessage,
+      sumMoney,
+      truncateDecimals,
+    });
+  const exportAsODS = () =>
+    exportOds({
+      transactions,
+      analytics,
+      currencyCode,
+      toast,
+      getErrorMessage,
+      sumMoney,
+      truncateDecimals,
+    });
+  const exportAsDOCX = () =>
+    exportDocx({
+      transactions,
+      analytics,
+      currencyCode,
+      toast,
+      getErrorMessage,
+      sumMoney,
+      truncateDecimals,
+    });
   const sanitizeFileBaseName = (value?: string | null, fallback = "bank-statement") => {
     const source = (value ?? "").trim();
     const noExtension = source.replace(/\.[^/.\\]+$/, "");
@@ -286,62 +327,8 @@ export const UploadDemo = () => {
   const MAX_PDF_RENDER_PAGES = 120;
   const FREE_MAX_PDF_PAGES_PER_FILE = 15;
   const maxPdfRenderPages = isFreeUsageMode ? FREE_MAX_PDF_PAGES_PER_FILE : MAX_PDF_RENDER_PAGES;
-  const getPdfPageCount = async (file: File, password?: string): Promise<number | null> => {
-    const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({
-        data: arrayBuffer,
-        password: password || undefined,
-        useWorkerFetch: false,
-        isEvalSupported: false,
-        useSystemFonts: true,
-      });
-      const pdf = await loadingTask.promise;
-      const count = pdf.numPages;
-      await pdf.destroy?.();
-      return count;
-    } catch (err: unknown) {
-      const error = err as { name?: string; message?: string };
-      if (
-        error?.name === 'PasswordException' ||
-        String(error?.message || '').toLowerCase().includes('password')
-      ) {
-        return null;
-      }
-      return null;
-    }
-  };
 
-  const getFilePageCount = async (file: File): Promise<number | null> => {
-    const isPdf = file.name.toLowerCase().endsWith('.pdf');
-    if (!isPdf) return 1;
-    const count = await getPdfPageCount(file, pdfPassword.trim() || undefined);
-    if (count === null) return null;
-    return count;
-  };
-
-  const getTotalPages = async (files: File[]): Promise<{ total: number; unknown: boolean; overCap: boolean; maxSingle: number }> => {
-    let total = 0;
-    let unknown = false;
-    let overCap = false;
-    let maxSingle = 0;
-    for (const file of files) {
-      const pages = await getFilePageCount(file);
-      if (pages === null) {
-        unknown = true;
-        continue;
-      }
-      total += pages;
-      if (pages > MAX_PDF_RENDER_PAGES) {
-        overCap = true;
-        maxSingle = Math.max(maxSingle, pages);
-      }
-    }
-    return { total, unknown, overCap, maxSingle };
-  };
 
   const openLimitDialog = (options: {
     title: string;
@@ -431,7 +418,11 @@ export const UploadDemo = () => {
 
       if (!usageLimitLoading) {
         const candidateFiles = [...selectedFiles, ...newFiles];
-        const { unknown, overCap, maxSingle } = await getTotalPages(candidateFiles);
+        const { unknown, overCap, maxSingle } = await getTotalPages(
+          candidateFiles,
+          pdfPassword.trim() || undefined,
+          maxPdfRenderPages
+        );
         if (overCap) {
           toast({
             variant: "destructive",
@@ -498,96 +489,8 @@ export const UploadDemo = () => {
     });
   };
 
-  const detectEditedPdf = async (file: File): Promise<{ suspected: boolean; reason: string }> => {
-    const buffer = await file.arrayBuffer();
-    const text = new TextDecoder('latin1').decode(new Uint8Array(buffer));
-    const eofMatches = text.match(/%%EOF/g) || [];
-    const hasPrev = /\/Prev\s+\d+/i.test(text);
-    const hasIncremental = eofMatches.length > 1 || hasPrev;
 
-    const reasons: string[] = [];
-    if (eofMatches.length > 1) reasons.push('Multiple EOF markers (incremental updates)');
-    if (hasPrev) reasons.push('Incremental update reference found');
 
-    return {
-      suspected: hasIncremental,
-      reason: reasons.join(', ') || 'Heuristic indicator found',
-    };
-  };
-
-  const detectPasswordProtectedPdf = async (file: File): Promise<boolean> => {
-    const pdfjsLib = await import('pdfjs-dist');
-
-    // IMPORTANT: Use bundled worker (same-origin). CDN worker can fail due to CORS/dynamic import.
-    pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
-
-    const arrayBuffer = await file.arrayBuffer();
-    try {
-      const loadingTask = pdfjsLib.getDocument({
-        data: arrayBuffer,
-        password: '',
-        useWorkerFetch: false,
-        isEvalSupported: false,
-        useSystemFonts: true,
-      });
-      const pdf = await loadingTask.promise;
-      await pdf.destroy?.();
-      return false;
-    } catch (err: unknown) {
-      const error = err as { name?: string; message?: string };
-      return (
-        error?.name === 'PasswordException' ||
-        String(error?.message || '').toLowerCase().includes('password')
-      );
-    }
-  };
-
-  const pdfToPageImages = async (file: File, password?: string): Promise<string[]> => {
-    const pdfjsLib = await import('pdfjs-dist');
-
-    // IMPORTANT: Use bundled worker (same-origin). CDN worker can fail due to CORS/dynamic import.
-    pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
-
-    const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjsLib.getDocument({
-      data: arrayBuffer,
-      password: password || undefined,
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      useSystemFonts: true,
-    });
-
-    const pdf = await loadingTask.promise;
-    if (pdf.numPages > maxPdfRenderPages) {
-      await pdf.destroy?.();
-      if (isFreeUsageMode) {
-        throw new Error(`Free tier supports PDFs up to ${FREE_MAX_PDF_PAGES_PER_FILE} pages per file.`);
-      }
-      throw new Error(`This PDF has ${pdf.numPages} pages. The current maximum supported per file is ${MAX_PDF_RENDER_PAGES} pages.`);
-    }
-
-    const pageCount = pdf.numPages;
-
-    const images: string[] = [];
-    for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.6 });
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) continue;
-
-      canvas.width = Math.floor(viewport.width);
-      canvas.height = Math.floor(viewport.height);
-
-      await page.render({ canvasContext: ctx, viewport }).promise;
-
-      // JPEG keeps payload smaller than PNG
-      images.push(canvas.toDataURL('image/jpeg', 0.82));
-    }
-
-    await pdf.destroy?.();
-    return images;
-  };
 
   const handleConvert = async (fileOverride?: File) => {
     // Clear previous errors
@@ -659,7 +562,12 @@ export const UploadDemo = () => {
       // For PDFs: render page images client-side and send to backend (Groq Vision can't accept PDFs directly)
       if (isPdf) {
         try {
-          requestBody.pdfPageImages = await pdfToPageImages(fileToConvert, pdfPassword.trim() || undefined);
+          requestBody.pdfPageImages = await pdfToPageImages(fileToConvert, {
+            password: pdfPassword.trim() || undefined,
+            maxPdfRenderPages,
+            isFreeUsageMode,
+            freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+          });
         } catch (err: unknown) {
           const error = err as { name?: string; message?: string };
           // Surface password errors in existing UX
@@ -966,7 +874,12 @@ Analytics Summary:
 
         if (isPdf) {
           try {
-            payload.pdfPageImages = await pdfToPageImages(file, pdfPassword.trim() || undefined);
+            payload.pdfPageImages = await pdfToPageImages(file, {
+              password: pdfPassword.trim() || undefined,
+              maxPdfRenderPages,
+              isFreeUsageMode,
+              freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+            });
           } catch (err: unknown) {
             const error = err as { name?: string; message?: string };
             if (error?.name === 'PasswordException' || String(error?.message || '').toLowerCase().includes('password')) {
@@ -1329,214 +1242,7 @@ Analytics Summary:
     }
   };
 
-  const exportAsCSV = () => {
-    if (transactions.length === 0) return;
 
-    // Simple CSV with only essential columns: Date, Description, Debit, Credit, Balance
-    const headers = ['Date', 'Description', 'Debit', 'Credit', 'Balance'];
-
-    // Calculate totals
-    const totalDebit = sumMoney(transactions.map((t) => t.debit || 0));
-    const totalCredit = sumMoney(transactions.map((t) => t.credit || 0));
-    const totalDebitDisplay = totalDebit.toFixed(2);
-    const totalCreditDisplay = totalCredit.toFixed(2);
-
-    const csvRows = [
-      headers.join(','),
-      ...transactions.map(t =>
-        [
-          t.date || '',
-          `"${(t.description || '').replace(/"/g, '""')}"`,
-          t.debit || '',
-          t.credit || '',
-          t.balance ?? '',
-        ].join(',')
-      ),
-      // Add totals row
-      ['', 'TOTAL', totalDebitDisplay, totalCreditDisplay, ''].join(',')
-    ];
-    const csvContent = csvRows.join('\n');
-
-    // Create and download CSV file
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `transactions_${Date.now()}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "CSV Downloaded",
-      description: "Your transaction data has been exported to CSV.",
-    });
-  };
-
-  const exportAsPDF = async () => {
-    if (transactions.length === 0) return;
-
-    try {
-      const { jsPDF } = await import("jspdf");
-      const autoTable = (await import("jspdf-autotable")).default;
-      type JsPdfWithExtras = InstanceType<typeof jsPDF> & {
-        setCharSpace?: (value: number) => void;
-        setWordSpacing?: (value: number) => void;
-        lastAutoTable?: { finalY?: number };
-      };
-      const doc = new jsPDF({ unit: "pt", format: "a4" }) as JsPdfWithExtras;
-
-      const marginX = 40;
-      const pageHeight = doc.internal.pageSize.getHeight();
-      let cursorY = 48;
-
-      const formatAmount = (value: number, decimals = 2) =>
-        formatCurrencyValue(value, currencyCode, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-
-      const addLine = (text: string) => {
-        if (cursorY > pageHeight - 48) {
-          doc.addPage();
-          cursorY = 48;
-        }
-        doc.text(text, marginX, cursorY);
-        cursorY += 14;
-      };
-
-      const addSection = (title: string) => {
-        if (cursorY > pageHeight - 72) {
-          doc.addPage();
-          cursorY = 48;
-        }
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.text(title, marginX, cursorY);
-        cursorY += 16;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-      };
-
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.text("Analyzed Statement Report", marginX, cursorY);
-      cursorY += 18;
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      // Reset spacing to avoid any unexpected letter spacing in PDF viewers
-      doc.setCharSpace?.(0);
-      doc.setWordSpacing?.(0);
-      doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, marginX, cursorY);
-      cursorY += 16;
-
-      doc.setFontSize(11);
-      addLine(`Total Transactions: ${transactions.length}`);
-      addLine(`Total Credits: ${formatAmount(truncateDecimals(analytics?.totalCredits ?? 0))}`);
-      addLine(`Total Debits: ${formatAmount(truncateDecimals(analytics?.totalDebits ?? 0))}`);
-      addLine(`Net Flow: ${formatAmount(truncateDecimals(analytics?.netFlow ?? 0))}`);
-
-      if (analytics?.underwriting) {
-        addSection("Underwriting Summary");
-        addLine(`FOIR Score: ${(analytics.underwriting.summary?.foirScore ?? 0).toFixed(1)}%`);
-        addLine(`FOIR Status: ${(analytics.underwriting.summary?.foirStatus ?? "N/A").toUpperCase()}`);
-        addLine(`Avg Monthly Income: ${formatAmount(analytics.underwriting.summary?.avgMonthlyIncome ?? 0, 0)}`);
-        addLine(`Avg Monthly EMI: ${formatAmount(analytics.underwriting.summary?.avgMonthlyEMI ?? 0, 0)}`);
-        addLine(`Salary Credits Detected: ${analytics.underwriting.summary?.totalSalaryDetected ?? 0}`);
-        addLine(`EMI Debits Detected: ${analytics.underwriting.summary?.totalEMIDetected ?? 0}`);
-        addLine(`Est. Loan Eligibility: ${formatAmount(analytics.underwriting.eligibility?.estimatedLoanEligibility ?? 0, 0)}`);
-        addLine(`Max New EMI: ${formatAmount(analytics.underwriting.eligibility?.maxNewEMI ?? 0, 0)}`);
-        addLine(`Eligibility Status: ${(analytics.underwriting.eligibility?.status ?? "N/A").toUpperCase()}`);
-        if (analytics.underwriting.eligibility?.message) {
-          addLine(`Message: ${analytics.underwriting.eligibility.message}`);
-        }
-      }
-
-      if (analytics?.riskAnalysis) {
-        addSection("Risk & Integrity Analysis");
-        addLine(`Integrity Score: ${analytics.riskAnalysis.integrityScore}%`);
-        addLine(`Balance Mismatches: ${analytics.riskAnalysis.balanceMismatches}`);
-        addLine(`Avg Daily Balance: ${formatAmount(analytics.riskAnalysis.averageDailyBalance ?? 0, 0)}`);
-        addLine(`Lowest Balance: ${formatAmount(analytics.riskAnalysis.maxDip?.amount ?? 0, 0)}${analytics.riskAnalysis.maxDip?.date ? ` on ${analytics.riskAnalysis.maxDip.date}` : ""}`);
-        const riskFlagCount = analytics.riskAnalysis.riskFlags?.reduce((sum, r) => sum + r.count, 0) ?? 0;
-        addLine(`Risk Flags: ${riskFlagCount}`);
-        if (analytics.duplicateCount > 0) {
-          addLine(`Duplicates Found: ${analytics.duplicateCount}`);
-        }
-        if (analytics.riskAnalysis.fraudAlerts?.length) {
-          addLine(`Fraud Alerts: ${analytics.riskAnalysis.fraudAlerts.length}`);
-        }
-      }
-
-      if (analytics?.categoryBreakdown && Object.keys(analytics.categoryBreakdown).length > 0) {
-        addSection("Category Breakdown");
-        const categoryRows = Object.entries(analytics.categoryBreakdown)
-          .sort((a, b) => b[1].count - a[1].count)
-          .slice(0, 12)
-          .map(([category, data]) => [
-            category,
-            `${data.count}`,
-            formatAmount(truncateDecimals(data.totalDebit ?? 0)),
-            formatAmount(truncateDecimals(data.totalCredit ?? 0)),
-          ]);
-
-        autoTable(doc, {
-          startY: cursorY + 6,
-          head: [["Category", "Count", "Total Debit", "Total Credit"]],
-          body: categoryRows,
-          styles: { fontSize: 9, cellPadding: 4 },
-          headStyles: { fillColor: [24, 24, 24], textColor: [255, 255, 255] },
-          columnStyles: {
-            0: { cellWidth: 180 },
-            1: { halign: "right" },
-            2: { halign: "right" },
-            3: { halign: "right" },
-          },
-          margin: { left: marginX, right: marginX },
-        });
-
-        cursorY = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 16 : cursorY + 24;
-      }
-
-      const tableRows = transactions.slice(0, 100).map((t) => [
-        t.date || "",
-        t.description || "",
-        t.debit ? formatAmount(t.debit) : "",
-        t.credit ? formatAmount(t.credit) : "",
-        t.balance != null ? formatAmount(t.balance) : "",
-      ]);
-
-      addSection("Transaction Details (first 100 rows)");
-      autoTable(doc, {
-        startY: cursorY + 6,
-        head: [["Date", "Description", "Debit", "Credit", "Balance"]],
-        body: tableRows,
-        styles: { fontSize: 9, cellPadding: 4 },
-        headStyles: { fillColor: [24, 24, 24], textColor: [255, 255, 255] },
-        columnStyles: {
-          0: { cellWidth: 72 },
-          1: { cellWidth: 220 },
-          2: { halign: "right" },
-          3: { halign: "right" },
-          4: { halign: "right" },
-        },
-        margin: { left: marginX, right: marginX },
-      });
-
-      doc.save(`analyzed_report_${Date.now()}.pdf`);
-
-      toast({
-        title: "PDF Downloaded",
-        description: "Your analyzed report has been exported to PDF.",
-      });
-    } catch (error: unknown) {
-      console.error("PDF export error:", error);
-      toast({
-        variant: "destructive",
-        title: "PDF export failed",
-        description: getErrorMessage(error, "Failed to export PDF."),
-      });
-    }
-  };
 
   // Check if user has premium access
   const isPaidUser = isPaidPlan({
@@ -1574,168 +1280,7 @@ Analytics Summary:
     return 'bad';
   };
 
-  const exportAsODS = async () => {
-    if (transactions.length === 0) return;
 
-    try {
-      const XLSX = await import("xlsx");
-
-      const headers = [
-        'Date',
-        'Reference No / Transaction ID',
-        'Description',
-        'Debit',
-        'Credit',
-        'Balance',
-        'Pricing Mismatch Flag',
-        'Duplicate Flag',
-      ];
-      const rows = [
-        headers,
-        ...transactions.map(t => [
-          t.date || '',
-          t.refNumber || '',
-          t.description || '',
-          t.debit ?? 0,
-          t.credit ?? 0,
-          t.balance ?? 0,
-          t.balanceMismatch ? 'YES' : '',
-          t.isDuplicate ? 'YES' : '',
-        ]),
-      ];
-
-      const worksheet = XLSX.utils.aoa_to_sheet(rows);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
-      const wbout = XLSX.write(workbook, { bookType: 'ods', type: 'array' });
-      const blob = new Blob([wbout], { type: 'application/vnd.oasis.opendocument.spreadsheet' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `transactions_${Date.now()}.ods`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "ODS Downloaded",
-        description: "Your transaction data has been exported to ODS.",
-      });
-    } catch (error: unknown) {
-      console.error('ODS export error:', error);
-      toast({
-        variant: "destructive",
-        title: "ODS export failed",
-        description: getErrorMessage(error, "Failed to export ODS."),
-      });
-    }
-  };
-
-  const exportAsDOCX = async () => {
-    if (transactions.length === 0) return;
-
-    try {
-      const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel, WidthType, BorderStyle, AlignmentType } = await import('docx');
-
-      // Create header rows for transaction table
-      const headerRow = new TableRow({
-        children: [
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Date', bold: true })] })] }),
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Description', bold: true })] })] }),
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Category', bold: true })] })] }),
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Debit', bold: true })] })] }),
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Credit', bold: true })] })] }),
-          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Balance', bold: true })] })] }),
-        ],
-      });
-
-      // Create data rows (limit to first 100 for performance)
-      const dataRows = transactions.slice(0, 100).map(t => new TableRow({
-        children: [
-          new TableCell({ children: [new Paragraph(t.date || '')] }),
-          new TableCell({ children: [new Paragraph((t.description || '').substring(0, 50))] }),
-          new TableCell({ children: [new Paragraph(t.category || 'Other')] }),
-          new TableCell({ children: [new Paragraph(`${t.debit || 0}`)] }),
-          new TableCell({ children: [new Paragraph(`${t.credit || 0}`)] }),
-          new TableCell({ children: [new Paragraph(`${t.balance || 0}`)] }),
-        ],
-      }));
-
-      const doc = new Document({
-        sections: [{
-          properties: {},
-          children: [
-            new Paragraph({
-              text: 'BANKLEFY',
-              heading: HeadingLevel.TITLE,
-              alignment: AlignmentType.CENTER,
-            }),
-            new Paragraph({
-              text: 'Financial Intelligence Report',
-              heading: HeadingLevel.HEADING_2,
-              alignment: AlignmentType.CENTER,
-            }),
-            new Paragraph({
-              text: `Generated: ${new Date().toLocaleString()}`,
-              alignment: AlignmentType.CENTER,
-            }),
-            new Paragraph({ text: '' }),
-            new Paragraph({
-              text: 'Financial Summary',
-              heading: HeadingLevel.HEADING_1,
-            }),
-            new Paragraph({ text: `Total Transactions: ${transactions.length}` }),
-            new Paragraph({ text: `Total Credits: ${formatAmount(truncateDecimals(analytics?.totalCredits || 0), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
-            new Paragraph({ text: `Total Debits: ${formatAmount(truncateDecimals(analytics?.totalDebits || 0), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
-            new Paragraph({ text: `Net Flow: ${formatAmount(truncateDecimals(analytics?.netFlow || 0), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
-            new Paragraph({ text: '' }),
-            ...(analytics?.underwriting ? [
-              new Paragraph({
-                text: 'FOIR Analysis',
-                heading: HeadingLevel.HEADING_1,
-              }),
-              new Paragraph({ text: `FOIR Score: ${analytics.underwriting.summary?.foirScore?.toFixed(2) || 0}%` }),
-              new Paragraph({ text: `Status: ${(analytics.underwriting.summary?.foirStatus || 'N/A').toUpperCase()}` }),
-              new Paragraph({ text: `Avg Monthly Income: ${formatAmount(analytics.underwriting.summary?.avgMonthlyIncome || 0, { maximumFractionDigits: 0 })}` }),
-              new Paragraph({ text: `Avg Monthly EMI: ${formatAmount(analytics.underwriting.summary?.avgMonthlyEMI || 0, { maximumFractionDigits: 0 })}` }),
-              new Paragraph({ text: '' }),
-            ] : []),
-            new Paragraph({
-              text: `Transaction Details (${Math.min(transactions.length, 100)} of ${transactions.length})`,
-              heading: HeadingLevel.HEADING_1,
-            }),
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              rows: [headerRow, ...dataRows],
-            }),
-          ],
-        }],
-      });
-
-      const blob = await Packer.toBlob(doc);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `bank_statement_report_${Date.now()}.docx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "DOCX Downloaded",
-        description: "Your professional Word document has been exported.",
-      });
-    } catch (error) {
-      console.error('DOCX export error:', error);
-      toast({
-        variant: "destructive",
-        title: "Export Failed",
-        description: "Failed to generate Word document.",
-      });
-    }
-  };
 
   const handlePremiumExport = (format: 'docx' | 'ods') => {
     if (!isPaidUser) {
