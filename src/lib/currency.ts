@@ -14,7 +14,7 @@ const CURRENCY_ALIASES: Record<string, string> = {
 };
 
 const CURRENCY_SYMBOL_OVERRIDES: Record<string, string> = {
-  AED: '\u062F.\u0625',
+  AED: 'AED',
 };
 
 export const normalizeCurrencyCode = (currencyCode?: string): string => {
