@@ -3,7 +3,6 @@ import { Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom"; 
 import { useLanguage } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
-import heroDemoVideo from "@/assets/hero-demo.mp4";
 
 export const Hero = () => {
   const navigate = useNavigate();
@@ -61,21 +60,7 @@ export const Hero = () => {
             {/* Stats... (unchanged) */}
           </div>
 
-          <div className="hidden md:flex justify-end md:translate-x-6 lg:translate-x-10">
-            <div className="w-full max-w-[600px] lg:max-w-[740px] aspect-[4/3] overflow-hidden bg-black">
-              <video
-                className="h-full w-full object-cover scale-[1.18] shadow-none outline-none"
-                style={{ clipPath: "inset(3%)" }}
-                src={heroDemoVideo}
-                autoPlay
-                loop
-                muted
-                playsInline
-                preload="none"
-                poster="/hero-poster.svg"
-              />
-            </div>
-          </div>
+          <div className="hidden md:flex justify-end md:translate-x-6 lg:translate-x-10" />
         </div>
       </div>
     </section>

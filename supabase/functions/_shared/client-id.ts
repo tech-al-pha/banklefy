@@ -42,14 +42,7 @@ export const getFingerprint = async (req: Request): Promise<string> => {
  * It ignores the client-provided ID if a valid fingerprint can be generated,
  * preventing bypasses via clearing local storage.
  */
-export const getTrackingKey = async (req: Request, clientId?: string): Promise<string> => {
+export const getTrackingKey = async (req: Request): Promise<string> => {
   const fingerprint = await getFingerprint(req);
-  const ip = getClientIp(req);
-  
-  // If we couldn't get a reliable IP or UA, fallback to clientId as a last resort
-  if ((ip === 'unknown' || fingerprint.length === 0) && clientId) {
-    return `client:${clientId}`;
-  }
-  
   return fingerprint;
 };

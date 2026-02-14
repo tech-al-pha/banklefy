@@ -15,7 +15,6 @@ import {
   AlertCircle,
   Loader2
 } from "lucide-react";
-import { invokeEdgeFunction } from "@/lib/supabaseApi";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -198,7 +197,7 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
         }
       }
 
-      const { data, error } = await invokeEdgeFunction<{ response: string }>("chat-aura", {
+      const { data, error } = await supabase.functions.invoke<{ response: string }>("chat-aura", {
         body: {
           message: userMessage.content,
           pdfContext: effectivePdfContext || null,
@@ -226,7 +225,9 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
           : undefined,
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || "Failed to send message");
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),

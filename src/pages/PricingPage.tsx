@@ -175,6 +175,7 @@ const PricingPage = () => {
       const result = typeof data === "string" ? JSON.parse(data) : data;
       if (result?.success) {
         toast.success(`Payment successful! ${result.pages_added} pages added to your account.`);
+        window.dispatchEvent(new Event("banklefy:subscription-updated"));
         navigate("/dashboard");
       } else {
         toast.error("Payment verification failed.");
@@ -467,5 +468,4 @@ const PricingPage = () => {
 };
 
 export default PricingPage;
-
 

@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, Users, FileText, TrendingUp, Calendar, Shield, RefreshCw, BarChart3, ShieldAlert, Database, KeyRound, Settings, Server } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import banklefyLogo from '@/assets/banklefy-logo.svg';
-import { invokeEdgeFunction } from '@/lib/supabaseApi';
 
 interface UserProfile {
   id: string;
@@ -188,7 +187,7 @@ export default function Admin() {
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await invokeEdgeFunction<{
+      const { data, error } = await supabase.functions.invoke<{
         success?: boolean;
         error?: string;
         users?: UserProfile[];
@@ -198,7 +197,7 @@ export default function Admin() {
       }>('admin-dashboard');
 
       if (error) {
-        throw error;
+        throw new Error(error.message || 'Failed to load dashboard data');
       }
 
       if (!data?.success) {
@@ -233,9 +232,9 @@ export default function Admin() {
     setApiLoading(true);
     setApiError(null);
     try {
-      const { data, error } = await invokeEdgeFunction<ApiStatusPayload & { success?: boolean; error?: string }>('api-status');
+      const { data, error } = await supabase.functions.invoke<ApiStatusPayload & { success?: boolean; error?: string }>('api-status');
       if (error) {
-        throw error;
+        throw new Error(error.message || 'Failed to load API status');
       }
 
       if (!data?.success) {

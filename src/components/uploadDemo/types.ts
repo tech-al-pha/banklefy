@@ -183,7 +183,6 @@ export interface BatchFilePayload {
 export interface BatchRequestBody {
   files: BatchFilePayload[];
   timezone: string;
-  clientId?: string;
   pdfPassword?: string;
   recaptchaToken?: string;
 }

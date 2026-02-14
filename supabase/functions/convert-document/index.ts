@@ -188,11 +188,11 @@ Deno.serve(async (req) => {
 
   try {
     // Parse request
-    const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken, pdfPassword, pdfPageImages, clientId } = await req.json();
+    const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken, pdfPassword, pdfPageImages } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
     
     // Robust client tracking to prevent bypasses
-    const trackingKey = await getTrackingKey(req, clientId);
+    const trackingKey = await getTrackingKey(req);
 
     // Create Supabase admin client (service role for privileged operations)
     const supabaseAdmin = createClient(
@@ -1009,4 +1009,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-

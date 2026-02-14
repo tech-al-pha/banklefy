@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
-import { invokeEdgeFunction } from '@/lib/supabaseApi';
-import { getAnonymousClientId } from '@/lib/usageClient';
+import { supabase } from '@/integrations/supabase/client';
 import { getDefaultDailyLimit } from '@/lib/usageLimits';
 
 interface UsageLimit {
@@ -44,8 +43,7 @@ export const useUsageLimit = () => {
       const accessToken = session?.access_token;
 
       // Use explicit REST call (deployment-agnostic)
-      const clientId = user ? null : getAnonymousClientId();
-      const { data, error } = await invokeEdgeFunction<{
+      const { data, error } = await supabase.functions.invoke<{
         conversionsUsed?: number;
         conversionsLimit?: number;
         remaining?: number;
@@ -53,12 +51,12 @@ export const useUsageLimit = () => {
         isAuthenticated?: boolean;
         planType?: string;
       }>('check-usage-limit', {
-        body: { timezone, clientId: clientId ?? undefined },
+        body: { timezone },
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
 
       if (error) {
-        throw error;
+        throw new Error(error.message || 'Failed to check usage limit');
       }
 
       const resolvedLimit = data.conversionsLimit ?? defaultLimit;
@@ -86,6 +84,14 @@ export const useUsageLimit = () => {
 
   useEffect(() => {
     checkUsageLimit();
+  }, [checkUsageLimit]);
+
+  useEffect(() => {
+    const handler = () => {
+      void checkUsageLimit();
+    };
+    window.addEventListener("banklefy:subscription-updated", handler);
+    return () => window.removeEventListener("banklefy:subscription-updated", handler);
   }, [checkUsageLimit]);
 
   return {

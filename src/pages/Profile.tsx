@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
-import { invokeEdgeFunction } from "@/lib/supabaseApi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -297,11 +296,11 @@ const Profile = () => {
     }
     try {
       setDeletingId(item.id);
-      const { error } = await invokeEdgeFunction("delete-conversion", {
+      const { error } = await supabase.functions.invoke("delete-conversion", {
         body: { conversionId: item.id },
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (error) throw error;
+      if (error) throw new Error(error.message || "Failed to delete conversion");
       setRecent((prev) => prev.filter((c) => c.id !== item.id));
       toast({ title: "Deleted", description: "File and data deleted successfully." });
     } catch (error: unknown) {

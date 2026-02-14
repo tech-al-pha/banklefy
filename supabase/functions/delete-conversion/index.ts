@@ -105,7 +105,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const paths = [conversion.file_path, conversion.result_path].filter(Boolean) as string[];
+    const paths: string[] = [];
+    if (conversion.file_path) {
+      const normalizedPath = conversion.file_path.includes("/")
+        ? conversion.file_path
+        : `${conversion.user_id}/${conversion.file_path}`;
+      paths.push(normalizedPath);
+    }
+    if (conversion.result_path) {
+      paths.push(conversion.result_path);
+    }
+
     if (paths.length > 0) {
       const { error: removeError } = await supabaseAdmin
         .storage

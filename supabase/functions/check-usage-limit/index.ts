@@ -85,11 +85,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { timezone, clientId } = await req.json();
+    const { timezone } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
 
     // Robust client tracking to prevent bypasses
-    const trackingKey = await getTrackingKey(req, clientId);
+    const trackingKey = await getTrackingKey(req);
 
     console.log('Checking usage limit', { timezone: userTimezone, trackingKey: trackingKey.substring(0, 8) + '...' });
 
@@ -224,5 +224,4 @@ Deno.serve(async (req) => {
     );
   }
 });
-
 

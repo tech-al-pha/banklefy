@@ -5,7 +5,6 @@ import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreads
 import { useToast } from "@/hooks/use-toast";
 import { useReducer, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { invokeEdgeFunction } from "@/lib/supabaseApi";
 import { useAuth } from "@/hooks/useAuth";
 import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
 import { useNavigate } from "react-router-dom";
@@ -20,10 +19,9 @@ import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 import { isPaidPlan } from "@/lib/entitlements";
 import banklefyLogo from "@/assets/banklefy-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
-import { getAnonymousClientId } from "@/lib/usageClient";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { detectEditedPdf, detectPasswordProtectedPdf, getTotalPages, pdfToPageImages } from "./uploadDemo/pdfUtils";
-import { exportAsCSV as exportCsv, exportAsDOCX as exportDocx, exportAsODS as exportOds, exportAsPDF as exportPdf, exportAsTallyXml as exportTallyXml } from "./uploadDemo/exporters";
+const loadPdfUtils = () => import("./uploadDemo/pdfUtils");
+const loadExporters = () => import("./uploadDemo/exporters");
 import {
   Dialog,
   DialogContent,
@@ -315,8 +313,9 @@ export const UploadDemo = () => {
     if (typeof error === 'string') return error;
     return fallback;
   };
-  const exportAsCSV = () =>
-    exportCsv({
+  const exportAsCSV = async () => {
+    const { exportAsCSV: exportCsv } = await loadExporters();
+    return exportCsv({
       transactions,
       analytics,
       currencyCode,
@@ -325,8 +324,10 @@ export const UploadDemo = () => {
       sumMoney,
       truncateDecimals,
     });
-  const exportAsPDF = () =>
-    exportPdf({
+  };
+  const exportAsPDF = async () => {
+    const { exportAsPDF: exportPdf } = await loadExporters();
+    return exportPdf({
       transactions,
       analytics,
       currencyCode,
@@ -335,8 +336,10 @@ export const UploadDemo = () => {
       sumMoney,
       truncateDecimals,
     });
-  const exportAsODS = () =>
-    exportOds({
+  };
+  const exportAsODS = async () => {
+    const { exportAsODS: exportOds } = await loadExporters();
+    return exportOds({
       transactions,
       analytics,
       currencyCode,
@@ -345,8 +348,10 @@ export const UploadDemo = () => {
       sumMoney,
       truncateDecimals,
     });
-  const exportAsDOCX = () =>
-    exportDocx({
+  };
+  const exportAsDOCX = async () => {
+    const { exportAsDOCX: exportDocx } = await loadExporters();
+    return exportDocx({
       transactions,
       analytics,
       currencyCode,
@@ -355,8 +360,10 @@ export const UploadDemo = () => {
       sumMoney,
       truncateDecimals,
     });
-  const exportAsTally = () =>
-    exportTallyXml({
+  };
+  const exportAsTally = async () => {
+    const { exportAsTallyXml: exportTallyXml } = await loadExporters();
+    return exportTallyXml({
       transactions,
       analytics,
       currencyCode,
@@ -365,6 +372,7 @@ export const UploadDemo = () => {
       sumMoney,
       truncateDecimals,
     });
+  };
   const sanitizeFileBaseName = (value?: string | null, fallback = "bank-statement") => {
     const source = (value ?? "").trim();
     const noExtension = source.replace(/\.[^/.\\]+$/, "");
@@ -423,6 +431,7 @@ export const UploadDemo = () => {
         return;
       }
       try {
+        const { detectPasswordProtectedPdf } = await loadPdfUtils();
         const requiresPassword = await detectPasswordProtectedPdf(selectedFile);
         if (!isMounted) return;
         setShowPasswordInput(requiresPassword);
@@ -571,6 +580,7 @@ export const UploadDemo = () => {
 
       if (!usageLimitLoading) {
         const candidateFiles = [...selectedFiles, ...newFiles];
+        const { getTotalPages } = await loadPdfUtils();
         const { unknown, overCap, maxSingle } = await getTotalPages(
           candidateFiles,
           pdfPassword.trim() || undefined,
@@ -674,6 +684,7 @@ export const UploadDemo = () => {
     const isPdf = fileToConvert.name.toLowerCase().endsWith('.pdf');
     if (isPdf && !dismissedEditedWarningsRef.current.has(fileToConvert.name)) {
       try {
+        const { detectEditedPdf } = await loadPdfUtils();
         const detection = await detectEditedPdf(fileToConvert);
         if (detection.suspected) {
           setEditedPdfWarning({ fileName: fileToConvert.name, reason: detection.reason });
@@ -693,10 +704,7 @@ export const UploadDemo = () => {
         fileName: fileToConvert.name,
         timezone,
       };
-      if (!user) {
-        const clientId = getAnonymousClientId();
-        if (clientId) requestBody.clientId = clientId;
-      }
+        // Anonymous users are tracked server-side by fingerprint (no client IDs).
 
       // Add PDF password if provided
       if (pdfPassword.trim()) {
@@ -715,6 +723,7 @@ export const UploadDemo = () => {
       // For PDFs: render page images client-side and send to backend (Groq Vision can't accept PDFs directly)
       if (isPdf) {
         try {
+          const { pdfToPageImages } = await loadPdfUtils();
           requestBody.pdfPageImages = await pdfToPageImages(fileToConvert, {
             password: pdfPassword.trim() || undefined,
             maxPdfRenderPages,
@@ -792,7 +801,7 @@ export const UploadDemo = () => {
         }
       }
 
-      const { data, error: functionError } = await invokeEdgeFunction<ConversionResponse>('convert-document', {
+      const { data, error: functionError } = await supabase.functions.invoke<ConversionResponse>('convert-document', {
         body: requestBody,
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
@@ -1000,10 +1009,7 @@ Analytics Summary:
         files: [],
         timezone,
       };
-      if (!user) {
-        const clientId = getAnonymousClientId();
-        if (clientId) requestBody.clientId = clientId;
-      }
+      // Anonymous users are tracked server-side by fingerprint (no client IDs).
 
       if (pdfPassword.trim()) {
         requestBody.pdfPassword = pdfPassword.trim();
@@ -1027,6 +1033,7 @@ Analytics Summary:
 
         if (isPdf) {
           try {
+            const { pdfToPageImages } = await loadPdfUtils();
             payload.pdfPageImages = await pdfToPageImages(file, {
               password: pdfPassword.trim() || undefined,
               maxPdfRenderPages,
@@ -1088,7 +1095,7 @@ Analytics Summary:
         }
       }
 
-      const { data, error: functionError } = await invokeEdgeFunction<MultiConversionResponse>('convert-statements-batch', {
+      const { data, error: functionError } = await supabase.functions.invoke<MultiConversionResponse>('convert-statements-batch', {
         body: requestBody,
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });

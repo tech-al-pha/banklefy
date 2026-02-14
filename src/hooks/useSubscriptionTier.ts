@@ -10,6 +10,13 @@ export const useSubscriptionTier = () => {
   const [tier, setTier] = useState<SubscriptionTier | null>(null);
   const [planType, setPlanType] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const handler = () => setRefreshKey((prev) => prev + 1);
+    window.addEventListener("banklefy:subscription-updated", handler);
+    return () => window.removeEventListener("banklefy:subscription-updated", handler);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -49,7 +56,7 @@ export const useSubscriptionTier = () => {
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [user, refreshKey]);
 
   const hasChatAuraAccess =
     !!user && isPaidPlan({ planType, tier, isAuthenticated: true });
