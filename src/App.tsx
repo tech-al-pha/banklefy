@@ -39,9 +39,10 @@ const AppRoutes = () => {
       title: "Bank Statement Converter to Excel & CSV | Fast AI OCR | Banklefy",
       description:
         "Convert bank statement PDFs to Excel or CSV in seconds. Accurate AI OCR, multi-bank support, secure processing, instant export.",
+      image: "https://banklefy.vercel.app/og-banklefy.jpg",
     };
 
-    const metaByPath: Record<string, { title: string; description: string }> = {
+    const metaByPath: Record<string, { title: string; description: string; image?: string }> = {
       "/": defaultMeta,
       "/pricing": {
         title: "Pricing | Banklefy Bank Statement Converter",
@@ -109,6 +110,9 @@ const AppRoutes = () => {
 
     const pathname = location.pathname;
     const meta = metaByPath[pathname] || defaultMeta;
+    const siteUrl =
+      (import.meta.env.VITE_SITE_URL as string | undefined) ||
+      (typeof window !== "undefined" ? window.location.origin : "https://banklefy.vercel.app");
 
     document.title = meta.title;
 
@@ -128,7 +132,7 @@ const AppRoutes = () => {
     setMeta("name", "twitter:title", meta.title);
     setMeta("name", "twitter:description", meta.description);
 
-    const canonical = `${window.location.origin}${pathname}`;
+    const canonical = `${siteUrl}${pathname === "/" ? "/" : pathname}`;
     let canonicalTag = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonicalTag) {
       canonicalTag = document.createElement("link");
@@ -139,6 +143,8 @@ const AppRoutes = () => {
 
     setMeta("property", "og:url", canonical);
     setMeta("name", "twitter:url", canonical);
+    setMeta("property", "og:image", meta.image || defaultMeta.image);
+    setMeta("name", "twitter:image", meta.image || defaultMeta.image);
 
     const noIndexPaths = ["/admin", "/dashboard", "/settings", "/profile", "/auth", "/chat"];
     const shouldNoIndex = noIndexPaths.some((path) => pathname.startsWith(path));
