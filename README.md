@@ -50,7 +50,3 @@ Future enhancements include: GST reconciliation, transaction splitting, receipt/
 - AI & Processing: Advanced OCR + ML models for extraction, fraud detection, and analysis
 - Deployment & Hosting: Lovable.dev with custom domain support
 - Security: Bank-grade encryption, 24-hour auto-delete, reCAPTCHA v3
-
-
-# Start development server<a href="http://localhost:5173" target="_blank" rel="noopener noreferrer nofollow"></a>
-npm run dev
