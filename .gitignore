@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 .env
 .env.*
+
+# Temporary local Supabase debug artifacts
+.tmp_remote_public.sql
+.tmp_supabase_init/
