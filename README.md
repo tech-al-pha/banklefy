@@ -1,4 +1,4 @@
-# Banklefy.site – Intelligent Bank Statement Converter & Financial Analyzer
+# Banklefy – Intelligent Bank Statement Converter & Financial Analyzer
 
 Banklefy is a modern, AI-powered SaaS tool that transforms messy bank statements (PDF, JPG, PNG) into clean, actionable data in seconds. With built-in fraud detection, tampering checks, and advanced financial insights, it eliminates manual data entry and empowers users to make faster, smarter decisions.
 
