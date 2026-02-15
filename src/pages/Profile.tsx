@@ -45,16 +45,21 @@ const Profile = () => {
     if (showLoading) {
       setLoading(true);
     }
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const since = Date.now() - 24 * 60 * 60 * 1000;
     const { data, error } = await supabase
       .from("conversions")
       .select("id, original_filename, status, created_at, completed_at, result_path, file_path")
       .eq("user_id", user.id)
-      .gte("created_at", since)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(100);
 
     if (!error) {
-      setRecent(data || []);
+      const filtered = (data || []).filter((item) => {
+        const createdAt = item.created_at ? new Date(item.created_at).getTime() : 0;
+        const completedAt = item.completed_at ? new Date(item.completed_at).getTime() : 0;
+        return createdAt >= since || completedAt >= since;
+      });
+      setRecent(filtered);
     }
     if (showLoading) {
       setLoading(false);

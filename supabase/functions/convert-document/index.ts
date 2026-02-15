@@ -178,6 +178,371 @@ const estimateBase64Bytes = (base64: string): number => {
   return Math.floor((cleaned.length * 3) / 4) - padding;
 };
 
+const isMissingColumnError = (error: unknown, column: string): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const message = String((error as { message?: unknown }).message ?? '').toLowerCase();
+  return message.includes('column') && message.includes(column.toLowerCase()) && message.includes('does not exist');
+};
+
+const toNumber = (value: unknown, fallback: number): number => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const toDateString = (value: unknown): string | null => {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+};
+
+const normalizePlan = (value: unknown): string =>
+  typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'free';
+
+const resolvePlanType = (row: Record<string, unknown> | null): string => {
+  if (!row) return 'free';
+  const planType = normalizePlan(row.plan_type);
+  if (planType !== 'free') return planType;
+  return normalizePlan(row.tier);
+};
+
+const isKnownPaidPlan = (normalizedPlan: string): boolean =>
+  normalizedPlan === 'unlimited' ||
+  normalizedPlan.startsWith('per_page') ||
+  normalizedPlan.startsWith('monthly') ||
+  normalizedPlan.startsWith('yearly') ||
+  normalizedPlan === 'daily' ||
+  normalizedPlan === 'business';
+
+const getDatePartsInTimezone = (timezone: string) => {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+
+    const year = parts.find((part) => part.type === 'year')?.value ?? '1970';
+    const month = parts.find((part) => part.type === 'month')?.value ?? '01';
+    const day = parts.find((part) => part.type === 'day')?.value ?? '01';
+
+    return {
+      year,
+      month,
+      day,
+      isoDate: `${year}-${month}-${day}`,
+    };
+  } catch {
+    const now = new Date();
+    const year = String(now.getUTCFullYear());
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(now.getUTCDate()).padStart(2, '0');
+    return {
+      year,
+      month,
+      day,
+      isoDate: `${year}-${month}-${day}`,
+    };
+  }
+};
+
+const getResetBoundary = (planType: string, dateParts: { year: string; month: string; isoDate: string }): string | null => {
+  const normalizedPlan = normalizePlan(planType);
+  const isMonthly = normalizedPlan.startsWith('monthly') || normalizedPlan === 'daily';
+  const isYearly = normalizedPlan.startsWith('yearly') || normalizedPlan === 'business';
+  if (isMonthly) return `${dateParts.year}-${dateParts.month}-01`;
+  if (isYearly) return `${dateParts.year}-01-01`;
+  if (!isKnownPaidPlan(normalizedPlan)) return dateParts.isoDate;
+  return null;
+};
+
+const updateAnonymousUsage = async (
+  supabaseAdmin: any,
+  keyColumn: 'ip_address' | 'tracking_key',
+  trackingKey: string,
+  payload: Record<string, unknown>,
+) => {
+  const { error } = await supabaseAdmin
+    .from('anonymous_usage')
+    .update(payload as any)
+    .eq(keyColumn, trackingKey);
+
+  return { error };
+};
+
+const readAnonymousUsage = async (
+  supabaseAdmin: any,
+  trackingKey: string,
+) => {
+  const firstTry = await supabaseAdmin
+    .from('anonymous_usage')
+    .select('*')
+    .eq('ip_address', trackingKey)
+    .maybeSingle();
+
+  if (!firstTry.error || !isMissingColumnError(firstTry.error, 'ip_address')) {
+    return { keyColumn: 'ip_address' as const, ...firstTry };
+  }
+
+  const secondTry = await supabaseAdmin
+    .from('anonymous_usage')
+    .select('*')
+    .eq('tracking_key', trackingKey)
+    .maybeSingle();
+
+  return { keyColumn: 'tracking_key' as const, ...secondTry };
+};
+
+const checkLimitFallback = async ({
+  supabaseAdmin,
+  userId,
+  trackingKey,
+  timezone,
+}: {
+  supabaseAdmin: any;
+  userId: string | null;
+  trackingKey: string;
+  timezone: string;
+}) => {
+  try {
+    const dateParts = getDatePartsInTimezone(timezone);
+    const today = dateParts.isoDate;
+
+    if (userId) {
+      const subscriptionResponse = await supabaseAdmin
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      let row = (subscriptionResponse.data as Record<string, unknown> | null) ?? null;
+
+      if (subscriptionResponse.error) {
+        console.error('Fallback subscription read failed:', subscriptionResponse.error);
+        return {
+          conversionsUsed: 0,
+          conversionsLimit: 5,
+          planType: 'free',
+        };
+      }
+
+      if (!row) {
+        const created = await supabaseAdmin
+          .from('subscriptions')
+          .insert({
+            user_id: userId,
+            conversions_used: 0,
+            conversions_limit: 5,
+            last_reset_date: today,
+            timezone,
+            plan_type: 'free',
+          } as any)
+          .select('*')
+          .maybeSingle();
+
+        if (created.error) {
+          console.error('Fallback subscription create failed:', created.error);
+          return {
+            conversionsUsed: 0,
+            conversionsLimit: 5,
+            planType: 'free',
+          };
+        }
+
+        row = (created.data as Record<string, unknown> | null) ?? {
+          conversions_used: 0,
+          conversions_limit: 5,
+          last_reset_date: today,
+          plan_type: 'free',
+        };
+      }
+
+      const planType = resolvePlanType(row);
+      const conversionsLimit = toNumber(row.conversions_limit, 5);
+      let conversionsUsed = toNumber(row.conversions_used, 0);
+      const lastResetDate = toDateString(row.last_reset_date);
+      const resetBoundary = getResetBoundary(planType, dateParts);
+
+      if (resetBoundary && (!lastResetDate || lastResetDate < resetBoundary)) {
+        const { error: resetError } = await supabaseAdmin
+          .from('subscriptions')
+          .update({
+            conversions_used: 0,
+            last_reset_date: resetBoundary,
+            timezone,
+          } as any)
+          .eq('user_id', userId);
+
+        if (resetError) {
+          console.error('Fallback subscription reset failed:', resetError);
+        } else {
+          conversionsUsed = 0;
+        }
+      }
+
+      return {
+        conversionsUsed,
+        conversionsLimit,
+        planType,
+      };
+    }
+
+    const anonRead = await readAnonymousUsage(supabaseAdmin, trackingKey);
+    if (anonRead.error) {
+      console.error('Fallback anonymous usage read failed:', anonRead.error);
+      return {
+        conversionsUsed: 0,
+        conversionsLimit: 2,
+        planType: 'free',
+      };
+    }
+
+    let row = (anonRead.data as Record<string, unknown> | null) ?? null;
+    const keyColumn = anonRead.keyColumn;
+
+    if (!row) {
+      const insertPayload: Record<string, unknown> = {
+        conversions_count: 0,
+        last_reset_date: today,
+        timezone,
+      };
+      insertPayload[keyColumn] = trackingKey;
+
+      const created = await supabaseAdmin
+        .from('anonymous_usage')
+        .insert(insertPayload as any)
+        .select('*')
+        .maybeSingle();
+
+      if (created.error) {
+        console.error('Fallback anonymous usage create failed:', created.error);
+        return {
+          conversionsUsed: 0,
+          conversionsLimit: 2,
+          planType: 'free',
+        };
+      }
+
+      row = (created.data as Record<string, unknown> | null) ?? {
+        conversions_count: 0,
+        last_reset_date: today,
+      };
+    }
+
+    let conversionsUsed = toNumber(row.conversions_count ?? row.conversions_used, 0);
+    const lastResetDate = toDateString(row.last_reset_date);
+
+    if (!lastResetDate || lastResetDate < today) {
+      const { error: resetError } = await updateAnonymousUsage(supabaseAdmin, keyColumn, trackingKey, {
+        conversions_count: 0,
+        last_reset_date: today,
+        timezone,
+      });
+      if (resetError) {
+        console.error('Fallback anonymous reset failed:', resetError);
+      } else {
+        conversionsUsed = 0;
+      }
+    }
+
+    return {
+      conversionsUsed,
+      conversionsLimit: 2,
+      planType: 'free',
+    };
+  } catch (error) {
+    console.error('Fallback limit check crashed:', error);
+    return {
+      conversionsUsed: 0,
+      conversionsLimit: userId ? 5 : 2,
+      planType: 'free',
+    };
+  }
+};
+
+const incrementUsageFallback = async ({
+  supabaseAdmin,
+  userId,
+  trackingKey,
+  incrementBy,
+  timezone,
+}: {
+  supabaseAdmin: any;
+  userId: string | null;
+  trackingKey: string;
+  incrementBy: number;
+  timezone: string;
+}) => {
+  try {
+    const dateParts = getDatePartsInTimezone(timezone);
+    const today = dateParts.isoDate;
+
+    if (userId) {
+      const { data: row, error: readError } = await supabaseAdmin
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (readError) {
+        return { ok: false, error: readError };
+      }
+
+      if (!row) {
+        const { error: insertError } = await supabaseAdmin
+          .from('subscriptions')
+          .insert({
+            user_id: userId,
+            conversions_used: incrementBy,
+            conversions_limit: 5,
+            last_reset_date: today,
+            timezone,
+            plan_type: 'free',
+          } as any);
+        return { ok: !insertError, error: insertError };
+      }
+
+      const nextValue = toNumber((row as Record<string, unknown>).conversions_used, 0) + incrementBy;
+      const { error: updateError } = await supabaseAdmin
+        .from('subscriptions')
+        .update({ conversions_used: nextValue, timezone } as any)
+        .eq('user_id', userId);
+      return { ok: !updateError, error: updateError };
+    }
+
+    const anonRead = await readAnonymousUsage(supabaseAdmin, trackingKey);
+    if (anonRead.error) {
+      return { ok: false, error: anonRead.error };
+    }
+
+    const keyColumn = anonRead.keyColumn;
+    const row = (anonRead.data as Record<string, unknown> | null) ?? null;
+
+    if (!row) {
+      const payload: Record<string, unknown> = {
+        conversions_count: incrementBy,
+        last_reset_date: today,
+        timezone,
+      };
+      payload[keyColumn] = trackingKey;
+      const { error: insertError } = await supabaseAdmin
+        .from('anonymous_usage')
+        .insert(payload as any);
+      return { ok: !insertError, error: insertError };
+    }
+
+    const nextValue = toNumber(row.conversions_count ?? row.conversions_used, 0) + incrementBy;
+    const { error: updateError } = await updateAnonymousUsage(supabaseAdmin, keyColumn, trackingKey, {
+      conversions_count: nextValue,
+      timezone,
+    });
+    return { ok: !updateError, error: updateError };
+  } catch (error) {
+    return { ok: false, error };
+  }
+};
+
 // ============= MAIN HANDLER =============
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -401,23 +766,40 @@ Deno.serve(async (req) => {
 
     // ============= USAGE LIMITS ENFORCEMENT =============
     // Check usage limits - IP-based for anonymous, user-based for authenticated
-    const { data: limitResult, error: limitError } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
-      p_ip_address: user ? null : trackingKey,
-      p_user_id: user ? user.id : null,
-      p_timezone: userTimezone
-    });
+    let conversionsUsed = 0;
+    let conversionsLimit = user ? 5 : 2;
+    let userPlanType = 'free';
 
-    if (limitError) {
-      console.error('Error checking limit:', limitError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to check usage limit', status: 'error' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    let limitResult: Array<{ conversions_used?: number; conversions_limit?: number }> | null = null;
+    let limitError: unknown = null;
+    try {
+      const rpcResponse = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
+        p_ip_address: user ? null : trackingKey,
+        p_user_id: user ? user.id : null,
+        p_timezone: userTimezone,
+      });
+      limitResult = (rpcResponse.data as Array<{ conversions_used?: number; conversions_limit?: number }> | null) ?? null;
+      limitError = rpcResponse.error;
+    } catch (rpcThrownError) {
+      limitError = rpcThrownError;
     }
 
-    const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
-    const conversionsUsed = usageInfo?.conversions_used ?? 0;
-    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 5 : 2); // Default: 5 for users, 2 for anon
+    if (limitError) {
+      console.error('Error checking limit via RPC, using fallback:', limitError);
+      const fallback = await checkLimitFallback({
+        supabaseAdmin,
+        userId: user?.id ?? null,
+        trackingKey,
+        timezone: userTimezone,
+      });
+      conversionsUsed = fallback.conversionsUsed;
+      conversionsLimit = fallback.conversionsLimit;
+      userPlanType = fallback.planType;
+    } else {
+      const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
+      conversionsUsed = toNumber(usageInfo?.conversions_used, 0);
+      conversionsLimit = toNumber(usageInfo?.conversions_limit, user ? 5 : 2);
+    }
 
     console.log('Usage info:', { conversionsUsed, conversionsLimit, user: !!user });
 
@@ -434,21 +816,20 @@ Deno.serve(async (req) => {
       isAdmin = !!roleData;
     }
     console.log('Admin check:', { isAdmin });
-    let userPlanType = 'free';
     let pagesUsedThisMonth = 0;
     const userPlanLimit = conversionsLimit;
 
     if (user && !isAdmin) {
       const { data: subData, error: subError } = await supabase
         .from('subscriptions')
-        .select('plan_type, pages_used_this_month')
+        .select('plan_type, tier, pages_used_this_month')
         .eq('user_id', user.id)
         .single();
 
       if (subError) {
         console.error('Failed to load subscription plan type:', subError);
       } else if (subData) {
-        userPlanType = subData.plan_type || userPlanType;
+        userPlanType = resolvePlanType((subData as Record<string, unknown> | null) ?? null) || userPlanType;
         pagesUsedThisMonth = subData.pages_used_this_month || 0;
       }
     }
@@ -973,13 +1354,35 @@ Deno.serve(async (req) => {
     // Increment usage count ONLY after successful conversion (prevents wasting credits/limit on failures)
     const incrementBy = isFreeMode ? 1 : Math.max(1, pagesWithData);
     let remaining = conversionsLimit - conversionsUsed;
-    const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
-      p_ip_address: user ? null : trackingKey,
-      p_user_id: user ? user.id : null,
-      p_increment: incrementBy,
-    });
-    if (incrementError) {
-      console.error('Error incrementing usage after success:', incrementError);
+    let incrementFailed = false;
+    try {
+      const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
+        p_ip_address: user ? null : trackingKey,
+        p_user_id: user ? user.id : null,
+        p_increment: incrementBy,
+      });
+      if (incrementError) {
+        console.error('Error incrementing usage via RPC, trying fallback:', incrementError);
+        incrementFailed = true;
+      }
+    } catch (incrementRpcError) {
+      console.error('Usage increment RPC crashed, trying fallback:', incrementRpcError);
+      incrementFailed = true;
+    }
+
+    if (incrementFailed) {
+      const fallbackIncrement = await incrementUsageFallback({
+        supabaseAdmin,
+        userId: user?.id ?? null,
+        trackingKey,
+        incrementBy,
+        timezone: userTimezone,
+      });
+      if (!fallbackIncrement.ok) {
+        console.error('Fallback usage increment failed:', fallbackIncrement.error);
+      } else {
+        remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
+      }
     } else {
       remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
     }

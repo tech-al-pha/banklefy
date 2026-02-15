@@ -9,6 +9,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     'https://banklefy.lovable.app',
     'https://banklefy.vercel.app',
     'http://localhost:8080',
+    'http://localhost:8081',
     'http://localhost:5173',
     'http://localhost:3000',
   ].filter(Boolean) as string[];
@@ -84,6 +85,16 @@ const respond = (req: Request, status: number, payload: unknown) => {
   });
 };
 
+const extractBearerToken = (authHeader: string | null): string | null => {
+  if (!authHeader) return null;
+  const segments = authHeader.split(',').map((part) => part.trim());
+  for (const segment of segments) {
+    const match = segment.match(/^Bearer\s+(.+)$/i);
+    if (match && match[1]?.trim()) return match[1].trim();
+  }
+  return null;
+};
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -94,6 +105,11 @@ Deno.serve(async (req) => {
     Deno.env.get('RAZERPAY_SECRET_KEY') ||
     Deno.env.get('RAZORPAY_SECRET_KEY') ||
     Deno.env.get('RAZORPAY_KEY_SECRET');
+  const serverRazorpayKeyId =
+    Deno.env.get('RAZERPAY_SITE_KEY') ||
+    Deno.env.get('RAZORPAY_SITE_KEY') ||
+    Deno.env.get('RAZORPAY_KEY_ID') ||
+    Deno.env.get('VITE_RAZORPAY_SITE_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
@@ -117,13 +133,6 @@ Deno.serve(async (req) => {
   }
 
   const planId = typeof body.planId === 'string' ? body.planId.trim() : '';
-  const razorpayKeyIdFromBody =
-    typeof body.razorpayKeyId === 'string' ? body.razorpayKeyId.trim() : '';
-  const razorpayKeyId =
-    razorpayKeyIdFromBody ||
-    Deno.env.get('RAZERPAY_SITE_KEY') ||
-    Deno.env.get('RAZORPAY_SITE_KEY') ||
-    Deno.env.get('RAZORPAY_KEY_ID');
   const pricing = PLAN_PRICING[planId];
   const extraNotes = body.notes && typeof body.notes === 'object' ? (body.notes as Record<string, unknown>) : undefined;
 
@@ -135,28 +144,23 @@ Deno.serve(async (req) => {
     return respond(req, 400, { error: 'Unknown plan selected.' });
   }
 
-  if (!razorpayKeyId) {
-    return respond(req, 400, { error: 'Razorpay site key is required.' });
+  if (!serverRazorpayKeyId) {
+    return respond(req, 500, { error: 'Razorpay site key is not configured on server.' });
   }
 
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return respond(req, 401, { error: 'Authentication required.' });
-  }
-
-  const token = authHeader.replace('Bearer ', '').trim();
+  const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
+  const tokenFromHeader = extractBearerToken(authHeader);
+  const tokenFromBody = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
+  const token = tokenFromHeader || tokenFromBody;
   if (!token) {
-    return respond(req, 401, { error: 'Invalid authorization token.' });
+    return respond(req, 401, { error: 'Authentication required.' });
   }
 
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
   const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-  if (authError || !authData?.user) {
-    console.error('Razorpay order request rejected:', authError?.message);
-    return respond(req, 401, { error: 'Unable to verify your session.' });
+  if (authError || !authData.user) {
+    return respond(req, 401, { error: 'Invalid or expired session.' });
   }
-
   const userId = authData.user.id;
 
   // Receipt must be <= 40 chars for Razorpay
@@ -178,7 +182,7 @@ Deno.serve(async (req) => {
   };
 
   try {
-    const authorization = `Basic ${btoa(`${razorpayKeyId}:${razorpaySecret}`)}`;
+    const authorization = `Basic ${btoa(`${serverRazorpayKeyId}:${razorpaySecret}`)}`;
     const response = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -218,7 +222,7 @@ Deno.serve(async (req) => {
 
     return respond(req, 200, {
       order: responseBody,
-      razorpayKeyId,
+      razorpayKeyId: serverRazorpayKeyId,
       planId,
     });
   } catch (error) {
@@ -228,5 +232,3 @@ Deno.serve(async (req) => {
     });
   }
 });
-
-

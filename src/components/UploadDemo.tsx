@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, FileText, CheckCircle, Sparkles, Loader2, Download, FileSpreadsheet, AlertTriangle, TrendingUp, TrendingDown, PieChart, ShieldAlert, Lock, Eye, EyeOff, RefreshCw, XCircle, Crown, User } from "lucide-react";
+import { Upload, FileText, Sparkles, Loader2, AlertTriangle, Lock, Eye, EyeOff, RefreshCw, XCircle, Crown, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useReducer, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,10 +10,6 @@ import { useNavigate } from "react-router-dom";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { UsageLimitBanner } from "./UsageLimitBanner";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
-import { FraudAlertPanel } from "./FraudAlertPanel";
-import { UnderwritingPanel } from "./UnderwritingPanel";
-import { UnderwritingPanelSkeleton } from "./UnderwritingPanelSkeleton";
-import { AIStatusPanel } from "./AIStatusPanel";
 import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 import { isPaidPlan } from "@/lib/entitlements";
 import banklefyLogo from "@/assets/banklefy-logo.svg";
@@ -22,6 +17,8 @@ import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/curr
 import { useLanguage } from "@/contexts/LanguageContext";
 const loadPdfUtils = () => import("./uploadDemo/pdfUtils");
 const loadExporters = () => import("./uploadDemo/exporters");
+import { ResultsSection } from "./uploadDemo/ResultsSection";
+import { initialUploadState, type UploadDemoState, uploadDemoReducer } from "./uploadDemo/state";
 import {
   Dialog,
   DialogContent,
@@ -29,142 +26,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type {
-  Transaction,
-  Analytics,
-  AiStatus,
-  MergeInfo,
   MultiConversionResponse,
   ConversionResponse,
   BatchFilePayload,
   BatchRequestBody,
 } from "./uploadDemo/types";
-
-// Category color mapping
-const categoryColors: Record<string, string> = {
-  "Salary/Income": "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  "Transfer In": "bg-green-500/20 text-green-400 border-green-500/30",
-  "Transfer Out": "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  "Bills & Utilities": "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  "Shopping": "bg-pink-500/20 text-pink-400 border-pink-500/30",
-  "Food & Dining": "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  "Transportation": "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  "Entertainment": "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  "Healthcare": "bg-red-500/20 text-red-400 border-red-500/30",
-  "Education": "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-  "Insurance": "bg-slate-500/20 text-slate-400 border-slate-500/30",
-  "Investments": "bg-teal-500/20 text-teal-400 border-teal-500/30",
-  "Loan/EMI": "bg-rose-500/20 text-rose-400 border-rose-500/30",
-  "Cash": "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  "Bank Fees": "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  "Other": "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
-};
-
-const conversionSteps = [
-  "Reading document",
-  "Detecting amounts",
-  "Categorizing data",
-  "Analyzing information",
-  "Done",
-];
-
-type UploadDemoState = {
-  selectedFiles: File[];
-  selectedFile: File | null;
-  uploading: boolean;
-  converting: boolean;
-  conversionResult: { id: string | null; resultPath: string | null; excelData?: string } | null;
-  singleDownloadFileName: string;
-  batchResults: Array<{ fileName: string; downloadFileName?: string; status: 'success' | 'error'; data?: { excelData?: string; resultPath?: string | null }; error?: string }>;
-  mergeInfo: MergeInfo | null;
-  mergeResult: { excelData?: string; resultPath?: string | null; fileName: string } | null;
-  transactions: Transaction[];
-  analytics: Analytics | null;
-  currencyCode: string;
-  aiStatus: AiStatus | null;
-  downloading: boolean;
-  batchDownloading: boolean;
-  mergeDownloading: boolean;
-  showDuplicatesOnly: boolean;
-  pdfPassword: string;
-  showPasswordInput: boolean;
-  passwordError: boolean;
-  lastError: { message: string; canRetry: boolean } | null;
-  editedPdfWarning: { fileName: string; reason: string } | null;
-  showPassword: boolean;
-  showUpgradeDialog: boolean;
-  showLimitDialog: boolean;
-  limitDialogTitle: string;
-  limitDialogMessage: string;
-  limitDialogShowSignup: boolean;
-  limitDialogShowPricing: boolean;
-  progressStep: number;
-  showProgress: boolean;
-};
-
-const initialUploadState: UploadDemoState = {
-  selectedFiles: [],
-  selectedFile: null,
-  uploading: false,
-  converting: false,
-  conversionResult: null,
-  singleDownloadFileName: "bank-statement.xlsx",
-  batchResults: [],
-  mergeInfo: null,
-  mergeResult: null,
-  transactions: [],
-  analytics: null,
-  currencyCode: "",
-  aiStatus: null,
-  downloading: false,
-  batchDownloading: false,
-  mergeDownloading: false,
-  showDuplicatesOnly: false,
-  pdfPassword: "",
-  showPasswordInput: false,
-  passwordError: false,
-  lastError: null,
-  editedPdfWarning: null,
-  showPassword: false,
-  showUpgradeDialog: false,
-  showLimitDialog: false,
-  limitDialogTitle: "Daily Limit Reached",
-  limitDialogMessage: "",
-  limitDialogShowSignup: false,
-  limitDialogShowPricing: false,
-  progressStep: 0,
-  showProgress: false,
-};
-
-type UploadDemoAction =
-  | { type: "set"; payload: Partial<UploadDemoState> }
-  | { type: "reset" };
-
-const uploadDemoReducer = (state: UploadDemoState, action: UploadDemoAction): UploadDemoState => {
-  switch (action.type) {
-    case "set":
-      return { ...state, ...action.payload };
-    case "reset":
-      return { ...initialUploadState };
-    default:
-      return state;
-  }
-};
 
 export const UploadDemo = () => {
   const { toast } = useToast();
@@ -295,10 +162,6 @@ export const UploadDemo = () => {
   const { user } = useAuth();
   const { hasChatAuraAccess } = useSubscriptionTier();
   const navigate = useNavigate();
-  const formatAmount = (
-    value: number,
-    options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
-  ) => formatCurrencyValue(value ?? 0, currencyCode, options);
   const formatAmountNoSymbol = (
     value: number,
     options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
@@ -791,8 +654,7 @@ export const UploadDemo = () => {
 
           if (refreshError || !refreshData.session) {
             console.error('Failed to refresh session:', refreshError);
-            // User appears logged in but session is invalid - still allow conversion
-            // Edge function will treat as anonymous but that's OK
+            throw new Error('Session expired. Please sign in again.');
           } else {
             accessToken = refreshData.session.access_token;
           }
@@ -924,6 +786,16 @@ Analytics Summary:
     } catch (error: unknown) {
       console.error('Conversion error:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+
+      if (errorMessage.toLowerCase().includes('session expired')) {
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Please sign in again.",
+        });
+        navigate('/auth');
+        return;
+      }
 
       // Check if it's a password-related error
       if (errorMessage.toLowerCase().includes('password') ||
@@ -1087,7 +959,10 @@ Analytics Summary:
         const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !sessionData.session) {
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-          if (!refreshError && refreshData.session) {
+          if (refreshError || !refreshData.session) {
+            console.error('Failed to refresh session for batch conversion:', refreshError);
+            throw new Error('Session expired. Please sign in again.');
+          } else {
             accessToken = refreshData.session.access_token;
           }
         } else {
@@ -1197,6 +1072,16 @@ Analytics Summary:
     } catch (error: unknown) {
       console.error('Batch conversion error:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+
+      if (errorMessage.toLowerCase().includes('session expired')) {
+        toast({
+          variant: "destructive",
+          title: "Session Expired",
+          description: "Please sign in again.",
+        });
+        navigate('/auth');
+        return;
+      }
 
       if (errorMessage.toLowerCase().includes('password') ||
           errorMessage.toLowerCase().includes('encrypted') ||
@@ -1410,37 +1295,24 @@ Analytics Summary:
     conversionsLimit,
     isAuthenticated: isAuthenticated,
   });
-  const toneClasses = {
-    excellent: { text: 'tone-excellent-text', border: 'tone-excellent-border' },
-    good: { text: 'tone-good-text', border: 'tone-good-border' },
-    moderate: { text: 'tone-moderate-text', border: 'tone-moderate-border' },
-    bad: { text: 'tone-bad-text', border: 'tone-bad-border' },
-  } as const;
+  const hasTallyAccess = (() => {
+    if (!isAuthenticated) return false;
+    const normalized = (planType ?? "free").toLowerCase();
+    return (
+      normalized === "monthly_pro" ||
+      normalized === "monthly_enterprise" ||
+      normalized === "yearly_full" ||
+      normalized === "yearly_pro"
+    );
+  })();
 
-  type Tone = keyof typeof toneClasses;
-
-  const getCreditTone = (totalCredits: number): Tone => (totalCredits > 0 ? 'excellent' : 'bad');
-  const getDebitTone = (totalCredits: number, totalDebits: number): Tone => {
-    if (totalCredits <= 0) return totalDebits > 0 ? 'bad' : 'moderate';
-    const ratio = totalDebits / totalCredits;
-    if (ratio <= 0.6) return 'good';
-    if (ratio <= 0.9) return 'moderate';
-    return 'bad';
-  };
-  const getNetFlowTone = (netFlow: number, totalCredits: number): Tone => {
-    if (totalCredits > 0) {
-      const ratio = netFlow / totalCredits;
-      if (ratio >= 0.2) return 'excellent';
-      if (ratio > 0) return 'good';
-      if (ratio >= -0.1) return 'moderate';
-      return 'bad';
+  const handleTallyExport = async () => {
+    if (!hasTallyAccess) {
+      setShowUpgradeDialog(true);
+      return;
     }
-    if (netFlow > 0) return 'good';
-    if (netFlow === 0) return 'moderate';
-    return 'bad';
+    await exportAsTally();
   };
-
-
 
   const handlePremiumExport = (format: 'docx' | 'ods') => {
     if (!isPaidUser) {
@@ -1453,10 +1325,6 @@ Analytics Summary:
       exportAsODS();
     }
   };
-
-  const creditTone: Tone = analytics ? getCreditTone(analytics.totalCredits) : 'good';
-  const debitTone: Tone = analytics ? getDebitTone(analytics.totalCredits, analytics.totalDebits) : 'moderate';
-  const netFlowTone: Tone = analytics ? getNetFlowTone(analytics.netFlow, analytics.totalCredits) : 'moderate';
 
   return (
     <section className="relative py-16 px-4 sm:px-6 overflow-hidden bg-background">
@@ -1759,555 +1627,35 @@ Analytics Summary:
                 </div>
               )}
 
-              {/* Batch Results and Download */}
-              {batchResults.length > 0 && (
-                <div className="text-center space-y-3">
-                  <div className="flex items-center justify-center gap-2 tone-excellent-text">
-                    <CheckCircle className="h-5 w-5" />
-                    <span className="font-medium">Batch Conversion Complete!</span>
-                  </div>
-                  <p className="text-sm font-medium text-muted-foreground">Download options:</p>
-                   <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Button
-                      size="lg"
-                      className="excel-button"
-                      onClick={handleBatchDownload}
-                      disabled={batchDownloading}
-                    >
-                       {batchDownloading ? (
-                         <>
-                           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                           Downloading...
-                         </>
-                       ) : (
-                         <>
-                           <FileSpreadsheet className="mr-2 h-5 w-5" />
-                           Separate Excel
-                         </>
-                       )}
-                     </Button>
-                     {mergeInfo && mergeInfo.available && mergeResult && (
-                      <Button
-                        size="lg"
-                        className="excel-button"
-                        onClick={handleMergedDownload}
-                        disabled={mergeDownloading}
-                      >
-                         {mergeDownloading ? (
-                           <>
-                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                             Preparing...
-                           </>
-                         ) : (
-                           <>
-                             <FileSpreadsheet className="mr-2 h-5 w-5" />
-                             Merge Excel
-                           </>
-                         )}
-                       </Button>
-                     )}
-                   </div>
-                   {mergeInfo && !mergeInfo.available && (
-                     <p className="text-xs text-muted-foreground">
-                       Merge disabled: {mergeInfo.reasons?.join('; ') || 'Conditions not met'}
-                     </p>
-                   )}
-                   <p className="text-xs text-muted-foreground">Successfully converted: {batchResults.filter(r => r.status === 'success').length}/{batchResults.length}</p>
-
-                   {/* Additional Export Options for Batch */}
-                   <div className="flex flex-wrap gap-2 justify-center pt-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={exportAsCSV}
-                      disabled={transactions.length === 0}
-                      className="csv-button"
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      CSV
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={exportAsTally}
-                      disabled={transactions.length === 0}
-                      className="text-white"
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      Tally XML
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={exportAsPDF}
-                      disabled={transactions.length === 0}
-                      className="text-white"
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      Analyzed PDF
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handlePremiumExport('docx')}
-                      disabled={transactions.length === 0}
-                      className={`text-white ${!isPaidUser ? 'bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]' : ''}`}
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      DOCX
-                      {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handlePremiumExport('ods')}
-                      disabled={transactions.length === 0}
-                      className={`text-white ${!isPaidUser ? 'bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]' : ''}`}
-                    >
-                      <FileSpreadsheet className="mr-2 h-4 w-4" />
-                      ODS
-                      {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
-                    </Button>
-                   </div>
-                   {!isPaidUser && (
-                     <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                       <Crown className="h-3 w-3 text-amber-500" />
-                       DOCX & ODS are premium formats
-                     </p>
-                   )}
-                 </div>
-               )}
-
-              {/* Single File Download Buttons - Show after conversion */}
-              {conversionResult && batchResults.length === 0 && (
-                <div className="text-center space-y-3">
-                  <div className="flex items-center justify-center gap-2 tone-excellent-text">
-                    <CheckCircle className="h-5 w-5" />
-                    <span className="font-medium">Conversion Complete!</span>
-                  </div>
-                  <p className="text-sm font-medium text-muted-foreground">Download your file:</p>
-                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Button
-                      size="lg"
-                      className="excel-button"
-                      onClick={handleDownload}
-                      disabled={downloading}
-                    >
-                      {downloading ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Downloading...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="mr-2 h-5 w-5" />
-                          Download Excel
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={exportAsCSV}
-                      disabled={transactions.length === 0}
-                      className="csv-button"
-                    >
-                      <FileText className="mr-2 h-5 w-5" />
-                      CSV
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={exportAsTally}
-                      disabled={transactions.length === 0}
-                      className="text-white"
-                    >
-                      <FileText className="mr-2 h-5 w-5" />
-                      Tally XML
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={exportAsPDF}
-                      disabled={transactions.length === 0}
-                      className="text-white"
-                    >
-                      <FileText className="mr-2 h-5 w-5" />
-                      Analyzed PDF
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={() => handlePremiumExport('docx')}
-                      disabled={transactions.length === 0}
-                      className={`text-white ${!isPaidUser ? 'bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]' : ''}`}
-                    >
-                      <FileText className="mr-2 h-5 w-5" />
-                      DOCX
-                      {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
-                    </Button>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      onClick={() => handlePremiumExport('ods')}
-                      disabled={transactions.length === 0}
-                      className={`text-white ${!isPaidUser ? 'bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]' : ''}`}
-                    >
-                      <FileSpreadsheet className="mr-2 h-5 w-5" />
-                      ODS
-                      {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
-                    </Button>
-                  </div>
-                  {!isPaidUser && (
-                    <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                      <Crown className="h-3 w-3 text-amber-500" />
-                      DOCX & ODS are premium formats
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* AI Processing Status Panel */}
-              {aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
-
-              {(converting || showProgress) && (
-                <div className="rounded-xl border border-white/10 bg-[#191919]/80 p-4 sm:p-5" role="status" aria-live="polite" aria-atomic="true">
-                  <div className="space-y-2">
-                    {conversionSteps.map((step, index) => {
-                      const isDone = index < progressStep;
-                      const isActive = index === progressStep;
-                      const isUpcoming = index > progressStep;
-
-                      return (
-                        <div
-                          key={step}
-                          className={`relative flex items-center gap-3 rounded-lg px-3 py-2 transition-all duration-500 ${
-                            isActive
-                              ? "text-white"
-                              : isDone
-                                ? "text-emerald-200"
-                                : "text-white/50"
-                          } ${
-                            isActive
-                              ? "before:absolute before:inset-0 before:-z-10 before:rounded-lg before:bg-primary/10 before:blur-xl before:opacity-70 before:content-['']"
-                              : ""
-                          } ${
-                            isDone
-                              ? "bg-emerald-500/10 border border-emerald-500/25"
-                              : isActive
-                                ? "bg-primary/5 border border-primary/20"
-                                : "border border-transparent"
-                          }`}
-                        >
-                          <div
-                            className={`relative flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-500 ${
-                              isDone
-                                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                                : isActive
-                                  ? "border-primary/60 text-primary shadow-[0_0_18px_hsl(var(--primary)/0.35)]"
-                                  : "border-white/10 text-white/40"
-                            }`}
-                          >
-                            {isDone ? (
-                              <CheckCircle className="h-4 w-4" />
-                            ) : (
-                              <div
-                                className={`h-2 w-2 rounded-full ${
-                                  isActive ? "bg-primary animate-pulse" : "bg-white/20"
-                                }`}
-                              />
-                            )}
-                          </div>
-                          <span className={`text-sm font-medium ${isUpcoming ? "text-white/50" : ""}`}>
-                            {step}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* FOIR & Underwriting Analysis Panel - with skeleton during conversion */}
-              {converting && (
-                <UnderwritingPanelSkeleton />
-              )}
-              {!converting && analytics?.underwriting && (
-                <UnderwritingPanel underwriting={analytics.underwriting} currencyCode={currencyCode} />
-              )}
-
-              {/* Risk Analysis & Fraud Detection Panel */}
-              {analytics?.riskAnalysis && (
-                <FraudAlertPanel riskAnalysis={analytics.riskAnalysis} currencyCode={currencyCode} />
-              )}
-
-              {/* Analytics Summary */}
-              {analytics && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <PieChart className="w-5 h-5 text-primary" />
-                    Financial Analytics
-                  </h3>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Card className={`p-4 !bg-[#191919] ${toneClasses[creditTone].border}`}>
-                      <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[creditTone].text}`}>
-                        <TrendingUp className={`w-4 h-4 ${toneClasses[creditTone].text}`} />
-                        Total Credits
-                      </div>
-                      <p className={`text-2xl font-bold ${toneClasses[creditTone].text}`}>
-                        {formatAmountNoSymbol(truncateDecimals(analytics.totalCredits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </p>
-                    </Card>
-
-                    <Card className={`p-4 !bg-[#191919] ${toneClasses[debitTone].border}`}>
-                      <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[debitTone].text}`}>
-                        <TrendingDown className={`w-4 h-4 ${toneClasses[debitTone].text}`} />
-                        Total Debits
-                      </div>
-                      <p className={`text-2xl font-bold ${toneClasses[debitTone].text}`}>
-                        {formatAmountNoSymbol(truncateDecimals(analytics.totalDebits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </p>
-                    </Card>
-
-                    <Card className={`p-4 !bg-[#191919] ${toneClasses[netFlowTone].border}`}>
-                      <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[netFlowTone].text}`}>
-                        {analytics.netFlow >= 0 ? <TrendingUp className={`w-4 h-4 ${toneClasses[netFlowTone].text}`} /> : <TrendingDown className={`w-4 h-4 ${toneClasses[netFlowTone].text}`} />}
-                        Net Flow
-                      </div>
-                      <p className={`text-2xl font-bold ${toneClasses[netFlowTone].text}`}>
-                        {formatAmountNoSymbol(truncateDecimals(analytics.netFlow), { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'always' })}
-                      </p>
-                    </Card>
-
-                    {analytics.duplicateCount > 0 && (
-                      <Card className="p-4 !bg-[#191919] border-orange-500/30">
-                        <div className="flex items-center gap-2 text-sm tone-moderate-text mb-1">
-                          <AlertTriangle className="w-4 h-4 tone-moderate-text" />
-                          Duplicates Found
-                        </div>
-                        <p className="text-2xl font-bold tone-moderate-text">
-                          {analytics.duplicateCount}
-                        </p>
-                      </Card>
-                    )}
-                  </div>
-
-                  {/* Category Breakdown */}
-                  <div className="mt-4">
-                    <p className="text-sm text-muted-foreground mb-3">Category Breakdown</p>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(analytics.categoryBreakdown)
-                        .sort((a, b) => b[1].count - a[1].count)
-                        .slice(0, 8)
-                        .map(([category, data]) => (
-                          <Badge
-                            key={category}
-                            variant="outline"
-                            className={`${categoryColors[category] || categoryColors['Other']} border`}
-                          >
-                            {category}: {data.count}
-                          </Badge>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Transaction Preview */}
-              {transactions.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <h3 className="text-lg font-semibold">Extracted Transactions</h3>
-                    <div className="flex items-center gap-3">
-                      {analytics && analytics.duplicateCount > 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowDuplicatesOnly(!showDuplicatesOnly)}
-                          className={
-                            showDuplicatesOnly
-                              ? "bg-surface-elevated/30 border border-surface-elevated/60 shadow-[0_0_10px_rgba(0,0,0,0.18)]"
-                              : ""
-                          }
-                        >
-                          <AlertTriangle className="w-4 h-4 mr-1" />
-                          {showDuplicatesOnly ? 'Show All' : `Show Duplicates (${analytics.duplicateCount})`}
-                        </Button>
-                      )}
-                      <span className="text-sm text-muted-foreground">
-                        {transactions.length} transaction{transactions.length !== 1 ? 's' : ''} found
-                      </span>
-                    </div>
-                  </div>
-
-                  <Card className="overflow-hidden !bg-[#191919] border-primary/20">
-                    <div className="overflow-x-auto">
-                      <ScrollArea className="h-[400px] min-w-[720px]">
-                        <Table className="min-w-[720px]">
-                        <TableHeader>
-                          <TableRow className="bg-[#191919]">
-                            <TableHead className="font-semibold">Date</TableHead>
-                            <TableHead className="font-semibold">Description</TableHead>
-                            <TableHead className="font-semibold">Category</TableHead>
-                            <TableHead className="font-semibold text-right tone-bad-text">Debit</TableHead>
-                            <TableHead className="font-semibold text-right tone-excellent-text">Credit</TableHead>
-                            <TableHead className="font-semibold text-right">Balance</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {transactions
-                            .filter(t => !showDuplicatesOnly || t.isDuplicate)
-                            .map((transaction, index) => (
-                            <TableRow
-                              key={index}
-                              className={`${
-                                transaction.balanceMismatch
-                                  ? 'bg-red-500/10 border-l-2 border-l-red-500'
-                                  : transaction.riskFlag
-                                    ? 'bg-orange-500/5 border-l-2 border-l-orange-500'
-                                    : transaction.isDuplicate
-                                      ? 'bg-yellow-500/5 border-l-2 border-l-yellow-500'
-                                      : ''
-                              }`}
-                            >
-                              <TableCell className="font-medium">
-                                <div className="flex items-center gap-2">
-                                  {transaction.date}
-                                  {transaction.balanceMismatch && (
-                                    <Tooltip>
-                                      <TooltipTrigger aria-label="Balance mismatch warning">
-                                        <ShieldAlert className="w-4 h-4 tone-bad-text" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        Balance mismatch! Expected: {transaction.expectedBalance == null ? 'N/A' : formatAmount(transaction.expectedBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                  {transaction.riskFlag && !transaction.balanceMismatch && (
-                                    <Tooltip>
-                                      <TooltipTrigger aria-label="Risk flag warning">
-                                        <AlertTriangle className="w-4 h-4 text-orange-500" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        Risk Flag: {transaction.riskFlag}
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                  {transaction.isDuplicate && !transaction.balanceMismatch && !transaction.riskFlag && (
-                                    <Tooltip>
-                                      <TooltipTrigger aria-label="Potential duplicate warning">
-                                        <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        Potential duplicate (Group #{transaction.duplicateGroup})
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="max-w-[200px] truncate">
-                                {transaction.description}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="outline"
-                                  className={`text-xs ${categoryColors[transaction.category] || categoryColors['Other']} border`}
-                                >
-                                  {transaction.category}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {transaction.debit > 0 ? (
-                                  <span className="inline-flex items-center justify-end rounded-md tone-bad-bg tone-bad-text px-2 py-0.5 font-semibold tabular-nums">
-                                    {formatAmount(transaction.debit, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {transaction.credit > 0 ? (
-                                  <span className="inline-flex items-center justify-end rounded-md tone-excellent-bg tone-excellent-text px-2 py-0.5 font-semibold tabular-nums">
-                                    {formatAmount(transaction.credit, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className={`text-right ${transaction.balanceMismatch ? 'tone-bad-text' : ''}`}>
-                                {formatAmount(transaction.balance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                {transaction.balanceMismatch && transaction.expectedBalance && (
-                                  <div className="text-xs text-muted-foreground">
-                                    Expected: {formatAmount(transaction.expectedBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </div>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                        </Table>
-                      </ScrollArea>
-                    </div>
-                  </Card>
-                </div>
-              )}
-
-              {/* Process Steps */}
-              <div className="grid md:grid-cols-3 gap-6">
-                <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-primary/20">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <FileText className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-semibold text-sm">1. Upload</p>
-                    <p className="text-xs text-muted-foreground">
-                      Drag & drop your statement
-                    </p>
-                  </div>
-                </div>
-
-                <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-secondary/20">
-                  <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
-                    <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-semibold text-sm">2. AI Processing</p>
-                    <p className="text-xs text-muted-foreground">
-                      Our AI extracts data
-                    </p>
-                  </div>
-                </div>
-
-                <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-green-500/20">
-                  <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
-                    <CheckCircle className="w-4 h-4 tone-excellent-text" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-semibold text-sm">3. Download</p>
-                    <p className="text-xs text-muted-foreground">
-                      Get your Excel file
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Supported Banks */}
-              <div className="text-center pt-8 border-t border-muted">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Compatible with most major banks worldwide
-                </p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {["HDFC Bank", "ICICI Bank", "Axis Bank", "State Bank of India", "IDBI Bank", "Yes Bank", "Kotak Bank", "Union Bank", "Bank of Baroda", "Punjab National Bank", "HSBC", "Citibank", "Deutsche Bank", "Chase Bank", "Bank of America", "Wells Fargo", "Santander", "BNP Paribas", "ING", "Barclays", "DBS Bank", "OCBC", "UOB", "China Construction Bank", "Agricultural Bank of China", "Bank of China", "ICBC", "Mitsubishi UFJ", "Sumitomo Mitsui", "Nomura"].map((bank) => (
-                    <span
-                      key={bank}
-                      className="px-3 py-1 text-xs rounded-full bg-muted/50 text-muted-foreground transition-all"
-                    >
-                      {bank}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              <ResultsSection
+                batchResults={batchResults}
+                batchDownloading={batchDownloading}
+                mergeInfo={mergeInfo}
+                mergeResult={mergeResult}
+                mergeDownloading={mergeDownloading}
+                handleBatchDownload={handleBatchDownload}
+                handleMergedDownload={handleMergedDownload}
+                conversionResult={conversionResult}
+                downloading={downloading}
+                handleDownload={handleDownload}
+                transactions={transactions}
+                isPaidUser={isPaidUser}
+                hasTallyAccess={hasTallyAccess}
+                exportAsCSV={exportAsCSV}
+                handleTallyExport={handleTallyExport}
+                exportAsPDF={exportAsPDF}
+                handlePremiumExport={handlePremiumExport}
+                aiStatus={aiStatus}
+                converting={converting}
+                showProgress={showProgress}
+                progressStep={progressStep}
+                analytics={analytics}
+                currencyCode={currencyCode}
+                showDuplicatesOnly={showDuplicatesOnly}
+                setShowDuplicatesOnly={setShowDuplicatesOnly}
+                formatAmountNoSymbol={formatAmountNoSymbol}
+                truncateDecimals={truncateDecimals}
+              />
             </div>
           </div>
         </div>

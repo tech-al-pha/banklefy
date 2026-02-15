@@ -7,7 +7,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { LuxuryCursor } from "@/components/LuxuryCursor";
 import { Loader2 } from "lucide-react";
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
+import { Helmet, HelmetProvider } from "@dr.pogodin/react-helmet";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { RequireAuth, RequirePaid } from "@/components/RouteGuards";
@@ -32,128 +33,140 @@ const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
+type RouteMeta = { title: string; description: string; image?: string };
+
+const DEFAULT_META: RouteMeta = {
+  title: "Bank Statement Converter to Excel & CSV | Fast AI OCR | Banklefy",
+  description:
+    "Convert bank statement PDFs to Excel or CSV in seconds. Accurate AI OCR, multi-bank support, secure processing, instant export.",
+  image: "https://banklefy.vercel.app/og-banklefy.jpg",
+};
+
+const META_BY_PATH: Record<string, RouteMeta> = {
+  "/": DEFAULT_META,
+  "/pricing": {
+    title: "Pricing | Banklefy Bank Statement Converter",
+    description:
+      "Transparent pricing for AI bank statement conversion. Free trials and paid plans with higher limits and premium exports.",
+  },
+  "/features": {
+    title: "Features | Banklefy Bank Statement Converter",
+    description:
+      "Explore AI OCR, PDF to Excel/CSV, multilingual support, and secure processing for fast conversions.",
+  },
+  "/benefits": {
+    title: "Benefits | Banklefy Statement Converter",
+    description:
+      "Reduce manual work, speed reconciliation, and improve accuracy with AI bank statement conversion.",
+  },
+  "/about": {
+    title: "About Banklefy",
+    description:
+      "Banklefy delivers secure, accurate bank statement conversion with AI OCR and modern financial workflows.",
+  },
+  "/sample-report": {
+    title: "Sample Report | Banklefy",
+    description:
+      "Preview a clean, structured Excel report generated from a bank statement.",
+  },
+  "/privacy": {
+    title: "Privacy Policy | Banklefy",
+    description: "Learn how Banklefy handles data privacy and document security.",
+  },
+  "/terms": {
+    title: "Terms of Service | Banklefy",
+    description: "Review the terms of service for using Banklefy.",
+  },
+  "/auth": {
+    title: "Sign In | Banklefy",
+    description: "Sign in or create an account to convert bank statements.",
+  },
+  "/dashboard": {
+    title: "Dashboard | Banklefy",
+    description: "Manage processed pages and download Excel exports.",
+  },
+  "/settings": {
+    title: "Settings | Banklefy",
+    description: "Manage your account settings and preferences.",
+  },
+  "/profile": {
+    title: "Profile | Banklefy",
+    description: "View your account details and recent page usage.",
+  },
+  "/help": {
+    title: "Help Center | Banklefy",
+    description:
+      "Get help with supported formats, password-protected PDFs, daily limits, and refund requests.",
+  },
+  "/blog": {
+    title: "Blog | Banklefy",
+    description: "Product updates, tutorials, and announcements from Banklefy.",
+  },
+  "/admin": {
+    title: "Admin Console | Banklefy",
+    description: "Administrative dashboard for system status and operations.",
+  },
+};
+
+const NO_INDEX_PREFIXES = ["/admin", "/dashboard", "/settings", "/profile", "/auth", "/chat"];
+
+const normalizePathname = (pathname: string) =>
+  pathname !== "/" && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+
+const getSiteUrl = () => {
+  const configured = import.meta.env.VITE_SITE_URL as string | undefined;
+  if (configured && configured.trim()) {
+    return configured.replace(/\/+$/, "");
+  }
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  return "https://banklefy.vercel.app";
+};
+
+const toAbsoluteUrl = (value: string, baseUrl: string) => {
+  if (/^https?:\/\//i.test(value)) return value;
+  const normalizedPath = value.startsWith("/") ? value : `/${value}`;
+  return `${baseUrl}${normalizedPath}`;
+};
+
 const AppRoutes = () => {
   const location = useLocation();
-
-  useEffect(() => {
-    const defaultMeta = {
-      title: "Bank Statement Converter to Excel & CSV | Fast AI OCR | Banklefy",
-      description:
-        "Convert bank statement PDFs to Excel or CSV in seconds. Accurate AI OCR, multi-bank support, secure processing, instant export.",
-      image: "https://banklefy.vercel.app/og-banklefy.jpg",
-    };
-
-    const metaByPath: Record<string, { title: string; description: string; image?: string }> = {
-      "/": defaultMeta,
-      "/pricing": {
-        title: "Pricing | Banklefy Bank Statement Converter",
-        description:
-          "Transparent pricing for AI bank statement conversion. Free trials and paid plans with higher limits and premium exports.",
-      },
-      "/features": {
-        title: "Features | Banklefy Bank Statement Converter",
-        description:
-          "Explore AI OCR, PDF to Excel/CSV, multilingual support, and secure processing for fast conversions.",
-      },
-      "/benefits": {
-        title: "Benefits | Banklefy Statement Converter",
-        description:
-          "Reduce manual work, speed reconciliation, and improve accuracy with AI bank statement conversion.",
-      },
-      "/about": {
-        title: "About Banklefy",
-        description:
-          "Banklefy delivers secure, accurate bank statement conversion with AI OCR and modern financial workflows.",
-      },
-      "/sample-report": {
-        title: "Sample Report | Banklefy",
-        description:
-          "Preview a clean, structured Excel report generated from a bank statement.",
-      },
-      "/privacy": {
-        title: "Privacy Policy | Banklefy",
-        description: "Learn how Banklefy handles data privacy and document security.",
-      },
-      "/terms": {
-        title: "Terms of Service | Banklefy",
-        description: "Review the terms of service for using Banklefy.",
-      },
-      "/auth": {
-        title: "Sign In | Banklefy",
-        description: "Sign in or create an account to convert bank statements.",
-      },
-      "/dashboard": {
-        title: "Dashboard | Banklefy",
-        description: "Manage processed pages and download Excel exports.",
-      },
-      "/settings": {
-        title: "Settings | Banklefy",
-        description: "Manage your account settings and preferences.",
-      },
-      "/profile": {
-        title: "Profile | Banklefy",
-        description: "View your account details and recent page usage.",
-      },
-      "/help": {
-        title: "Help Center | Banklefy",
-        description:
-          "Get help with supported formats, password-protected PDFs, daily limits, and refund requests.",
-      },
-      "/blog": {
-        title: "Blog | Banklefy",
-        description: "Product updates, tutorials, and announcements from Banklefy.",
-      },
-      "/admin": {
-        title: "Admin Console | Banklefy",
-        description: "Administrative dashboard for system status and operations.",
-      },
-    };
-
-    const pathname = location.pathname;
-    const meta = metaByPath[pathname] || defaultMeta;
-    const siteUrl =
-      (import.meta.env.VITE_SITE_URL as string | undefined) ||
-      (typeof window !== "undefined" ? window.location.origin : "https://banklefy.vercel.app");
-
-    document.title = meta.title;
-
-    const setMeta = (attr: "name" | "property", key: string, content: string) => {
-      let tag = document.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
-      if (!tag) {
-        tag = document.createElement("meta");
-        tag.setAttribute(attr, key);
-        document.head.appendChild(tag);
-      }
-      tag.setAttribute("content", content);
-    };
-
-    setMeta("name", "description", meta.description);
-    setMeta("property", "og:title", meta.title);
-    setMeta("property", "og:description", meta.description);
-    setMeta("name", "twitter:title", meta.title);
-    setMeta("name", "twitter:description", meta.description);
-
-    const canonical = `${siteUrl}${pathname === "/" ? "/" : pathname}`;
-    let canonicalTag = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
-    if (!canonicalTag) {
-      canonicalTag = document.createElement("link");
-      canonicalTag.setAttribute("rel", "canonical");
-      document.head.appendChild(canonicalTag);
-    }
-    canonicalTag.setAttribute("href", canonical);
-
-    setMeta("property", "og:url", canonical);
-    setMeta("name", "twitter:url", canonical);
-    setMeta("property", "og:image", meta.image || defaultMeta.image);
-    setMeta("name", "twitter:image", meta.image || defaultMeta.image);
-
-    const noIndexPaths = ["/admin", "/dashboard", "/settings", "/profile", "/auth", "/chat"];
-    const shouldNoIndex = noIndexPaths.some((path) => pathname.startsWith(path));
-    setMeta("name", "robots", shouldNoIndex ? "noindex, nofollow" : "index, follow");
-  }, [location.pathname]);
+  const normalizedPathname = normalizePathname(location.pathname);
+  const meta = META_BY_PATH[normalizedPathname] || DEFAULT_META;
+  const siteUrl = getSiteUrl();
+  const canonical = `${siteUrl}${normalizedPathname === "/" ? "/" : normalizedPathname}`;
+  const imageUrl = toAbsoluteUrl(meta.image || DEFAULT_META.image || "/og-banklefy.jpg", siteUrl);
+  const shouldNoIndex = NO_INDEX_PREFIXES.some((path) => normalizedPathname.startsWith(path));
 
   return (
     <ErrorBoundary resetKey={location.pathname}>
+      <Helmet>
+        <title>{meta.title}</title>
+        <link rel="canonical" href={canonical} />
+
+        <meta name="description" content={meta.description} />
+        <meta name="robots" content={shouldNoIndex ? "noindex, nofollow" : "index, follow"} />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Banklefy" />
+        <meta property="og:title" content={meta.title} />
+        <meta property="og:description" content={meta.description} />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:image" content={imageUrl} />
+        <meta property="og:image:secure_url" content={imageUrl} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="Banklefy bank statement converter preview" />
+
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={meta.title} />
+        <meta name="twitter:description" content={meta.description} />
+        <meta name="twitter:url" content={canonical} />
+        <meta name="twitter:image" content={imageUrl} />
+        <meta name="twitter:image:alt" content="Banklefy bank statement converter preview" />
+      </Helmet>
+
       <Suspense
         fallback={
           <div className="min-h-screen bg-background flex items-center justify-center" role="status" aria-live="polite">
@@ -189,16 +202,18 @@ const AppRoutes = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <LanguageProvider>
-      <AuthProvider>
-        <TooltipProvider>
-          <LuxuryCursor />
-          <Toaster />
-          <Sonner />
-          <AppRoutes />
-        </TooltipProvider>
-      </AuthProvider>
-    </LanguageProvider>
+    <HelmetProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <LuxuryCursor />
+            <Toaster />
+            <Sonner />
+            <AppRoutes />
+          </TooltipProvider>
+        </AuthProvider>
+      </LanguageProvider>
+    </HelmetProvider>
   </QueryClientProvider>
 );
 

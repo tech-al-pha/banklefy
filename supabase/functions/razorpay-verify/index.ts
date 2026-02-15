@@ -9,6 +9,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     'https://banklefy.lovable.app',
     'https://banklefy.vercel.app',
     'http://localhost:8080',
+    'http://localhost:8081',
     'http://localhost:5173',
     'http://localhost:3000',
   ].filter(Boolean) as string[];
@@ -42,6 +43,16 @@ const respond = (req: Request, status: number, payload: unknown) =>
     status,
     headers: { 'Content-Type': 'application/json', ...getCorsHeaders(req) },
   });
+
+const extractBearerToken = (authHeader: string | null): string | null => {
+  if (!authHeader) return null;
+  const segments = authHeader.split(',').map((part) => part.trim());
+  for (const segment of segments) {
+    const match = segment.match(/^Bearer\s+(.+)$/i);
+    if (match && match[1]?.trim()) return match[1].trim();
+  }
+  return null;
+};
 
 // Plan → pages mapping
 const PLAN_PAGES: Record<string, number> = {
@@ -105,19 +116,18 @@ Deno.serve(async (req) => {
   }
 
   // Auth check
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
+  const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
+  const tokenFromHeader = extractBearerToken(authHeader);
+  const tokenFromBody = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
+  const token = tokenFromHeader || tokenFromBody;
+  if (!token) {
     return respond(req, 401, { error: 'Authentication required.' });
   }
-
-  const token = authHeader.replace('Bearer ', '').trim();
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
   const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-  if (authError || !authData?.user) {
-    return respond(req, 401, { error: 'Unable to verify your session.' });
+  if (authError || !authData.user) {
+    return respond(req, 401, { error: 'Invalid or expired session.' });
   }
-
   const userId = authData.user.id;
 
   // Get order from DB
@@ -179,5 +189,3 @@ Deno.serve(async (req) => {
     pages_added: pagesAdded,
   });
 });
-
-

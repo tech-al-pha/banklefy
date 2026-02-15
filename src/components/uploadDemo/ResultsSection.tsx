@@ -1,0 +1,653 @@
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Crown,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Loader2,
+  Lock,
+  PieChart,
+  ShieldAlert,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
+import { AIStatusPanel } from "@/components/AIStatusPanel";
+import { UnderwritingPanel } from "@/components/UnderwritingPanel";
+import { UnderwritingPanelSkeleton } from "@/components/UnderwritingPanelSkeleton";
+import { FraudAlertPanel } from "@/components/FraudAlertPanel";
+import { categoryColors, conversionSteps, supportedBanks } from "./constants";
+import type {
+  AiStatus,
+  Analytics,
+  MergeInfo,
+  Transaction,
+} from "./types";
+
+type ToneName = "excellent" | "good" | "moderate" | "bad";
+
+const toneClasses: Record<ToneName, { border: string; text: string }> = {
+  excellent: { border: "border-[hsl(var(--tone-excellent-border))]", text: "tone-excellent-text" },
+  good: { border: "border-[hsl(var(--tone-good-border))]", text: "tone-good-text" },
+  moderate: { border: "border-[hsl(var(--tone-moderate-border))]", text: "tone-moderate-text" },
+  bad: { border: "border-[hsl(var(--tone-bad-border))]", text: "tone-bad-text" },
+};
+
+const getCreditTone = (totalCredits: number): ToneName => (totalCredits > 0 ? "excellent" : "bad");
+const getDebitTone = (totalCredits: number, totalDebits: number): ToneName => {
+  if (totalDebits <= 0) return "moderate";
+  if (totalCredits <= 0) return "bad";
+  const ratio = totalDebits / totalCredits;
+  if (ratio <= 0.7) return "good";
+  if (ratio <= 1.0) return "moderate";
+  return "bad";
+};
+const getNetFlowTone = (netFlow: number, totalCredits: number): ToneName => {
+  if (netFlow > 0) return "excellent";
+  if (netFlow === 0) return "moderate";
+  if (totalCredits > 0 && Math.abs(netFlow) / totalCredits <= 0.2) return "moderate";
+  return "bad";
+};
+
+type FormatAmountFn = (
+  value: number,
+  options?: {
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+    signDisplay?: "auto" | "always" | "never";
+  },
+) => string;
+
+type ResultsSectionProps = {
+  batchResults: Array<{ status: "success" | "error" }>;
+  batchDownloading: boolean;
+  mergeInfo: MergeInfo | null;
+  mergeResult: { excelData?: string; resultPath?: string | null; fileName: string } | null;
+  mergeDownloading: boolean;
+  handleBatchDownload: () => Promise<void>;
+  handleMergedDownload: () => Promise<void>;
+  conversionResult: { id: string | null; resultPath: string | null; excelData?: string } | null;
+  downloading: boolean;
+  handleDownload: () => Promise<void>;
+  transactions: Transaction[];
+  isPaidUser: boolean;
+  hasTallyAccess: boolean;
+  exportAsCSV: () => Promise<void>;
+  handleTallyExport: () => Promise<void>;
+  exportAsPDF: () => Promise<void>;
+  handlePremiumExport: (format: "docx" | "ods") => void;
+  aiStatus: AiStatus | null;
+  converting: boolean;
+  showProgress: boolean;
+  progressStep: number;
+  analytics: Analytics | null;
+  currencyCode: string;
+  showDuplicatesOnly: boolean;
+  setShowDuplicatesOnly: (value: boolean) => void;
+  formatAmountNoSymbol: FormatAmountFn;
+  truncateDecimals: (value: number, decimals?: number) => number;
+};
+
+export const ResultsSection = ({
+  batchResults,
+  batchDownloading,
+  mergeInfo,
+  mergeResult,
+  mergeDownloading,
+  handleBatchDownload,
+  handleMergedDownload,
+  conversionResult,
+  downloading,
+  handleDownload,
+  transactions,
+  isPaidUser,
+  hasTallyAccess,
+  exportAsCSV,
+  handleTallyExport,
+  exportAsPDF,
+  handlePremiumExport,
+  aiStatus,
+  converting,
+  showProgress,
+  progressStep,
+  analytics,
+  currencyCode,
+  showDuplicatesOnly,
+  setShowDuplicatesOnly,
+  formatAmountNoSymbol,
+  truncateDecimals,
+}: ResultsSectionProps) => {
+  const creditTone: ToneName = analytics ? getCreditTone(analytics.totalCredits) : "good";
+  const debitTone: ToneName = analytics ? getDebitTone(analytics.totalCredits, analytics.totalDebits) : "moderate";
+  const netFlowTone: ToneName = analytics ? getNetFlowTone(analytics.netFlow, analytics.totalCredits) : "moderate";
+  const lockedFormats: string[] = [];
+  if (!hasTallyAccess) lockedFormats.push("Tally XML");
+  if (!isPaidUser) lockedFormats.push("DOCX", "ODS");
+
+  return (
+    <>
+      {batchResults.length > 0 && (
+        <div className="text-center space-y-3">
+          <div className="flex items-center justify-center gap-2 tone-excellent-text">
+            <CheckCircle className="h-5 w-5" />
+            <span className="font-medium">Batch Conversion Complete!</span>
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">Download options:</p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Button
+              size="lg"
+              className="excel-button"
+              onClick={handleBatchDownload}
+              disabled={batchDownloading}
+            >
+              {batchDownloading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="mr-2 h-5 w-5" />
+                  Separate Excel
+                </>
+              )}
+            </Button>
+            {mergeInfo && mergeInfo.available && mergeResult && (
+              <Button
+                size="lg"
+                className="excel-button"
+                onClick={handleMergedDownload}
+                disabled={mergeDownloading}
+              >
+                {mergeDownloading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Preparing...
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="mr-2 h-5 w-5" />
+                    Merge Excel
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+          {mergeInfo && !mergeInfo.available && (
+            <p className="text-xs text-muted-foreground">
+              Merge disabled: {mergeInfo.reasons?.join("; ") || "Conditions not met"}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Successfully converted: {batchResults.filter((r) => r.status === "success").length}/{batchResults.length}
+          </p>
+
+          <div className="flex flex-wrap gap-2 justify-center pt-2">
+            <Button size="sm" variant="outline" onClick={exportAsCSV} disabled={transactions.length === 0} className="csv-button">
+              <FileText className="mr-2 h-4 w-4" />
+              CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleTallyExport}
+              disabled={transactions.length === 0}
+              className={`text-white ${
+                !hasTallyAccess
+                  ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
+                  : ""
+              }`}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Tally XML
+              {!hasTallyAccess && <Lock className="ml-1 h-3 w-3" />}
+            </Button>
+            <Button size="sm" variant="outline" onClick={exportAsPDF} disabled={transactions.length === 0} className="text-white">
+              <FileText className="mr-2 h-4 w-4" />
+              Analyzed PDF
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handlePremiumExport("docx")}
+              disabled={transactions.length === 0}
+              className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              DOCX
+              {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handlePremiumExport("ods")}
+              disabled={transactions.length === 0}
+              className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
+            >
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              ODS
+              {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
+            </Button>
+          </div>
+          {lockedFormats.length > 0 && (
+            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+              <Crown className="h-3 w-3 text-amber-500" />
+              {lockedFormats.join(", ")} {lockedFormats.length === 1 ? "is" : "are"} plan-gated formats
+            </p>
+          )}
+        </div>
+      )}
+
+      {conversionResult && batchResults.length === 0 && (
+        <div className="text-center space-y-3">
+          <div className="flex items-center justify-center gap-2 tone-excellent-text">
+            <CheckCircle className="h-5 w-5" />
+            <span className="font-medium">Conversion Complete!</span>
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">Download your file:</p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Button size="lg" className="excel-button" onClick={handleDownload} disabled={downloading}>
+              {downloading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-5 w-5" />
+                  Download Excel
+                </>
+              )}
+            </Button>
+            <Button size="lg" variant="outline" onClick={exportAsCSV} disabled={transactions.length === 0} className="csv-button">
+              <FileText className="mr-2 h-5 w-5" />
+              CSV
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={handleTallyExport}
+              disabled={transactions.length === 0}
+              className={`text-white ${
+                !hasTallyAccess
+                  ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
+                  : ""
+              }`}
+            >
+              <FileText className="mr-2 h-5 w-5" />
+              Tally XML
+              {!hasTallyAccess && <Lock className="ml-1 h-4 w-4" />}
+            </Button>
+            <Button size="lg" variant="outline" onClick={exportAsPDF} disabled={transactions.length === 0} className="text-white">
+              <FileText className="mr-2 h-5 w-5" />
+              Analyzed PDF
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => handlePremiumExport("docx")}
+              disabled={transactions.length === 0}
+              className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
+            >
+              <FileText className="mr-2 h-5 w-5" />
+              DOCX
+              {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => handlePremiumExport("ods")}
+              disabled={transactions.length === 0}
+              className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
+            >
+              <FileSpreadsheet className="mr-2 h-5 w-5" />
+              ODS
+              {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
+            </Button>
+          </div>
+          {lockedFormats.length > 0 && (
+            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+              <Crown className="h-3 w-3 text-amber-500" />
+              {lockedFormats.join(", ")} {lockedFormats.length === 1 ? "is" : "are"} plan-gated formats
+            </p>
+          )}
+        </div>
+      )}
+
+      {aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
+
+      {(converting || showProgress) && (
+        <div className="rounded-xl border border-white/10 bg-[#191919]/80 p-4 sm:p-5" role="status" aria-live="polite" aria-atomic="true">
+          <div className="space-y-2">
+            {conversionSteps.map((step, index) => {
+              const isDone = index < progressStep;
+              const isActive = index === progressStep;
+              const isUpcoming = index > progressStep;
+
+              return (
+                <div
+                  key={step}
+                  className={`relative flex items-center gap-3 rounded-lg px-3 py-2 transition-all duration-500 ${
+                    isActive ? "text-white" : isDone ? "text-emerald-200" : "text-white/50"
+                  } ${
+                    isActive
+                      ? "before:absolute before:inset-0 before:-z-10 before:rounded-lg before:bg-primary/10 before:blur-xl before:opacity-70 before:content-['']"
+                      : ""
+                  } ${
+                    isDone
+                      ? "bg-emerald-500/10 border border-emerald-500/25"
+                      : isActive
+                        ? "bg-primary/5 border border-primary/20"
+                        : "border border-transparent"
+                  }`}
+                >
+                  <div
+                    className={`relative flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-500 ${
+                      isDone
+                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
+                        : isActive
+                          ? "border-primary/60 text-primary shadow-[0_0_18px_hsl(var(--primary)/0.35)]"
+                          : "border-white/10 text-white/40"
+                    }`}
+                  >
+                    {isDone ? (
+                      <CheckCircle className="h-4 w-4" />
+                    ) : (
+                      <div className={`h-2 w-2 rounded-full ${isActive ? "bg-primary animate-pulse" : "bg-white/20"}`} />
+                    )}
+                  </div>
+                  <span className={`text-sm font-medium ${isUpcoming ? "text-white/50" : ""}`}>
+                    {step}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {converting && <UnderwritingPanelSkeleton />}
+      {!converting && analytics?.underwriting && (
+        <UnderwritingPanel underwriting={analytics.underwriting} currencyCode={currencyCode} />
+      )}
+
+      {analytics?.riskAnalysis && (
+        <FraudAlertPanel riskAnalysis={analytics.riskAnalysis} currencyCode={currencyCode} />
+      )}
+
+      {analytics && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <PieChart className="w-5 h-5 text-primary" />
+            Financial Analytics
+          </h3>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className={`p-4 !bg-[#191919] ${toneClasses[creditTone].border}`}>
+              <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[creditTone].text}`}>
+                <TrendingUp className={`w-4 h-4 ${toneClasses[creditTone].text}`} />
+                Total Credits
+              </div>
+              <p className={`text-2xl font-bold ${toneClasses[creditTone].text}`}>
+                {formatAmountNoSymbol(truncateDecimals(analytics.totalCredits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </Card>
+
+            <Card className={`p-4 !bg-[#191919] ${toneClasses[debitTone].border}`}>
+              <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[debitTone].text}`}>
+                <TrendingDown className={`w-4 h-4 ${toneClasses[debitTone].text}`} />
+                Total Debits
+              </div>
+              <p className={`text-2xl font-bold ${toneClasses[debitTone].text}`}>
+                {formatAmountNoSymbol(truncateDecimals(analytics.totalDebits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </Card>
+
+            <Card className={`p-4 !bg-[#191919] ${toneClasses[netFlowTone].border}`}>
+              <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[netFlowTone].text}`}>
+                {analytics.netFlow >= 0 ? (
+                  <TrendingUp className={`w-4 h-4 ${toneClasses[netFlowTone].text}`} />
+                ) : (
+                  <TrendingDown className={`w-4 h-4 ${toneClasses[netFlowTone].text}`} />
+                )}
+                Net Flow
+              </div>
+              <p className={`text-2xl font-bold ${toneClasses[netFlowTone].text}`}>
+                {formatAmountNoSymbol(truncateDecimals(analytics.netFlow), { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "always" })}
+              </p>
+            </Card>
+
+            {analytics.duplicateCount > 0 && (
+              <Card className="p-4 !bg-[#191919] border-orange-500/30">
+                <div className="flex items-center gap-2 text-sm tone-moderate-text mb-1">
+                  <AlertTriangle className="w-4 h-4 tone-moderate-text" />
+                  Duplicates Found
+                </div>
+                <p className="text-2xl font-bold tone-moderate-text">{analytics.duplicateCount}</p>
+              </Card>
+            )}
+          </div>
+
+          <div className="mt-4">
+            <p className="text-sm text-muted-foreground mb-3">Category Breakdown</p>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(analytics.categoryBreakdown)
+                .sort((a, b) => b[1].count - a[1].count)
+                .slice(0, 8)
+                .map(([category, data]) => (
+                  <Badge
+                    key={category}
+                    variant="outline"
+                    className={`${categoryColors[category] || categoryColors.Other} border`}
+                  >
+                    {category}: {data.count}
+                  </Badge>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {transactions.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h3 className="text-lg font-semibold">Extracted Transactions</h3>
+            <div className="flex items-center gap-3">
+              {analytics && analytics.duplicateCount > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDuplicatesOnly(!showDuplicatesOnly)}
+                  className={
+                    showDuplicatesOnly
+                      ? "bg-surface-elevated/30 border border-surface-elevated/60 shadow-[0_0_10px_rgba(0,0,0,0.18)]"
+                      : ""
+                  }
+                >
+                  <AlertTriangle className="w-4 h-4 mr-1" />
+                  {showDuplicatesOnly ? "Show All" : `Show Duplicates (${analytics.duplicateCount})`}
+                </Button>
+              )}
+              <span className="text-sm text-muted-foreground">
+                {transactions.length} transaction{transactions.length !== 1 ? "s" : ""} found
+              </span>
+            </div>
+          </div>
+
+          <Card className="overflow-hidden !bg-[#191919] border-primary/20">
+            <div className="overflow-x-auto">
+              <ScrollArea className="h-[400px] min-w-[720px]">
+                <Table className="min-w-[720px]">
+                  <TableHeader>
+                    <TableRow className="bg-[#191919]">
+                      <TableHead className="font-semibold">Date</TableHead>
+                      <TableHead className="font-semibold">Description</TableHead>
+                      <TableHead className="font-semibold">Category</TableHead>
+                      <TableHead className="font-semibold text-right tone-bad-text">Debit</TableHead>
+                      <TableHead className="font-semibold text-right tone-excellent-text">Credit</TableHead>
+                      <TableHead className="font-semibold text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions
+                      .filter((t) => !showDuplicatesOnly || t.isDuplicate)
+                      .map((transaction, index) => (
+                        <TableRow
+                          key={index}
+                          className={`${
+                            transaction.balanceMismatch
+                              ? "bg-red-500/10 border-l-2 border-l-red-500"
+                              : transaction.riskFlag
+                                ? "bg-orange-500/5 border-l-2 border-l-orange-500"
+                                : transaction.isDuplicate
+                                  ? "bg-yellow-500/5 border-l-2 border-l-yellow-500"
+                                  : ""
+                          }`}
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {transaction.date}
+                              {transaction.balanceMismatch && (
+                                <Tooltip>
+                                  <TooltipTrigger aria-label="Balance mismatch warning">
+                                    <ShieldAlert className="w-4 h-4 tone-bad-text" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Balance mismatch! Expected: {transaction.expectedBalance == null ? "N/A" : formatAmountNoSymbol(transaction.expectedBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              {transaction.riskFlag && !transaction.balanceMismatch && (
+                                <Tooltip>
+                                  <TooltipTrigger aria-label="Risk flag warning">
+                                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>Risk Flag: {transaction.riskFlag}</TooltipContent>
+                                </Tooltip>
+                              )}
+                              {transaction.isDuplicate && !transaction.balanceMismatch && !transaction.riskFlag && (
+                                <Tooltip>
+                                  <TooltipTrigger aria-label="Potential duplicate warning">
+                                    <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Potential duplicate (Group #{transaction.duplicateGroup})
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate">
+                            {transaction.description}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${categoryColors[transaction.category] || categoryColors.Other} border`}
+                            >
+                              {transaction.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {transaction.debit > 0 ? (
+                              <span className="inline-flex items-center justify-end rounded-md tone-bad-bg tone-bad-text px-2 py-0.5 font-semibold tabular-nums">
+                                {formatAmountNoSymbol(transaction.debit, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {transaction.credit > 0 ? (
+                              <span className="inline-flex items-center justify-end rounded-md tone-excellent-bg tone-excellent-text px-2 py-0.5 font-semibold tabular-nums">
+                                {formatAmountNoSymbol(transaction.credit, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className={`text-right ${transaction.balanceMismatch ? "tone-bad-text" : ""}`}>
+                            {formatAmountNoSymbol(transaction.balance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {transaction.balanceMismatch && transaction.expectedBalance && (
+                              <div className="text-xs text-muted-foreground">
+                                Expected: {formatAmountNoSymbol(transaction.expectedBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-primary/20">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <FileText className="w-4 h-4 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <p className="font-semibold text-sm">1. Upload</p>
+            <p className="text-xs text-muted-foreground">Drag & drop your statement</p>
+          </div>
+        </div>
+
+        <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-secondary/20">
+          <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
+            <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+          </div>
+          <div className="space-y-1">
+            <p className="font-semibold text-sm">2. AI Processing</p>
+            <p className="text-xs text-muted-foreground">Our AI extracts data</p>
+          </div>
+        </div>
+
+        <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-green-500/20">
+          <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
+            <CheckCircle className="w-4 h-4 tone-excellent-text" />
+          </div>
+          <div className="space-y-1">
+            <p className="font-semibold text-sm">3. Download</p>
+            <p className="text-xs text-muted-foreground">Get your Excel file</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="text-center pt-8 border-t border-muted">
+        <p className="text-sm text-muted-foreground mb-4">
+          Compatible with most major banks worldwide
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          {supportedBanks.map((bank) => (
+            <span
+              key={bank}
+              className="px-3 py-1 text-xs rounded-full bg-muted/50 text-muted-foreground transition-all"
+            >
+              {bank}
+            </span>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+};

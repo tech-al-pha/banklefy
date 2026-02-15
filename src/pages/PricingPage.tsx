@@ -5,7 +5,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BadgeDollarSign, Check } from "lucide-react";
 import { toast } from "sonner";
-import Logo from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
 
 type Plan = {
@@ -140,7 +139,6 @@ const PricingPage = () => {
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigate = useNavigate();
-  const razorpaySiteKey = import.meta.env.VITE_RAZORPAY_SITE_KEY;
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -156,19 +154,61 @@ const PricingPage = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const ensureActiveSession = async () => {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    if (!refreshError && refreshed.session?.access_token) {
+      return;
+    }
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.access_token) {
+      throw new Error("Session expired. Please sign in again.");
+    }
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      throw new Error("Session expired. Please sign in again.");
+    }
+  };
+
+  const getSessionAccessToken = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      throw new Error("Session expired. Please sign in again.");
+    }
+    return token;
+  };
+
   const verifyPayment = async (
     razorpay_order_id: string,
     razorpay_payment_id: string,
     razorpay_signature: string
   ) => {
     try {
-      const { data, error } = await supabase.functions.invoke("razorpay-verify", {
+      await ensureActiveSession();
+      const accessToken = await getSessionAccessToken();
+
+      let { data, error } = await supabase.functions.invoke("razorpay-verify", {
         body: {
           razorpay_order_id,
           razorpay_payment_id,
           razorpay_signature,
+          accessToken,
         },
       });
+
+      if (error && /401|unauthorized|jwt/i.test(error.message || "")) {
+        await supabase.auth.refreshSession();
+        const retry = await supabase.functions.invoke("razorpay-verify", {
+          body: {
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature,
+            accessToken,
+          },
+        });
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) throw error;
 
@@ -197,20 +237,35 @@ const PricingPage = () => {
     setProcessingPlan(plan.planId);
 
     try {
-      if (!razorpaySiteKey) {
-        throw new Error("Razorpay site key is missing.");
-      }
+      await ensureActiveSession();
+      const accessToken = await getSessionAccessToken();
 
-      const { data, error } = await supabase.functions.invoke("razorpay-order", {
+      let { data, error } = await supabase.functions.invoke("razorpay-order", {
         body: {
           planId: plan.planId,
-          razorpayKeyId: razorpaySiteKey,
+          accessToken,
           notes: {
             planName: plan.name,
             planCategory: plan.category,
           },
         },
       });
+
+      if (error && /401|unauthorized|jwt/i.test(error.message || "")) {
+        await supabase.auth.refreshSession();
+        const retry = await supabase.functions.invoke("razorpay-order", {
+          body: {
+            planId: plan.planId,
+            accessToken,
+            notes: {
+              planName: plan.name,
+              planCategory: plan.category,
+            },
+          },
+        });
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) {
         throw new Error(error.message || "Failed to create payment order");
@@ -219,10 +274,10 @@ const PricingPage = () => {
       const payload = typeof data === "string" ? JSON.parse(data) : data;
       const order = payload?.order;
       const razorpayKeyId = payload?.razorpayKeyId;
-      const checkoutKey = razorpaySiteKey || razorpayKeyId;
+      const checkoutKey = razorpayKeyId;
 
       if (!order || !checkoutKey) {
-        throw new Error("Unexpected response from payment service");
+        throw new Error("Payment config missing on server. Please contact support.");
       }
 
       if (!window.Razorpay) {
@@ -263,6 +318,9 @@ const PricingPage = () => {
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Unable to start Razorpay checkout.");
+      if (error instanceof Error && error.message.toLowerCase().includes("session expired")) {
+        navigate("/auth");
+      }
     } finally {
       setProcessingPlan(null);
     }
@@ -349,12 +407,11 @@ const PricingPage = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
-        <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Logo />
+        <div className="container mx-auto flex items-center justify-start">
           <Button
             variant="ghost"
             onClick={() => navigate("/")}
-            className="back-pill w-full sm:w-auto"
+            className="back-pill"
           >
             Back to Home
           </Button>
@@ -468,4 +525,3 @@ const PricingPage = () => {
 };
 
 export default PricingPage;
-

@@ -161,7 +161,7 @@ export const FraudAlertPanel = ({ riskAnalysis, currencyCode }: FraudAlertPanelP
   const formatAmount = (
     value: number,
     options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
-  ) => formatCurrencyValue(value ?? 0, currencyCode, options);
+  ) => formatCurrencyValue(value ?? 0, currencyCode, { ...options, showSymbol: false });
 
   return (
     <div className="space-y-4">

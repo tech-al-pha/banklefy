@@ -1,7 +1,7 @@
 ﻿import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Shield, Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,8 @@ const LandingPageContent = lazyWithRetry(() =>
 const Index = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const nextParam = searchParams.get("next");
   const [isAdmin, setIsAdmin] = useState(false);
   const { t } = useLanguage();
 
@@ -35,6 +37,36 @@ const Index = () => {
     };
     checkAdmin();
   }, [user]);
+
+  useEffect(() => {
+    if (nextParam !== "demo") return;
+
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    const scrollToDemo = () => {
+      attempts += 1;
+
+      if (document.getElementById("demo")) {
+        scrollToId("demo");
+        const params = new URLSearchParams(window.location.search);
+        params.delete("next");
+        setSearchParams(params, { replace: true });
+        return;
+      }
+
+      if (attempts < maxAttempts) {
+        window.setTimeout(scrollToDemo, 120);
+        return;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      params.delete("next");
+      setSearchParams(params, { replace: true });
+    };
+
+    scrollToDemo();
+  }, [nextParam, setSearchParams]);
 
   const handleAuthClick = () => {
     if (user) {

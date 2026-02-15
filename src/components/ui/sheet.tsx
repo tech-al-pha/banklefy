@@ -47,23 +47,53 @@ const sheetVariants = cva(
   },
 );
 
+const hasElementWithDisplayName = (children: React.ReactNode, targetDisplayName: string): boolean => {
+  return React.Children.toArray(children).some((child) => {
+    if (!React.isValidElement(child)) return false;
+
+    const childType = child.type as { displayName?: string; name?: string };
+    const displayName = childType.displayName ?? childType.name ?? "";
+    if (displayName === targetDisplayName) return true;
+
+    const nestedChildren = (child.props as { children?: React.ReactNode })?.children;
+    return nestedChildren ? hasElementWithDisplayName(nestedChildren, targetDisplayName) : false;
+  });
+};
+
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+    VariantProps<typeof sheetVariants> {
+  fallbackTitle?: string;
+  fallbackDescription?: string;
+}
 
 const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Content>, SheetContentProps>(
-  ({ side = "right", className, children, ...props }, ref) => (
-    <SheetPortal>
-      <SheetOverlay />
-      <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
-        {children}
-        <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-          <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
-        </SheetPrimitive.Close>
-      </SheetPrimitive.Content>
-    </SheetPortal>
-  ),
+  (
+    { side = "right", className, children, fallbackTitle = "Sheet", fallbackDescription = "Sheet content", ...props },
+    ref,
+  ) => {
+    const titleDisplayName = SheetPrimitive.Title.displayName ?? "SheetTitle";
+    const descriptionDisplayName = SheetPrimitive.Description.displayName ?? "SheetDescription";
+    const hasTitle = hasElementWithDisplayName(children, titleDisplayName);
+    const hasDescription = hasElementWithDisplayName(children, descriptionDisplayName);
+
+    return (
+      <SheetPortal>
+        <SheetOverlay />
+        <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
+          {!hasTitle && <SheetPrimitive.Title className="sr-only">{fallbackTitle}</SheetPrimitive.Title>}
+          {!hasDescription && (
+            <SheetPrimitive.Description className="sr-only">{fallbackDescription}</SheetPrimitive.Description>
+          )}
+          {children}
+          <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity data-[state=open]:bg-secondary hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </SheetPrimitive.Close>
+        </SheetPrimitive.Content>
+      </SheetPortal>
+    );
+  },
 );
 SheetContent.displayName = SheetPrimitive.Content.displayName;
 
