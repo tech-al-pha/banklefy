@@ -1,73 +1,56 @@
-# Welcome to your Lovable project
+# Banklefy.site – Intelligent Bank Statement Converter & Financial Analyzer
 
-## Project info
+Banklefy is a modern, AI-powered SaaS tool that transforms messy bank statements (PDF, JPG, PNG) into clean, actionable data in seconds. With built-in fraud detection, tampering checks, and advanced financial insights, it eliminates manual data entry and empowers users to make faster, smarter decisions.
 
-**URL**: https://lovable.dev/projects/fe6d6ae8-b615-4259-b9aa-d17cf811e337
+Designed specifically for Chartered Accountants (CAs), freelancers, small lenders, NBFCs, and individuals in India – delivering 99%+ accuracy, privacy-first processing, and unbeatable value.
 
-## How can I edit this code?
+## Live Platform
+🌐 **https://banklefy.site**  
+Secure • Fast • Mobile-Friendly
 
-There are several ways of editing your application.
+## Key Features
+### Core Conversion & Export
+- Anonymous users: 2 free conversions per day
+- Logged-in users: 5 free conversions per day
+- All users: 2 free export formats (Excel + CSV)
+- Paid users: 4 premium formats (Excel, CSV, ODS, DOCX)
+- Direct Tally Prime XML export – ready for seamless import (no manual tweaks needed)
 
-**Use Lovable**
+### Advanced Detection & Insights
+- Fraud Detector – flags suspicious patterns and anomalies
+- Edited PDF / Tampered Document Detector – identifies manipulated statements
+- Pricing Mismatch Detector – alerts on inconsistent transaction amounts
+- Reverse Amount Detector – highlights repeated identical transactions on the same day/location
+- LOAN / FOIR Analyser – calculates Fixed Obligation to Income Ratio and estimates loan approval probability
+- AI Financial Assistant – chat interface for instant queries, explanations, and insights
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/fe6d6ae8-b615-4259-b9aa-d17cf811e337) and start prompting.
+### Workflow & Productivity Tools
+- Multiple file upload – process several statements at once
+- Merge or separate Excel reports – consolidate multi-bank data or keep individual files
+- Free Analysed PDF Report – detailed summary with visuals and highlights
+- 24-hour automatic data deletion – your privacy is our priority (bank-level encryption + reCAPTCHA)
+- Clear refund policy for complete peace of mind
 
-Changes made via Lovable will be committed automatically to this repo.
+### Pricing
+Affordable & flexible plans starting from $1 per conversion  
+Monthly subscriptions from $9 – no hidden fees, maximum value.
 
-**Use your preferred IDE**
+## Roadmap – What's Coming Next
+- Team collaboration: Shared workspaces, role-based access, and real-time comments
+- Public API: Seamless integration with your apps, CRMs, or loan origination systems
+- QuickBooks Online & Desktop format export
+- Xero format export
+- Zoho Books format export
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Future enhancements include: GST reconciliation, transaction splitting, receipt/invoice matching, cash flow forecasting, behavioral risk scoring, and Account Aggregator (AA) integration.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Tech Stack
+- Frontend: React • TypeScript • Vite
+- Styling: Tailwind CSS • shadcn/ui
+- AI & Processing: Advanced OCR + ML models for extraction, fraud detection, and analysis
+- Deployment & Hosting: Lovable.dev with custom domain support
+- Security: Bank-grade encryption, 24-hour auto-delete, reCAPTCHA v3
 
-Follow these steps:
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server<a href="http://localhost:5173" target="_blank" rel="noopener noreferrer nofollow"></a>
 npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/fe6d6ae8-b615-4259-b9aa-d17cf811e337) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
