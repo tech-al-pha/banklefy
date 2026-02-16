@@ -70,6 +70,32 @@ const PLAN_PAGES: Record<string, number> = {
   yearly_pro: 65000,
 };
 
+const toIsoDate = (value: Date): string => value.toISOString().slice(0, 10);
+
+const getTierForPlan = (planId: string): 'free' | 'daily' | 'business' => {
+  if (planId.startsWith('yearly_')) return 'business';
+  if (planId.startsWith('monthly_')) return 'daily';
+  return 'free';
+};
+
+const getBillingWindow = (planId: string) => {
+  const start = new Date();
+  const end = new Date(start);
+  if (planId.startsWith('monthly_')) {
+    end.setMonth(end.getMonth() + 1);
+  } else if (planId.startsWith('yearly_')) {
+    end.setFullYear(end.getFullYear() + 1);
+  } else {
+    // One-time packs don't have recurring billing; keep a long horizon for required fields.
+    end.setFullYear(end.getFullYear() + 10);
+  }
+  return {
+    billing_cycle_start: start.toISOString(),
+    billing_cycle_end: end.toISOString(),
+    last_reset_date: toIsoDate(start),
+  };
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: getCorsHeaders(req) });
@@ -174,27 +200,113 @@ Deno.serve(async (req) => {
   // Update user subscription based on plan
   const planId = order.plan_id as string;
   const pagesToAdd = PLAN_PAGES[planId] || 0;
+  const paymentPayload = {
+    user_id: userId,
+    order_id: order.id,
+    razorpay_payment_id,
+    razorpay_order_id,
+    razorpay_signature,
+    amount: order.amount,
+    currency: order.currency,
+    status: 'captured',
+    plan_id: planId,
+    metadata: {
+      verified_at: new Date().toISOString(),
+    },
+  };
 
-  const { data: processResult, error: processError } = await supabaseAdmin.rpc('process_razorpay_payment', {
-    p_user_id: userId,
-    p_order_id: order.id,
-    p_razorpay_payment_id: razorpay_payment_id,
-    p_razorpay_order_id: razorpay_order_id,
-    p_razorpay_signature: razorpay_signature,
-    p_amount: order.amount,
-    p_currency: order.currency,
-    p_plan_id: planId,
-    p_pages_to_add: pagesToAdd,
-  });
+  const { error: paymentInsertError } = await supabaseAdmin
+    .from('razorpay_payments')
+    .upsert(paymentPayload, {
+      onConflict: 'razorpay_payment_id',
+      ignoreDuplicates: true,
+    });
 
-  if (processError) {
-    console.error('Failed to process payment', processError);
+  if (paymentInsertError) {
+    console.error('Failed to record payment row', paymentInsertError);
     return respond(req, 500, { error: 'Failed to finalize payment.' });
   }
 
-  const result = Array.isArray(processResult) ? processResult[0] : processResult;
-  const alreadyProcessed = Boolean(result?.already_processed ?? result?.alreadyProcessed);
-  const pagesAdded = Number(result?.pages_added ?? result?.pagesAdded ?? 0);
+  const { data: paidOrderRows, error: orderUpdateError } = await supabaseAdmin
+    .from('razorpay_orders')
+    .update({ status: 'paid' })
+    .eq('id', order.id)
+    .neq('status', 'paid')
+    .select('id')
+    .limit(1);
+
+  if (orderUpdateError) {
+    console.error('Failed to mark order paid', orderUpdateError);
+    return respond(req, 500, { error: 'Failed to finalize payment.' });
+  }
+
+  const alreadyProcessed = !paidOrderRows || paidOrderRows.length === 0;
+  const pagesAdded = alreadyProcessed ? 0 : pagesToAdd;
+
+  if (!alreadyProcessed) {
+    const isRecurringPlan = planId.startsWith('monthly_') || planId.startsWith('yearly_');
+    const planTier = getTierForPlan(planId);
+    const billingWindow = getBillingWindow(planId);
+    const { data: existingSubscription, error: subscriptionReadError } = await supabaseAdmin
+      .from('subscriptions')
+      .select('conversions_limit, tier')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (subscriptionReadError) {
+      console.error('Failed to read subscription row', subscriptionReadError);
+      return respond(req, 500, { error: 'Failed to finalize payment.' });
+    }
+
+    if (!existingSubscription) {
+      const { error: subscriptionInsertError } = await supabaseAdmin.from('subscriptions').insert({
+        user_id: userId,
+        tier: planTier,
+        conversions_limit: pagesToAdd,
+        conversions_used: 0,
+        billing_cycle_start: billingWindow.billing_cycle_start,
+        billing_cycle_end: billingWindow.billing_cycle_end,
+        last_reset_date: billingWindow.last_reset_date,
+        timezone: 'UTC',
+      });
+
+      if (subscriptionInsertError) {
+        console.error('Failed to create subscription row', subscriptionInsertError);
+        return respond(req, 500, { error: 'Failed to finalize payment.' });
+      }
+    } else {
+      const retainedTier =
+        !isRecurringPlan && existingSubscription.tier && existingSubscription.tier !== 'free'
+          ? existingSubscription.tier
+          : planTier;
+      const nextLimit = isRecurringPlan
+        ? pagesToAdd
+        : Number(existingSubscription.conversions_limit || 0) + pagesToAdd;
+
+      const updatePayload: Record<string, unknown> = {
+        conversions_limit: nextLimit,
+        tier: retainedTier,
+      };
+
+      if (isRecurringPlan) {
+        updatePayload.conversions_used = 0;
+        updatePayload.last_reset_date = billingWindow.last_reset_date;
+        updatePayload.billing_cycle_start = billingWindow.billing_cycle_start;
+        updatePayload.billing_cycle_end = billingWindow.billing_cycle_end;
+        updatePayload.timezone = 'UTC';
+      }
+
+      const { error: subscriptionUpdateError } = await supabaseAdmin
+        .from('subscriptions')
+        .update(updatePayload)
+        .eq('user_id', userId);
+
+      if (subscriptionUpdateError) {
+        console.error('Failed to update subscription row', subscriptionUpdateError);
+        return respond(req, 500, { error: 'Failed to finalize payment.' });
+      }
+    }
+  }
 
   return respond(req, 200, {
     success: true,
