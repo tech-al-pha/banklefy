@@ -178,41 +178,50 @@ const PricingPage = () => {
     return token;
   };
 
+  const invokeFunctionWithSession = async (
+    functionName: string,
+    requestBody: Record<string, unknown>
+  ) => {
+    const invoke = async () => {
+      await ensureActiveSession();
+      const accessToken = await getSessionAccessToken();
+      return supabase.functions.invoke(functionName, {
+        body: {
+          ...requestBody,
+          accessToken,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+    };
+
+    let { data, error } = await invoke();
+    if (error && /401|unauthorized|jwt|session/i.test(error.message || "")) {
+      await supabase.auth.refreshSession();
+      const retry = await invoke();
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) {
+      throw new Error(error.message || `Failed to invoke ${functionName}`);
+    }
+
+    return typeof data === "string" ? JSON.parse(data) : data;
+  };
+
   const verifyPayment = async (
     razorpay_order_id: string,
     razorpay_payment_id: string,
     razorpay_signature: string
   ) => {
     try {
-      await ensureActiveSession();
-      const accessToken = await getSessionAccessToken();
-
-      let { data, error } = await supabase.functions.invoke("razorpay-verify", {
-        body: {
-          razorpay_order_id,
-          razorpay_payment_id,
-          razorpay_signature,
-          accessToken,
-        },
+      const result = await invokeFunctionWithSession("razorpay-verify", {
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
       });
-
-      if (error && /401|unauthorized|jwt/i.test(error.message || "")) {
-        await supabase.auth.refreshSession();
-        const retry = await supabase.functions.invoke("razorpay-verify", {
-          body: {
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature,
-            accessToken,
-          },
-        });
-        data = retry.data;
-        error = retry.error;
-      }
-
-      if (error) throw error;
-
-      const result = typeof data === "string" ? JSON.parse(data) : data;
       if (result?.success) {
         toast.success(`Payment successful! ${result.pages_added} pages added to your account.`);
         window.dispatchEvent(new Event("banklefy:subscription-updated"));
@@ -237,41 +246,13 @@ const PricingPage = () => {
     setProcessingPlan(plan.planId);
 
     try {
-      await ensureActiveSession();
-      const accessToken = await getSessionAccessToken();
-
-      let { data, error } = await supabase.functions.invoke("razorpay-order", {
-        body: {
-          planId: plan.planId,
-          accessToken,
-          notes: {
-            planName: plan.name,
-            planCategory: plan.category,
-          },
+      const payload = await invokeFunctionWithSession("razorpay-order", {
+        planId: plan.planId,
+        notes: {
+          planName: plan.name,
+          planCategory: plan.category,
         },
       });
-
-      if (error && /401|unauthorized|jwt/i.test(error.message || "")) {
-        await supabase.auth.refreshSession();
-        const retry = await supabase.functions.invoke("razorpay-order", {
-          body: {
-            planId: plan.planId,
-            accessToken,
-            notes: {
-              planName: plan.name,
-              planCategory: plan.category,
-            },
-          },
-        });
-        data = retry.data;
-        error = retry.error;
-      }
-
-      if (error) {
-        throw new Error(error.message || "Failed to create payment order");
-      }
-
-      const payload = typeof data === "string" ? JSON.parse(data) : data;
       const order = payload?.order;
       const razorpayKeyId = payload?.razorpayKeyId;
       const checkoutKey = razorpayKeyId;

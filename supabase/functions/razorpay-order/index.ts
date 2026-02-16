@@ -151,17 +151,31 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');
   const tokenFromHeader = extractBearerToken(authHeader);
   const tokenFromBody = typeof body.accessToken === 'string' ? body.accessToken.trim() : '';
-  const token = tokenFromHeader || tokenFromBody;
-  if (!token) {
+  const tokenCandidates = Array.from(
+    new Set(
+      [tokenFromHeader, tokenFromBody]
+        .filter((value): value is string => typeof value === 'string' && value.length > 0),
+    ),
+  );
+
+  if (tokenCandidates.length === 0) {
     return respond(req, 401, { error: 'Authentication required.' });
   }
 
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-  const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
-  if (authError || !authData.user) {
+  let userId: string | null = null;
+
+  for (const candidateToken of tokenCandidates) {
+    const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(candidateToken);
+    if (!authError && authData.user) {
+      userId = authData.user.id;
+      break;
+    }
+  }
+
+  if (!userId) {
     return respond(req, 401, { error: 'Invalid or expired session.' });
   }
-  const userId = authData.user.id;
 
   // Receipt must be <= 40 chars for Razorpay
   const shortId = crypto.randomUUID().slice(0, 8);
@@ -218,6 +232,9 @@ Deno.serve(async (req) => {
     const { error: insertError } = await supabaseAdmin.from('razorpay_orders').insert(insertPayload);
     if (insertError) {
       console.error('Failed to persist Razorpay order', insertError);
+      return respond(req, 500, {
+        error: 'Failed to persist Razorpay order. Please retry.',
+      });
     }
 
     return respond(req, 200, {
