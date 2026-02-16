@@ -225,7 +225,7 @@ const PricingPage = () => {
       if (result?.success) {
         toast.success(`Payment successful! ${result.pages_added} pages added to your account.`);
         window.dispatchEvent(new Event("banklefy:subscription-updated"));
-        navigate("/dashboard");
+        navigate("/?next=demo");
       } else {
         toast.error("Payment verification failed.");
       }
