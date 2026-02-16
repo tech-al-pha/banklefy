@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { LuxuryCursor } from "@/components/LuxuryCursor";
@@ -15,7 +15,6 @@ import { RequireAuth, RequirePaid } from "@/components/RouteGuards";
 
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const Index = lazyWithRetry(() => import("./pages/Index"));
-const Dashboard = lazyWithRetry(() => import("./pages/Dashboard"));
 const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
 const Terms = lazyWithRetry(() => import("./pages/Terms"));
 const ChatPage = lazyWithRetry(() => import("./pages/ChatPage"));
@@ -178,7 +177,7 @@ const AppRoutes = () => {
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+          <Route path="/dashboard" element={<RequireAuth><Navigate to="/profile" replace /></RequireAuth>} />
           <Route path="/chat" element={<RequirePaid><ChatPage /></RequirePaid>} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />

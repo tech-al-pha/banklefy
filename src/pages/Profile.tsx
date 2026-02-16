@@ -22,6 +22,7 @@ interface RecentConversion {
   completed_at?: string | null;
   result_path?: string | null;
   file_path?: string;
+  error_message?: string | null;
 }
 
 const Profile = () => {
@@ -45,21 +46,15 @@ const Profile = () => {
     if (showLoading) {
       setLoading(true);
     }
-    const since = Date.now() - 24 * 60 * 60 * 1000;
     const { data, error } = await supabase
       .from("conversions")
-      .select("id, original_filename, status, created_at, completed_at, result_path, file_path")
+      .select("id, original_filename, status, created_at, completed_at, result_path, file_path, error_message")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(100);
 
     if (!error) {
-      const filtered = (data || []).filter((item) => {
-        const createdAt = item.created_at ? new Date(item.created_at).getTime() : 0;
-        const completedAt = item.completed_at ? new Date(item.completed_at).getTime() : 0;
-        return createdAt >= since || completedAt >= since;
-      });
-      setRecent(filtered);
+      setRecent(data || []);
     }
     if (showLoading) {
       setLoading(false);
@@ -417,9 +412,12 @@ const Profile = () => {
           </Card>
 
           <Card className="p-6 glass-card">
-            <h2 className="text-xl font-semibold mb-4">Last 24 Hours</h2>
+            <h2 className="text-xl font-semibold mb-2">Processing History</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Your latest converted files (newest first).
+            </p>
             {recent.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No pages processed in the last 24 hours.</p>
+              <p className="text-sm text-muted-foreground">No pages processed yet.</p>
             ) : (
               <div className="space-y-3">
                 {recent.map((item) => (
@@ -445,6 +443,8 @@ const Profile = () => {
                             DOCX
                           </Button>
                         </>
+                      ) : item.status === "failed" ? (
+                        <span className="text-xs text-destructive">{item.error_message || "Conversion failed"}</span>
                       ) : (
                         <span className="text-xs text-muted-foreground">{item.status}</span>
                       )}
