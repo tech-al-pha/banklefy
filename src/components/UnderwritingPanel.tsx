@@ -49,6 +49,8 @@ interface MonthlyBreakdown {
 }
 
 interface UnderwritingAnalysis {
+  tier?: 'basic' | 'pro' | 'advanced';
+  tierLabel?: 'Basic' | 'Pro' | 'Advanced';
   salaryCredits: SalaryCredit[];
   emiDebits: EMIDebit[];
   monthlyBreakdown: MonthlyBreakdown[];
@@ -67,6 +69,14 @@ interface UnderwritingAnalysis {
     factors: string[];
     maxNewEMI: number;
     estimatedLoanEligibility: number;
+  };
+  advancedSignals?: {
+    disposableIncome: number;
+    foirCapPercent: number;
+    availableEMIHeadroom: number;
+    stressAdjustedHeadroom: number;
+    assumedAnnualRate: number;
+    assumedTenureMonths: number;
   };
 }
 
@@ -126,6 +136,11 @@ const loanTypeIcons: Record<string, React.ReactNode> = {
 };
 
 export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPanelProps) => {
+  const underwritingTier = underwriting?.tier ?? 'advanced';
+  const underwritingTierLabel = underwriting?.tierLabel ?? (underwritingTier === 'advanced' ? 'Advanced' : underwritingTier === 'pro' ? 'Pro' : 'Basic');
+  const showProInsights = underwritingTier !== 'basic';
+  const showAdvancedInsights = underwritingTier === 'advanced';
+
   // Guard against undefined/partial data to prevent toLocaleString crashes
   const summary = underwriting?.summary ?? {
     avgMonthlyIncome: 0,
@@ -146,6 +161,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
   const salaryCredits = underwriting?.salaryCredits ?? [];
   const emiDebits = underwriting?.emiDebits ?? [];
   const monthlyBreakdown = underwriting?.monthlyBreakdown ?? [];
+  const advancedSignals = underwriting?.advancedSignals;
 
   const StatusIcon = statusConfig[eligibility.status]?.icon ?? statusConfig.moderate.icon;
   
@@ -193,9 +209,14 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
           <Wallet className={`w-5 h-5 ${statusConfig[eligibilityTone].text}`} />
           FOIR & Loan Eligibility Analysis
         </h3>
-        <Badge variant="outline" className={`${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border} ${statusConfig[eligibility.status].text}`}>
-          {eligibility.status.toUpperCase()}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="uppercase tracking-wide border-primary/30 text-primary">
+            {underwritingTierLabel}
+          </Badge>
+          <Badge variant="outline" className={`${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border} ${statusConfig[eligibility.status].text}`}>
+            {eligibility.status.toUpperCase()}
+          </Badge>
+        </div>
       </div>
 
       {/* Eligibility Summary Card */}
@@ -290,7 +311,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
       </div>
 
       {/* EMI Breakdown by Loan Type */}
-      {Object.keys(summary.emiByLoanType).length > 0 && (
+      {showProInsights && Object.keys(summary.emiByLoanType).length > 0 && (
         <Card className="p-4 !bg-[#191919]">
           <h4 className="font-medium mb-3 flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-muted-foreground" />
@@ -320,7 +341,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
       {/* Detailed Breakdown Accordion */}
       <Accordion type="single" collapsible className="space-y-2">
         {/* Salary Credits */}
-        {salaryCredits.length > 0 && (
+        {showAdvancedInsights && salaryCredits.length > 0 && (
           <AccordionItem value="salaries" className="border rounded-lg px-4 bg-[#191919] card-hover-glow">
             <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
               <div className="flex items-center gap-2">
@@ -347,7 +368,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
         )}
 
         {/* EMI Debits */}
-        {emiDebits.length > 0 && (
+        {showAdvancedInsights && emiDebits.length > 0 && (
           <AccordionItem value="emis" className="border rounded-lg px-4 bg-[#191919] card-hover-glow">
             <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
               <div className="flex items-center gap-2">
@@ -379,7 +400,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
         )}
 
         {/* Monthly Breakdown */}
-        {monthlyBreakdown.length > 0 && (
+        {showProInsights && monthlyBreakdown.length > 0 && (
           <AccordionItem value="monthly" className="border rounded-lg px-4 bg-[#191919] card-hover-glow">
             <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
               <div className="flex items-center gap-2">
@@ -408,8 +429,53 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
         )}
       </Accordion>
 
+      {showAdvancedInsights && advancedSignals && (
+        <Card className="p-4 !bg-[#191919] border-primary/20">
+          <h4 className="font-medium mb-3 flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-muted-foreground" />
+            Advanced Underwriting Signals
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            <div className="rounded-md bg-muted/30 p-2">
+              <p className="label-muted text-xs">Disposable Income</p>
+              <p className="font-semibold">{formatAmount(advancedSignals.disposableIncome)}</p>
+            </div>
+            <div className="rounded-md bg-muted/30 p-2">
+              <p className="label-muted text-xs">FOIR Cap</p>
+              <p className="font-semibold">{advancedSignals.foirCapPercent}%</p>
+            </div>
+            <div className="rounded-md bg-muted/30 p-2">
+              <p className="label-muted text-xs">EMI Headroom</p>
+              <p className="font-semibold">{formatAmount(advancedSignals.availableEMIHeadroom)}</p>
+            </div>
+            <div className="rounded-md bg-muted/30 p-2">
+              <p className="label-muted text-xs">Stress Headroom</p>
+              <p className="font-semibold">{formatAmount(advancedSignals.stressAdjustedHeadroom)}</p>
+            </div>
+            <div className="rounded-md bg-muted/30 p-2">
+              <p className="label-muted text-xs">Assumed APR</p>
+              <p className="font-semibold">{(advancedSignals.assumedAnnualRate * 100).toFixed(2)}%</p>
+            </div>
+            <div className="rounded-md bg-muted/30 p-2">
+              <p className="label-muted text-xs">Assumed Tenure</p>
+              <p className="font-semibold">{advancedSignals.assumedTenureMonths} months</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {!showAdvancedInsights && (
+        <Card className="p-4 !bg-[#191919] border-primary/20">
+          <p className="text-sm text-muted-foreground">
+            {underwritingTier === 'basic'
+              ? 'Basic tier shows FOIR summary only. Upgrade to Pro/Advanced for deeper EMI trends and transaction-level evidence.'
+              : 'Pro tier includes monthly and category-level insights. Upgrade to Advanced for transaction-level salary and EMI evidence.'}
+          </p>
+        </Card>
+      )}
+
       {/* No Data Message */}
-      {salaryCredits.length === 0 && emiDebits.length === 0 && (
+      {showAdvancedInsights && salaryCredits.length === 0 && emiDebits.length === 0 && (
         <Card className="p-4 !bg-[#191919] tone-moderate-border">
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 tone-moderate-text" />

@@ -49,6 +49,11 @@ export interface FOIRResult {
   maxNewEMI: number;
   loanEligibility: number;
   disposableIncome: number;
+  foirCapPercent?: number;
+  availableEMIHeadroom?: number;
+  stressAdjustedHeadroom?: number;
+  assumedAnnualRate?: number;
+  assumedTenureMonths?: number;
 }
 
 export interface SalaryCredit {

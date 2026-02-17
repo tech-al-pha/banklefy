@@ -24,16 +24,24 @@ import {
 import {
   reconcileBalances,
   detectDuplicates,
-  detectHighRiskTransactions,
-  detectCircularTrading,
-  performUnderwritingAnalysis,
   analyzeLiquidity,
-  generateFraudAlerts,
-  calculateIntegrityScore,
   type FraudAlert,
   type RiskTransaction,
   type Transaction,
 } from '../_shared/financial-engine.ts';
+import {
+  performUnderwritingAnalysis,
+} from '../_shared/underwriting-engine.ts';
+import {
+  buildUnderwritingPayload,
+  resolveUnderwritingTier,
+} from '../_shared/foir-tier.ts';
+import {
+  detectHighRiskTransactions,
+  detectCircularTrading,
+  generateFraudAlerts,
+  calculateIntegrityScore,
+} from '../_shared/risk-alert-engine.ts';
 import { generateProfessionalExcel } from '../_shared/excel-generator.ts';
 import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
@@ -840,6 +848,7 @@ Deno.serve(async (req) => {
     const isPerPagePlan = normalizedPlanType.startsWith('per_page');
     const isPaidPlan = !!user && (isMonthlyPlan || isYearlyPlan || isPerPagePlan || conversionsLimit > 5);
     const isFreeMode = !isPaidPlan;
+    const underwritingTier = resolveUnderwritingTier(userPlanType, isAdmin);
     const remainingQuota = Math.max(0, conversionsLimit - conversionsUsed);
 
     // Free mode: one file = one conversion, plus a 15-page per-file PDF cap.
@@ -1184,21 +1193,7 @@ Deno.serve(async (req) => {
     });
 
     // Build underwriting analysis for response
-    const underwritingAnalysis = {
-      salaryCredits: underwritingResult.salaryCredits,
-      emiDebits: underwritingResult.emiDebits,
-      monthlyBreakdown: underwritingResult.monthlyBreakdown,
-      summary: {
-        avgMonthlyIncome: underwritingResult.foir.avgMonthlyIncome,
-        avgMonthlyEMI: underwritingResult.foir.avgMonthlyEMI,
-        foirScore: underwritingResult.foir.score,
-        foirStatus: underwritingResult.foir.status,
-        emiByLoanType: underwritingResult.emiByLoanType,
-        totalSalaryDetected: underwritingResult.salaryCredits.length,
-        totalEMIDetected: underwritingResult.emiDebits.length,
-      },
-      eligibility: underwritingResult.eligibility,
-    };
+    const underwritingAnalysis = buildUnderwritingPayload(underwritingResult, underwritingTier);
 
     // Build risk analysis for response
     const riskAnalysis = {
@@ -1222,7 +1217,7 @@ Deno.serve(async (req) => {
       duplicateCount,
       categoryBreakdown,
       riskAnalysis,
-      underwriting: underwritingAnalysis,
+      ...(underwritingAnalysis ? { underwriting: underwritingAnalysis } : {}),
     };
 
     // Generate Excel (styled)

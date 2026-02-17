@@ -17,14 +17,23 @@ import {
 import {
   reconcileBalances,
   detectDuplicates,
-  detectHighRiskTransactions,
-  detectCircularTrading,
-  performUnderwritingAnalysis,
   analyzeLiquidity,
-  generateFraudAlerts,
-  calculateIntegrityScore,
   type Transaction,
 } from '../_shared/financial-engine.ts';
+import {
+  performUnderwritingAnalysis,
+} from '../_shared/underwriting-engine.ts';
+import {
+  buildUnderwritingPayload,
+  resolveUnderwritingTier,
+  type UnderwritingPayload,
+} from '../_shared/foir-tier.ts';
+import {
+  detectHighRiskTransactions,
+  detectCircularTrading,
+  generateFraudAlerts,
+  calculateIntegrityScore,
+} from '../_shared/risk-alert-engine.ts';
 import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
 import {
   generateProfessionalExcel,
@@ -245,31 +254,14 @@ interface AggregatedAnalytics {
     riskFlags: { type: string; count: number }[];
     fraudAlerts: FraudAlert[];
   };
-  underwriting: {
-    salaryCredits: { date: string; amount: number; description: string }[];
-    emiDebits: { date: string; amount: number; description: string; loanType: string }[];
-    monthlyBreakdown: { month: string; salaryIncome: number; emiOutflow: number }[];
-    summary: {
-      avgMonthlyIncome: number;
-      avgMonthlyEMI: number;
-      foirScore: number;
-      foirStatus: 'excellent' | 'good' | 'moderate' | 'high';
-      emiByLoanType: Record<string, { count: number; totalAmount: number }>;
-      totalSalaryDetected: number;
-      totalEMIDetected: number;
-    };
-    eligibility: {
-      status: 'excellent' | 'good' | 'moderate' | 'poor' | 'ineligible';
-      message: string;
-      factors: string[];
-      maxNewEMI: number;
-      estimatedLoanEligibility: number;
-    };
-  };
+  underwriting?: UnderwritingPayload;
 }
 
 // Function to aggregate analytics from multiple statements
-function aggregateBatchAnalytics(statements: ProcessedStatement[]): AggregatedAnalytics {
+function aggregateBatchAnalytics(
+  statements: ProcessedStatement[],
+  underwritingTier: Parameters<typeof buildUnderwritingPayload>[1],
+): AggregatedAnalytics {
   // Combine all transactions from all statements
   const allTransactions: Transaction[] = [];
   statements.forEach(s => {
@@ -289,6 +281,7 @@ function aggregateBatchAnalytics(statements: ProcessedStatement[]): AggregatedAn
   }
 
   const underwritingResult = performUnderwritingAnalysis(allTransactions);
+  const underwritingPayload = buildUnderwritingPayload(underwritingResult, underwritingTier);
   const liquidityMetrics = analyzeLiquidity(allTransactions);
   const fraudAlerts = generateFraudAlerts(
     reconciliation,
@@ -348,36 +341,7 @@ function aggregateBatchAnalytics(statements: ProcessedStatement[]): AggregatedAn
       riskFlags,
       fraudAlerts,
     },
-    underwriting: {
-      salaryCredits: underwritingResult.salaryCredits.map(s => ({
-        date: s.date,
-        amount: s.amount,
-        description: s.description,
-      })),
-      emiDebits: underwritingResult.emiDebits.map(e => ({
-        date: e.date,
-        amount: e.amount,
-        description: e.description,
-        loanType: e.loanType,
-      })),
-      monthlyBreakdown: underwritingResult.monthlyBreakdown,
-      summary: {
-        avgMonthlyIncome: underwritingResult.foir.avgMonthlyIncome,
-        avgMonthlyEMI: underwritingResult.foir.avgMonthlyEMI,
-        foirScore: underwritingResult.foir.score,
-        foirStatus: underwritingResult.foir.status,
-        emiByLoanType: underwritingResult.emiByLoanType,
-        totalSalaryDetected: underwritingResult.salaryCredits.reduce((sum, s) => sum + s.amount, 0),
-        totalEMIDetected: underwritingResult.emiDebits.reduce((sum, e) => sum + e.amount, 0),
-      },
-      eligibility: {
-        status: underwritingResult.eligibility.status,
-        message: underwritingResult.eligibility.message,
-        factors: underwritingResult.eligibility.factors,
-        maxNewEMI: underwritingResult.foir.maxNewEMI,
-        estimatedLoanEligibility: underwritingResult.foir.loanEligibility,
-      },
-    },
+    ...(underwritingPayload ? { underwriting: underwritingPayload } : {}),
   };
 }
 
@@ -762,6 +726,7 @@ Deno.serve(async (req) => {
     const isPerPagePlan = normalizedPlanType.startsWith('per_page');
     const isPaidPlan = !!user && (isMonthlyPlan || isYearlyPlan || isPerPagePlan || conversionsLimit > 5);
     const isFreeMode = !isPaidPlan;
+    const underwritingTier = resolveUnderwritingTier(userPlanType, isAdmin);
     const remainingQuota = Math.max(0, conversionsLimit - conversionsUsed);
 
     // Free mode: enforce a 15-page max per PDF before processing.
@@ -1119,7 +1084,7 @@ Deno.serve(async (req) => {
         remaining,
         isAuthenticated: !!user,
         // Include aggregated analytics for batch mode panels
-        analytics: successes.length > 0 ? aggregateBatchAnalytics(successes) : null,
+        analytics: successes.length > 0 ? aggregateBatchAnalytics(successes, underwritingTier) : null,
         // Include all transactions for export options
         transactions: successes.flatMap(s => s.transactions),
         planType: userPlanType,

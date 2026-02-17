@@ -56,6 +56,8 @@ export interface RiskAnalysis {
 }
 
 export interface UnderwritingAnalysis {
+  tier?: 'basic' | 'pro' | 'advanced';
+  tierLabel?: 'Basic' | 'Pro' | 'Advanced';
   salaryCredits: { date: string; amount: number; description: string }[];
   emiDebits: { date: string; amount: number; description: string; loanType: string }[];
   monthlyBreakdown: { month: string; salaryIncome: number; emiOutflow: number }[];
@@ -74,6 +76,14 @@ export interface UnderwritingAnalysis {
     factors: string[];
     maxNewEMI: number;
     estimatedLoanEligibility: number;
+  };
+  advancedSignals?: {
+    disposableIncome: number;
+    foirCapPercent: number;
+    availableEMIHeadroom: number;
+    stressAdjustedHeadroom: number;
+    assumedAnnualRate: number;
+    assumedTenureMonths: number;
   };
 }
 

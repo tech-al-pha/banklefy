@@ -68,7 +68,26 @@ interface RiskAnalysis {
 interface FraudAlertPanelProps {
   riskAnalysis: RiskAnalysis;
   currencyCode?: string;
+  showEditDetectorSignals?: boolean;
 }
+
+const EDIT_DETECTOR_ALERT_TYPES = new Set([
+  "PDF_TAMPER",
+  "EDITED_PDF",
+  "SUSPICIOUS_PRODUCER",
+  "UNKNOWN_PRODUCER",
+  "INCREMENTAL_UPDATE",
+  "METADATA_ANOMALY",
+  "ANNOTATIONS_PRESENT",
+  "ACROFORM_PRESENT",
+  "LAYERS_PRESENT",
+  "ACTIVE_CONTENT",
+  "FONT_INCONSISTENCY",
+  "IMAGE_TEXT_OVERLAY",
+  "MIXED_PAGE_TYPES",
+  "FUTURE_MOD_DATE",
+  "FUTURE_CREATION_DATE",
+]);
 
 const severityConfig = {
   low: { 
@@ -127,12 +146,19 @@ const getIntegrityLabel = (score: number) => {
   return 'Tamper Alert';
 };
 
-export const FraudAlertPanel = ({ riskAnalysis, currencyCode }: FraudAlertPanelProps) => {
+export const FraudAlertPanel = ({
+  riskAnalysis,
+  currencyCode,
+  showEditDetectorSignals = true,
+}: FraudAlertPanelProps) => {
   const { integrityScore, fraudAlerts, balanceMismatches, averageDailyBalance, maxDip, riskFlags } = riskAnalysis;
-  
-  const criticalAlerts = fraudAlerts.filter(a => a.severity === 'critical');
-  const highAlerts = fraudAlerts.filter(a => a.severity === 'high');
-  const otherAlerts = fraudAlerts.filter(a => a.severity !== 'critical' && a.severity !== 'high');
+  const visibleAlerts = showEditDetectorSignals
+    ? fraudAlerts
+    : fraudAlerts.filter((alert) => !EDIT_DETECTOR_ALERT_TYPES.has(alert.type));
+
+  const criticalAlerts = visibleAlerts.filter(a => a.severity === 'critical');
+  const highAlerts = visibleAlerts.filter(a => a.severity === 'high');
+  const otherAlerts = visibleAlerts.filter(a => a.severity !== 'critical' && a.severity !== 'high');
   const totalRiskFlags = riskFlags.reduce((sum, r) => sum + r.count, 0);
 
   const toneText = {
@@ -151,13 +177,17 @@ export const FraudAlertPanel = ({ riskAnalysis, currencyCode }: FraudAlertPanelP
   const getLowestBalanceTone = (value: number) =>
     value >= 10000 ? 'excellent' : value >= 1000 ? 'good' : value > 0 ? 'moderate' : 'bad';
   const getAlertHeaderTone = () =>
-    criticalAlerts.length > 0 ? 'bad' : highAlerts.length > 0 ? 'moderate' : fraudAlerts.length > 0 ? 'good' : 'excellent';
+    criticalAlerts.length > 0 ? 'bad' : highAlerts.length > 0 ? 'moderate' : visibleAlerts.length > 0 ? 'good' : 'excellent';
 
   const balanceTone = getMismatchTone(balanceMismatches);
   const riskTone = getRiskTone(totalRiskFlags);
   const avgBalanceTone = getAvgBalanceTone(averageDailyBalance);
   const lowestBalanceTone = getLowestBalanceTone(maxDip.amount);
   const alertHeaderTone = getAlertHeaderTone();
+  const panelTitle = showEditDetectorSignals ? "Document Integrity & Risk Analysis" : "Transaction Risk Analysis";
+  const scoreTooltip = showEditDetectorSignals
+    ? "100% = No anomalies detected by our checks. Lower scores indicate potential tampering or high-risk activities."
+    : "Higher score indicates cleaner transaction consistency and lower financial risk signals.";
   const formatAmount = (
     value: number,
     options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
@@ -169,7 +199,7 @@ export const FraudAlertPanel = ({ riskAnalysis, currencyCode }: FraudAlertPanelP
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <Shield className={`w-5 h-5 ${getIntegrityColor(integrityScore)}`} />
-          Document Integrity & Risk Analysis
+          {panelTitle}
         </h3>
         <Tooltip>
           <TooltipTrigger className="no-hover-glow">
@@ -188,8 +218,7 @@ export const FraudAlertPanel = ({ riskAnalysis, currencyCode }: FraudAlertPanelP
           <TooltipContent className="max-w-[300px]">
             <p className="font-semibold mb-1">Integrity Score</p>
             <p className="text-sm text-muted-foreground">
-              100% = No anomalies detected by our checks.
-              Lower scores indicate potential tampering or high-risk activities.
+              {scoreTooltip}
             </p>
           </TooltipContent>
         </Tooltip>
@@ -246,12 +275,12 @@ export const FraudAlertPanel = ({ riskAnalysis, currencyCode }: FraudAlertPanelP
       </div>
 
       {/* Fraud Alerts */}
-      {fraudAlerts.length > 0 ? (
+      {visibleAlerts.length > 0 ? (
         <Card className="p-4 !bg-[#191919] border-border/50">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className={`w-5 h-5 ${toneText[alertHeaderTone]}`} />
             <h4 className={`font-semibold ${toneText[alertHeaderTone]}`}>
-              {fraudAlerts.length} Alert{fraudAlerts.length !== 1 ? 's' : ''} Detected
+              {visibleAlerts.length} Alert{visibleAlerts.length !== 1 ? 's' : ''} Detected
             </h4>
           </div>
 
@@ -457,7 +486,7 @@ export const FraudAlertPanel = ({ riskAnalysis, currencyCode }: FraudAlertPanelP
             <div>
               <p className="font-semibold tone-excellent-text">No Anomalies Detected</p>
               <p className="text-sm text-muted-foreground">
-                Document passed all integrity checks. No suspicious activity found.
+                No suspicious financial activity found in this statement.
               </p>
             </div>
           </div>

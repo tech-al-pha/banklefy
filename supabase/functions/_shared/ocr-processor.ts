@@ -90,6 +90,9 @@ REFERENCE NUMBER - Extract from:
 - "Ref. Number", "Reference", "Txn ID", "UTR", "NEFT Ref", "IMPS Ref"
 - Transaction codes like P123456, N789012, IMPS/456/...
 COPY EXACTLY AS SHOWN. Do NOT add prefixes or alter case.
+IMPORTANT: refNumber must be ONLY identifier/code, not full narration text.
+If multiple IDs exist in same row, choose the best primary transaction ID (e.g., UTR/TR REF/AE/S codes).
+If no clear ID exists, return an empty string.
 If no reference number exists for a row, return an empty string.
 
 DO NOT merge content across different pages or rows.
@@ -109,6 +112,123 @@ const pickString = (value: unknown): string | undefined => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
   return undefined;
+};
+
+const collapseWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim();
+
+const normalizeReferenceToken = (value: string): string =>
+  collapseWhitespace(value)
+    .replace(/^[\s#:/.-]+/, '')
+    .replace(/[\s#:/.-]+$/, '');
+
+const looksLikeDateToken = (value: string): boolean => {
+  const v = value.trim();
+  return (
+    /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$/.test(v) ||
+    /^\d{4}[/-]\d{1,2}[/-]\d{1,2}$/.test(v) ||
+    /^\d{1,2}:\d{2}(?::\d{2})?$/.test(v)
+  );
+};
+
+const NON_REF_PHRASES = [
+  'transfer',
+  'purchase',
+  'property',
+  'salary',
+  'bank charges',
+  'monthly account',
+  'customer credit',
+  'government',
+];
+
+type RefCandidate = { value: string; weight: number };
+
+const collectReferenceCandidates = (text: string | undefined, seedWeight: number): RefCandidate[] => {
+  if (!text) return [];
+  const candidates: RefCandidate[] = [];
+  const input = String(text);
+
+  const addMatch = (value: string, weight: number) => {
+    const normalized = normalizeReferenceToken(value);
+    if (!normalized || normalized.length < 5) return;
+    candidates.push({ value: normalized, weight });
+  };
+
+  const labelledPattern =
+    /\b(?:ref(?:erence)?(?:\s*no)?|txn(?:\s*id)?|transaction(?:\s*id)?|utr|rrn|imps|neft|rtgs|tr\s*ref|chq(?:ue)?(?:\s*no)?)\b[^\S\r\n]*[:#-]?[^\S\r\n]*([A-Za-z0-9Xx./-]{5,})/gi;
+  for (const match of input.matchAll(labelledPattern)) {
+    addMatch(match[1], seedWeight + 40);
+  }
+
+  const patterns: Array<[RegExp, number]> = [
+    [/\bAE\d{5,}\b/gi, seedWeight + 38],
+    [/\bS\d{5,}\b/gi, seedWeight + 34],
+    [/\bFCF[A-Z0-9]{6,}\b/gi, seedWeight + 32],
+    [/\b[A-Z]{3,}\d{5,}[A-Z0-9]*\b/gi, seedWeight + 28],
+    [/\b[A-Z0-9]{8,}(?:-[A-Z0-9]{2,})+\b/gi, seedWeight + 26],
+    [/\b[0-9Xx]{10,20}\b/g, seedWeight + 22],
+  ];
+
+  for (const [pattern, weight] of patterns) {
+    for (const match of input.matchAll(pattern)) {
+      addMatch(match[0], weight);
+    }
+  }
+
+  const compact = normalizeReferenceToken(input);
+  if (compact && compact.length <= 40 && compact.split(' ').length <= 4) {
+    addMatch(compact, seedWeight + 12);
+  }
+
+  return candidates;
+};
+
+const scoreReferenceCandidate = (candidate: string, baseWeight: number): number => {
+  const value = normalizeReferenceToken(candidate);
+  if (!value) return -999;
+  if (looksLikeDateToken(value)) return -999;
+
+  let score = baseWeight;
+
+  const hasLetters = /[A-Za-z]/.test(value);
+  const hasDigits = /\d/.test(value);
+
+  if (hasLetters && hasDigits) score += 20;
+  if (!value.includes(' ')) score += 8;
+  if (value.length >= 6 && value.length <= 28) score += 10;
+  if (value.length > 60) score -= 25;
+
+  const lower = value.toLowerCase();
+  if (NON_REF_PHRASES.some((phrase) => lower.includes(phrase))) score -= 18;
+  if (/^[A-Za-z]+$/.test(value)) score -= 20;
+  if (/^[0-9]+$/.test(value) && value.length < 8) score -= 20;
+
+  return score;
+};
+
+const selectBestReference = (rawRef: string | undefined, description: string | undefined): string | undefined => {
+  const candidates = [
+    ...collectReferenceCandidates(rawRef, 20),
+    ...collectReferenceCandidates(description, 0),
+  ];
+
+  if (candidates.length === 0) return undefined;
+
+  const seen = new Set<string>();
+  let best: { value: string; score: number } | undefined;
+  for (const candidate of candidates) {
+    const normalized = normalizeReferenceToken(candidate.value);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+
+    const score = scoreReferenceCandidate(normalized, candidate.weight);
+    if (score < 0) continue;
+    if (!best || score > best.score) {
+      best = { value: normalized, score };
+    }
+  }
+
+  return best?.value;
 };
 
 const normalizeBankMetadata = (raw: Record<string, unknown>): BankMetadata => {
@@ -181,22 +301,7 @@ const normalizeTransaction = (raw: Record<string, unknown>): RawTransaction => {
     raw.memo ??
     raw.particulars;
 
-  const extractRefFromText = (text?: string | null): string | undefined => {
-    if (!text) return undefined;
-    const value = String(text);
-    const patterns = [
-      /(?:ref(?:erence)?|ref no|txn|transaction|utr|rrn|imps|neft|upi|rtgs|id|tr ref)[:\-\s#]*([A-Za-z0-9\/\-]{5,})/i,
-    ];
-    for (const pattern of patterns) {
-      const match = value.match(pattern);
-      if (match && match[1]) {
-        return match[1];
-      }
-    }
-    return undefined;
-  };
-
-  let ref =
+  const rawRef =
     raw.refNumber ??
     raw.refNo ??
     raw.referenceNo ??
@@ -208,12 +313,7 @@ const normalizeTransaction = (raw: Record<string, unknown>): RawTransaction => {
     raw.txnId ??
     raw.txnID ??
     raw.id;
-  if (ref === undefined || ref === null || String(ref).trim() === '') {
-    const refFromDesc = extractRefFromText(pickString(descriptionRaw));
-    if (refFromDesc) {
-      ref = refFromDesc;
-    }
-  }
+  const cleanedRef = selectBestReference(pickString(rawRef), pickString(descriptionRaw));
 
   return {
     date: pickString(dateRaw)?.trim() || 'Unknown',
@@ -224,11 +324,11 @@ const normalizeTransaction = (raw: Record<string, unknown>): RawTransaction => {
     balance: toNumber(raw.balance ?? raw.bal ?? raw.runningBalance),
     amount: toNumber(raw.amount),
     type: pickString(raw.type ?? raw.txnType ?? raw.transactionType)?.trim(),
-    refNumber: ref === undefined || ref === null ? undefined : String(ref),
+    refNumber: cleanedRef,
   };
 };
 
-const normalizeTransactions = (rows: unknown[]): RawTransaction[] => {
+export const normalizeRawTransactions = (rows: unknown[]): RawTransaction[] => {
   return rows.map((row) => normalizeTransaction(row as Record<string, unknown>));
 };
 
@@ -297,7 +397,7 @@ export async function callGroqVisionOCR(
           console.log(`Groq Vision OCR extracted ${parsed.transactions.length} transactions with bank metadata`);
           return { 
             success: true, 
-            transactions: normalizeTransactions(parsed.transactions), 
+            transactions: normalizeRawTransactions(parsed.transactions), 
             bankMetadata: normalizeBankMetadata(parsed.bankMetadata),
             text: textContent 
           };
@@ -305,7 +405,7 @@ export async function callGroqVisionOCR(
         
         // If it's just an object but has date/description, it might be a single transaction
         if (parsed.date && parsed.description) {
-          return { success: true, transactions: normalizeTransactions([parsed]), text: textContent };
+          return { success: true, transactions: normalizeRawTransactions([parsed]), text: textContent };
         }
       } catch (parseError) {
         console.log('Object parse failed, trying array format...');
@@ -318,7 +418,7 @@ export async function callGroqVisionOCR(
       try {
         const transactions = JSON.parse(jsonMatch[0]);
         console.log(`Groq Vision OCR extracted ${transactions.length} transactions (legacy format)`);
-        return { success: true, transactions: normalizeTransactions(transactions), text: textContent };
+        return { success: true, transactions: normalizeRawTransactions(transactions), text: textContent };
       } catch (parseError) {
         console.error('Failed to parse Groq JSON:', parseError);
         return { success: true, text: textContent };

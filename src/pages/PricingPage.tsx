@@ -17,6 +17,7 @@ type Plan = {
   description: string;
   statements: string;
   features: string[];
+  editPdfDetector?: "Basic" | "Advanced";
   savings?: string;
   highlighted?: boolean;
 };
@@ -31,7 +32,7 @@ const monthlyPlans: Plan[] = [
     unit: "/month",
     description: "Perfect for regular analysis",
     statements: "300 Pages/month",
-    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
+    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura", "FOIR/Loan Analysis (Basic)"],
   },
   {
     planId: "monthly_pro",
@@ -42,7 +43,14 @@ const monthlyPlans: Plan[] = [
     unit: "/month",
     description: "Most popular for professionals",
     statements: "1000 Pages/month",
-    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
+    features: [
+      "Download in 4 Formats",
+      "Free Analyzed PDF Report",
+      "AI Chat Aura",
+      "FOIR/Loan Analysis (Pro)",
+      "Tally XML (25 exports/month)",
+    ],
+    editPdfDetector: "Basic",
     highlighted: true,
   },
   {
@@ -54,7 +62,14 @@ const monthlyPlans: Plan[] = [
     unit: "/month",
     description: "For heavy users and teams",
     statements: "4500 Pages/month",
-    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
+    features: [
+      "Download in 4 Formats",
+      "Free Analyzed PDF Report",
+      "AI Chat Aura",
+      "FOIR/Loan Analysis (Advanced - Enterprise)",
+      "Tally XML (150 exports/month)",
+    ],
+    editPdfDetector: "Advanced",
   },
 ];
 
@@ -69,7 +84,7 @@ const yearlyPlans: Plan[] = [
     description: "Great for regular users",
     statements: "5000 Pages/year",
     savings: "Save 8% vs Monthly",
-    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
+    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura", "FOIR/Loan Analysis (Basic)"],
   },
   {
     planId: "yearly_full",
@@ -81,7 +96,14 @@ const yearlyPlans: Plan[] = [
     description: "Best value for professionals",
     statements: "15,000 Pages/year",
     savings: "Save 13% vs Monthly",
-    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
+    features: [
+      "Download in 4 Formats",
+      "Free Analyzed PDF Report",
+      "AI Chat Aura",
+      "FOIR/Loan Analysis (Pro)",
+      "Tally XML (300 exports/year)",
+    ],
+    editPdfDetector: "Basic",
     highlighted: true,
   },
   {
@@ -94,7 +116,14 @@ const yearlyPlans: Plan[] = [
     description: "Maximum savings for power users",
     statements: "65,000 Pages/year",
     savings: "Save 15% vs Monthly",
-    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura"],
+    features: [
+      "Download in 4 Formats",
+      "Free Analyzed PDF Report",
+      "AI Chat Aura",
+      "FOIR/Loan Analysis (Advanced - Enterprise)",
+      "Tally XML (1200 exports/year)",
+    ],
+    editPdfDetector: "Advanced",
   },
 ];
 
@@ -108,7 +137,7 @@ const perPagePlans: Plan[] = [
     unit: "/conversion",
     description: "Quick single conversion",
     statements: "10 Pages",
-    features: ["Analyzed PDF Report", "Download in 4 Formats"],
+    features: ["Analyzed PDF Report", "Download in 4 Formats", "FOIR/Loan Analysis (Basic)"],
   },
   {
     planId: "per_page_standard",
@@ -119,7 +148,7 @@ const perPagePlans: Plan[] = [
     unit: "/conversion",
     description: "Popular for small batches",
     statements: "25 Pages",
-    features: ["Analyzed PDF Report", "Download in 4 Formats"],
+    features: ["Analyzed PDF Report", "Download in 4 Formats", "FOIR/Loan Analysis (Pro)"],
     highlighted: true,
   },
   {
@@ -131,7 +160,7 @@ const perPagePlans: Plan[] = [
     unit: "/conversion",
     description: "For larger batches",
     statements: "50 Pages",
-    features: ["Analyzed PDF Report", "Download in 4 Formats"],
+    features: ["Analyzed PDF Report", "Download in 4 Formats", "FOIR/Loan Analysis (Advanced - Enterprise)"],
   },
 ];
 
@@ -309,6 +338,9 @@ const PricingPage = () => {
 
   const renderPlanCard = (plan: Plan) => {
     const isProcessing = processingPlan === plan.planId;
+    const planFeatureItems = plan.editPdfDetector
+      ? [...plan.features, `${plan.editPdfDetector} Edit PDF Detector`]
+      : plan.features;
 
     return (
       <Card
@@ -357,9 +389,9 @@ const PricingPage = () => {
             </div>
           )}
 
-          {plan.features && plan.features.length > 0 && (
+          {planFeatureItems.length > 0 && (
             <ul className="space-y-2">
-              {plan.features.map((feature, idx) => (
+              {planFeatureItems.map((feature, idx) => (
                 <li key={idx} className="flex items-start gap-2">
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
                   <span className="text-sm text-muted-foreground">{feature}</span>

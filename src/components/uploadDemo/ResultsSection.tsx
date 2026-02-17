@@ -103,6 +103,7 @@ type ResultsSectionProps = {
   setShowDuplicatesOnly: (value: boolean) => void;
   formatAmountNoSymbol: FormatAmountFn;
   truncateDecimals: (value: number, decimals?: number) => number;
+  showEditDetectorSignals?: boolean;
 };
 
 export const ResultsSection = ({
@@ -133,6 +134,7 @@ export const ResultsSection = ({
   setShowDuplicatesOnly,
   formatAmountNoSymbol,
   truncateDecimals,
+  showEditDetectorSignals = true,
 }: ResultsSectionProps) => {
   const creditTone: ToneName = analytics ? getCreditTone(analytics.totalCredits) : "good";
   const debitTone: ToneName = analytics ? getDebitTone(analytics.totalCredits, analytics.totalDebits) : "moderate";
@@ -389,7 +391,11 @@ export const ResultsSection = ({
       )}
 
       {analytics?.riskAnalysis && (
-        <FraudAlertPanel riskAnalysis={analytics.riskAnalysis} currencyCode={currencyCode} />
+        <FraudAlertPanel
+          riskAnalysis={analytics.riskAnalysis}
+          currencyCode={currencyCode}
+          showEditDetectorSignals={showEditDetectorSignals}
+        />
       )}
 
       {analytics && (

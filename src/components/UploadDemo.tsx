@@ -267,6 +267,17 @@ export const UploadDemo = () => {
   const isYearlyUsagePlan = normalizedPlanType.startsWith("yearly") || normalizedPlanType === "business";
   const isKnownPaidUsagePlan = isPerPageUsagePlan || isMonthlyUsagePlan || isYearlyUsagePlan || isUnlimitedUsagePlan;
   const isFreeUsageMode = !isKnownPaidUsagePlan && (!isAuthenticated || normalizedPlanType === "free" || conversionsLimit <= 5);
+  const getPdfDetectorTier = (): "none" | "basic" | "advanced" => {
+    if (normalizedPlanType === "monthly_enterprise" || normalizedPlanType === "yearly_pro") {
+      return "advanced";
+    }
+    if (normalizedPlanType === "monthly_pro" || normalizedPlanType === "yearly_full") {
+      return "basic";
+    }
+    return "none";
+  };
+  const pdfDetectorTier = getPdfDetectorTier();
+  const hasEditPdfDetectorAccess = pdfDetectorTier !== "none";
 
   // reCAPTCHA v3 for anonymous users - runs invisibly in background
   const { executeRecaptcha } = useRecaptcha();
@@ -337,6 +348,12 @@ export const UploadDemo = () => {
       timeouts.forEach((t) => window.clearTimeout(t));
     };
   }, [converting]);
+
+  useEffect(() => {
+    if (!hasEditPdfDetectorAccess && editedPdfWarning) {
+      setEditedPdfWarning(null);
+    }
+  }, [hasEditPdfDetectorAccess, editedPdfWarning]);
 
   useEffect(() => {
     if (converting || !showProgress) return;
@@ -515,6 +532,32 @@ export const UploadDemo = () => {
     });
   };
 
+  const runEditedPdfDetection = async (file: File): Promise<boolean> => {
+    const isPdf = file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf || !hasEditPdfDetectorAccess || dismissedEditedWarningsRef.current.has(file.name)) {
+      return false;
+    }
+
+    try {
+      const { detectEditedPdf } = await loadPdfUtils();
+      const detection = await detectEditedPdf(file, {
+        tier: pdfDetectorTier,
+        password: pdfPassword.trim() || undefined,
+      });
+      if (!detection.suspected) return false;
+
+      setSelectedFile(file);
+      setEditedPdfWarning({
+        fileName: file.name,
+        reason: `${detection.riskLevel.toUpperCase()} risk - ${detection.reason}`,
+      });
+      return true;
+    } catch {
+      // Detector failure must not block conversion flow.
+      return false;
+    }
+  };
+
 
 
 
@@ -545,18 +588,8 @@ export const UploadDemo = () => {
     // For anonymous users, reCAPTCHA v3 runs in background - token generated at conversion time
 
     const isPdf = fileToConvert.name.toLowerCase().endsWith('.pdf');
-    if (isPdf && !dismissedEditedWarningsRef.current.has(fileToConvert.name)) {
-      try {
-        const { detectEditedPdf } = await loadPdfUtils();
-        const detection = await detectEditedPdf(fileToConvert);
-        if (detection.suspected) {
-          setEditedPdfWarning({ fileName: fileToConvert.name, reason: detection.reason });
-          return;
-        }
-      } catch {
-        // If detection fails, allow conversion to proceed
-      }
-    }
+    const shouldBlockForEditedPdf = await runEditedPdfDetection(fileToConvert);
+    if (shouldBlockForEditedPdf) return;
 
     setCurrencyCode('');
     setUploading(true);
@@ -896,6 +929,11 @@ Analytics Summary:
       }
 
       for (const [index, file] of selectedFiles.entries()) {
+        const shouldBlockForEditedPdf = await runEditedPdfDetection(file);
+        if (shouldBlockForEditedPdf) {
+          return;
+        }
+
         const isPdf = file.name.toLowerCase().endsWith('.pdf');
         const payload: BatchFilePayload = { fileName: file.name };
 
@@ -1306,12 +1344,65 @@ Analytics Summary:
     );
   })();
 
+  const getTallyLimit = (normalizedPlan: string): number | null => {
+    if (normalizedPlan === "monthly_pro") return 25;
+    if (normalizedPlan === "monthly_enterprise") return 150;
+    if (normalizedPlan === "yearly_full") return 300;
+    if (normalizedPlan === "yearly_pro") return 1200;
+    return null;
+  };
+
+  const getTallyPeriodKey = (normalizedPlan: string): string => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    if (normalizedPlan.startsWith("monthly")) {
+      return `${year}-${month}`;
+    }
+    if (normalizedPlan.startsWith("yearly")) {
+      return `${year}`;
+    }
+    return `${year}-${month}`;
+  };
+
+  const getTallyUsage = (normalizedPlan: string) => {
+    const limit = getTallyLimit(normalizedPlan);
+    const periodKey = getTallyPeriodKey(normalizedPlan);
+    const storageKey = `banklefy:tally:${normalizedPlan}:${periodKey}`;
+    const used = Number.parseInt(localStorage.getItem(storageKey) ?? "0", 10) || 0;
+    const remaining = limit ? Math.max(0, limit - used) : 0;
+    return { limit, used, remaining, storageKey, periodKey };
+  };
+
   const handleTallyExport = async () => {
     if (!hasTallyAccess) {
       setShowUpgradeDialog(true);
       return;
     }
+    const normalized = (planType ?? "free").toLowerCase();
+    const { limit, remaining, storageKey } = getTallyUsage(normalized);
+
+    if (!limit) {
+      setShowUpgradeDialog(true);
+      return;
+    }
+
+    if (remaining <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Tally export limit reached",
+        description: "You have used all Tally exports for this billing period.",
+      });
+      setShowUpgradeDialog(true);
+      return;
+    }
+
     await exportAsTally();
+    localStorage.setItem(storageKey, String((Number.parseInt(localStorage.getItem(storageKey) ?? "0", 10) || 0) + 1));
+    toast({
+      title: "Tally export ready",
+      description: `Remaining exports this period: ${Math.max(0, remaining - 1)}`,
+    });
   };
 
   const handlePremiumExport = (format: 'docx' | 'ods') => {
@@ -1514,7 +1605,7 @@ Analytics Summary:
               )}
 
               {/* Edited PDF Warning */}
-              {editedPdfWarning && selectedFile && !converting && !uploading && (
+              {hasEditPdfDetectorAccess && editedPdfWarning && selectedFile && !converting && !uploading && (
                 <div className="p-4 bg-[#191919]/80 border border-amber-500/30 rounded-xl space-y-3">
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 flex-shrink-0" />
@@ -1532,7 +1623,9 @@ Analytics Summary:
                       onClick={() => {
                         dismissedEditedWarningsRef.current.add(editedPdfWarning.fileName);
                         setEditedPdfWarning(null);
-                        if (selectedFile) {
+                        if (selectedFiles.length > 1) {
+                          handleConvertMultiple();
+                        } else if (selectedFile) {
                           handleConvert(selectedFile);
                         }
                       }}
@@ -1655,6 +1748,7 @@ Analytics Summary:
                 setShowDuplicatesOnly={setShowDuplicatesOnly}
                 formatAmountNoSymbol={formatAmountNoSymbol}
                 truncateDecimals={truncateDecimals}
+                showEditDetectorSignals={hasEditPdfDetectorAccess}
               />
             </div>
           </div>
