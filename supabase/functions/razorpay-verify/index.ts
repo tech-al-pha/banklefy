@@ -78,22 +78,31 @@ const getTierForPlan = (planId: string): 'free' | 'daily' | 'business' => {
   return 'free';
 };
 
-const getBillingWindow = (planId: string) => {
-  const start = new Date();
-  const end = new Date(start);
-  if (planId.startsWith('monthly_')) {
-    end.setMonth(end.getMonth() + 1);
-  } else if (planId.startsWith('yearly_')) {
-    end.setFullYear(end.getFullYear() + 1);
-  } else {
-    // One-time packs don't have recurring billing; keep a long horizon for required fields.
-    end.setFullYear(end.getFullYear() + 10);
+const asRecord = (value: unknown): Record<string, unknown> | null => {
+  if (!value || typeof value !== 'object') return null;
+  return value as Record<string, unknown>;
+};
+
+const toBoolean = (value: unknown, fallback: boolean): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+    if (normalized === '1') return true;
+    if (normalized === '0') return false;
   }
-  return {
-    billing_cycle_start: start.toISOString(),
-    billing_cycle_end: end.toISOString(),
-    last_reset_date: toIsoDate(start),
-  };
+  return fallback;
+};
+
+const toInteger = (value: unknown, fallback: number): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return Math.trunc(parsed);
+  }
+  return fallback;
 };
 
 Deno.serve(async (req) => {
@@ -200,6 +209,40 @@ Deno.serve(async (req) => {
   // Update user subscription based on plan
   const planId = order.plan_id as string;
   const pagesToAdd = PLAN_PAGES[planId] || 0;
+
+  // Preferred: atomic DB-side finalization for all plan types.
+  const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('process_razorpay_payment', {
+    p_user_id: userId,
+    p_order_id: order.id,
+    p_razorpay_payment_id: razorpay_payment_id,
+    p_razorpay_order_id: razorpay_order_id,
+    p_razorpay_signature: razorpay_signature,
+    p_amount: order.amount,
+    p_currency: order.currency,
+    p_plan_id: planId,
+    p_pages_to_add: pagesToAdd,
+  });
+
+  if (!rpcError) {
+    const rpcRow = asRecord(Array.isArray(rpcData) ? rpcData[0] : rpcData);
+    const alreadyProcessed = toBoolean(rpcRow?.already_processed, false);
+    const pagesAdded = toInteger(rpcRow?.pages_added, alreadyProcessed ? 0 : pagesToAdd);
+
+    return respond(req, 200, {
+      success: true,
+      message: alreadyProcessed ? 'Payment already verified.' : 'Payment verified successfully.',
+      alreadyProcessed,
+      plan_id: planId,
+      pages_added: pagesAdded,
+    });
+  }
+
+  console.error('RPC payment finalization failed. Falling back to legacy path.', {
+    planId,
+    orderId: order.id,
+    rpcError,
+  });
+
   const paymentPayload = {
     user_id: userId,
     order_id: order.id,
@@ -246,10 +289,10 @@ Deno.serve(async (req) => {
   if (!alreadyProcessed) {
     const isRecurringPlan = planId.startsWith('monthly_') || planId.startsWith('yearly_');
     const planTier = getTierForPlan(planId);
-    const billingWindow = getBillingWindow(planId);
+    const resetDate = toIsoDate(new Date());
     const { data: existingSubscription, error: subscriptionReadError } = await supabaseAdmin
       .from('subscriptions')
-      .select('conversions_limit, tier')
+      .select('conversions_limit, tier, plan_type')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -262,11 +305,10 @@ Deno.serve(async (req) => {
       const { error: subscriptionInsertError } = await supabaseAdmin.from('subscriptions').insert({
         user_id: userId,
         tier: planTier,
+        plan_type: planId,
         conversions_limit: pagesToAdd,
         conversions_used: 0,
-        billing_cycle_start: billingWindow.billing_cycle_start,
-        billing_cycle_end: billingWindow.billing_cycle_end,
-        last_reset_date: billingWindow.last_reset_date,
+        last_reset_date: resetDate,
         timezone: 'UTC',
       });
 
@@ -286,13 +328,12 @@ Deno.serve(async (req) => {
       const updatePayload: Record<string, unknown> = {
         conversions_limit: nextLimit,
         tier: retainedTier,
+        plan_type: planId,
       };
 
       if (isRecurringPlan) {
         updatePayload.conversions_used = 0;
-        updatePayload.last_reset_date = billingWindow.last_reset_date;
-        updatePayload.billing_cycle_start = billingWindow.billing_cycle_start;
-        updatePayload.billing_cycle_end = billingWindow.billing_cycle_end;
+        updatePayload.last_reset_date = resetDate;
         updatePayload.timezone = 'UTC';
       }
 

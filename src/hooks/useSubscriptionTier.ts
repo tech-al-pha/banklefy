@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { isPaidPlan } from "@/lib/entitlements";
+import { isPaidPlan, resolveEffectivePlanType } from "@/lib/entitlements";
 
 type SubscriptionTier = "free" | "daily" | "business";
 
@@ -41,7 +41,7 @@ export const useSubscriptionTier = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("plan_type")
+        .select("plan_type, conversions_limit")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -52,7 +52,10 @@ export const useSubscriptionTier = () => {
         setTier("free");
         setPlanType(null);
       } else {
-        const nextPlanType = typeof data?.plan_type === "string" ? data.plan_type : null;
+        const nextPlanType = resolveEffectivePlanType(
+          typeof data?.plan_type === "string" ? data.plan_type : null,
+          typeof data?.conversions_limit === "number" ? data.conversions_limit : null,
+        );
         setPlanType(nextPlanType);
         setTier(deriveTierFromPlanType(nextPlanType));
       }

@@ -33,6 +33,8 @@ import type {
   BatchRequestBody,
 } from "./uploadDemo/types";
 
+const PURCHASE_TOAST_STORAGE_KEY = "banklefy:last-plan-purchase";
+
 export const UploadDemo = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -260,6 +262,51 @@ export const UploadDemo = () => {
     getTimezone,
     planType
   } = useUsageLimit();
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem(PURCHASE_TOAST_STORAGE_KEY);
+    if (!raw) return;
+
+    sessionStorage.removeItem(PURCHASE_TOAST_STORAGE_KEY);
+
+    try {
+      const parsed = JSON.parse(raw) as {
+        at?: unknown;
+        planName?: unknown;
+        pagesAdded?: unknown;
+        features?: unknown;
+      };
+
+      const purchasedAt = Number(parsed.at ?? 0);
+      if (!Number.isFinite(purchasedAt) || Date.now() - purchasedAt > 15 * 60 * 1000) {
+        return;
+      }
+
+      const planName = typeof parsed.planName === "string" && parsed.planName.trim()
+        ? parsed.planName.trim()
+        : "Your plan";
+      const pagesAdded = Number(parsed.pagesAdded ?? 0);
+      const features = Array.isArray(parsed.features)
+        ? parsed.features.filter((feature): feature is string => typeof feature === "string").slice(0, 3)
+        : [];
+
+      const descriptionParts = [
+        Number.isFinite(pagesAdded) ? `${Math.max(0, pagesAdded)} pages added.` : null,
+        features.length > 0 ? `Unlocked: ${features.join(" | ")}.` : null,
+      ].filter(Boolean) as string[];
+
+      toast({
+        title: `Plan activated: ${planName}`,
+        description: descriptionParts.join(" "),
+      });
+
+      window.dispatchEvent(new Event("banklefy:subscription-updated"));
+      void refreshUsageLimit();
+    } catch {
+      // Ignore malformed payloads and continue.
+    }
+  }, [refreshUsageLimit, toast]);
+
   const normalizedPlanType = (planType ?? "free").toLowerCase();
   const isUnlimitedUsagePlan = normalizedPlanType === "unlimited";
   const isPerPageUsagePlan = normalizedPlanType.startsWith("per_page");
@@ -619,7 +666,7 @@ export const UploadDemo = () => {
       // For PDFs: render page images client-side and send to backend (Groq Vision can't accept PDFs directly)
       if (isPdf) {
         try {
-          const { pdfToPageImages, extractPdfTransactionsFromText } = await loadPdfUtils();
+          const { pdfToPageImages, extractPdfDataFromText } = await loadPdfUtils();
           requestBody.pdfPageImages = await pdfToPageImages(fileToConvert, {
             password: pdfPassword.trim() || undefined,
             maxPdfRenderPages,
@@ -630,12 +677,15 @@ export const UploadDemo = () => {
           // Deterministic path for text-based PDFs: extract rows directly from PDF text.
           // OCR remains fallback for scanned PDFs / extraction misses.
           try {
-            const parsedTransactions = await extractPdfTransactionsFromText(fileToConvert, {
+            const parsedPdf = await extractPdfDataFromText(fileToConvert, {
               password: pdfPassword.trim() || undefined,
               maxPdfRenderPages,
             });
-            if (parsedTransactions.length > 0) {
-              requestBody.pdfParsedTransactions = parsedTransactions;
+            if (parsedPdf.transactions.length > 0) {
+              requestBody.pdfParsedTransactions = parsedPdf.transactions;
+            }
+            if (parsedPdf.bankMetadata) {
+              requestBody.pdfParsedBankMetadata = parsedPdf.bankMetadata;
             }
           } catch {
             // Parser failure should not block conversion; backend OCR fallback will handle it.
@@ -957,7 +1007,7 @@ Analytics Summary:
 
         if (isPdf) {
           try {
-            const { pdfToPageImages, extractPdfTransactionsFromText } = await loadPdfUtils();
+            const { pdfToPageImages, extractPdfDataFromText } = await loadPdfUtils();
             payload.pdfPageImages = await pdfToPageImages(file, {
               password: pdfPassword.trim() || undefined,
               maxPdfRenderPages,
@@ -966,12 +1016,15 @@ Analytics Summary:
             });
 
             try {
-              const parsedTransactions = await extractPdfTransactionsFromText(file, {
+              const parsedPdf = await extractPdfDataFromText(file, {
                 password: pdfPassword.trim() || undefined,
                 maxPdfRenderPages,
               });
-              if (parsedTransactions.length > 0) {
-                payload.pdfParsedTransactions = parsedTransactions;
+              if (parsedPdf.transactions.length > 0) {
+                payload.pdfParsedTransactions = parsedPdf.transactions;
+              }
+              if (parsedPdf.bankMetadata) {
+                payload.pdfParsedBankMetadata = parsedPdf.bankMetadata;
               }
             } catch {
               // Ignore parser errors; backend OCR fallback remains active.

@@ -43,6 +43,26 @@ export interface ParsedPdfTransaction {
   refNumber?: string;
 }
 
+export interface ParsedPdfBankMetadata {
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
+  currency?: string;
+  iban?: string;
+  ifsc?: string;
+  swift?: string;
+  routingNumber?: string;
+  sortCode?: string;
+  bsb?: string;
+  micr?: string;
+  statementPeriod?: string;
+}
+
+export interface ParsedPdfData {
+  transactions: ParsedPdfTransaction[];
+  bankMetadata?: ParsedPdfBankMetadata;
+}
+
 const SUSPICIOUS_PRODUCER_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /smallpdf|ilovepdf|sejda|canva/i, label: "Consumer PDF editor detected" },
   { pattern: /microsoft\s+word|photoshop|foxit|nitro|pdfescape|pdf24/i, label: "Office/design editor detected" },
@@ -360,6 +380,30 @@ export const detectPasswordProtectedPdf = async (file: File): Promise<boolean> =
 const DATE_TOKEN = /\d{2}[/-]\d{2}[/-]\d{4}/;
 const ROW_START_PATTERN = /^(\d{2}[/-]\d{2}[/-]\d{4})\s+(\d{2}[/-]\d{2}[/-]\d{4})\s+(.+)$/;
 const AMOUNT_PATTERN = /-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g;
+const PERIOD_FROM_TO_PATTERN =
+  /\bfrom\b\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s*(?:to|-)\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i;
+const IBAN_PATTERN = /\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b/;
+const SWIFT_PATTERN = /\b[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?\b/;
+const CURRENCY_CODES = new Set([
+  "AED",
+  "USD",
+  "INR",
+  "EUR",
+  "GBP",
+  "SAR",
+  "QAR",
+  "OMR",
+  "KWD",
+  "BHD",
+  "JPY",
+  "CNY",
+  "SGD",
+  "HKD",
+  "AUD",
+  "CAD",
+  "CHF",
+  "NZD",
+]);
 
 type PositionedToken = {
   x: number;
@@ -382,6 +426,148 @@ const parseAmount = (value: string): number => {
 
 const escapeRegExp = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const cleanMetadataValue = (value?: string): string => {
+  if (!value) return "";
+  return value.replace(/\s+/g, " ").replace(/^[\s:;-]+|[\s:;-]+$/g, "").trim();
+};
+
+const findLabeledValue = (lines: string[], labels: string[]): string | undefined => {
+  for (const line of lines) {
+    const normalized = line.replace(/\s+/g, " ").trim();
+    if (!normalized) continue;
+
+    for (const label of labels) {
+      const pattern = new RegExp(
+        `\\b${escapeRegExp(label).replace(/\s+/g, "\\s+")}\\b\\s*[:\\-]?\\s*(.+)$`,
+        "i",
+      );
+      const match = normalized.match(pattern);
+      if (!match) continue;
+      const value = cleanMetadataValue(match[1]);
+      if (value) return value;
+    }
+  }
+  return undefined;
+};
+
+const toCurrencyCode = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  const token = value.toUpperCase().match(/[A-Z]{3}/)?.[0];
+  if (!token) return undefined;
+  return CURRENCY_CODES.has(token) ? token : undefined;
+};
+
+const pickMostFrequentCurrency = (text: string): string | undefined => {
+  const matches = text.toUpperCase().match(/\b[A-Z]{3}\b/g);
+  if (!matches || matches.length === 0) return undefined;
+
+  const freq = new Map<string, number>();
+  for (const token of matches) {
+    if (!CURRENCY_CODES.has(token)) continue;
+    freq.set(token, (freq.get(token) || 0) + 1);
+  }
+
+  let selected: string | undefined;
+  let count = 0;
+  freq.forEach((value, key) => {
+    if (value > count) {
+      selected = key;
+      count = value;
+    }
+  });
+  return selected;
+};
+
+const extractBankMetadataFromLines = (sourceLines: string[]): ParsedPdfBankMetadata | undefined => {
+  const lines = sourceLines.map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+  if (lines.length === 0) return undefined;
+
+  const fullText = lines.join("\n");
+  const metadata: ParsedPdfBankMetadata = {};
+
+  const bankNameFromLabel = findLabeledValue(lines, ["Bank Name"]);
+  if (bankNameFromLabel && !/account statement/i.test(bankNameFromLabel)) {
+    metadata.bankName = bankNameFromLabel;
+  }
+
+  if (!metadata.bankName) {
+    const likelyBankLine = lines.slice(0, 40).find((line) =>
+      /(bank|emirates nbd|hsbc|hdfc|icici|axis|citi|citibank|barclays|standard chartered|chase)/i.test(line) &&
+      !/(account statement|transaction|debit|credit|running balance|charges|total records|page \d+)/i.test(line)
+    );
+    if (likelyBankLine) {
+      metadata.bankName = likelyBankLine;
+    }
+  }
+
+  const accountNumber = findLabeledValue(lines, [
+    "Account Number",
+    "Account No",
+    "A/C No",
+    "Acct No",
+  ]);
+  if (accountNumber) metadata.accountNumber = accountNumber;
+
+  const accountHolder = findLabeledValue(lines, [
+    "Account Holder Name",
+    "Account Holder",
+    "Account Name",
+    "Customer Name",
+    "Name",
+  ]);
+  if (accountHolder && !/statement/i.test(accountHolder)) {
+    metadata.accountHolder = accountHolder;
+  }
+
+  const currencyLabeled = toCurrencyCode(
+    findLabeledValue(lines, ["Currency Type", "Currency", "Currency Code"]),
+  );
+  metadata.currency = currencyLabeled || pickMostFrequentCurrency(fullText);
+
+  const periodLabeled = cleanMetadataValue(
+    findLabeledValue(lines, ["Statement Period", "Period", "Date Range"]),
+  );
+  if (periodLabeled) {
+    metadata.statementPeriod = periodLabeled;
+  } else {
+    const periodMatch = fullText.match(PERIOD_FROM_TO_PATTERN);
+    if (periodMatch) {
+      metadata.statementPeriod = `${periodMatch[1]} - ${periodMatch[2]}`;
+    }
+  }
+
+  const ibanLabeled = cleanMetadataValue(findLabeledValue(lines, ["IBAN"]));
+  const ibanMatch = fullText.toUpperCase().match(IBAN_PATTERN);
+  metadata.iban = ibanLabeled || ibanMatch?.[0];
+
+  const ifsc = cleanMetadataValue(findLabeledValue(lines, ["IFSC", "IFSC Code"]));
+  if (ifsc) metadata.ifsc = ifsc;
+
+  const swiftLabeled = cleanMetadataValue(findLabeledValue(lines, ["SWIFT", "BIC", "SWIFT Code"]));
+  const swiftMatch = fullText.toUpperCase().match(SWIFT_PATTERN);
+  metadata.swift = swiftLabeled || swiftMatch?.[0];
+
+  const routingNumber = cleanMetadataValue(
+    findLabeledValue(lines, ["Routing Number", "Routing No"]),
+  );
+  if (routingNumber) metadata.routingNumber = routingNumber;
+
+  const sortCode = cleanMetadataValue(findLabeledValue(lines, ["Sort Code"]));
+  if (sortCode) metadata.sortCode = sortCode;
+
+  const bsb = cleanMetadataValue(findLabeledValue(lines, ["BSB"]));
+  if (bsb) metadata.bsb = bsb;
+
+  const micr = cleanMetadataValue(findLabeledValue(lines, ["MICR"]));
+  if (micr) metadata.micr = micr;
+
+  const hasMetadata = Object.values(metadata).some(
+    (value) => typeof value === "string" && value.trim().length > 0,
+  );
+
+  return hasMetadata ? metadata : undefined;
+};
 
 const isNoiseLine = (line: string): boolean => {
   const lower = line.toLowerCase();
@@ -455,10 +641,10 @@ const extractAmounts = (text: string): { textWithoutAmounts: string; debit: numb
   };
 };
 
-export const extractPdfTransactionsFromText = async (
+export const extractPdfDataFromText = async (
   file: File,
   options?: { password?: string; maxPdfRenderPages?: number },
-): Promise<ParsedPdfTransaction[]> => {
+): Promise<ParsedPdfData> => {
   const pdfjsLib = (await import("pdfjs-dist")) as PdfJsModule;
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
@@ -475,10 +661,11 @@ export const extractPdfTransactionsFromText = async (
   const maxPages = options?.maxPdfRenderPages ?? 120;
   if (pdf.numPages > maxPages) {
     await pdf.destroy?.();
-    return [];
+    return { transactions: [] };
   }
 
   const rows: ParsedPdfTransaction[] = [];
+  const metadataLines: string[] = [];
   let current: (ParsedPdfTransaction & { _descriptionParts: string[] }) | null = null;
 
   const flushCurrent = () => {
@@ -497,6 +684,9 @@ export const extractPdfTransactionsFromText = async (
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent?.();
     const lines = linesFromTextItems((textContent?.items || []) as PdfTextItem[]);
+    if (pageNum <= 2) {
+      metadataLines.push(...lines);
+    }
 
     for (const line of lines) {
       if (isNoiseLine(line)) continue;
@@ -548,8 +738,19 @@ export const extractPdfTransactionsFromText = async (
   flushCurrent();
   await pdf.destroy?.();
 
+  const transactions = rows.filter((row) => row.date && row.description && Number.isFinite(row.balance));
+  const bankMetadata = extractBankMetadataFromLines(metadataLines);
+
   // Return only meaningful rows and keep original debit/credit/balance values.
-  return rows.filter((row) => row.date && row.description && Number.isFinite(row.balance));
+  return { transactions, bankMetadata };
+};
+
+export const extractPdfTransactionsFromText = async (
+  file: File,
+  options?: { password?: string; maxPdfRenderPages?: number },
+): Promise<ParsedPdfTransaction[]> => {
+  const result = await extractPdfDataFromText(file, options);
+  return result.transactions;
 };
 
 export const pdfToPageImages = async (

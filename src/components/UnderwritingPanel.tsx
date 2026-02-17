@@ -136,7 +136,17 @@ const loanTypeIcons: Record<string, React.ReactNode> = {
 };
 
 export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPanelProps) => {
-  const underwritingTier = underwriting?.tier ?? 'advanced';
+  const resolveTier = (): 'basic' | 'pro' | 'advanced' => {
+    if (underwriting?.tier === 'advanced' || underwriting?.tier === 'pro' || underwriting?.tier === 'basic') {
+      return underwriting.tier;
+    }
+    if (underwriting?.tierLabel === 'Advanced') return 'advanced';
+    if (underwriting?.tierLabel === 'Pro') return 'pro';
+    return 'basic';
+  };
+
+  // Security-first fallback: when tier is missing, do NOT expose higher-tier sections.
+  const underwritingTier = resolveTier();
   const underwritingTierLabel = underwriting?.tierLabel ?? (underwritingTier === 'advanced' ? 'Advanced' : underwritingTier === 'pro' ? 'Pro' : 'Basic');
   const showProInsights = underwritingTier !== 'basic';
   const showAdvancedInsights = underwritingTier === 'advanced';

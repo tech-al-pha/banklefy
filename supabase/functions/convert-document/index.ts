@@ -205,14 +205,141 @@ const toDateString = (value: unknown): string | null => {
   return parsed.toISOString().slice(0, 10);
 };
 
+const pickString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+};
+
+const pickNumber = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[,\s]/g, '').trim();
+    if (!cleaned) return undefined;
+    const numeric = Number(cleaned);
+    return Number.isFinite(numeric) ? numeric : undefined;
+  }
+  return undefined;
+};
+
+const normalizeClientBankMetadata = (value: unknown): BankMetadata | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+
+  const metadata: BankMetadata = {
+    bankName: pickString(raw.bankName) || '',
+    accountNumber: pickString(raw.accountNumber) || '',
+    accountHolder: pickString(raw.accountHolder) || '',
+    currency: pickString(raw.currency) || '',
+    iban: pickString(raw.iban),
+    ifsc: pickString(raw.ifsc),
+    swift: pickString(raw.swift),
+    routingNumber: pickString(raw.routingNumber),
+    sortCode: pickString(raw.sortCode),
+    bsb: pickString(raw.bsb),
+    micr: pickString(raw.micr),
+    statementPeriod: pickString(raw.statementPeriod),
+    openingBalance: pickNumber(raw.openingBalance),
+    closingBalance: pickNumber(raw.closingBalance),
+  };
+
+  const hasValue = Object.values(metadata).some((field) =>
+    (typeof field === 'string' && field.trim().length > 0) ||
+    (typeof field === 'number' && Number.isFinite(field))
+  );
+
+  return hasValue ? metadata : undefined;
+};
+
+const mergeBankMetadata = (...candidates: Array<BankMetadata | undefined>): BankMetadata | undefined => {
+  const merged: BankMetadata = {
+    bankName: '',
+    accountNumber: '',
+    accountHolder: '',
+    currency: '',
+  };
+  let hasValue = false;
+  const writable = merged as unknown as Record<string, unknown>;
+
+  const assignString = (key: keyof BankMetadata, value: unknown) => {
+    if (typeof value !== 'string') return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const current = merged[key];
+    if (typeof current === 'string' && current.trim()) return;
+    writable[key] = trimmed;
+    hasValue = true;
+  };
+
+  const assignNumber = (key: keyof BankMetadata, value: unknown) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return;
+    const current = merged[key];
+    if (typeof current === 'number' && Number.isFinite(current)) return;
+    writable[key] = value;
+    hasValue = true;
+  };
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    assignString('bankName', candidate.bankName);
+    assignString('accountNumber', candidate.accountNumber);
+    assignString('accountHolder', candidate.accountHolder);
+    assignString('currency', candidate.currency);
+    assignString('iban', candidate.iban);
+    assignString('ifsc', candidate.ifsc);
+    assignString('swift', candidate.swift);
+    assignString('routingNumber', candidate.routingNumber);
+    assignString('sortCode', candidate.sortCode);
+    assignString('bsb', candidate.bsb);
+    assignString('micr', candidate.micr);
+    assignString('statementPeriod', candidate.statementPeriod);
+    assignNumber('openingBalance', candidate.openingBalance);
+    assignNumber('closingBalance', candidate.closingBalance);
+  }
+
+  return hasValue ? merged : undefined;
+};
+
 const normalizePlan = (value: unknown): string =>
   typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'free';
 
+const normalizeLegacyPlanType = (planType: string, conversionsLimit: number): string => {
+  if (
+    planType === 'free' ||
+    planType === 'unlimited' ||
+    planType.startsWith('monthly') ||
+    planType.startsWith('yearly') ||
+    planType.startsWith('per_page')
+  ) {
+    return planType;
+  }
+
+  if (planType === 'daily') {
+    if (conversionsLimit >= 4500) return 'monthly_enterprise';
+    if (conversionsLimit >= 1000) return 'monthly_pro';
+    if (conversionsLimit >= 300) return 'monthly_basic';
+    return 'daily';
+  }
+
+  if (planType === 'business') {
+    if (conversionsLimit >= 65000) return 'yearly_pro';
+    if (conversionsLimit >= 15000) return 'yearly_full';
+    if (conversionsLimit >= 5000) return 'yearly_lite';
+    if (conversionsLimit === 50) return 'per_page_power';
+    if (conversionsLimit === 25) return 'per_page_standard';
+    if (conversionsLimit === 10) return 'per_page_lite';
+    return 'business';
+  }
+
+  return planType;
+};
+
 const resolvePlanType = (row: Record<string, unknown> | null): string => {
   if (!row) return 'free';
+  const conversionsLimit = toNumber(row.conversions_limit, 0);
   const planType = normalizePlan(row.plan_type);
-  if (planType !== 'free') return planType;
-  return normalizePlan(row.tier);
+  if (planType !== 'free') return normalizeLegacyPlanType(planType, conversionsLimit);
+  return normalizeLegacyPlanType(normalizePlan(row.tier), conversionsLimit);
 };
 
 const isKnownPaidPlan = (normalizedPlan: string): boolean =>
@@ -571,6 +698,7 @@ Deno.serve(async (req) => {
       pdfPassword,
       pdfPageImages,
       pdfParsedTransactions,
+      pdfParsedBankMetadata,
     } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
     
@@ -962,10 +1090,11 @@ Deno.serve(async (req) => {
           return hasDate && hasDescription && hasAmount;
         })
       : [];
+    const clientParsedBankMetadata = normalizeClientBankMetadata(pdfParsedBankMetadata);
 
     // isPdf and hasPdfPageImages already defined above for page limit check
     // Track bank metadata across pages
-    let collectedBankMetadata: BankMetadata | undefined;
+    let collectedBankMetadata: BankMetadata | undefined = clientParsedBankMetadata;
     let pagesWithData = 1;
 
     if (isPdf && clientParsedTransactions.length > 0) {
@@ -1007,9 +1136,8 @@ Deno.serve(async (req) => {
           pagesWithData += 1;
           collected.push(...res.transactions);
           if (res.text) combinedText += (combinedText ? '\n' : '') + res.text;
-          // Capture bank metadata from first page that has it
-          if (!collectedBankMetadata && res.bankMetadata) {
-            collectedBankMetadata = res.bankMetadata;
+          if (res.bankMetadata) {
+            collectedBankMetadata = mergeBankMetadata(collectedBankMetadata, res.bankMetadata);
             console.log('Bank metadata detected:', collectedBankMetadata);
           }
         } else {
@@ -1255,7 +1383,11 @@ Deno.serve(async (req) => {
     };
 
     // Generate Excel (styled)
-    const bankInfo = collectedBankMetadata || extractionResult.bankMetadata;
+    const bankInfo = mergeBankMetadata(
+      clientParsedBankMetadata,
+      collectedBankMetadata,
+      extractionResult.bankMetadata,
+    );
     const excelResult = generateProfessionalExcel({
       transactions,
       analytics: {

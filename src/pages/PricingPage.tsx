@@ -7,6 +7,8 @@ import { BadgeDollarSign, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+const PURCHASE_TOAST_STORAGE_KEY = "banklefy:last-plan-purchase";
+
 type Plan = {
   planId: string;
   category: "perPage" | "monthly" | "yearly";
@@ -243,7 +245,8 @@ const PricingPage = () => {
   const verifyPayment = async (
     razorpay_order_id: string,
     razorpay_payment_id: string,
-    razorpay_signature: string
+    razorpay_signature: string,
+    purchasedPlan?: Plan,
   ) => {
     try {
       const result = await invokeFunctionWithSession("razorpay-verify", {
@@ -252,9 +255,32 @@ const PricingPage = () => {
         razorpay_signature,
       });
       if (result?.success) {
-        toast.success(`Payment successful! ${result.pages_added} pages added to your account.`);
+        const pagesAdded = Number(result.pages_added ?? 0);
+        const planName = purchasedPlan?.name ?? "Selected Plan";
+        const planFeatures = purchasedPlan?.features ?? [];
+        const featureSummary = planFeatures.slice(0, 3).join(" | ");
+        const descriptionParts = [
+          `${pagesAdded} pages added to your account.`,
+          featureSummary ? `Unlocked: ${featureSummary}.` : null,
+        ].filter(Boolean);
+
+        sessionStorage.setItem(
+          PURCHASE_TOAST_STORAGE_KEY,
+          JSON.stringify({
+            at: Date.now(),
+            planId: purchasedPlan?.planId ?? result.plan_id ?? null,
+            planName,
+            pagesAdded,
+            features: planFeatures,
+          }),
+        );
+
+        toast.success(`Plan activated: ${planName}`, {
+          description: descriptionParts.join(" "),
+        });
         window.dispatchEvent(new Event("banklefy:subscription-updated"));
-        navigate("/?next=demo");
+        // Hard redirect ensures user always lands on the upload box section after payment.
+        window.location.assign("/?next=demo");
       } else {
         toast.error("Payment verification failed.");
       }
@@ -314,7 +340,8 @@ const PricingPage = () => {
           verifyPayment(
             response.razorpay_order_id,
             response.razorpay_payment_id,
-            response.razorpay_signature
+            response.razorpay_signature,
+            plan,
           );
         },
         theme: {

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getDefaultDailyLimit } from '@/lib/usageLimits';
+import { resolveEffectivePlanType } from '@/lib/entitlements';
 
 interface UsageLimit {
   conversionsUsed: number;
@@ -61,6 +62,7 @@ export const useUsageLimit = () => {
 
       const resolvedLimit = data.conversionsLimit ?? defaultLimit;
       const resolvedUsed = data.conversionsUsed ?? 0;
+      const resolvedPlanType = resolveEffectivePlanType(data.planType ?? 'free', resolvedLimit);
       setUsageLimit({
         conversionsUsed: resolvedUsed,
         conversionsLimit: resolvedLimit,
@@ -69,7 +71,7 @@ export const useUsageLimit = () => {
         isAuthenticated: data.isAuthenticated ?? !!user,
         loading: false,
         error: null,
-        planType: data.planType ?? 'free',
+        planType: resolvedPlanType,
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to check usage limit';

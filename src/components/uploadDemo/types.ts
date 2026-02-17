@@ -196,6 +196,7 @@ export interface BatchFilePayload {
     balance?: number;
     refNumber?: string;
   }>;
+  pdfParsedBankMetadata?: BankInfo;
   pdfPassword?: string;
 }
 

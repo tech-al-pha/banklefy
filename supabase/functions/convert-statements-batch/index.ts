@@ -189,6 +189,100 @@ const bufferToBase64 = (buffer: ArrayBuffer): string => {
   return btoa(binary);
 };
 
+const pickString = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+};
+
+const pickNumber = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/[,\s]/g, '').trim();
+    if (!cleaned) return undefined;
+    const numeric = Number(cleaned);
+    return Number.isFinite(numeric) ? numeric : undefined;
+  }
+  return undefined;
+};
+
+const normalizeClientBankMetadata = (value: unknown): BankMetadata | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+
+  const metadata: BankMetadata = {
+    bankName: pickString(raw.bankName) || '',
+    accountNumber: pickString(raw.accountNumber) || '',
+    accountHolder: pickString(raw.accountHolder) || '',
+    currency: pickString(raw.currency) || '',
+    iban: pickString(raw.iban),
+    ifsc: pickString(raw.ifsc),
+    swift: pickString(raw.swift),
+    routingNumber: pickString(raw.routingNumber),
+    sortCode: pickString(raw.sortCode),
+    bsb: pickString(raw.bsb),
+    micr: pickString(raw.micr),
+    statementPeriod: pickString(raw.statementPeriod),
+    openingBalance: pickNumber(raw.openingBalance),
+    closingBalance: pickNumber(raw.closingBalance),
+  };
+
+  const hasValue = Object.values(metadata).some((field) =>
+    (typeof field === 'string' && field.trim().length > 0) ||
+    (typeof field === 'number' && Number.isFinite(field))
+  );
+  return hasValue ? metadata : undefined;
+};
+
+const mergeBankMetadata = (...candidates: Array<BankMetadata | undefined>): BankMetadata | undefined => {
+  const merged: BankMetadata = {
+    bankName: '',
+    accountNumber: '',
+    accountHolder: '',
+    currency: '',
+  };
+  let hasValue = false;
+  const writable = merged as unknown as Record<string, unknown>;
+
+  const assignString = (key: keyof BankMetadata, value: unknown) => {
+    if (typeof value !== 'string') return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const current = merged[key];
+    if (typeof current === 'string' && current.trim()) return;
+    writable[key] = trimmed;
+    hasValue = true;
+  };
+
+  const assignNumber = (key: keyof BankMetadata, value: unknown) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return;
+    const current = merged[key];
+    if (typeof current === 'number' && Number.isFinite(current)) return;
+    writable[key] = value;
+    hasValue = true;
+  };
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    assignString('bankName', candidate.bankName);
+    assignString('accountNumber', candidate.accountNumber);
+    assignString('accountHolder', candidate.accountHolder);
+    assignString('currency', candidate.currency);
+    assignString('iban', candidate.iban);
+    assignString('ifsc', candidate.ifsc);
+    assignString('swift', candidate.swift);
+    assignString('routingNumber', candidate.routingNumber);
+    assignString('sortCode', candidate.sortCode);
+    assignString('bsb', candidate.bsb);
+    assignString('micr', candidate.micr);
+    assignString('statementPeriod', candidate.statementPeriod);
+    assignNumber('openingBalance', candidate.openingBalance);
+    assignNumber('closingBalance', candidate.closingBalance);
+  }
+
+  return hasValue ? merged : undefined;
+};
+
 const sanitizeFileName = (fileName: string): string =>
   fileName.replace(/[\\/]/g, '').substring(0, 255);
 
@@ -224,6 +318,22 @@ type StatementPayload = {
     balance?: number | string;
     refNumber?: string;
   }>;
+  pdfParsedBankMetadata?: {
+    bankName?: string;
+    accountNumber?: string;
+    accountHolder?: string;
+    currency?: string;
+    iban?: string;
+    ifsc?: string;
+    swift?: string;
+    routingNumber?: string;
+    sortCode?: string;
+    bsb?: string;
+    micr?: string;
+    statementPeriod?: string;
+    openingBalance?: number | string;
+    closingBalance?: number | string;
+  };
   pdfPassword?: string;
 };
 
@@ -398,6 +508,7 @@ const processStatement = async (params: {
   bytes: Uint8Array;
   pdfPageImages?: string[];
   pdfParsedTransactions?: StatementPayload['pdfParsedTransactions'];
+  pdfParsedBankMetadata?: StatementPayload['pdfParsedBankMetadata'];
   categoryCorrections?: Map<string, string>;
 }): Promise<{ transactions: Transaction[]; bankMetadata?: BankMetadata; excelBuffer: ArrayBuffer; totals: { totalCredits: number; totalDebits: number }; pagesWithData: number }> => {
   const lowerFileName = params.fileName.toLowerCase();
@@ -414,9 +525,10 @@ const processStatement = async (params: {
         return hasDate && hasDescription && hasAmount;
       })
     : [];
+  const clientParsedBankMetadata = normalizeClientBankMetadata(params.pdfParsedBankMetadata);
 
   let extractionResult: Awaited<ReturnType<typeof performExtraction>>;
-  let collectedBankMetadata: BankMetadata | undefined;
+  let collectedBankMetadata: BankMetadata | undefined = clientParsedBankMetadata;
   let pagesWithData = 1;
 
   if (isPdf && clientParsedTransactions.length > 0) {
@@ -457,8 +569,8 @@ const processStatement = async (params: {
         pagesWithData += 1;
         collected.push(...res.transactions);
         if (res.text) combinedText += (combinedText ? '\n' : '') + res.text;
-        if (!collectedBankMetadata && res.bankMetadata) {
-          collectedBankMetadata = res.bankMetadata;
+        if (res.bankMetadata) {
+          collectedBankMetadata = mergeBankMetadata(collectedBankMetadata, res.bankMetadata);
           console.log('Bank metadata detected:', collectedBankMetadata);
         }
       } else {
@@ -577,12 +689,22 @@ const processStatement = async (params: {
     fraudAlerts,
     liquidity: liquidityMetrics,
     reconciliation,
-    bankInfo: collectedBankMetadata || extractionResult.bankMetadata,
+    bankInfo: mergeBankMetadata(
+      clientParsedBankMetadata,
+      collectedBankMetadata,
+      extractionResult.bankMetadata,
+    ),
   });
+
+  const bankMetadata = mergeBankMetadata(
+    clientParsedBankMetadata,
+    collectedBankMetadata,
+    extractionResult.bankMetadata,
+  );
 
   return {
     transactions,
-    bankMetadata: collectedBankMetadata || extractionResult.bankMetadata,
+    bankMetadata,
     excelBuffer: excelResult.buffer,
     totals: {
       totalCredits,
@@ -911,6 +1033,7 @@ Deno.serve(async (req) => {
           bytes,
           pdfPageImages: file.pdfPageImages,
           pdfParsedTransactions: file.pdfParsedTransactions,
+          pdfParsedBankMetadata: file.pdfParsedBankMetadata,
           categoryCorrections,
         });
 

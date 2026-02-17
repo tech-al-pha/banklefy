@@ -111,16 +111,48 @@ const getDatePartsInTimezone = (timezone: string) => {
 const normalizePlan = (value: unknown): string =>
   typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'free';
 
-const resolvePlanType = (row: Record<string, unknown> | null): string => {
-  if (!row) return 'free';
-  const planType = normalizePlan(row.plan_type);
-  if (planType !== 'free') return planType;
-  return normalizePlan(row.tier);
-};
-
 const toNumber = (value: unknown, fallback: number): number => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
+};
+
+const normalizeLegacyPlanType = (planType: string, conversionsLimit: number): string => {
+  if (
+    planType === 'free' ||
+    planType === 'unlimited' ||
+    planType.startsWith('monthly') ||
+    planType.startsWith('yearly') ||
+    planType.startsWith('per_page')
+  ) {
+    return planType;
+  }
+
+  if (planType === 'daily') {
+    if (conversionsLimit >= 4500) return 'monthly_enterprise';
+    if (conversionsLimit >= 1000) return 'monthly_pro';
+    if (conversionsLimit >= 300) return 'monthly_basic';
+    return 'daily';
+  }
+
+  if (planType === 'business') {
+    if (conversionsLimit >= 65000) return 'yearly_pro';
+    if (conversionsLimit >= 15000) return 'yearly_full';
+    if (conversionsLimit >= 5000) return 'yearly_lite';
+    if (conversionsLimit === 50) return 'per_page_power';
+    if (conversionsLimit === 25) return 'per_page_standard';
+    if (conversionsLimit === 10) return 'per_page_lite';
+    return 'business';
+  }
+
+  return planType;
+};
+
+const resolvePlanType = (row: Record<string, unknown> | null): string => {
+  if (!row) return 'free';
+  const conversionsLimit = toNumber(row.conversions_limit, 0);
+  const planType = normalizePlan(row.plan_type);
+  if (planType !== 'free') return normalizeLegacyPlanType(planType, conversionsLimit);
+  return normalizeLegacyPlanType(normalizePlan(row.tier), conversionsLimit);
 };
 
 const toDateString = (value: unknown): string | null => {
@@ -149,21 +181,21 @@ const getResetBoundary = (planType: string, dateParts: { year: string; month: st
 };
 
 const updateAnonymousUsage = async (
-  supabaseAdmin: ReturnType<typeof createClient>,
+  supabaseAdmin: any,
   keyColumn: 'ip_address' | 'tracking_key',
   trackingKey: string,
   payload: Record<string, unknown>,
 ) => {
   const { error } = await supabaseAdmin
     .from('anonymous_usage')
-    .update(payload)
+    .update(payload as any)
     .eq(keyColumn, trackingKey);
 
   return { error };
 };
 
 const readAnonymousUsage = async (
-  supabaseAdmin: ReturnType<typeof createClient>,
+  supabaseAdmin: any,
   trackingKey: string,
 ) => {
   const firstTry = await supabaseAdmin
@@ -191,7 +223,7 @@ const checkLimitFallback = async ({
   trackingKey,
   timezone,
 }: {
-  supabaseAdmin: ReturnType<typeof createClient>;
+  supabaseAdmin: any;
   userId: string | null;
   trackingKey: string;
   timezone: string;
@@ -228,7 +260,7 @@ const checkLimitFallback = async ({
             last_reset_date: today,
             timezone,
             plan_type: 'free',
-          })
+          } as any)
           .select('*')
           .maybeSingle();
 
@@ -262,7 +294,7 @@ const checkLimitFallback = async ({
             conversions_used: 0,
             last_reset_date: resetBoundary,
             timezone,
-          })
+          } as any)
           .eq('user_id', userId);
 
         if (resetError) {
@@ -302,7 +334,7 @@ const checkLimitFallback = async ({
 
       const created = await supabaseAdmin
         .from('anonymous_usage')
-        .insert(insertPayload)
+        .insert(insertPayload as any)
         .select('*')
         .maybeSingle();
 

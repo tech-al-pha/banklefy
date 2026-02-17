@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,6 +7,14 @@ import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Logo from "@/components/Logo";
@@ -25,6 +33,9 @@ interface RecentConversion {
   error_message?: string | null;
 }
 
+const ONE_HOUR_MS = 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * ONE_HOUR_MS;
+
 const Profile = () => {
   const { user, session, signOut } = useAuth();
   const navigate = useNavigate();
@@ -37,6 +48,7 @@ const Profile = () => {
   const [nameChanged, setNameChanged] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const workbookCache = useState(() => new Map<string, ArrayBuffer>())[0];
   const authFlags = user as { email_confirmed_at?: string | null; confirmed_at?: string | null } | null;
   const isVerified = Boolean(authFlags?.email_confirmed_at || authFlags?.confirmed_at);
@@ -94,6 +106,49 @@ const Profile = () => {
     setNameChanged(false);
   }, [profileData, user]);
 
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, ONE_HOUR_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (recent.length === 0) return;
+
+    let nearestExpiryMs = Number.POSITIVE_INFINITY;
+    for (const item of recent) {
+      const createdMs = new Date(item.created_at).getTime();
+      if (Number.isNaN(createdMs)) continue;
+      const expiryMs = createdMs + ONE_DAY_MS;
+      if (expiryMs > nowMs && expiryMs < nearestExpiryMs) {
+        nearestExpiryMs = expiryMs;
+      }
+    }
+
+    if (!Number.isFinite(nearestExpiryMs)) return;
+
+    const timeoutMs = Math.max(0, nearestExpiryMs - nowMs);
+    const timeoutId = window.setTimeout(() => {
+      setNowMs(Date.now());
+    }, timeoutMs);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [recent, nowMs]);
+
+  const visibleRecent = useMemo(() => {
+    return recent.filter((item) => {
+      const createdMs = new Date(item.created_at).getTime();
+      if (Number.isNaN(createdMs)) return false;
+      return createdMs + ONE_DAY_MS > nowMs;
+    });
+  }, [recent, nowMs]);
+
   const handleSaveName = async () => {
     await updateProfile(displayName);
     setNameChanged(false);
@@ -116,13 +171,25 @@ const Profile = () => {
     return safe || fallback;
   };
 
-  const getExpiryLabel = (createdAt: string) => {
-    const expiresAt = new Date(new Date(createdAt).getTime() + 24 * 60 * 60 * 1000);
-    const msLeft = expiresAt.getTime() - Date.now();
+  const getExpiryLabel = (createdAt: string, referenceNowMs: number) => {
+    const expiresAt = new Date(new Date(createdAt).getTime() + ONE_DAY_MS);
+    const msLeft = expiresAt.getTime() - referenceNowMs;
     if (msLeft <= 0) return "Expired";
-    const hours = Math.floor(msLeft / (1000 * 60 * 60));
-    const mins = Math.floor((msLeft % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${mins}m left`;
+    const hours = Math.ceil(msLeft / ONE_HOUR_MS);
+    return `${hours}h left`;
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+        return <Badge className="bg-green-600">Completed</Badge>;
+      case "processing":
+        return <Badge className="bg-yellow-600">Processing</Badge>;
+      case "failed":
+        return <Badge variant="destructive">Failed</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
   };
 
   const fetchResultBuffer = async (item: RecentConversion) => {
@@ -414,52 +481,93 @@ const Profile = () => {
           <Card className="p-6 glass-card">
             <h2 className="text-xl font-semibold mb-2">Processing History</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Your latest converted files (newest first).
+              View and manage all converted files. Expiry updates hourly.
             </p>
-            {recent.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No pages processed yet.</p>
+            {visibleRecent.length === 0 ? (
+              <div className="py-8 text-center">
+                <p className="text-sm text-muted-foreground mb-4">No pages processed yet.</p>
+                <Button onClick={() => navigate("/?next=demo")}>Start Converting</Button>
+              </div>
             ) : (
-              <div className="space-y-3">
-                {recent.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between border-b border-white/5 pb-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{item.original_filename}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(item.created_at), "MMM d, yyyy HH:mm")}</p>
-                      <p className="text-[11px] text-muted-foreground">{getExpiryLabel(item.created_at)}</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 justify-end">
-                      {item.status === "completed" && item.result_path ? (
-                        <>
-                          <Button size="sm" variant="outline" onClick={() => downloadExcel(item)} disabled={downloadingId === item.id}>
-                            {downloadingId === item.id ? "Downloading..." : "Excel"}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => downloadAsCsv(item)} disabled={downloadingId === item.id}>
-                            CSV
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => downloadAsOds(item)} disabled={downloadingId === item.id}>
-                            ODS
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => downloadAsDocx(item)} disabled={downloadingId === item.id}>
-                            DOCX
-                          </Button>
-                        </>
-                      ) : item.status === "failed" ? (
-                        <span className="text-xs text-destructive">{item.error_message || "Conversion failed"}</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">{item.status}</span>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-red-500/40 text-red-300 hover:text-red-200"
-                        onClick={() => handleDeleteConversion(item)}
-                        disabled={deletingId === item.id}
-                      >
-                        {deletingId === item.id ? "Deleting..." : "Delete"}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <Table className="min-w-[920px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>File Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Auto Remove</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleRecent.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium max-w-[280px] truncate">
+                          {item.original_filename}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(item.status)}</TableCell>
+                        <TableCell>{format(new Date(item.created_at), "MMM d, yyyy HH:mm")}</TableCell>
+                        <TableCell>{getExpiryLabel(item.created_at, nowMs)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {item.status === "completed" && item.result_path ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => downloadExcel(item)}
+                                  disabled={downloadingId === item.id}
+                                >
+                                  {downloadingId === item.id ? "Downloading..." : "Excel"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => downloadAsCsv(item)}
+                                  disabled={downloadingId === item.id}
+                                >
+                                  CSV
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => downloadAsOds(item)}
+                                  disabled={downloadingId === item.id}
+                                >
+                                  ODS
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => downloadAsDocx(item)}
+                                  disabled={downloadingId === item.id}
+                                >
+                                  DOCX
+                                </Button>
+                              </>
+                            ) : item.status === "failed" ? (
+                              <span className="text-xs text-destructive max-w-[220px] truncate">
+                                {item.error_message || "Conversion failed"}
+                              </span>
+                            ) : (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-red-500/40 text-red-300 hover:text-red-200"
+                              onClick={() => handleDeleteConversion(item)}
+                              disabled={deletingId === item.id}
+                            >
+                              {deletingId === item.id ? "Deleting..." : "Delete"}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </Card>
