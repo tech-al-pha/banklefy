@@ -8,6 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import {
   classifyDocument,
   callGroqVisionOCR,
+  normalizeRawTransactions,
   type RawTransaction,
   type BankMetadata,
 } from '../_shared/ocr-processor.ts';
@@ -561,7 +562,16 @@ Deno.serve(async (req) => {
 
   try {
     // Parse request
-    const { fileId, fileName, fileData: base64FileData, timezone, recaptchaToken, pdfPassword, pdfPageImages } = await req.json();
+    const {
+      fileId,
+      fileName,
+      fileData: base64FileData,
+      timezone,
+      recaptchaToken,
+      pdfPassword,
+      pdfPageImages,
+      pdfParsedTransactions,
+    } = await req.json();
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
     
     // Robust client tracking to prevent bypasses
@@ -941,13 +951,37 @@ Deno.serve(async (req) => {
     console.log('=== Starting Specialized AI Pipeline ===');
 
     let extractionResult: Awaited<ReturnType<typeof performExtraction>>;
+    const clientParsedTransactions: RawTransaction[] = Array.isArray(pdfParsedTransactions)
+      ? normalizeRawTransactions(pdfParsedTransactions).filter((transaction) => {
+          const hasDate = typeof transaction.date === 'string' && transaction.date.trim() && transaction.date !== 'Unknown';
+          const hasDescription = typeof transaction.description === 'string' && transaction.description.trim().length > 0;
+          const hasAmount =
+            Number.isFinite(Number(transaction.debit ?? NaN)) ||
+            Number.isFinite(Number(transaction.credit ?? NaN)) ||
+            Number.isFinite(Number(transaction.balance ?? NaN));
+          return hasDate && hasDescription && hasAmount;
+        })
+      : [];
 
     // isPdf and hasPdfPageImages already defined above for page limit check
     // Track bank metadata across pages
     let collectedBankMetadata: BankMetadata | undefined;
     let pagesWithData = 1;
 
-    if (isPdf && hasPdfPageImages) {
+    if (isPdf && clientParsedTransactions.length > 0) {
+      console.log(`Using deterministic client PDF text extraction: ${clientParsedTransactions.length} transactions`);
+      extractionResult = {
+        transactions: clientParsedTransactions,
+        status: {
+          groqVision: { used: false, success: false },
+          mistral: { used: false, success: false },
+          groqText: { used: false, success: false },
+          patternFallback: { used: false, success: false },
+        },
+        extractedText: '',
+      };
+      pagesWithData = Math.max(1, pageCount);
+    } else if (isPdf && hasPdfPageImages) {
       // Build a minimal status object consistent with ai-orchestrator
       const status: AIProcessingStatus = {
         groqVision: { used: true, success: false },

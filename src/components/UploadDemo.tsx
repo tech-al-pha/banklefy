@@ -619,13 +619,27 @@ export const UploadDemo = () => {
       // For PDFs: render page images client-side and send to backend (Groq Vision can't accept PDFs directly)
       if (isPdf) {
         try {
-          const { pdfToPageImages } = await loadPdfUtils();
+          const { pdfToPageImages, extractPdfTransactionsFromText } = await loadPdfUtils();
           requestBody.pdfPageImages = await pdfToPageImages(fileToConvert, {
             password: pdfPassword.trim() || undefined,
             maxPdfRenderPages,
             isFreeUsageMode,
             freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
           });
+
+          // Deterministic path for text-based PDFs: extract rows directly from PDF text.
+          // OCR remains fallback for scanned PDFs / extraction misses.
+          try {
+            const parsedTransactions = await extractPdfTransactionsFromText(fileToConvert, {
+              password: pdfPassword.trim() || undefined,
+              maxPdfRenderPages,
+            });
+            if (parsedTransactions.length > 0) {
+              requestBody.pdfParsedTransactions = parsedTransactions;
+            }
+          } catch {
+            // Parser failure should not block conversion; backend OCR fallback will handle it.
+          }
         } catch (err: unknown) {
           const error = err as { name?: string; message?: string };
           // Surface password errors in existing UX
@@ -943,13 +957,25 @@ Analytics Summary:
 
         if (isPdf) {
           try {
-            const { pdfToPageImages } = await loadPdfUtils();
+            const { pdfToPageImages, extractPdfTransactionsFromText } = await loadPdfUtils();
             payload.pdfPageImages = await pdfToPageImages(file, {
               password: pdfPassword.trim() || undefined,
               maxPdfRenderPages,
               isFreeUsageMode,
               freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
             });
+
+            try {
+              const parsedTransactions = await extractPdfTransactionsFromText(file, {
+                password: pdfPassword.trim() || undefined,
+                maxPdfRenderPages,
+              });
+              if (parsedTransactions.length > 0) {
+                payload.pdfParsedTransactions = parsedTransactions;
+              }
+            } catch {
+              // Ignore parser errors; backend OCR fallback remains active.
+            }
           } catch (err: unknown) {
             const error = err as { name?: string; message?: string };
             if (error?.name === 'PasswordException' || String(error?.message || '').toLowerCase().includes('password')) {

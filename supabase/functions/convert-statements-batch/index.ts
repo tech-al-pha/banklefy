@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 import {
   callGroqVisionOCR,
+  normalizeRawTransactions,
   type RawTransaction,
   type BankMetadata,
 } from '../_shared/ocr-processor.ts';
@@ -213,6 +214,16 @@ type StatementPayload = {
   fileName: string;
   fileData?: string;
   pdfPageImages?: string[];
+  pdfParsedTransactions?: Array<{
+    date?: string;
+    valueDate?: string;
+    description?: string;
+    narration?: string;
+    debit?: number | string;
+    credit?: number | string;
+    balance?: number | string;
+    refNumber?: string;
+  }>;
   pdfPassword?: string;
 };
 
@@ -386,17 +397,42 @@ const processStatement = async (params: {
   fileName: string;
   bytes: Uint8Array;
   pdfPageImages?: string[];
+  pdfParsedTransactions?: StatementPayload['pdfParsedTransactions'];
   categoryCorrections?: Map<string, string>;
 }): Promise<{ transactions: Transaction[]; bankMetadata?: BankMetadata; excelBuffer: ArrayBuffer; totals: { totalCredits: number; totalDebits: number }; pagesWithData: number }> => {
   const lowerFileName = params.fileName.toLowerCase();
   const isPdf = lowerFileName.endsWith('.pdf');
   const hasPdfPageImages = Array.isArray(params.pdfPageImages) && params.pdfPageImages.length > 0;
+  const clientParsedTransactions: RawTransaction[] = Array.isArray(params.pdfParsedTransactions)
+    ? normalizeRawTransactions(params.pdfParsedTransactions).filter((transaction) => {
+        const hasDate = typeof transaction.date === 'string' && transaction.date.trim() && transaction.date !== 'Unknown';
+        const hasDescription = typeof transaction.description === 'string' && transaction.description.trim().length > 0;
+        const hasAmount =
+          Number.isFinite(Number(transaction.debit ?? NaN)) ||
+          Number.isFinite(Number(transaction.credit ?? NaN)) ||
+          Number.isFinite(Number(transaction.balance ?? NaN));
+        return hasDate && hasDescription && hasAmount;
+      })
+    : [];
 
   let extractionResult: Awaited<ReturnType<typeof performExtraction>>;
   let collectedBankMetadata: BankMetadata | undefined;
   let pagesWithData = 1;
 
-  if (isPdf && hasPdfPageImages) {
+  if (isPdf && clientParsedTransactions.length > 0) {
+    console.log(`Using deterministic client PDF text extraction: ${clientParsedTransactions.length} transactions`);
+    extractionResult = {
+      transactions: clientParsedTransactions,
+      status: {
+        groqVision: { used: false, success: false },
+        mistral: { used: false, success: false },
+        groqText: { used: false, success: false },
+        patternFallback: { used: false, success: false },
+      },
+      extractedText: '',
+    };
+    pagesWithData = Math.max(1, hasPdfPageImages ? params.pdfPageImages!.length : 1);
+  } else if (isPdf && hasPdfPageImages) {
     const status: AIProcessingStatus = {
       groqVision: { used: true, success: false },
       mistral: { used: false, success: false },
@@ -874,6 +910,7 @@ Deno.serve(async (req) => {
           fileName: sanitizedName,
           bytes,
           pdfPageImages: file.pdfPageImages,
+          pdfParsedTransactions: file.pdfParsedTransactions,
           categoryCorrections,
         });
 

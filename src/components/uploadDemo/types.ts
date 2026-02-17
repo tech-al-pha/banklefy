@@ -187,6 +187,15 @@ export interface BatchFilePayload {
   fileId?: string;
   fileData?: string;
   pdfPageImages?: string[];
+  pdfParsedTransactions?: Array<{
+    date: string;
+    valueDate?: string;
+    description: string;
+    debit?: number;
+    credit?: number;
+    balance?: number;
+    refNumber?: string;
+  }>;
   pdfPassword?: string;
 }
 

@@ -19,6 +19,11 @@ type PdfJsModule = {
   GlobalWorkerOptions: { workerSrc: string };
 };
 
+type PdfTextItem = {
+  str?: string;
+  transform?: number[];
+};
+
 type PdfError = { name?: string; message?: string };
 type DetectorTier = "basic" | "advanced";
 type DetectorFlag = {
@@ -27,6 +32,16 @@ type DetectorFlag = {
   score: number;
   severity: "low" | "medium" | "high";
 };
+
+export interface ParsedPdfTransaction {
+  date: string;
+  valueDate?: string;
+  description: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  refNumber?: string;
+}
 
 const SUSPICIOUS_PRODUCER_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /smallpdf|ilovepdf|sejda|canva/i, label: "Consumer PDF editor detected" },
@@ -340,6 +355,201 @@ export const detectPasswordProtectedPdf = async (file: File): Promise<boolean> =
       String(error?.message || "").toLowerCase().includes("password")
     );
   }
+};
+
+const DATE_TOKEN = /\d{2}[/-]\d{2}[/-]\d{4}/;
+const ROW_START_PATTERN = /^(\d{2}[/-]\d{2}[/-]\d{4})\s+(\d{2}[/-]\d{2}[/-]\d{4})\s+(.+)$/;
+const AMOUNT_PATTERN = /-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g;
+
+type PositionedToken = {
+  x: number;
+  y: number;
+  text: string;
+};
+
+const normalizeDate = (value: string): string => {
+  const match = value.trim().match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
+  if (!match) return value.trim();
+  const [, dd, mm, yyyy] = match;
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const parseAmount = (value: string): number => {
+  const normalized = value.replace(/,/g, "").trim();
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
+const escapeRegExp = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const isNoiseLine = (line: string): boolean => {
+  const lower = line.toLowerCase();
+  if (!lower) return true;
+  if (lower.includes("account statement")) return true;
+  if (lower.includes("total records")) return true;
+  if (lower.includes("transaction date") && lower.includes("value date")) return true;
+  if (lower.includes("running balance")) return true;
+  if (/^page\s*\d+(\s*of\s*\d+)?$/i.test(line)) return true;
+  return false;
+};
+
+const linesFromTextItems = (items: PdfTextItem[]): string[] => {
+  const tokens: PositionedToken[] = items
+    .map((item) => {
+      const text = String(item?.str ?? "").replace(/\s+/g, " ").trim();
+      const transform = Array.isArray(item?.transform) ? item.transform : [];
+      const x = Number(transform[4] ?? 0);
+      const y = Number(transform[5] ?? 0);
+      return { x, y, text };
+    })
+    .filter((token) => token.text.length > 0);
+
+  if (tokens.length === 0) return [];
+
+  tokens.sort((a, b) => {
+    const yDiff = Math.abs(a.y - b.y);
+    if (yDiff <= 1.5) return a.x - b.x;
+    return b.y - a.y;
+  });
+
+  const buckets: Array<{ y: number; tokens: PositionedToken[] }> = [];
+  for (const token of tokens) {
+    const bucket = buckets.find((entry) => Math.abs(entry.y - token.y) <= 1.5);
+    if (bucket) {
+      bucket.tokens.push(token);
+      continue;
+    }
+    buckets.push({ y: token.y, tokens: [token] });
+  }
+
+  buckets.sort((a, b) => b.y - a.y);
+
+  return buckets
+    .map((bucket) =>
+      bucket.tokens
+        .sort((a, b) => a.x - b.x)
+        .map((token) => token.text)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim()
+    )
+    .filter((line) => line.length > 0);
+};
+
+const extractAmounts = (text: string): { textWithoutAmounts: string; debit: number; credit: number; balance: number } | null => {
+  const matches = text.match(AMOUNT_PATTERN) || [];
+  if (matches.length < 3) return null;
+
+  const [debitToken, creditToken, balanceToken] = matches.slice(-3);
+  const trailingPattern = new RegExp(
+    `${escapeRegExp(debitToken)}\\s+${escapeRegExp(creditToken)}\\s+${escapeRegExp(balanceToken)}\\s*$`,
+  );
+  const cleaned = text.replace(trailingPattern, "").trim();
+
+  return {
+    textWithoutAmounts: cleaned,
+    debit: parseAmount(debitToken),
+    credit: parseAmount(creditToken),
+    balance: parseAmount(balanceToken),
+  };
+};
+
+export const extractPdfTransactionsFromText = async (
+  file: File,
+  options?: { password?: string; maxPdfRenderPages?: number },
+): Promise<ParsedPdfTransaction[]> => {
+  const pdfjsLib = (await import("pdfjs-dist")) as PdfJsModule;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
+
+  const arrayBuffer = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({
+    data: arrayBuffer,
+    password: options?.password || undefined,
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+  });
+
+  const pdf = await loadingTask.promise;
+  const maxPages = options?.maxPdfRenderPages ?? 120;
+  if (pdf.numPages > maxPages) {
+    await pdf.destroy?.();
+    return [];
+  }
+
+  const rows: ParsedPdfTransaction[] = [];
+  let current: (ParsedPdfTransaction & { _descriptionParts: string[] }) | null = null;
+
+  const flushCurrent = () => {
+    if (!current) return;
+    if (!current.date || (!current.debit && !current.credit && !current.balance)) {
+      current = null;
+      return;
+    }
+    current.description = current._descriptionParts.join(" ").replace(/\s+/g, " ").trim();
+    delete (current as ParsedPdfTransaction & { _descriptionParts?: string[] })._descriptionParts;
+    rows.push(current as ParsedPdfTransaction);
+    current = null;
+  };
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const textContent = await page.getTextContent?.();
+    const lines = linesFromTextItems((textContent?.items || []) as PdfTextItem[]);
+
+    for (const line of lines) {
+      if (isNoiseLine(line)) continue;
+
+      const rowStart = line.match(ROW_START_PATTERN);
+      if (rowStart) {
+        flushCurrent();
+
+        const [, transactionDateToken, valueDateToken, trailing] = rowStart;
+        const amounts = extractAmounts(trailing);
+        const descriptionText = (amounts?.textWithoutAmounts || trailing).trim();
+
+        current = {
+          date: normalizeDate(transactionDateToken),
+          valueDate: normalizeDate(valueDateToken),
+          description: descriptionText,
+          debit: amounts?.debit ?? 0,
+          credit: amounts?.credit ?? 0,
+          balance: amounts?.balance ?? 0,
+          refNumber: "",
+          _descriptionParts: descriptionText ? [descriptionText] : [],
+        };
+        continue;
+      }
+
+      if (!current) continue;
+
+      const maybeAmounts = extractAmounts(line);
+      if (maybeAmounts && current.balance === 0 && current.debit === 0 && current.credit === 0) {
+        current.debit = maybeAmounts.debit;
+        current.credit = maybeAmounts.credit;
+        current.balance = maybeAmounts.balance;
+        if (maybeAmounts.textWithoutAmounts) {
+          current._descriptionParts.push(maybeAmounts.textWithoutAmounts);
+        }
+        continue;
+      }
+
+      if (DATE_TOKEN.test(line) && line.includes(":")) {
+        // Keep transaction timestamps inside narration.
+        current._descriptionParts.push(line);
+        continue;
+      }
+
+      current._descriptionParts.push(line);
+    }
+  }
+
+  flushCurrent();
+  await pdf.destroy?.();
+
+  // Return only meaningful rows and keep original debit/credit/balance values.
+  return rows.filter((row) => row.date && row.description && Number.isFinite(row.balance));
 };
 
 export const pdfToPageImages = async (
