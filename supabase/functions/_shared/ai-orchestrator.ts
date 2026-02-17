@@ -91,7 +91,9 @@ export async function performExtraction(
                 content: `Extract ALL transactions from this bank statement text.
 
 Return JSON array with: date (YYYY-MM-DD), refNumber (as shown in the document), description, debit (number), credit (number), balance (number).
+If both Transaction Date and Value Date/Posting Date exist, use Transaction Date as date.
 If refNumber is not present for a row, return an empty string.
+Populate refNumber only when a dedicated reference column exists. If ID appears only inside description text, keep it in description and set refNumber to "".
 Ignore headers, footers, summaries, opening/closing balance lines, and page-break artifacts.
 Return ONLY the JSON array, no markdown.`,
               },

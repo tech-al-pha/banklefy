@@ -200,10 +200,10 @@ export async function callMistralCategorizer(
         return 0;
       };
 
-      // Use original values if Mistral returned 0 but original had a value
-      const debit = parseAmount(t.debit) || parseAmount(original?.debit);
-      const credit = parseAmount(t.credit) || parseAmount(original?.credit);
-      const balance = parseAmount(t.balance, true) || parseAmount(original?.balance, true);
+      // Deterministic rule: preserve OCR/source monetary values; never let categorizer alter numbers.
+      const debit = parseAmount(original?.debit) || parseAmount(t.debit);
+      const credit = parseAmount(original?.credit) || parseAmount(t.credit);
+      const balance = parseAmount(original?.balance, true) || parseAmount(t.balance, true);
 
       const rawDate = original?.date || t.date || '';
       const rawDescription = original?.description || original?.narration || t.description || t.narration || '';
@@ -215,7 +215,7 @@ export async function callMistralCategorizer(
         debit,
         credit,
         balance,
-        refNumber: t.refNumber || original?.refNumber,
+        refNumber: original?.refNumber || t.refNumber,
         originalDescription: rawDescription,
       };
     });

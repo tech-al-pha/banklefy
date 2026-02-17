@@ -89,6 +89,8 @@ CURRENCY DETECTION - Look at:
 REFERENCE NUMBER - Extract from:
 - "Ref. Number", "Reference", "Txn ID", "UTR", "NEFT Ref", "IMPS Ref"
 - Transaction codes like P123456, N789012, IMPS/456/...
+ONLY populate refNumber when the statement has a dedicated reference/ID column.
+If the identifier appears only inside Narration/Description text, keep it inside description and set refNumber to "".
 COPY EXACTLY AS SHOWN. Do NOT add prefixes or alter case.
 IMPORTANT: refNumber must be ONLY identifier/code, not full narration text.
 If multiple IDs exist in same row, choose the best primary transaction ID (e.g., UTR/TR REF/AE/S codes).
@@ -97,6 +99,11 @@ If no reference number exists for a row, return an empty string.
 
 DO NOT merge content across different pages or rows.
 IGNORE headers, footers, summaries, opening/closing balance lines, and page-break artifacts. Only real transaction rows.
+
+DATE RULES:
+1. If both "Transaction Date" and "Value Date"/"Posting Date" exist, use Transaction Date as "date".
+2. Use Value Date/Posting Date only when Transaction Date is missing.
+3. Always output "date" in YYYY-MM-DD.
 
 AMOUNT RULES:
 1. DEBIT = money OUT - positive number
@@ -207,10 +214,21 @@ const scoreReferenceCandidate = (candidate: string, baseWeight: number): number 
 };
 
 const selectBestReference = (rawRef: string | undefined, description: string | undefined): string | undefined => {
-  const candidates = [
-    ...collectReferenceCandidates(rawRef, 20),
-    ...collectReferenceCandidates(description, 0),
-  ];
+  if (!rawRef) return undefined;
+  const raw = normalizeReferenceToken(rawRef);
+  if (!raw) return undefined;
+
+  const rawWords = raw.split(/\s+/).filter(Boolean);
+  // Guardrail: if OCR gives full narration in ref field, treat it as no dedicated reference column.
+  if (rawWords.length > 6 || raw.length > 80) return undefined;
+
+  const desc = normalizeReferenceToken(description ?? '').toLowerCase();
+  const rawLower = raw.toLowerCase();
+  if (desc && rawLower.length > 12 && (rawLower.includes(desc) || desc.includes(rawLower))) {
+    return undefined;
+  }
+
+  const candidates = collectReferenceCandidates(rawRef, 20);
 
   if (candidates.length === 0) return undefined;
 
@@ -288,10 +306,15 @@ const normalizeTransaction = (raw: Record<string, unknown>): RawTransaction => {
   };
 
   const dateRaw =
-    raw.date ??
     raw.txnDate ??
     raw.transactionDate ??
+    raw.transaction_date ??
+    raw.txn_date ??
+    raw.transDate ??
+    raw.trans_date ??
+    raw.date ??
     raw.valueDate ??
+    raw.value_date ??
     raw.postingDate;
 
   const descriptionRaw =
@@ -391,18 +414,18 @@ export async function callGroqVisionOCR(
     if (objectMatch) {
       try {
         const parsed = JSON.parse(objectMatch[0]);
-        
+
         // Check if it's the new format with bankMetadata
         if (parsed.bankMetadata && parsed.transactions) {
           console.log(`Groq Vision OCR extracted ${parsed.transactions.length} transactions with bank metadata`);
-          return { 
-            success: true, 
-            transactions: normalizeRawTransactions(parsed.transactions), 
+          return {
+            success: true,
+            transactions: normalizeRawTransactions(parsed.transactions),
             bankMetadata: normalizeBankMetadata(parsed.bankMetadata),
-            text: textContent 
+            text: textContent
           };
         }
-        
+
         // If it's just an object but has date/description, it might be a single transaction
         if (parsed.date && parsed.description) {
           return { success: true, transactions: normalizeRawTransactions([parsed]), text: textContent };

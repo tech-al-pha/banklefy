@@ -128,7 +128,7 @@ const totalLabelStyle = {
   },
 } as SheetStyle;
 
-const TABLE_HEADERS = [
+const TABLE_HEADERS_WITH_REF = [
   'Date',
   'Reference No / Transaction ID',
   'Description',
@@ -139,7 +139,30 @@ const TABLE_HEADERS = [
   'Duplicate Flag',
 ];
 
+const TABLE_HEADERS_NO_REF = [
+  'Date',
+  'Description',
+  'Debit',
+  'Credit',
+  'Balance',
+  'Pricing Mismatch Flag',
+  'Duplicate Flag',
+];
+
+const TABLE_HEADER_VARIANTS = [TABLE_HEADERS_WITH_REF, TABLE_HEADERS_NO_REF] as const;
+
 const MONEY_FORMAT = '#,##0.00';
+
+interface ColumnLayout {
+  headers: string[];
+  includeReferenceColumn: boolean;
+  descriptionColumn: number;
+  debitColumn: number;
+  creditColumn: number;
+  balanceColumn: number;
+  pricingMismatchColumn: number;
+  duplicateFlagColumn: number;
+}
 
 function setCellStyle(ws: Worksheet, addr: string, style: SheetStyle) {
   if (!ws[addr]) return;
@@ -173,6 +196,54 @@ function autoFitCols(allData: SheetData, headers: string[]) {
     });
     return { wch: Math.min(Math.max(maxLen + 2, 8), 70) };
   });
+}
+
+const normalizeToken = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const isReferenceEmbeddedInDescription = (reference: string, description: string): boolean => {
+  const ref = normalizeToken(reference);
+  const desc = normalizeToken(description);
+  if (!ref || !desc) return false;
+  if (ref.length < 6) return false;
+  return desc.includes(ref);
+};
+
+const shouldIncludeReferenceColumn = (transactions: Transaction[]): boolean => {
+  const withReference = transactions.filter((transaction) => (transaction.refNumber || '').trim());
+  if (withReference.length === 0) return false;
+
+  const embeddedCount = withReference.filter((transaction) =>
+    isReferenceEmbeddedInDescription(transaction.refNumber || '', transaction.description || '')
+  ).length;
+
+  // If references are already embedded in narration for almost all rows, skip dedicated reference column.
+  const embeddedRatio = embeddedCount / withReference.length;
+  if (embeddedRatio >= 0.8) return false;
+
+  return true;
+};
+
+function buildColumnLayout(transactions: Transaction[]): ColumnLayout {
+  const includeReferenceColumn = shouldIncludeReferenceColumn(transactions);
+  const headers = includeReferenceColumn ? [...TABLE_HEADERS_WITH_REF] : [...TABLE_HEADERS_NO_REF];
+  const descriptionColumn = includeReferenceColumn ? 2 : 1;
+  const debitColumn = descriptionColumn + 1;
+  const creditColumn = descriptionColumn + 2;
+  const balanceColumn = descriptionColumn + 3;
+  const pricingMismatchColumn = descriptionColumn + 4;
+  const duplicateFlagColumn = descriptionColumn + 5;
+
+  return {
+    headers,
+    includeReferenceColumn,
+    descriptionColumn,
+    debitColumn,
+    creditColumn,
+    balanceColumn,
+    pricingMismatchColumn,
+    duplicateFlagColumn,
+  };
 }
 
 function buildAccountRows(bankInfo?: BankInfo, statementPeriod?: string): SheetData {
@@ -219,67 +290,81 @@ function numberOrBlank(value: unknown): number | string {
   return value === 0 ? 0 : '';
 }
 
-function buildTransactionRows(transactions: Transaction[]): SheetData {
-  return transactions.map((t) => [
-    t.date || '',
-    t.refNumber || '',
-    t.description || '',
-    numberOrBlank(t.debit),
-    numberOrBlank(t.credit),
-    numberOrBlank(t.balance),
-    t.balanceMismatch ? 'YES' : '',
-    t.isDuplicate ? 'YES' : '',
-  ]);
+function buildTransactionRows(transactions: Transaction[], layout: ColumnLayout): SheetData {
+  return transactions.map((transaction) => {
+    const row: SheetRow = [
+      transaction.date || '',
+    ];
+
+    if (layout.includeReferenceColumn) {
+      row.push(transaction.refNumber || '');
+    }
+
+    row.push(
+      transaction.description || '',
+      numberOrBlank(transaction.debit),
+      numberOrBlank(transaction.credit),
+      numberOrBlank(transaction.balance),
+      transaction.balanceMismatch ? 'YES' : '',
+      transaction.isDuplicate ? 'YES' : '',
+    );
+
+    return row;
+  });
+}
+
+function buildTotalsRow(layout: ColumnLayout): SheetRow {
+  const row: SheetRow = Array(layout.headers.length).fill('');
+  row[layout.descriptionColumn] = 'TOTAL';
+  row[layout.debitColumn] = null;
+  row[layout.creditColumn] = null;
+  return row;
 }
 
 export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationResult {
   const workbook = XLSX.utils.book_new();
   const rows: SheetData = [];
+  const layout = buildColumnLayout(config.transactions);
 
   rows.push(...buildAccountRows(config.bankInfo));
   const headerRowIndex = rows.length;
-  rows.push(TABLE_HEADERS);
-  const txnRows = buildTransactionRows(config.transactions);
+  rows.push(layout.headers);
+  const txnRows = buildTransactionRows(config.transactions, layout);
   rows.push(...txnRows);
 
   // Add totals row with formulas
   const dataStartRow = headerRowIndex + 2; // 1-indexed, after header
   const dataEndRow = headerRowIndex + 1 + txnRows.length;
   const totalRowIndex = rows.length;
-  
-  // Debit is column D (index 3), Credit is column E (index 4)
-  rows.push([
-    '', '', 'TOTAL',
-    null, // Debit formula placeholder
-    null, // Credit formula placeholder
-    '', '', ''
-  ]);
+  rows.push(buildTotalsRow(layout));
 
   const ws = XLSX.utils.aoa_to_sheet(rows) as Worksheet;
-  
+
   // Add SUM formulas for Debit and Credit
-  const debitCol = 'D';
-  const creditCol = 'E';
+  const debitCol = XLSX.utils.encode_col(layout.debitColumn);
+  const creditCol = XLSX.utils.encode_col(layout.creditColumn);
+  const balanceCol = XLSX.utils.encode_col(layout.balanceColumn);
   const debitAddr = `${debitCol}${totalRowIndex + 1}`;
   const creditAddr = `${creditCol}${totalRowIndex + 1}`;
 
-  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
-  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
+  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n', v: 0 };
+  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n', v: 0 };
 
   // Ensure debit/credit/balance columns keep decimal precision in Excel.
   for (let r = dataStartRow; r <= dataEndRow; r++) {
-    setCellFormat(ws, `D${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `E${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `F${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `${debitCol}${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `${creditCol}${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `${balanceCol}${r}`, MONEY_FORMAT);
   }
   setCellFormat(ws, debitAddr, MONEY_FORMAT);
   setCellFormat(ws, creditAddr, MONEY_FORMAT);
 
-  ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
-  setRowStyle(ws, headerRowIndex, TABLE_HEADERS.length, headerStyle);
-  
+  ws['!cols'] = autoFitCols(rows, layout.headers);
+  setRowStyle(ws, headerRowIndex, layout.headers.length, headerStyle);
+
   // Style the totals row
-  setCellStyle(ws, `C${totalRowIndex + 1}`, totalLabelStyle);
+  const totalLabelAddr = `${XLSX.utils.encode_col(layout.descriptionColumn)}${totalRowIndex + 1}`;
+  setCellStyle(ws, totalLabelAddr, totalLabelStyle);
   setCellStyle(ws, debitAddr, debitTotalStyle);
   setCellStyle(ws, creditAddr, creditTotalStyle);
 
@@ -290,45 +375,42 @@ export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationR
 
 export function generateSimpleExcel(transactions: Transaction[]): ArrayBuffer {
   const workbook = XLSX.utils.book_new();
-  const txnRows = buildTransactionRows(transactions);
-  const rows: SheetData = [TABLE_HEADERS, ...txnRows];
+  const layout = buildColumnLayout(transactions);
+  const txnRows = buildTransactionRows(transactions, layout);
+  const rows: SheetData = [layout.headers, ...txnRows];
   
   // Add totals row
   const dataStartRow = 2; // 1-indexed, after header
   const dataEndRow = 1 + txnRows.length;
   const totalRowIndex = rows.length;
-  
-  rows.push([
-    '', '', 'TOTAL',
-    null, // Debit formula placeholder
-    null, // Credit formula placeholder
-    '', '', ''
-  ]);
+  rows.push(buildTotalsRow(layout));
 
   const ws = XLSX.utils.aoa_to_sheet(rows) as Worksheet;
   
   // Add SUM formulas for Debit and Credit
-  const debitCol = 'D';
-  const creditCol = 'E';
+  const debitCol = XLSX.utils.encode_col(layout.debitColumn);
+  const creditCol = XLSX.utils.encode_col(layout.creditColumn);
+  const balanceCol = XLSX.utils.encode_col(layout.balanceColumn);
   const debitAddr = `${debitCol}${totalRowIndex + 1}`;
   const creditAddr = `${creditCol}${totalRowIndex + 1}`;
 
-  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
-  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
+  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n', v: 0 };
+  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n', v: 0 };
 
   for (let r = dataStartRow; r <= dataEndRow; r++) {
-    setCellFormat(ws, `D${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `E${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `F${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `${debitCol}${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `${creditCol}${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `${balanceCol}${r}`, MONEY_FORMAT);
   }
   setCellFormat(ws, debitAddr, MONEY_FORMAT);
   setCellFormat(ws, creditAddr, MONEY_FORMAT);
 
-  ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
-  setRowStyle(ws, 0, TABLE_HEADERS.length, headerStyle);
+  ws['!cols'] = autoFitCols(rows, layout.headers);
+  setRowStyle(ws, 0, layout.headers.length, headerStyle);
   
   // Style the totals row
-  setCellStyle(ws, `C${totalRowIndex + 1}`, totalLabelStyle);
+  const totalLabelAddr = `${XLSX.utils.encode_col(layout.descriptionColumn)}${totalRowIndex + 1}`;
+  setCellStyle(ws, totalLabelAddr, totalLabelStyle);
   setCellStyle(ws, debitAddr, debitTotalStyle);
   setCellStyle(ws, creditAddr, creditTotalStyle);
 
@@ -350,51 +432,48 @@ export interface MergedExcelConfig {
 export function generateMergedStatementsExcel(config: MergedExcelConfig): ExcelGenerationResult {
   const workbook = XLSX.utils.book_new();
   const rows: SheetData = [];
+  const layout = buildColumnLayout(config.transactions);
 
   const statementPeriod = config.statementPeriod || config.bankInfo.statementPeriod || '';
   rows.push(...buildAccountRows(config.bankInfo, statementPeriod));
 
   const headerRowIndex = rows.length;
-  rows.push(TABLE_HEADERS);
-  const txnRows = buildTransactionRows(config.transactions);
+  rows.push(layout.headers);
+  const txnRows = buildTransactionRows(config.transactions, layout);
   rows.push(...txnRows);
 
   // Add totals row with formulas
   const dataStartRow = headerRowIndex + 2; // 1-indexed, after header
   const dataEndRow = headerRowIndex + 1 + txnRows.length;
   const totalRowIndex = rows.length;
-  
-  rows.push([
-    '', '', 'TOTAL',
-    null, // Debit formula placeholder
-    null, // Credit formula placeholder
-    '', '', ''
-  ]);
+  rows.push(buildTotalsRow(layout));
 
   const ws = XLSX.utils.aoa_to_sheet(rows) as Worksheet;
   
   // Add SUM formulas for Debit and Credit
-  const debitCol = 'D';
-  const creditCol = 'E';
+  const debitCol = XLSX.utils.encode_col(layout.debitColumn);
+  const creditCol = XLSX.utils.encode_col(layout.creditColumn);
+  const balanceCol = XLSX.utils.encode_col(layout.balanceColumn);
   const debitAddr = `${debitCol}${totalRowIndex + 1}`;
   const creditAddr = `${creditCol}${totalRowIndex + 1}`;
 
-  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n' };
-  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n' };
+  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n', v: 0 };
+  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n', v: 0 };
 
   for (let r = dataStartRow; r <= dataEndRow; r++) {
-    setCellFormat(ws, `D${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `E${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `F${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `${debitCol}${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `${creditCol}${r}`, MONEY_FORMAT);
+    setCellFormat(ws, `${balanceCol}${r}`, MONEY_FORMAT);
   }
   setCellFormat(ws, debitAddr, MONEY_FORMAT);
   setCellFormat(ws, creditAddr, MONEY_FORMAT);
 
-  ws['!cols'] = autoFitCols(rows, TABLE_HEADERS);
-  setRowStyle(ws, headerRowIndex, TABLE_HEADERS.length, headerStyle);
+  ws['!cols'] = autoFitCols(rows, layout.headers);
+  setRowStyle(ws, headerRowIndex, layout.headers.length, headerStyle);
   
   // Style the totals row
-  setCellStyle(ws, `C${totalRowIndex + 1}`, totalLabelStyle);
+  const totalLabelAddr = `${XLSX.utils.encode_col(layout.descriptionColumn)}${totalRowIndex + 1}`;
+  setCellStyle(ws, totalLabelAddr, totalLabelStyle);
   setCellStyle(ws, debitAddr, debitTotalStyle);
   setCellStyle(ws, creditAddr, creditTotalStyle);
 
@@ -443,7 +522,9 @@ export function validateExcelStructure(buffer: ArrayBuffer): {
     let headerRowIndex = -1;
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r] || [];
-      const matches = TABLE_HEADERS.every((header, idx) => (row[idx] ?? '') === header);
+      const matches = TABLE_HEADER_VARIANTS.some((expectedHeaders) =>
+        expectedHeaders.every((header, idx) => (row[idx] ?? '') === header)
+      );
       if (matches) {
         headerRowIndex = r;
         break;
