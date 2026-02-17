@@ -177,7 +177,7 @@ const AppRoutes = () => {
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<RequireAuth><Navigate to="/profile" replace /></RequireAuth>} />
+          <Route path="/dashboard" element={<RequireAuth><Navigate to="/?next=demo" replace /></RequireAuth>} />
           <Route path="/chat" element={<RequirePaid><ChatPage /></RequirePaid>} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
