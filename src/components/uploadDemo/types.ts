@@ -161,6 +161,8 @@ export interface MultiConversionResponse {
   transactions?: Transaction[];
   jsonData?: string;
   mt940Data?: string;
+  outputMode?: "standard" | "tally_only";
+  tallyEnabled?: boolean;
   planType?: string;
   bankInfo?: BankInfo;
   error?: string;
@@ -178,6 +180,8 @@ export interface ConversionResponse {
   bankInfo?: BankInfo;
   jsonData?: string;
   mt940Data?: string;
+  outputMode?: "standard" | "tally_only";
+  tallyEnabled?: boolean;
   aiStatus?: AiStatus;
   remaining?: number;
   limitReached?: boolean;
@@ -207,6 +211,7 @@ export interface BatchFilePayload {
 export interface BatchRequestBody {
   files: BatchFilePayload[];
   timezone: string;
+  outputMode?: "standard" | "tally_only";
   pdfPassword?: string;
   recaptchaToken?: string;
 }

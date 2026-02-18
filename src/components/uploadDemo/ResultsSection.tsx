@@ -145,7 +145,7 @@ export const ResultsSection = ({
   const debitTone: ToneName = analytics ? getDebitTone(analytics.totalCredits, analytics.totalDebits) : "moderate";
   const netFlowTone: ToneName = analytics ? getNetFlowTone(analytics.netFlow, analytics.totalCredits) : "moderate";
   const lockedFormats: string[] = [];
-  if (!hasTallyAccess) lockedFormats.push("Tally XML");
+  if (isTallyOnlyMode && !hasTallyAccess) lockedFormats.push("Tally XML");
   if (!isPaidUser) lockedFormats.push("JSON", "MT940");
 
   return (
@@ -237,21 +237,6 @@ export const ResultsSection = ({
                   <FileText className="mr-2 h-4 w-4" />
                   CSV
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleTallyExport}
-                  disabled={transactions.length === 0}
-                  className={`text-white ${
-                    !hasTallyAccess
-                      ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
-                      : ""
-                  }`}
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Tally XML
-                  {!hasTallyAccess && <Lock className="ml-1 h-3 w-3" />}
-                </Button>
                 <Button size="sm" variant="outline" onClick={exportAsPDF} disabled={transactions.length === 0} className="text-white">
                   <FileText className="mr-2 h-4 w-4" />
                   Analyzed PDF
@@ -336,21 +321,6 @@ export const ResultsSection = ({
                 <Button size="lg" variant="outline" onClick={exportAsCSV} disabled={transactions.length === 0} className="csv-button">
                   <FileText className="mr-2 h-5 w-5" />
                   CSV
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={handleTallyExport}
-                  disabled={transactions.length === 0}
-                  className={`text-white ${
-                    !hasTallyAccess
-                      ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
-                      : ""
-                  }`}
-                >
-                  <FileText className="mr-2 h-5 w-5" />
-                  Tally XML
-                  {!hasTallyAccess && <Lock className="ml-1 h-4 w-4" />}
                 </Button>
                 <Button size="lg" variant="outline" onClick={exportAsPDF} disabled={transactions.length === 0} className="text-white">
                   <FileText className="mr-2 h-5 w-5" />

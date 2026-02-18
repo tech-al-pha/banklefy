@@ -723,7 +723,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { files, timezone, recaptchaToken } = await req.json();
+    const { files, timezone, recaptchaToken, outputMode } = await req.json();
+    const requestedOutputMode = outputMode === 'tally_only' ? 'tally_only' : 'standard';
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
     const trackingKey = await getTrackingKey(req);
 
@@ -1282,6 +1283,8 @@ Deno.serve(async (req) => {
         transactions: combinedTransactions,
         jsonData,
         mt940Data,
+        outputMode: requestedOutputMode,
+        tallyEnabled: requestedOutputMode === 'tally_only',
         planType: userPlanType,
         bankInfo: primaryBankInfo,
       }),

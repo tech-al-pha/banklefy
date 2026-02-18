@@ -696,11 +696,13 @@ Deno.serve(async (req) => {
       fileData: base64FileData,
       timezone,
       recaptchaToken,
+      outputMode,
       pdfPassword,
       pdfPageImages,
       pdfParsedTransactions,
       pdfParsedBankMetadata,
     } = await req.json();
+    const requestedOutputMode = outputMode === 'tally_only' ? 'tally_only' : 'standard';
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
     
     // Robust client tracking to prevent bypasses
@@ -1588,6 +1590,8 @@ Deno.serve(async (req) => {
         excelData: excelBase64 ?? undefined,
         jsonData,
         mt940Data,
+        outputMode: requestedOutputMode,
+        tallyEnabled: requestedOutputMode === 'tally_only',
         message: 'Conversion completed successfully',
         remaining,
         isAuthenticated: !!user,

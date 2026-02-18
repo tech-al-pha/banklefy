@@ -714,6 +714,7 @@ export const UploadDemo = () => {
       const requestBody: Record<string, unknown> = {
         fileName: fileToConvert.name,
         timezone,
+        outputMode: mode,
       };
         // Anonymous users are tracked server-side by fingerprint (no client IDs).
 
@@ -929,10 +930,13 @@ Analytics Summary:
         }
       }
 
+      const resolvedOutputMode: ConversionMode = data?.outputMode === "tally_only" ? "tally_only" : "standard";
+      setConversionMode(resolvedOutputMode);
+
       // Refresh usage limit after successful conversion
       refreshUsageLimit();
 
-      if (mode === "tally_only") {
+      if (resolvedOutputMode === "tally_only") {
         const tallyDownloaded = await handleTallyExport();
         if (!tallyDownloaded) {
           throw new Error("Tally export could not be generated.");
@@ -940,9 +944,9 @@ Analytics Summary:
       }
 
       toast({
-        title: mode === "tally_only" ? "Tally conversion complete!" : "Conversion complete!",
+        title: resolvedOutputMode === "tally_only" ? "Tally conversion complete!" : "Conversion complete!",
         description:
-          mode === "tally_only"
+          resolvedOutputMode === "tally_only"
             ? [
                 `Extracted ${data?.transactions?.length || 0} transactions.`,
                 "Tally XML downloaded.",
@@ -1069,6 +1073,7 @@ Analytics Summary:
       const requestBody: BatchRequestBody = {
         files: [],
         timezone,
+        outputMode: mode,
       };
       // Anonymous users are tracked server-side by fingerprint (no client IDs).
 
@@ -1260,9 +1265,12 @@ Analytics Summary:
       setJsonData(data?.jsonData || null);
       setMt940Data(data?.mt940Data || null);
 
+      const resolvedOutputMode: ConversionMode = data?.outputMode === "tally_only" ? "tally_only" : "standard";
+      setConversionMode(resolvedOutputMode);
+
       refreshUsageLimit();
 
-      if (mode === "tally_only") {
+      if (resolvedOutputMode === "tally_only") {
         const tallyDownloaded = await handleTallyExport();
         if (!tallyDownloaded) {
           throw new Error("Tally export could not be generated.");
@@ -1270,9 +1278,9 @@ Analytics Summary:
       }
 
       toast({
-        title: mode === "tally_only" ? "Batch Tally conversion complete!" : "Batch conversion complete!",
+        title: resolvedOutputMode === "tally_only" ? "Batch Tally conversion complete!" : "Batch conversion complete!",
         description:
-          mode === "tally_only"
+          resolvedOutputMode === "tally_only"
             ? [
                 `${results.length} ${pluralize(results.length, "statement")} converted.`,
                 "Tally XML downloaded.",
@@ -1592,6 +1600,15 @@ Analytics Summary:
   };
 
   const handleTallyExport = async (): Promise<boolean> => {
+    if (conversionMode !== "tally_only") {
+      toast({
+        variant: "destructive",
+        title: "Tally export unavailable",
+        description: "Use 'Convert to Tally XML' first.",
+      });
+      return false;
+    }
+
     const usageContext = ensureTallyExportAllowed();
     if (!usageContext) return false;
 
