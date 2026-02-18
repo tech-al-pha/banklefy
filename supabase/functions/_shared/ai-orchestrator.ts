@@ -95,6 +95,9 @@ If both Transaction Date and Value Date/Posting Date exist, use Transaction Date
 If refNumber is not present for a row, return an empty string.
 Populate refNumber only when a dedicated reference column exists. If ID appears only inside description text, keep it in description and set refNumber to "".
 Ignore headers, footers, summaries, opening/closing balance lines, and page-break artifacts.
+Map debit/credit strictly by their table columns. If a column has "-" or blank, set that side to 0.
+Use running balance progression to resolve ambiguous debit vs credit rows.
+Never output negative debit or credit.
 Return ONLY the JSON array, no markdown.`,
               },
               {

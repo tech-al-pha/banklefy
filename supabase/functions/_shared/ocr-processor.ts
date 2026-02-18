@@ -111,6 +111,10 @@ AMOUNT RULES:
 3. BALANCE = running balance after transaction
 4. Remove currency symbols and commas
 5. Handle formats: "1,234.56", "1,23,456", "-500"
+6. If statement has separate "Debit" and "Credit" columns, map strictly by column position.
+7. If a cell is "-" or blank in Debit/Credit, treat it as 0 (do NOT shift value to other column).
+8. If one amount appears in wrong side, verify against running balance change and correct side.
+9. Never output negative debit/credit; keep both as positive numbers.
 
 Return ONLY valid JSON. No markdown, no code blocks.`;
 
@@ -337,16 +341,40 @@ const normalizeTransaction = (raw: Record<string, unknown>): RawTransaction => {
     raw.txnID ??
     raw.id;
   const cleanedRef = selectBestReference(pickString(rawRef), pickString(descriptionRaw));
+  const normalizedType = pickString(raw.type ?? raw.txnType ?? raw.transactionType)?.trim();
+  let debit = toNumber(raw.debit ?? raw.dr ?? raw.debitAmount ?? raw.withdrawal ?? raw.withdraw) ?? 0;
+  let credit = toNumber(raw.credit ?? raw.cr ?? raw.creditAmount ?? raw.deposit) ?? 0;
+
+  // Normalize signs to positive values and recover common CR/DR sign inversions.
+  if (debit < 0 && credit <= 0) {
+    credit = Math.abs(debit);
+    debit = 0;
+  } else if (credit < 0 && debit <= 0) {
+    debit = Math.abs(credit);
+    credit = 0;
+  } else {
+    debit = Math.abs(debit);
+    credit = Math.abs(credit);
+  }
+
+  const typeLower = (normalizedType || '').toLowerCase();
+  if (debit > 0 && credit === 0 && /\b(cr|credit)\b/.test(typeLower)) {
+    credit = debit;
+    debit = 0;
+  } else if (credit > 0 && debit === 0 && /\b(dr|debit)\b/.test(typeLower)) {
+    debit = credit;
+    credit = 0;
+  }
 
   return {
     date: pickString(dateRaw)?.trim() || 'Unknown',
     description: pickString(descriptionRaw)?.trim() || 'Unknown Transaction',
     category: pickString(raw.category)?.trim(),
-    debit: toNumber(raw.debit ?? raw.dr ?? raw.debitAmount ?? raw.withdrawal ?? raw.withdraw),
-    credit: toNumber(raw.credit ?? raw.cr ?? raw.creditAmount ?? raw.deposit),
+    debit,
+    credit,
     balance: toNumber(raw.balance ?? raw.bal ?? raw.runningBalance),
     amount: toNumber(raw.amount),
-    type: pickString(raw.type ?? raw.txnType ?? raw.transactionType)?.trim(),
+    type: normalizedType,
     refNumber: cleanedRef,
   };
 };

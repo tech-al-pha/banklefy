@@ -16,6 +16,35 @@ const NON_TRANSACTION_KEYWORDS = [
   'grand total',
 ];
 
+const CREDIT_HINTS = [
+  ' cr ',
+  'credit',
+  'deposit',
+  'salary',
+  'received',
+  'inward',
+  'refund',
+  'reversal',
+  'interest',
+  'cashback',
+  'transfer in',
+];
+
+const DEBIT_HINTS = [
+  ' dr ',
+  'debit',
+  'withdraw',
+  'atm',
+  'charges',
+  'fee',
+  'commission',
+  'purchase',
+  'pos',
+  'emi',
+  'payment',
+  'transfer out',
+];
+
 const isDateLike = (value?: string): boolean => {
   if (!value) return false;
   const trimmed = value.trim();
@@ -49,6 +78,177 @@ const cleanText = (value: string): string =>
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+type BalanceDirection = 'forward' | 'reverse';
+
+const hasFiniteBalance = (transaction: Transaction): boolean =>
+  Number.isFinite(Number(transaction.balance));
+
+const normalizeSignedAmounts = (transaction: Transaction): Transaction => {
+  let debit = Number(transaction.debit || 0);
+  let credit = Number(transaction.credit || 0);
+
+  if (!Number.isFinite(debit)) debit = 0;
+  if (!Number.isFinite(credit)) credit = 0;
+
+  // OCR occasionally emits negative values on the wrong side.
+  if (debit < 0 && credit <= 0) {
+    credit = Math.abs(debit);
+    debit = 0;
+  } else if (credit < 0 && debit <= 0) {
+    debit = Math.abs(credit);
+    credit = 0;
+  } else {
+    debit = Math.abs(debit);
+    credit = Math.abs(credit);
+  }
+
+  return {
+    ...transaction,
+    debit,
+    credit,
+  };
+};
+
+const getForwardDiffMinor = (
+  transactions: Transaction[],
+  index: number,
+  debit: number,
+  credit: number,
+): number => {
+  if (index <= 0) return Number.POSITIVE_INFINITY;
+  const prev = transactions[index - 1];
+  const current = transactions[index];
+  if (!hasFiniteBalance(prev) || !hasFiniteBalance(current)) return Number.POSITIVE_INFINITY;
+  const expectedMinor = toMinor(prev.balance) + toMinor(credit) - toMinor(debit);
+  const actualMinor = toMinor(current.balance);
+  return Math.abs(expectedMinor - actualMinor);
+};
+
+const getReverseDiffMinor = (
+  transactions: Transaction[],
+  index: number,
+  debit: number,
+  credit: number,
+): number => {
+  if (index >= transactions.length - 1) return Number.POSITIVE_INFINITY;
+  const next = transactions[index + 1];
+  const current = transactions[index];
+  if (!hasFiniteBalance(next) || !hasFiniteBalance(current)) return Number.POSITIVE_INFINITY;
+  // Reverse statements: current row balance should reconcile against next row.
+  const expectedMinor = toMinor(next.balance) + toMinor(credit) - toMinor(debit);
+  const actualMinor = toMinor(current.balance);
+  return Math.abs(expectedMinor - actualMinor);
+};
+
+const scoreDirection = (transactions: Transaction[], direction: BalanceDirection): { score: number; samples: number } => {
+  let score = 0;
+  let samples = 0;
+
+  const start = direction === 'forward' ? 1 : 0;
+  const endExclusive = direction === 'forward' ? transactions.length : transactions.length - 1;
+
+  for (let i = start; i < endExclusive; i++) {
+    const diff =
+      direction === 'forward'
+        ? getForwardDiffMinor(transactions, i, transactions[i].debit || 0, transactions[i].credit || 0)
+        : getReverseDiffMinor(transactions, i, transactions[i].debit || 0, transactions[i].credit || 0);
+    if (!Number.isFinite(diff)) continue;
+    score += diff;
+    samples += 1;
+  }
+
+  return { score, samples };
+};
+
+const inferBalanceDirection = (transactions: Transaction[]): BalanceDirection => {
+  const forward = scoreDirection(transactions, 'forward');
+  const reverse = scoreDirection(transactions, 'reverse');
+
+  if (forward.samples < 2 && reverse.samples < 2) return 'forward';
+  if (forward.samples === 0) return 'reverse';
+  if (reverse.samples === 0) return 'forward';
+  return reverse.score < forward.score ? 'reverse' : 'forward';
+};
+
+const shouldSwapByHint = (transaction: Transaction): boolean => {
+  const debit = Number(transaction.debit || 0);
+  const credit = Number(transaction.credit || 0);
+  if ((debit > 0 && credit > 0) || (debit === 0 && credit === 0)) return false;
+
+  const desc = ` ${cleanText(transaction.description || '')} `;
+  const hasCreditHint = CREDIT_HINTS.some((hint) => desc.includes(hint));
+  const hasDebitHint = DEBIT_HINTS.some((hint) => desc.includes(hint));
+
+  if (hasCreditHint && !hasDebitHint && debit > 0 && credit === 0) return true;
+  if (hasDebitHint && !hasCreditHint && credit > 0 && debit === 0) return true;
+  return false;
+};
+
+const trySwapByBalance = (
+  transactions: Transaction[],
+  index: number,
+  direction: BalanceDirection,
+): boolean => {
+  const transaction = transactions[index];
+  const debit = Number(transaction.debit || 0);
+  const credit = Number(transaction.credit || 0);
+  if ((debit > 0 && credit > 0) || (debit === 0 && credit === 0)) return false;
+
+  const asIsDiff =
+    direction === 'forward'
+      ? getForwardDiffMinor(transactions, index, debit, credit)
+      : getReverseDiffMinor(transactions, index, debit, credit);
+  const swappedDiff =
+    direction === 'forward'
+      ? getForwardDiffMinor(transactions, index, credit, debit)
+      : getReverseDiffMinor(transactions, index, credit, debit);
+
+  if (!Number.isFinite(asIsDiff) || !Number.isFinite(swappedDiff)) return false;
+
+  const improvement = asIsDiff - swappedDiff;
+  const amountMinor = Math.max(toMinor(debit), toMinor(credit));
+  const residualLimit = Math.max(2, Math.round(amountMinor * 0.002)); // <= 0.2% residual or 0.02 absolute.
+  const clearlyBetter = improvement >= 2 && swappedDiff + 1 < asIsDiff;
+  const residualAcceptable = swappedDiff <= residualLimit || swappedDiff <= Math.round(asIsDiff * 0.2);
+
+  if (!clearlyBetter || !residualAcceptable) return false;
+
+  transactions[index] = {
+    ...transaction,
+    debit: credit,
+    credit: debit,
+  };
+  return true;
+};
+
+const correctAmountDirection = (transactions: Transaction[]): Transaction[] => {
+  if (transactions.length <= 1) {
+    return transactions.map((t) => normalizeSignedAmounts(t));
+  }
+
+  const corrected = transactions.map((transaction) => normalizeSignedAmounts(transaction));
+  const direction = inferBalanceDirection(corrected);
+
+  const start = direction === 'forward' ? 1 : 0;
+  const endExclusive = direction === 'forward' ? corrected.length : corrected.length - 1;
+
+  // Run twice so earlier swaps can improve neighboring rows.
+  for (let pass = 0; pass < 2; pass++) {
+    for (let index = start; index < endExclusive; index++) {
+      trySwapByBalance(corrected, index, direction);
+    }
+  }
+
+  // Edge row cannot always be balance-validated; use narration hints only there.
+  const edgeIndex = direction === 'forward' ? 0 : corrected.length - 1;
+  if (edgeIndex >= 0 && edgeIndex < corrected.length && shouldSwapByHint(corrected[edgeIndex])) {
+    const edge = corrected[edgeIndex];
+    corrected[edgeIndex] = { ...edge, debit: edge.credit || 0, credit: edge.debit || 0 };
+  }
+
+  return corrected;
+};
 
 const scoreTransactionQuality = (transaction: Transaction): number => {
   const description = (transaction.description || '').trim();
@@ -87,12 +287,13 @@ export const sanitizeTransactions = (transactions: Transaction[]): Transaction[]
     if (debit === 0 && credit === 0) return false;
     return true;
   });
+  const directionCorrected = correctAmountDirection(filtered);
 
   // Remove OCR/AI duplicate rows that represent the same movement and balance.
   const deduped: Transaction[] = [];
   const indexByKey = new Map<string, number>();
 
-  for (const transaction of filtered) {
+  for (const transaction of directionCorrected) {
     const key = transactionKey(transaction);
     const existingIndex = indexByKey.get(key);
 

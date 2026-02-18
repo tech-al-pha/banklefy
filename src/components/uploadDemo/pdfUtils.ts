@@ -641,6 +641,41 @@ const extractAmounts = (text: string): { textWithoutAmounts: string; debit: numb
   };
 };
 
+const extractAmountsWithDashPlaceholders = (
+  text: string,
+): { textWithoutAmounts: string; debit: number; credit: number; balance: number } | null => {
+  const cleaned = text.trim();
+  if (!cleaned) return null;
+
+  const debitBlankPattern =
+    /^(.*?)(?:\s|^)[-–—]\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/;
+  const debitBlankMatch = cleaned.match(debitBlankPattern);
+  if (debitBlankMatch) {
+    const [, prefix, creditToken, balanceToken] = debitBlankMatch;
+    return {
+      textWithoutAmounts: prefix.trim(),
+      debit: 0,
+      credit: parseAmount(creditToken),
+      balance: parseAmount(balanceToken),
+    };
+  }
+
+  const creditBlankPattern =
+    /^(.*?)(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+[-–—]\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/;
+  const creditBlankMatch = cleaned.match(creditBlankPattern);
+  if (creditBlankMatch) {
+    const [, prefix, debitToken, balanceToken] = creditBlankMatch;
+    return {
+      textWithoutAmounts: prefix.trim(),
+      debit: parseAmount(debitToken),
+      credit: 0,
+      balance: parseAmount(balanceToken),
+    };
+  }
+
+  return null;
+};
+
 export const extractPdfDataFromText = async (
   file: File,
   options?: { password?: string; maxPdfRenderPages?: number },
@@ -696,7 +731,7 @@ export const extractPdfDataFromText = async (
         flushCurrent();
 
         const [, transactionDateToken, valueDateToken, trailing] = rowStart;
-        const amounts = extractAmounts(trailing);
+        const amounts = extractAmounts(trailing) || extractAmountsWithDashPlaceholders(trailing);
         const descriptionText = (amounts?.textWithoutAmounts || trailing).trim();
 
         current = {
@@ -714,7 +749,7 @@ export const extractPdfDataFromText = async (
 
       if (!current) continue;
 
-      const maybeAmounts = extractAmounts(line);
+      const maybeAmounts = extractAmounts(line) || extractAmountsWithDashPlaceholders(line);
       if (maybeAmounts && current.balance === 0 && current.debit === 0 && current.credit === 0) {
         current.debit = maybeAmounts.debit;
         current.credit = maybeAmounts.credit;
