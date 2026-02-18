@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, FileText, Sparkles, Loader2, AlertTriangle, Lock, Eye, EyeOff, RefreshCw, XCircle, Crown, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useReducer, useRef, useEffect } from "react";
+import { useReducer, useRef, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
@@ -171,6 +171,14 @@ export const UploadDemo = () => {
   const pdfPasswordHelpId = "pdf-password-help";
   const pdfPasswordErrorId = "pdf-password-error";
   const dismissedEditedWarningsRef = useRef<Set<string>>(new Set());
+  type ConversionMode = "standard" | "tally_only";
+  type EditedPdfCheckResult = {
+    fileName: string;
+    status: "clean" | "suspected";
+    reason: string;
+  };
+  const [conversionMode, setConversionMode] = useState<ConversionMode>("standard");
+  const [editedPdfCheckResult, setEditedPdfCheckResult] = useState<EditedPdfCheckResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { hasChatAuraAccess } = useSubscriptionTier();
@@ -440,7 +448,10 @@ export const UploadDemo = () => {
     if (!hasEditPdfDetectorAccess && editedPdfWarning) {
       setEditedPdfWarning(null);
     }
-  }, [hasEditPdfDetectorAccess, editedPdfWarning]);
+    if (!hasEditPdfDetectorAccess && editedPdfCheckResult) {
+      setEditedPdfCheckResult(null);
+    }
+  }, [hasEditPdfDetectorAccess, editedPdfWarning, editedPdfCheckResult]);
 
   useEffect(() => {
     if (converting || !showProgress) return;
@@ -594,6 +605,7 @@ export const UploadDemo = () => {
       setShowPasswordInput(false);
       setShowPassword(false);
       setEditedPdfWarning(null);
+      setEditedPdfCheckResult(null);
 
       toast({
         title: "Files Selected",
@@ -631,9 +643,21 @@ export const UploadDemo = () => {
         tier: pdfDetectorTier,
         password: pdfPassword.trim() || undefined,
       });
-      if (!detection.suspected) return false;
+      if (!detection.suspected) {
+        setEditedPdfCheckResult({
+          fileName: file.name,
+          status: "clean",
+          reason: detection.reason,
+        });
+        return false;
+      }
 
       setSelectedFile(file);
+      setEditedPdfCheckResult({
+        fileName: file.name,
+        status: "suspected",
+        reason: `${detection.riskLevel.toUpperCase()} risk - ${detection.reason}`,
+      });
       setEditedPdfWarning({
         fileName: file.name,
         reason: `${detection.riskLevel.toUpperCase()} risk - ${detection.reason}`,
@@ -648,12 +672,13 @@ export const UploadDemo = () => {
 
 
 
-  const handleConvert = async (fileOverride?: File) => {
+  const handleConvert = async (fileOverride?: File, mode: ConversionMode = "standard") => {
     // Clear previous errors
     setLastError(null);
     setBatchResults([]);
     setMergeInfo(null);
     setMergeResult(null);
+    setConversionMode(mode);
 
     const fileToConvert = fileOverride ?? selectedFile;
 
@@ -907,15 +932,31 @@ Analytics Summary:
       // Refresh usage limit after successful conversion
       refreshUsageLimit();
 
+      if (mode === "tally_only") {
+        const tallyDownloaded = await handleTallyExport();
+        if (!tallyDownloaded) {
+          throw new Error("Tally export could not be generated.");
+        }
+      }
+
       toast({
-        title: "Conversion complete!",
-        description: [
-          `Extracted ${data?.transactions?.length || 0} transactions.`,
-          formatRemaining(data?.remaining),
-          hasChatAuraAccess ? "Chat Aura wants to say something. Open Chat Aura to view it." : null,
-        ]
-          .filter(Boolean)
-          .join(" "),
+        title: mode === "tally_only" ? "Tally conversion complete!" : "Conversion complete!",
+        description:
+          mode === "tally_only"
+            ? [
+                `Extracted ${data?.transactions?.length || 0} transactions.`,
+                "Tally XML downloaded.",
+                formatRemaining(data?.remaining),
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : [
+                `Extracted ${data?.transactions?.length || 0} transactions.`,
+                formatRemaining(data?.remaining),
+                hasChatAuraAccess ? "Chat Aura wants to say something. Open Chat Aura to view it." : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
       });
 
       setSelectedFile(null);
@@ -923,6 +964,7 @@ Analytics Summary:
       setShowPasswordInput(false);
       setPdfPassword('');
       setPasswordError(false);
+      setEditedPdfCheckResult(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -982,8 +1024,9 @@ Analytics Summary:
     }
   };
 
-  const handleConvertMultiple = async () => {
+  const handleConvertMultiple = async (mode: ConversionMode = "standard") => {
     setLastError(null);
+    setConversionMode(mode);
 
     if (selectedFiles.length === 0) {
       toast({
@@ -1219,15 +1262,31 @@ Analytics Summary:
 
       refreshUsageLimit();
 
+      if (mode === "tally_only") {
+        const tallyDownloaded = await handleTallyExport();
+        if (!tallyDownloaded) {
+          throw new Error("Tally export could not be generated.");
+        }
+      }
+
       toast({
-        title: "Batch conversion complete!",
-        description: [
-          `${results.length} ${pluralize(results.length, "statement")} converted.`,
-          formatRemaining(data?.remaining),
-          hasChatAuraAccess ? "Chat Aura wants to say something. Open Chat Aura to view it." : null,
-        ]
-          .filter(Boolean)
-          .join(" "),
+        title: mode === "tally_only" ? "Batch Tally conversion complete!" : "Batch conversion complete!",
+        description:
+          mode === "tally_only"
+            ? [
+                `${results.length} ${pluralize(results.length, "statement")} converted.`,
+                "Tally XML downloaded.",
+                formatRemaining(data?.remaining),
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : [
+                `${results.length} ${pluralize(results.length, "statement")} converted.`,
+                formatRemaining(data?.remaining),
+                hasChatAuraAccess ? "Chat Aura wants to say something. Open Chat Aura to view it." : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
       });
 
       setSelectedFiles([]);
@@ -1235,6 +1294,7 @@ Analytics Summary:
       setShowPasswordInput(false);
       setPdfPassword('');
       setPasswordError(false);
+      setEditedPdfCheckResult(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -1505,17 +1565,17 @@ Analytics Summary:
     return { limit, used, remaining, storageKey, periodKey };
   };
 
-  const handleTallyExport = async () => {
+  const ensureTallyExportAllowed = () => {
     if (!hasTallyAccess) {
       setShowUpgradeDialog(true);
-      return;
+      return null;
     }
     const normalized = (planType ?? "free").toLowerCase();
     const { limit, remaining, storageKey } = getTallyUsage(normalized);
 
     if (!limit) {
       setShowUpgradeDialog(true);
-      return;
+      return null;
     }
 
     if (remaining <= 0) {
@@ -1525,15 +1585,24 @@ Analytics Summary:
         description: "You have used all Tally exports for this billing period.",
       });
       setShowUpgradeDialog(true);
-      return;
+      return null;
     }
 
+    return { remaining, storageKey };
+  };
+
+  const handleTallyExport = async (): Promise<boolean> => {
+    const usageContext = ensureTallyExportAllowed();
+    if (!usageContext) return false;
+
+    const { remaining, storageKey } = usageContext;
     await exportAsTally();
     localStorage.setItem(storageKey, String((Number.parseInt(localStorage.getItem(storageKey) ?? "0", 10) || 0) + 1));
     toast({
       title: "Tally export ready",
       description: `Remaining exports this period: ${Math.max(0, remaining - 1)}`,
     });
+    return true;
   };
 
   const handlePremiumExport = (format: 'json' | 'mt940') => {
@@ -1546,6 +1615,25 @@ Analytics Summary:
     } else {
       exportAsMT940();
     }
+  };
+
+  const runSelectedConversion = (mode: ConversionMode) => {
+    if (mode === "tally_only" && !ensureTallyExportAllowed()) {
+      return;
+    }
+    setConversionMode(mode);
+
+    if (selectedFiles.length === 1) {
+      const firstFile = selectedFiles[0];
+      setSelectedFile(firstFile);
+      void handleConvert(firstFile, mode);
+      return;
+    }
+    if (selectedFiles.length > 1) {
+      void handleConvertMultiple(mode);
+      return;
+    }
+    void handleConvert(undefined, mode);
   };
 
   return (
@@ -1678,6 +1766,9 @@ Analytics Summary:
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedFiles([]);
+                          setSelectedFile(null);
+                          setEditedPdfWarning(null);
+                          setEditedPdfCheckResult(null);
                         }}
                       >
                         Clear All
@@ -1755,9 +1846,9 @@ Analytics Summary:
                         dismissedEditedWarningsRef.current.add(editedPdfWarning.fileName);
                         setEditedPdfWarning(null);
                         if (selectedFiles.length > 1) {
-                          handleConvertMultiple();
+                          void handleConvertMultiple(conversionMode);
                         } else if (selectedFile) {
-                          handleConvert(selectedFile);
+                          void handleConvert(selectedFile, conversionMode);
                         }
                       }}
                       disabled={false}
@@ -1796,11 +1887,11 @@ Analytics Summary:
                         if (selectedFiles.length === 1) {
                           const firstFile = selectedFiles[0];
                           setSelectedFile(firstFile);
-                          handleConvert(firstFile);
+                          void handleConvert(firstFile, conversionMode);
                         } else if (selectedFiles.length > 1) {
-                          handleConvertMultiple();
+                          void handleConvertMultiple(conversionMode);
                         } else {
-                          handleConvert();
+                          void handleConvert(undefined, conversionMode);
                         }
                       }}
                       disabled={false}
@@ -1817,32 +1908,41 @@ Analytics Summary:
                 <div className="text-center space-y-3">
                   {selectedFiles.length > 0 && (
                     <div className="space-y-3">
-                      <Button
-                        size="lg"
-                        className="convert-button w-full md:w-auto"
-                        onClick={() => {
-                          if (selectedFiles.length === 1) {
-                            const firstFile = selectedFiles[0];
-                            setSelectedFile(firstFile);
-                            handleConvert(firstFile);
-                          } else if (selectedFiles.length > 1) {
-                            handleConvertMultiple();
-                          }
-                        }}
-                        disabled={uploading || converting}
-                      >
-                        {uploading || converting ? (
-                          <>
-                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            {uploading ? 'Uploading...' : 'Converting...'}
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="mr-2 h-5 w-5" />
-                            Convert All Statements
-                          </>
-                        )}
-                      </Button>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+                        <Button
+                          size="lg"
+                          className="convert-button w-full md:w-auto"
+                          onClick={() => runSelectedConversion("standard")}
+                          disabled={uploading || converting}
+                        >
+                          {uploading || converting ? (
+                            <>
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                              {uploading ? 'Uploading...' : 'Converting...'}
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="mr-2 h-5 w-5" />
+                              Convert All Statements
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          className={`w-full md:w-auto ${
+                            !hasTallyAccess
+                              ? "border-sky-300/40 bg-sky-500/10 text-sky-100 hover:border-sky-200/60 hover:bg-sky-500/20"
+                              : "border-primary/30 text-primary"
+                          }`}
+                          onClick={() => runSelectedConversion("tally_only")}
+                          disabled={uploading || converting}
+                        >
+                          <FileText className="mr-2 h-5 w-5" />
+                          Convert to Tally XML
+                          {!hasTallyAccess && <Lock className="ml-2 h-4 w-4" />}
+                        </Button>
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {selectedFiles.length} {pluralize(selectedFiles.length, "file")} ready to convert
                       </p>
@@ -1880,6 +1980,8 @@ Analytics Summary:
                 formatAmountNoSymbol={formatAmountNoSymbol}
                 truncateDecimals={truncateDecimals}
                 showEditDetectorSignals={hasEditPdfDetectorAccess}
+                resultMode={conversionMode}
+                editedPdfCheckResult={editedPdfCheckResult}
               />
             </div>
           </div>

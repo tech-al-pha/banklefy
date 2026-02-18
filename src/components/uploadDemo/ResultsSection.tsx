@@ -90,7 +90,7 @@ type ResultsSectionProps = {
   isPaidUser: boolean;
   hasTallyAccess: boolean;
   exportAsCSV: () => Promise<void>;
-  handleTallyExport: () => Promise<void>;
+  handleTallyExport: () => Promise<boolean>;
   exportAsPDF: () => Promise<void>;
   handlePremiumExport: (format: "json" | "mt940") => void;
   aiStatus: AiStatus | null;
@@ -104,6 +104,8 @@ type ResultsSectionProps = {
   formatAmountNoSymbol: FormatAmountFn;
   truncateDecimals: (value: number, decimals?: number) => number;
   showEditDetectorSignals?: boolean;
+  resultMode?: "standard" | "tally_only";
+  editedPdfCheckResult?: { fileName: string; status: "clean" | "suspected"; reason: string } | null;
 };
 
 export const ResultsSection = ({
@@ -135,7 +137,10 @@ export const ResultsSection = ({
   formatAmountNoSymbol,
   truncateDecimals,
   showEditDetectorSignals = true,
+  resultMode = "standard",
+  editedPdfCheckResult = null,
 }: ResultsSectionProps) => {
+  const isTallyOnlyMode = resultMode === "tally_only";
   const creditTone: ToneName = analytics ? getCreditTone(analytics.totalCredits) : "good";
   const debitTone: ToneName = analytics ? getDebitTone(analytics.totalCredits, analytics.totalDebits) : "moderate";
   const netFlowTone: ToneName = analytics ? getNetFlowTone(analytics.netFlow, analytics.totalCredits) : "moderate";
@@ -149,110 +154,138 @@ export const ResultsSection = ({
         <div className="text-center space-y-3">
           <div className="flex items-center justify-center gap-2 tone-excellent-text">
             <CheckCircle className="h-5 w-5" />
-            <span className="font-medium">Batch Conversion Complete!</span>
+            <span className="font-medium">
+              {isTallyOnlyMode ? "Batch Tally Conversion Complete!" : "Batch Conversion Complete!"}
+            </span>
           </div>
           <p className="text-sm font-medium text-muted-foreground">Download options:</p>
-          <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <Button
-              size="lg"
-              className="excel-button"
-              onClick={handleBatchDownload}
-              disabled={batchDownloading}
-            >
-              {batchDownloading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Downloading...
-                </>
-              ) : (
-                <>
-                  <FileSpreadsheet className="mr-2 h-5 w-5" />
-                  Separate Excel
-                </>
-              )}
-            </Button>
-            {mergeInfo && mergeInfo.available && mergeResult && (
+          {isTallyOnlyMode ? (
+            <div className="flex justify-center">
               <Button
                 size="lg"
-                className="excel-button"
-                onClick={handleMergedDownload}
-                disabled={mergeDownloading}
+                variant="outline"
+                onClick={handleTallyExport}
+                disabled={transactions.length === 0}
+                className={`text-white ${
+                  !hasTallyAccess
+                    ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
+                    : ""
+                }`}
               >
-                {mergeDownloading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Preparing...
-                  </>
-                ) : (
-                  <>
-                    <FileSpreadsheet className="mr-2 h-5 w-5" />
-                    Merge Excel
-                  </>
-                )}
+                <FileText className="mr-2 h-5 w-5" />
+                Download Tally XML
+                {!hasTallyAccess && <Lock className="ml-1 h-4 w-4" />}
               </Button>
-            )}
-          </div>
-          {mergeInfo && !mergeInfo.available && (
-            <p className="text-xs text-muted-foreground">
-              Merge disabled: {mergeInfo.reasons?.join("; ") || "Conditions not met"}
-            </p>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                <Button
+                  size="lg"
+                  className="excel-button"
+                  onClick={handleBatchDownload}
+                  disabled={batchDownloading}
+                >
+                  {batchDownloading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Downloading...
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="mr-2 h-5 w-5" />
+                      Separate Excel
+                    </>
+                  )}
+                </Button>
+                {mergeInfo && mergeInfo.available && mergeResult && (
+                  <Button
+                    size="lg"
+                    className="excel-button"
+                    onClick={handleMergedDownload}
+                    disabled={mergeDownloading}
+                  >
+                    {mergeDownloading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Preparing...
+                      </>
+                    ) : (
+                      <>
+                        <FileSpreadsheet className="mr-2 h-5 w-5" />
+                        Merge Excel
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+              {mergeInfo && !mergeInfo.available && (
+                <p className="text-xs text-muted-foreground">
+                  Merge disabled: {mergeInfo.reasons?.join("; ") || "Conditions not met"}
+                </p>
+              )}
+            </>
           )}
           <p className="text-xs text-muted-foreground">
             Successfully converted: {batchResults.filter((r) => r.status === "success").length}/{batchResults.length}
           </p>
 
-          <div className="flex flex-wrap gap-2 justify-center pt-2">
-            <Button size="sm" variant="outline" onClick={exportAsCSV} disabled={transactions.length === 0} className="csv-button">
-              <FileText className="mr-2 h-4 w-4" />
-              CSV
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleTallyExport}
-              disabled={transactions.length === 0}
-              className={`text-white ${
-                !hasTallyAccess
-                  ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
-                  : ""
-              }`}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Tally XML
-              {!hasTallyAccess && <Lock className="ml-1 h-3 w-3" />}
-            </Button>
-            <Button size="sm" variant="outline" onClick={exportAsPDF} disabled={transactions.length === 0} className="text-white">
-              <FileText className="mr-2 h-4 w-4" />
-              Analyzed PDF
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handlePremiumExport("json")}
-              disabled={transactions.length === 0}
-              className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              JSON
-              {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handlePremiumExport("mt940")}
-              disabled={transactions.length === 0}
-              className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              MT940
-              {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
-            </Button>
-          </div>
-          {lockedFormats.length > 0 && (
-            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-              <Crown className="h-3 w-3 text-amber-500" />
-              {lockedFormats.join(", ")} {lockedFormats.length === 1 ? "is" : "are"} plan-gated formats
-            </p>
+          {!isTallyOnlyMode && (
+            <>
+              <div className="flex flex-wrap gap-2 justify-center pt-2">
+                <Button size="sm" variant="outline" onClick={exportAsCSV} disabled={transactions.length === 0} className="csv-button">
+                  <FileText className="mr-2 h-4 w-4" />
+                  CSV
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTallyExport}
+                  disabled={transactions.length === 0}
+                  className={`text-white ${
+                    !hasTallyAccess
+                      ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
+                      : ""
+                  }`}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Tally XML
+                  {!hasTallyAccess && <Lock className="ml-1 h-3 w-3" />}
+                </Button>
+                <Button size="sm" variant="outline" onClick={exportAsPDF} disabled={transactions.length === 0} className="text-white">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Analyzed PDF
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handlePremiumExport("json")}
+                  disabled={transactions.length === 0}
+                  className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  JSON
+                  {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handlePremiumExport("mt940")}
+                  disabled={transactions.length === 0}
+                  className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  MT940
+                  {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
+                </Button>
+              </div>
+              {lockedFormats.length > 0 && (
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <Crown className="h-3 w-3 text-amber-500" />
+                  {lockedFormats.join(", ")} {lockedFormats.length === 1 ? "is" : "are"} plan-gated formats
+                </p>
+              )}
+            </>
           )}
         </div>
       )}
@@ -261,76 +294,124 @@ export const ResultsSection = ({
         <div className="text-center space-y-3">
           <div className="flex items-center justify-center gap-2 tone-excellent-text">
             <CheckCircle className="h-5 w-5" />
-            <span className="font-medium">Conversion Complete!</span>
+            <span className="font-medium">
+              {isTallyOnlyMode ? "Tally Conversion Complete!" : "Conversion Complete!"}
+            </span>
           </div>
           <p className="text-sm font-medium text-muted-foreground">Download your file:</p>
-          <div className="flex flex-col sm:flex-row gap-2 justify-center">
-            <Button size="lg" className="excel-button" onClick={handleDownload} disabled={downloading}>
-              {downloading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Downloading...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-5 w-5" />
-                  Download Excel
-                </>
+          {isTallyOnlyMode ? (
+            <div className="flex justify-center">
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={handleTallyExport}
+                disabled={transactions.length === 0}
+                className={`text-white ${
+                  !hasTallyAccess
+                    ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
+                    : ""
+                }`}
+              >
+                <FileText className="mr-2 h-5 w-5" />
+                Download Tally XML
+                {!hasTallyAccess && <Lock className="ml-1 h-4 w-4" />}
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                <Button size="lg" className="excel-button" onClick={handleDownload} disabled={downloading}>
+                  {downloading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Downloading...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-5 w-5" />
+                      Download Excel
+                    </>
+                  )}
+                </Button>
+                <Button size="lg" variant="outline" onClick={exportAsCSV} disabled={transactions.length === 0} className="csv-button">
+                  <FileText className="mr-2 h-5 w-5" />
+                  CSV
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={handleTallyExport}
+                  disabled={transactions.length === 0}
+                  className={`text-white ${
+                    !hasTallyAccess
+                      ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
+                      : ""
+                  }`}
+                >
+                  <FileText className="mr-2 h-5 w-5" />
+                  Tally XML
+                  {!hasTallyAccess && <Lock className="ml-1 h-4 w-4" />}
+                </Button>
+                <Button size="lg" variant="outline" onClick={exportAsPDF} disabled={transactions.length === 0} className="text-white">
+                  <FileText className="mr-2 h-5 w-5" />
+                  Analyzed PDF
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => handlePremiumExport("json")}
+                  disabled={transactions.length === 0}
+                  className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
+                >
+                  <FileText className="mr-2 h-5 w-5" />
+                  JSON
+                  {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => handlePremiumExport("mt940")}
+                  disabled={transactions.length === 0}
+                  className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
+                >
+                  <FileText className="mr-2 h-5 w-5" />
+                  MT940
+                  {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
+                </Button>
+              </div>
+              {lockedFormats.length > 0 && (
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                  <Crown className="h-3 w-3 text-amber-500" />
+                  {lockedFormats.join(", ")} {lockedFormats.length === 1 ? "is" : "are"} plan-gated formats
+                </p>
               )}
-            </Button>
-            <Button size="lg" variant="outline" onClick={exportAsCSV} disabled={transactions.length === 0} className="csv-button">
-              <FileText className="mr-2 h-5 w-5" />
-              CSV
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={handleTallyExport}
-              disabled={transactions.length === 0}
-              className={`text-white ${
-                !hasTallyAccess
-                  ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
-                  : ""
-              }`}
-            >
-              <FileText className="mr-2 h-5 w-5" />
-              Tally XML
-              {!hasTallyAccess && <Lock className="ml-1 h-4 w-4" />}
-            </Button>
-            <Button size="lg" variant="outline" onClick={exportAsPDF} disabled={transactions.length === 0} className="text-white">
-              <FileText className="mr-2 h-5 w-5" />
-              Analyzed PDF
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => handlePremiumExport("json")}
-              disabled={transactions.length === 0}
-              className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
-            >
-              <FileText className="mr-2 h-5 w-5" />
-              JSON
-              {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => handlePremiumExport("mt940")}
-              disabled={transactions.length === 0}
-              className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
-            >
-              <FileText className="mr-2 h-5 w-5" />
-              MT940
-              {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
-            </Button>
-          </div>
-          {lockedFormats.length > 0 && (
-            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-              <Crown className="h-3 w-3 text-amber-500" />
-              {lockedFormats.join(", ")} {lockedFormats.length === 1 ? "is" : "are"} plan-gated formats
-            </p>
+            </>
           )}
         </div>
+      )}
+
+      {isTallyOnlyMode && showEditDetectorSignals && editedPdfCheckResult && (
+        <Card
+          className={`p-4 border ${
+            editedPdfCheckResult.status === "suspected"
+              ? "border-amber-500/40 bg-amber-500/10"
+              : "border-emerald-500/35 bg-emerald-500/10"
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {editedPdfCheckResult.status === "suspected" ? (
+              <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-300" />
+            ) : (
+              <CheckCircle className="mt-0.5 h-5 w-5 text-emerald-300" />
+            )}
+            <div className="space-y-1 text-left">
+              <p className="text-sm font-semibold text-white">
+                Edit PDF Check: {editedPdfCheckResult.status === "suspected" ? "Possible edit detected" : "No edit signal detected"}
+              </p>
+              <p className="text-xs text-white/70">{editedPdfCheckResult.reason}</p>
+            </div>
+          </div>
+        </Card>
       )}
 
       {aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
@@ -386,11 +467,11 @@ export const ResultsSection = ({
       )}
 
       {converting && <UnderwritingPanelSkeleton />}
-      {!converting && analytics?.underwriting && (
+      {!converting && !isTallyOnlyMode && analytics?.underwriting && (
         <UnderwritingPanel underwriting={analytics.underwriting} currencyCode={currencyCode} />
       )}
 
-      {analytics?.riskAnalysis && (
+      {!isTallyOnlyMode && analytics?.riskAnalysis && (
         <FraudAlertPanel
           riskAnalysis={analytics.riskAnalysis}
           currencyCode={currencyCode}
@@ -398,7 +479,7 @@ export const ResultsSection = ({
         />
       )}
 
-      {analytics && (
+      {!isTallyOnlyMode && analytics && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <PieChart className="w-5 h-5 text-primary" />
@@ -471,7 +552,7 @@ export const ResultsSection = ({
         </div>
       )}
 
-      {transactions.length > 0 && (
+      {!isTallyOnlyMode && transactions.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h3 className="text-lg font-semibold">Extracted Transactions</h3>
