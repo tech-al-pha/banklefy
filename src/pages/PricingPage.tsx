@@ -135,7 +135,7 @@ const perPagePlans: Plan[] = [
     unit: "/conversion",
     description: "Quick single conversion",
     statements: "10 Pages",
-    features: ["Analyzed PDF Report", "Download in 4 Formats", "FOIR/Loan Analysis (Basic)"],
+    features: ["Analyzed PDF Report", "Download in 4 Formats"],
   },
   {
     planId: "per_page_standard",
@@ -146,7 +146,7 @@ const perPagePlans: Plan[] = [
     unit: "/conversion",
     description: "Popular for small batches",
     statements: "25 Pages",
-    features: ["Analyzed PDF Report", "Download in 4 Formats", "FOIR/Loan Analysis (Pro)"],
+    features: ["Analyzed PDF Report", "Download in 4 Formats"],
     highlighted: true,
   },
   {
@@ -158,7 +158,7 @@ const perPagePlans: Plan[] = [
     unit: "/conversion",
     description: "For larger batches",
     statements: "50 Pages",
-    features: ["Analyzed PDF Report", "Download in 4 Formats", "FOIR/Loan Analysis (Advanced - Enterprise)"],
+    features: ["Analyzed PDF Report", "Download in 4 Formats"],
   },
 ];
 
