@@ -40,6 +40,7 @@ import {
   generateProfessionalExcel,
   generateMergedStatementsExcel,
 } from '../_shared/excel-generator.ts';
+import { buildJsonExport, buildMt940Export } from '../_shared/export-formatters.ts';
 import {
   buildMergedStatement,
   validateStatementsForMerge,
@@ -1009,17 +1010,32 @@ Deno.serve(async (req) => {
 
         // Create conversion record (authenticated only)
         if (user && file.fileId) {
-          const { data: convData, error: convError } = await supabase
+          const insertPayload: Record<string, unknown> = {
+            user_id: user.id,
+            original_filename: sanitizedName,
+            file_path: file.fileId,
+            status: 'processing',
+          };
+          insertPayload.pages_processed = Array.isArray(file.pdfPageImages) && file.pdfPageImages.length > 0
+            ? file.pdfPageImages.length
+            : 1;
+
+          let { data: convData, error: convError } = await supabase
             .from('conversions')
-            .insert({
-              user_id: user.id,
-              original_filename: sanitizedName,
-              file_path: file.fileId,
-              status: 'processing',
-              pages_processed: Array.isArray(file.pdfPageImages) && file.pdfPageImages.length > 0 ? file.pdfPageImages.length : 1,
-            })
+            .insert(insertPayload)
             .select()
             .single();
+
+          // Some deployed DBs do not have `pages_processed` column yet.
+          // Retry without it so history records are still created.
+          if (convError && /pages_processed/i.test(convError.message || '')) {
+            delete insertPayload.pages_processed;
+            ({ data: convData, error: convError } = await supabase
+              .from('conversions')
+              .insert(insertPayload)
+              .select()
+              .single());
+          }
 
           if (convError) {
             console.error('Failed to create conversion record:', convError);
@@ -1225,7 +1241,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    const primaryBankInfo = successes.find((s) => s.bankMetadata)?.bankMetadata;
+    const combinedTransactions = successes.flatMap((statement) => statement.transactions);
+    const primaryBankInfo = successes.find((statement) => statement.bankMetadata)?.bankMetadata;
+    const totalCredits = fromMinorUnits(sumMinorUnits(combinedTransactions.map((t) => t.credit || 0)));
+    const totalDebits = fromMinorUnits(sumMinorUnits(combinedTransactions.map((t) => t.debit || 0)));
+    const netFlow = fromMinorUnits(toMinorUnits(totalCredits) - toMinorUnits(totalDebits));
+    const jsonData = buildJsonExport({
+      transactions: combinedTransactions,
+      bankMetadata: primaryBankInfo,
+      summary: {
+        totalCredits,
+        totalDebits,
+        netFlow,
+      },
+    });
+    const mt940Data = buildMt940Export({
+      transactions: combinedTransactions,
+      bankMetadata: primaryBankInfo,
+    });
 
     return new Response(
       JSON.stringify({
@@ -1246,7 +1279,9 @@ Deno.serve(async (req) => {
         // Include aggregated analytics for batch mode panels
         analytics: successes.length > 0 ? aggregateBatchAnalytics(successes, underwritingTier) : null,
         // Include all transactions for export options
-        transactions: successes.flatMap(s => s.transactions),
+        transactions: combinedTransactions,
+        jsonData,
+        mt940Data,
         planType: userPlanType,
         bankInfo: primaryBankInfo,
       }),

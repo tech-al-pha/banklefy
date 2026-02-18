@@ -159,6 +159,8 @@ export interface MultiConversionResponse {
   remaining?: number;
   analytics?: Analytics;
   transactions?: Transaction[];
+  jsonData?: string;
+  mt940Data?: string;
   planType?: string;
   bankInfo?: BankInfo;
   error?: string;
@@ -174,6 +176,8 @@ export interface ConversionResponse {
   transactions?: Transaction[];
   analytics?: Analytics;
   bankInfo?: BankInfo;
+  jsonData?: string;
+  mt940Data?: string;
   aiStatus?: AiStatus;
   remaining?: number;
   limitReached?: boolean;

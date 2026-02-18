@@ -1,7 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, FileSpreadsheet, FileText, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  FileSpreadsheet,
+  FileText,
+  ShieldCheck,
+  Sparkles,
+  TrendingDown,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const highlights = [
@@ -25,16 +33,43 @@ const downloads = [
     desc: "Raw table export",
   },
   {
-    label: "DOCX (.docx)",
-    href: "/samples/sample-report.docx",
+    label: "JSON (.json)",
+    href: "/samples/sample-report.json",
     icon: FileText,
-    desc: "Formatted report view",
+    desc: "Structured machine-readable export",
   },
   {
-    label: "ODS (.ods)",
-    href: "/samples/sample-report.ods",
-    icon: FileSpreadsheet,
-    desc: "OpenDocument spreadsheet output",
+    label: "MT940 (.mt940)",
+    href: "/samples/sample-report.mt940",
+    icon: FileText,
+    desc: "Banking interchange statement format",
+  },
+  {
+    label: "PDF (.pdf)",
+    href: "/samples/sample-source.pdf",
+    icon: FileText,
+    desc: "Original statement sample",
+  },
+  {
+    label: "Tally (.xml)",
+    href: "/samples/sample-report.xml",
+    icon: FileText,
+    desc: "Tally import-ready sample",
+  },
+];
+
+const upcomingFormats = [
+  {
+    label: "QuickBooks",
+    icon: FileText,
+  },
+  {
+    label: "Xero",
+    icon: FileText,
+  },
+  {
+    label: "Zoho",
+    icon: FileText,
   },
 ];
 
@@ -49,7 +84,7 @@ export default function SampleReport() {
         <div className="absolute -bottom-10 right-8 h-64 w-64 rounded-full bg-secondary/20 blur-3xl" />
       </div>
 
-      <div className="container mx-auto max-w-6xl">
+      <div className="container mx-auto w-full max-w-[1400px]">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Button
             variant="ghost"
@@ -65,29 +100,18 @@ export default function SampleReport() {
           </div>
         </div>
 
-        <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-6">
+        <div className="mt-10 grid items-start gap-8 lg:[grid-template-columns:minmax(340px,36vw)_minmax(0,1fr)]">
+          <div className="space-y-6 lg:max-w-[520px]">
             <div className="space-y-3">
               <Badge className="bg-primary/15 text-primary border border-primary/30">
                 Sample Report
               </Badge>
-              <h1 className="text-4xl font-bold text-white md:text-5xl">
+              <h1 className="max-w-[14ch] text-4xl font-bold leading-tight text-white md:text-5xl xl:text-6xl">
                 AI Bank Statement Report
               </h1>
               <p className="text-muted-foreground">
                 A preview of the structured Excel-style report users receive after conversion.
               </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              {highlights.map((item) => (
-                <Card key={item} className="border-primary/20 bg-surface-elevated/80 p-4 backdrop-blur-xl">
-                  <div className="flex items-start gap-3">
-                    <Sparkles className="h-5 w-5 text-primary" />
-                    <p className="text-sm text-white/90">{item}</p>
-                  </div>
-                </Card>
-              ))}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -96,7 +120,7 @@ export default function SampleReport() {
                   key={file.href}
                   href={file.href}
                   download
-                  className="group rounded-xl border border-primary/20 bg-surface-elevated/80 p-4 backdrop-blur-xl transition-all duration-300 hover:border-primary/40 hover:shadow-neon"
+                  className="group rounded-xl border border-white/15 bg-[#141414] p-4 backdrop-blur-xl transition-all duration-300 hover:border-primary/40 hover:shadow-neon"
                 >
                   <div className="flex items-center gap-3">
                     <file.icon className="h-5 w-5 text-primary" />
@@ -110,61 +134,201 @@ export default function SampleReport() {
                 </a>
               ))}
             </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {upcomingFormats.map((format) => (
+                <div
+                  key={format.label}
+                  className="rounded-xl border border-white/15 bg-[#141414] p-4 backdrop-blur-xl"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <format.icon className="h-5 w-5 text-primary" />
+                      <p className="text-sm font-semibold text-white">{format.label}</p>
+                    </div>
+                    <Badge className="border border-white/20 bg-white/10 text-white/80">
+                      Upcoming
+                    </Badge>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Temporarily unavailable for sample download.</p>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <Card className="border-primary/20 bg-surface-elevated/80 p-6 backdrop-blur-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  Report Overview
-                </p>
-                <h2 className="text-2xl font-semibold text-white">Banklefy Statement</h2>
-              </div>
-              <ShieldCheck className="h-8 w-8 text-[#7CFF9C] drop-shadow-[0_0_10px_rgba(124,255,156,0.35)]" />
+          <div className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              {highlights.map((item) => (
+                <Card key={item} className="border-white/15 bg-[#171717] p-4 backdrop-blur-xl">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    <p className="text-sm text-white/90">{item}</p>
+                  </div>
+                </Card>
+              ))}
             </div>
 
-            <div className="mt-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="rounded-lg border border-primary/20 bg-ink/30 p-3">
-                  <p className="text-muted-foreground">Period</p>
-                  <p className="text-white">Jan 01 - Jan 31</p>
+            <Card className="border-white/15 bg-[#111111] p-5 backdrop-blur-xl">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 text-xl font-semibold text-white">
+                  <ShieldCheck className="h-5 w-5 text-[#9AFB3F]" />
+                  <span>Document Integrity & Risk Analysis</span>
                 </div>
-                <div className="rounded-lg border border-primary/20 bg-ink/30 p-3">
-                  <p className="text-muted-foreground">Transactions</p>
-                  <p className="text-white">142</p>
-                </div>
-                <div className="rounded-lg border border-primary/20 bg-ink/30 p-3">
-                  <p className="text-muted-foreground">Total Credits</p>
-                  <p className="text-white">$48,210</p>
-                </div>
-                <div className="rounded-lg border border-primary/20 bg-ink/30 p-3">
-                  <p className="text-muted-foreground">Total Debits</p>
-                  <p className="text-white">$41,782</p>
+                <div className="text-right">
+                  <p className="text-4xl font-bold text-[#9AFB3F]">65%</p>
+                  <p className="text-sm text-[#9AFB3F]">Minor Issues</p>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-primary/20 bg-ink/30 p-4">
-                <p className="text-sm text-muted-foreground">Top Categories</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {["Salary", "Transfers", "Utilities", "Shopping", "Subscriptions"].map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <p className="text-sm text-muted-foreground">Balance Check</p>
+                  <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">16 Errors</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <p className="text-sm text-muted-foreground">Avg Daily Balance</p>
+                  <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">10,532</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <p className="text-sm text-muted-foreground">Lowest Balance</p>
+                  <p className="mt-1 text-3xl font-semibold text-[#9AFB3F]">1,129</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <p className="text-sm text-muted-foreground">Risk Flags</p>
+                  <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">None</p>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-primary/20 bg-ink/30 p-4">
-                <p className="text-sm text-muted-foreground">Risk Flags</p>
-                <p className="mt-2 text-sm text-white/90">
-                  No critical anomalies detected. 2 minor balance mismatches flagged for review.
+              <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/10 p-4">
+                <div className="flex items-center gap-2 text-amber-400">
+                  <AlertTriangle className="h-4 w-4" />
+                  <p className="text-sm font-semibold">1 Alert Detected</p>
+                </div>
+                <p className="mt-2 text-base font-semibold text-amber-300">
+                  16 transaction(s) have balance discrepancies. Mathematical reconciliation failed.
                 </p>
               </div>
-            </div>
-          </Card>
+
+              <div className="mt-5">
+                <h3 className="text-2xl font-semibold text-white">Financial Analytics</h3>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <p className="text-sm text-muted-foreground">Total Credits</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">1,14,150.39</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <p className="text-sm text-muted-foreground">Total Debits</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">2,56,969.40</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <TrendingDown className="h-4 w-4" />
+                      <p className="text-sm">Net Flow</p>
+                    </div>
+                    <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">-1,42,819.01</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <AlertTriangle className="h-4 w-4" />
+                      <p className="text-sm">Duplicates Found</p>
+                    </div>
+                    <p className="mt-1 text-3xl font-semibold text-amber-400">1</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="border-white/15 bg-[#111111] p-5 backdrop-blur-xl">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  "Transfer Out: 18",
+                  "Loan/EMI: 18",
+                  "Bills & Utilities: 13",
+                  "Cash: 12",
+                  "Transfer In: 8",
+                  "Other: 7",
+                  "Shopping: 5",
+                  "Salary/Income: 3",
+                ].map((chip) => (
+                  <span
+                    key={chip}
+                    className="rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs text-white/80"
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-3xl font-semibold text-white">Extracted Transactions</h3>
+                <div className="flex items-center gap-3">
+                  <span className="rounded-full border border-white/20 px-3 py-1 text-sm text-white/85">
+                    Show Duplicates (1)
+                  </span>
+                  <span className="text-sm text-muted-foreground">85 transactions found</span>
+                </div>
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-xl border border-white/10">
+                <div className="overflow-x-auto">
+                <table className="min-w-[760px] w-full text-left text-sm">
+                  <thead className="bg-white/5 text-white/75">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Date</th>
+                      <th className="px-4 py-3 font-medium">Description</th>
+                      <th className="px-4 py-3 font-medium">Category</th>
+                      <th className="px-4 py-3 font-medium text-[#FF4D4D]">Debit</th>
+                      <th className="px-4 py-3 font-medium text-[#53EFA3]">Credit</th>
+                      <th className="px-4 py-3 font-medium">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-white/10">
+                      <td className="px-4 py-3 text-white/90">2018-06-02</td>
+                      <td className="px-4 py-3 text-white/80">GM1TSA/MY0326/19</td>
+                      <td className="px-4 py-3 text-white/80">Salary/Income</td>
+                      <td className="px-4 py-3 text-white/80">-</td>
+                      <td className="px-4 py-3 text-[#53EFA3]">14,955.00</td>
+                      <td className="px-4 py-3 text-white/90">29,064.95</td>
+                    </tr>
+                    <tr className="border-t border-white/10">
+                      <td className="px-4 py-3 text-white/90">2018-06-03</td>
+                      <td className="px-4 py-3 text-white/80">IB BILLPAY DR-HDFCPE...</td>
+                      <td className="px-4 py-3 text-white/80">Bills & Utilities</td>
+                      <td className="px-4 py-3 text-[#FF4D4D]">1,285.98</td>
+                      <td className="px-4 py-3 text-white/80">-</td>
+                      <td className="px-4 py-3 text-white/90">27,778.97</td>
+                    </tr>
+                    <tr className="border-t border-white/10">
+                      <td className="px-4 py-3 text-white/90">2018-06-04</td>
+                      <td className="px-4 py-3 text-white/80">UPI-303702011440904...</td>
+                      <td className="px-4 py-3 text-white/80">Transfer In</td>
+                      <td className="px-4 py-3 text-white/80">-</td>
+                      <td className="px-4 py-3 text-[#53EFA3]">7,000.00</td>
+                      <td className="px-4 py-3 text-white/90">29,778.97</td>
+                    </tr>
+                    <tr className="border-t border-white/10">
+                      <td className="px-4 py-3 text-white/90">2018-06-05</td>
+                      <td className="px-4 py-3 text-white/80">EMI 4923306 CHQ S49...</td>
+                      <td className="px-4 py-3 text-white/80">Loan/EMI</td>
+                      <td className="px-4 py-3 text-[#FF4D4D]">2,268.00</td>
+                      <td className="px-4 py-3 text-white/80">-</td>
+                      <td className="px-4 py-3 text-white/90">27,510.97</td>
+                    </tr>
+                    <tr className="border-t border-white/10">
+                      <td className="px-4 py-3 text-white/90">2018-06-05</td>
+                      <td className="px-4 py-3 text-white/80">UPI-303702011440904...</td>
+                      <td className="px-4 py-3 text-white/80">Transfer In</td>
+                      <td className="px-4 py-3 text-white/80">-</td>
+                      <td className="px-4 py-3 text-[#53EFA3]">1,500.00</td>
+                      <td className="px-4 py-3 text-white/90">29,010.97</td>
+                    </tr>
+                  </tbody>
+                </table>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
     </section>

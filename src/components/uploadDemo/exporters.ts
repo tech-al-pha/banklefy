@@ -1,5 +1,6 @@
 ﻿import { formatCurrencyValue } from "@/lib/currency";
-import type { Transaction, Analytics } from "./types";
+import { buildMt940, buildStatementJson, downloadTextFile } from "@/lib/statement-export";
+import type { Transaction, Analytics, BankInfo } from "./types";
 
 type ToastFn = (args: { title: string; description?: string; variant?: "destructive" }) => void;
 
@@ -8,14 +9,29 @@ type ErrorFormatter = (error: unknown, fallback: string) => string;
 type ExportContext = {
   transactions: Transaction[];
   analytics: Analytics | null;
+  bankInfo?: BankInfo | null;
   currencyCode: string;
+  jsonData?: string | null;
+  mt940Data?: string | null;
+  exportBaseName?: string;
   toast: ToastFn;
   getErrorMessage: ErrorFormatter;
   sumMoney: (values: number[]) => number;
   truncateDecimals: (value: number, decimals?: number) => number;
 };
 
-export const exportAsCSV = ({ transactions, toast, sumMoney }: ExportContext) => {
+const getExportBaseName = (value?: string): string => {
+  const source = (value ?? '').trim();
+  const noExtension = source.replace(/\.[^/.\\]+$/, '');
+  const safe = noExtension
+    .replace(/[<>:"/\\|?*]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\.+$/g, '')
+    .trim();
+  return safe || 'bank-statement';
+};
+
+export const exportAsCSV = ({ transactions, exportBaseName, toast, sumMoney }: ExportContext) => {
   if (transactions.length === 0) return;
 
   const headers = ['Date', 'Description', 'Debit', 'Credit', 'Balance'];
@@ -40,7 +56,7 @@ export const exportAsCSV = ({ transactions, toast, sumMoney }: ExportContext) =>
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `transactions_${Date.now()}.csv`;
+  a.download = `${getExportBaseName(exportBaseName)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -56,6 +72,7 @@ export const exportAsPDF = async ({
   transactions,
   analytics,
   currencyCode,
+  exportBaseName,
   toast,
   getErrorMessage,
   truncateDecimals,
@@ -158,7 +175,7 @@ export const exportAsPDF = async ({
       headStyles: { fillColor: [20, 20, 20] },
     });
 
-    doc.save(`bank_statement_report_${Date.now()}.pdf`);
+    doc.save(`${getExportBaseName(exportBaseName)}.pdf`);
 
     toast({
       title: 'PDF Downloaded',
@@ -174,139 +191,84 @@ export const exportAsPDF = async ({
   }
 };
 
-export const exportAsODS = async ({ transactions, toast, getErrorMessage }: ExportContext) => {
+export const exportAsJSON = async ({
+  transactions,
+  analytics,
+  bankInfo,
+  currencyCode,
+  jsonData,
+  exportBaseName,
+  toast,
+  getErrorMessage,
+}: ExportContext) => {
   if (transactions.length === 0) return;
 
   try {
-    const XLSX = await import('xlsx');
+    const content = jsonData && jsonData.trim()
+      ? jsonData
+      : buildStatementJson({
+          transactions,
+          analytics,
+          bankInfo,
+          currencyCode,
+        });
 
-    const headers = [
-      'Date',
-      'Reference No / Transaction ID',
-      'Description',
-      'Debit',
-      'Credit',
-      'Balance',
-      'Pricing Mismatch Flag',
-      'Duplicate Flag',
-    ];
-    const rows = [
-      headers,
-      ...transactions.map(t => [
-        t.date || '',
-        t.refNumber || '',
-        t.description || '',
-        t.debit ?? 0,
-        t.credit ?? 0,
-        t.balance ?? 0,
-        t.balanceMismatch ? 'YES' : '',
-        t.isDuplicate ? 'YES' : '',
-      ]),
-    ];
-
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
-    const wbout = XLSX.write(workbook, { bookType: 'ods', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/vnd.oasis.opendocument.spreadsheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `transactions_${Date.now()}.ods`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadTextFile(
+      content,
+      `${getExportBaseName(exportBaseName)}.json`,
+      'application/json;charset=utf-8',
+    );
 
     toast({
-      title: 'ODS Downloaded',
-      description: 'Your transaction data has been exported to ODS.',
+      title: 'JSON Downloaded',
+      description: 'Your transaction data has been exported to JSON.',
     });
   } catch (error: unknown) {
-    console.error('ODS export error:', error);
+    console.error('JSON export error:', error);
     toast({
       variant: 'destructive',
-      title: 'ODS export failed',
-      description: getErrorMessage(error, 'Failed to export ODS.'),
+      title: 'JSON export failed',
+      description: getErrorMessage(error, 'Failed to export JSON.'),
     });
   }
 };
 
-export const exportAsDOCX = async ({ transactions, toast, getErrorMessage }: ExportContext) => {
+export const exportAsMT940 = async ({
+  transactions,
+  bankInfo,
+  currencyCode,
+  mt940Data,
+  exportBaseName,
+  toast,
+  getErrorMessage,
+}: ExportContext) => {
   if (transactions.length === 0) return;
 
   try {
-    const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel, WidthType, BorderStyle, AlignmentType } = await import('docx');
+    const content = mt940Data && mt940Data.trim()
+      ? mt940Data
+      : buildMt940({
+          transactions,
+          bankInfo,
+          currencyCode,
+        });
 
-    const headerRow = new TableRow({
-      children: [
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Date', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Description', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Category', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Debit', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Credit', bold: true })] })] }),
-        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Balance', bold: true })] })] }),
-      ],
-    });
-
-    const dataRows = transactions.slice(0, 100).map(t => new TableRow({
-      children: [
-        new TableCell({ children: [new Paragraph(t.date || '')] }),
-        new TableCell({ children: [new Paragraph((t.description || '').substring(0, 50))] }),
-        new TableCell({ children: [new Paragraph(t.category || 'Other')] }),
-        new TableCell({ children: [new Paragraph(`${t.debit || 0}`)] }),
-        new TableCell({ children: [new Paragraph(`${t.credit || 0}`)] }),
-        new TableCell({ children: [new Paragraph(`${t.balance || 0}`)] }),
-      ],
-    }));
-
-    const doc = new Document({
-      sections: [
-        {
-          children: [
-            new Paragraph({
-              text: 'Bank Statement Report',
-              heading: HeadingLevel.TITLE,
-              alignment: AlignmentType.CENTER,
-            }),
-            new Paragraph({ text: '' }),
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              rows: [headerRow, ...dataRows],
-              borders: {
-                top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
-                bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
-                left: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
-                right: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
-                insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
-                insideVertical: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
-              },
-            }),
-          ],
-        },
-      ],
-    });
-
-    const blob = await Packer.toBlob(doc);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bank_statement_report_${Date.now()}.docx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadTextFile(
+      content,
+      `${getExportBaseName(exportBaseName)}.mt940`,
+      'text/plain;charset=utf-8',
+    );
 
     toast({
-      title: 'DOCX Downloaded',
-      description: 'Your transaction data has been exported to DOCX.',
+      title: 'MT940 Downloaded',
+      description: 'Your transaction data has been exported to MT940.',
     });
   } catch (error: unknown) {
-    console.error('DOCX export error:', error);
+    console.error('MT940 export error:', error);
     toast({
       variant: 'destructive',
-      title: 'DOCX export failed',
-      description: getErrorMessage(error, 'Failed to export DOCX.'),
+      title: 'MT940 export failed',
+      description: getErrorMessage(error, 'Failed to export MT940.'),
     });
   }
 };
@@ -339,7 +301,7 @@ const escapeXml = (value: string): string => {
     .replace(/'/g, '&apos;');
 };
 
-export const exportAsTallyXml = ({ transactions, toast, getErrorMessage }: ExportContext) => {
+export const exportAsTallyXml = ({ transactions, exportBaseName, toast, getErrorMessage }: ExportContext) => {
   if (transactions.length === 0) return;
 
   try {
@@ -395,11 +357,11 @@ export const exportAsTallyXml = ({ transactions, toast, getErrorMessage }: Expor
 </ENVELOPE>
 `;
 
-    const blob = new Blob([xml], { type: 'text/xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tally_vouchers_${Date.now()}.xml`;
+  const blob = new Blob([xml], { type: 'text/xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${getExportBaseName(exportBaseName)}.xml`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -92,7 +92,7 @@ type ResultsSectionProps = {
   exportAsCSV: () => Promise<void>;
   handleTallyExport: () => Promise<void>;
   exportAsPDF: () => Promise<void>;
-  handlePremiumExport: (format: "docx" | "ods") => void;
+  handlePremiumExport: (format: "json" | "mt940") => void;
   aiStatus: AiStatus | null;
   converting: boolean;
   showProgress: boolean;
@@ -141,7 +141,7 @@ export const ResultsSection = ({
   const netFlowTone: ToneName = analytics ? getNetFlowTone(analytics.netFlow, analytics.totalCredits) : "moderate";
   const lockedFormats: string[] = [];
   if (!hasTallyAccess) lockedFormats.push("Tally XML");
-  if (!isPaidUser) lockedFormats.push("DOCX", "ODS");
+  if (!isPaidUser) lockedFormats.push("JSON", "MT940");
 
   return (
     <>
@@ -228,23 +228,23 @@ export const ResultsSection = ({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handlePremiumExport("docx")}
+              onClick={() => handlePremiumExport("json")}
               disabled={transactions.length === 0}
               className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
             >
               <FileText className="mr-2 h-4 w-4" />
-              DOCX
+              JSON
               {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => handlePremiumExport("ods")}
+              onClick={() => handlePremiumExport("mt940")}
               disabled={transactions.length === 0}
               className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
             >
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              ODS
+              <FileText className="mr-2 h-4 w-4" />
+              MT940
               {!isPaidUser && <Lock className="ml-1 h-3 w-3" />}
             </Button>
           </div>
@@ -304,23 +304,23 @@ export const ResultsSection = ({
             <Button
               size="lg"
               variant="outline"
-              onClick={() => handlePremiumExport("docx")}
+              onClick={() => handlePremiumExport("json")}
               disabled={transactions.length === 0}
               className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
             >
               <FileText className="mr-2 h-5 w-5" />
-              DOCX
+              JSON
               {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
             </Button>
             <Button
               size="lg"
               variant="outline"
-              onClick={() => handlePremiumExport("ods")}
+              onClick={() => handlePremiumExport("mt940")}
               disabled={transactions.length === 0}
               className={`text-white ${!isPaidUser ? "bg-[#404040] border-[#404040] hover:bg-[#4a4a4a] hover:border-[#4a4a4a]" : ""}`}
             >
-              <FileSpreadsheet className="mr-2 h-5 w-5" />
-              ODS
+              <FileText className="mr-2 h-5 w-5" />
+              MT940
               {!isPaidUser && <Lock className="ml-1 h-4 w-4" />}
             </Button>
           </div>

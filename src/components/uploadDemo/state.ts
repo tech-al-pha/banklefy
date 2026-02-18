@@ -1,6 +1,7 @@
 import type {
   AiStatus,
   Analytics,
+  BankInfo,
   MergeInfo,
   Transaction,
 } from "./types";
@@ -23,7 +24,10 @@ export type UploadDemoState = {
   mergeResult: { excelData?: string; resultPath?: string | null; fileName: string } | null;
   transactions: Transaction[];
   analytics: Analytics | null;
+  bankInfo: BankInfo | null;
   currencyCode: string;
+  jsonData: string | null;
+  mt940Data: string | null;
   aiStatus: AiStatus | null;
   downloading: boolean;
   batchDownloading: boolean;
@@ -57,7 +61,10 @@ export const initialUploadState: UploadDemoState = {
   mergeResult: null,
   transactions: [],
   analytics: null,
+  bankInfo: null,
   currencyCode: "",
+  jsonData: null,
+  mt940Data: null,
   aiStatus: null,
   downloading: false,
   batchDownloading: false,

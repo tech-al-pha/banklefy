@@ -195,7 +195,7 @@ const Dashboard = () => {
             <h1 className="text-4xl font-bold mb-2">Processing History</h1>
             <p className="text-muted-foreground">
               View and download all your converted bank statements in Excel format.
-              For CSV, DOCX, and ODS exports, use the converter on the home page.
+              For CSV, JSON, and MT940 exports, use the converter on the home page.
             </p>
           </div>
 
@@ -271,4 +271,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-

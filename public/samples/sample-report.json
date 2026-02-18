@@ -1,0 +1,778 @@
+{
+  "format": "banklefy-json-v1",
+  "generatedAt": "2026-02-17T22:34:30.918Z",
+  "currency": "INR",
+  "bankInfo": {
+    "bankName": "RTGS/NEFT IFSC : HDFC0001116 MICR : 400240150",
+    "accountNumber": "50100158077633 OTHER",
+    "accountHolder": "MR. ANUP DUBEY",
+    "iban": "IB03111916969774",
+    "statementPeriod": "01/06/2018 - 10/10/2018",
+    "openingBalance": 29064.95,
+    "closingBalance": 10633.81
+  },
+  "summary": {
+    "totalTransactions": 84,
+    "totalCredits": 114150.39,
+    "totalDebits": 221055.4,
+    "netFlow": -106905.01
+  },
+  "transactions": [
+    {
+      "date": "2018-06-02",
+      "description": "GM1TSA/MY0326/19",
+      "category": "Salary/Income",
+      "debit": 0,
+      "credit": 14955,
+      "balance": 29064.95,
+      "refNumber": "0000806023180071"
+    },
+    {
+      "date": "2018-06-03",
+      "description": "IB BILLPAY DR-HDFCPE-545964XXXXXX3563",
+      "category": "Bills & Utilities",
+      "debit": 1285.98,
+      "credit": 0,
+      "balance": 27778.97,
+      "refNumber": "IB03111916969774"
+    },
+    {
+      "date": "2018-06-04",
+      "description": "NEFT DR-UBIN0539686-RAJU DUBEY-NETBANK, MUM-N1551800555427618-PERSONAL",
+      "category": "Transfer Out",
+      "debit": 5000,
+      "credit": 0,
+      "balance": 22778.97,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-06-04",
+      "description": "UPI-3037020111409044-9307676700@UPI-81551 8551633-OK",
+      "category": "Transfer In",
+      "debit": 0,
+      "credit": 7000,
+      "balance": 29778.97,
+      "refNumber": "0000815518132372"
+    },
+    {
+      "date": "2018-06-05",
+      "description": "EMI 4923306 CHQ S492330600051 06184923306",
+      "category": "Loan/EMI",
+      "debit": 2268,
+      "credit": 0,
+      "balance": 27510.97,
+      "refNumber": "0000000000000006"
+    },
+    {
+      "date": "2018-06-05",
+      "description": "UPI-3037020111409044-9307676700@UPI-81561 9325080-OK",
+      "category": "Transfer In",
+      "debit": 0,
+      "credit": 1500,
+      "balance": 29010.97,
+      "refNumber": "0000815619221888"
+    },
+    {
+      "date": "2018-06-07",
+      "description": "EMI 50037630 CHQ S500376300091 0618500037630",
+      "category": "Loan/EMI",
+      "debit": 5333,
+      "credit": 0,
+      "balance": 23677.97,
+      "refNumber": "0000000000000000"
+    },
+    {
+      "date": "2018-06-09",
+      "description": "NHDF63763254563/ SBI CARDS",
+      "category": "Bills & Utilities",
+      "debit": 2820,
+      "credit": 0,
+      "balance": 20857.97,
+      "refNumber": "0000181609587153"
+    },
+    {
+      "date": "2018-06-12",
+      "description": "NHDF6358796167/BILLDKKVODAFONENDIAL",
+      "category": "Bills & Utilities",
+      "debit": 119.18,
+      "credit": 0,
+      "balance": 20738.79,
+      "refNumber": "0000181632079839"
+    },
+    {
+      "date": "2018-06-18",
+      "description": "ACH D- TP ACH HOME-105909750",
+      "category": "Loan/EMI",
+      "debit": 2284.98,
+      "credit": 0,
+      "balance": 18453.81,
+      "refNumber": "0000038163555734"
+    },
+    {
+      "date": "2018-06-18",
+      "description": "NEFT DR-VIJB00005051-PANKAJ KUMAR SINGH-N ETBANK, MUM-N1691800566006897-PERSOKNAL",
+      "category": "Transfer Out",
+      "debit": 4000,
+      "credit": 0,
+      "balance": 14453.81,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-06-19",
+      "description": "UPI-3037020111409044-9307676700@UPI-81701 1076987-OK",
+      "category": "Transfer In",
+      "debit": 0,
+      "credit": 2300,
+      "balance": 16753.81,
+      "refNumber": "00008170111546906"
+    },
+    {
+      "date": "2018-06-19",
+      "description": "NHDF6406143679/BILLDKKOTAKCARDS",
+      "category": "Bills & Utilities",
+      "debit": 11445,
+      "credit": 0,
+      "balance": 5308.81,
+      "refNumber": "0000181707403225"
+    },
+    {
+      "date": "2018-06-22",
+      "description": "ACH D- HOMECRINDINFINPVT LTD-38005587800106",
+      "category": "Loan/EMI",
+      "debit": 1315,
+      "credit": 0,
+      "balance": 3993.81,
+      "refNumber": "0000038726842626"
+    },
+    {
+      "date": "2018-06-26",
+      "description": "POS 416021XXXXXXXX8060 DCSIRELIANCE POS DET BIT",
+      "category": "Shopping",
+      "debit": 1760,
+      "credit": 0,
+      "balance": 2233.81,
+      "refNumber": "0000N164247631838"
+    },
+    {
+      "date": "2018-06-27",
+      "description": "NEFT DR-UBIN0539686-RAJU DUBEY-NETBANK, MUM-N1781800571609335-PERSONAL",
+      "category": "Transfer Out",
+      "debit": 1000,
+      "credit": 0,
+      "balance": 1233.81,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-06-30",
+      "description": "CREDIT INTEREST CAPITALISED",
+      "category": "Other",
+      "debit": 0,
+      "credit": 156,
+      "balance": 1389.81,
+      "refNumber": "0000000000000000"
+    },
+    {
+      "date": "2018-07-02",
+      "description": "MICRO ATM CASH DEP - HDFC THANE MH IN - BNAKMU02",
+      "category": "Cash",
+      "debit": 0,
+      "credit": 10000,
+      "balance": 11389.81,
+      "refNumber": "0000000000008945"
+    },
+    {
+      "date": "2018-07-02",
+      "description": "IB BILLPAY DR-HDFCPE-545964XXXXXX3563",
+      "category": "Bills & Utilities",
+      "debit": 3756,
+      "credit": 0,
+      "balance": 7633.81,
+      "refNumber": "IB02174244989256"
+    },
+    {
+      "date": "2018-07-03",
+      "description": "IMPS-8184111585956-ARUNARAVINDRADUBEY-HDF",
+      "category": "Transfer In",
+      "debit": 0,
+      "credit": 3000,
+      "balance": 10633.81,
+      "refNumber": "00008184111585956"
+    },
+    {
+      "date": "2018-05-07",
+      "description": "EMI CHQ S49233060061 07184923306",
+      "category": "Loan/EMI",
+      "debit": 2268,
+      "credit": 0,
+      "balance": 8365.81,
+      "refNumber": "4923306"
+    },
+    {
+      "date": "2018-05-07",
+      "description": "IMPS-818616336097-SUMIT DAS-CORP-XXXXXXXX XXXX8925-EMI K LIY",
+      "category": "Loan/EMI",
+      "debit": 2000,
+      "credit": 0,
+      "balance": 6365.81,
+      "refNumber": "818616336097"
+    },
+    {
+      "date": "2018-05-07",
+      "description": "REV-IMPS-818616336097-SUMIT DAS-CORP-XXX XXXXXXXXX8925-EMI K LIY",
+      "category": "Loan/EMI",
+      "debit": 2000,
+      "credit": 0,
+      "balance": 8365.81,
+      "refNumber": "818616336097"
+    },
+    {
+      "date": "2018-05-07",
+      "description": "GM1TSA/JU0363/19",
+      "category": "Salary/Income",
+      "debit": 13288,
+      "credit": 0,
+      "balance": 21653.81,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-07-07",
+      "description": "EMI 50037630 CHQ S500376300101 071850037 630",
+      "category": "Loan/EMI",
+      "debit": 5333,
+      "credit": 0,
+      "balance": 16320.81,
+      "refNumber": "50037630"
+    },
+    {
+      "date": "2018-07-09",
+      "description": "CASH DEP MIRA ROAD - NHDF6468764139/ SBI CARDS",
+      "category": "Cash",
+      "debit": 0,
+      "credit": 22500,
+      "balance": 38820.81,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-07-09",
+      "description": "UPI-3037020111409044-9307676700@UPI-81901 4420736-OK",
+      "category": "Transfer Out",
+      "debit": 2500,
+      "credit": 0,
+      "balance": 5406.81,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-07-11",
+      "description": "UPI-3037020111409044-9307676700@UPI-81921 7936299-OK",
+      "category": "Transfer Out",
+      "debit": 2500,
+      "credit": 0,
+      "balance": 7906.81,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-07-18",
+      "description": "ACH D- TP ACH HOME-112576758",
+      "category": "Loan/EMI",
+      "debit": 2284.98,
+      "credit": 0,
+      "balance": 5621.83,
+      "refNumber": "4313235195"
+    },
+    {
+      "date": "2018-07-18",
+      "description": "MICRO ATM CASH DEP - HDFC THANE MH IN - BNAKMU02",
+      "category": "Cash",
+      "debit": 0,
+      "credit": 10000,
+      "balance": 15621.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-07-18",
+      "description": "NEFT DR- VIBB0005051-PANKAJ KUMAR SINGH-N ETBANK, MUM-N199180589026984-PERSONAL",
+      "category": "Transfer Out",
+      "debit": 4000,
+      "credit": 0,
+      "balance": 11621.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-07-21",
+      "description": "POS 416021XXXXXXXX8060 APEX MOTORS POS DEBIT",
+      "category": "Transportation",
+      "debit": 763,
+      "credit": 0,
+      "balance": 10858.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-07-23",
+      "description": "ACH D- HOMECREDITINPVT LTD-38005587890107",
+      "category": "Loan/EMI",
+      "debit": 1314,
+      "credit": 0,
+      "balance": 9544.83,
+      "refNumber": "4377309864"
+    },
+    {
+      "date": "2018-07-24",
+      "description": "UPI-3037020111409044-9307676700@UPI-82051 0633512-OK",
+      "category": "Transfer Out",
+      "debit": 2300,
+      "credit": 0,
+      "balance": 11844.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-07-24",
+      "description": "POS 416021XXXXXXXX8060 SHREEJI ENTERPRI PO S DEBIT",
+      "category": "Shopping",
+      "debit": 399,
+      "credit": 0,
+      "balance": 11445.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-07-25",
+      "description": "POS 416021XXXXXXXX8060 DCSIRELIANCE POS DEBIT",
+      "category": "Shopping",
+      "debit": 1390,
+      "credit": 0,
+      "balance": 10055.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-07-25",
+      "description": "IMPS-820619336344-RAMNAYAN KANOJIA-CORP-XXXXXXXXXXXXXXX1052-PERSONAL",
+      "category": "Transfer Out",
+      "debit": 4300,
+      "credit": 0,
+      "balance": 5755.83,
+      "refNumber": "820619336344"
+    },
+    {
+      "date": "2018-07-30",
+      "description": "SHIVAM GOND-KIBK-XXXXX X4834-PERSONAL",
+      "category": "Transfer Out",
+      "debit": 4500,
+      "credit": 0,
+      "balance": 1255.83,
+      "refNumber": "821120336017"
+    },
+    {
+      "date": "2018-07-31",
+      "description": "MICRO ATM CASH DEP - HDFC THANE MH IN - BNAKMU02",
+      "category": "Cash",
+      "debit": 4500,
+      "credit": 0,
+      "balance": 5755.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-01",
+      "description": "4213895-OK",
+      "category": "Transfer Out",
+      "debit": 5000,
+      "credit": 0,
+      "balance": 10755.83,
+      "refNumber": "30370201141409044"
+    },
+    {
+      "date": "2018-08-03",
+      "description": "IB BILLPAY DR-HDFCPE-545964XXXXXXX3563",
+      "category": "Bills & Utilities",
+      "debit": 1239,
+      "credit": 0,
+      "balance": 9516.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-04",
+      "description": "GM1TSA/JL0330/19",
+      "category": "Salary/Income",
+      "debit": 7664,
+      "credit": 0,
+      "balance": 17180.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-06",
+      "description": "EMI 4923306 CHQ S49233060071 08184923306",
+      "category": "Loan/EMI",
+      "debit": 2268,
+      "credit": 0,
+      "balance": 14912.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-07",
+      "description": "EMI 50037630 CHQ S500376300111 081850037630",
+      "category": "Loan/EMI",
+      "debit": 5333,
+      "credit": 0,
+      "balance": 9579.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-07",
+      "description": "NHDF6557831106 SBI CARDS",
+      "category": "Bills & Utilities",
+      "debit": 3483,
+      "credit": 0,
+      "balance": 6096.83,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-08",
+      "description": "NHDF6559735103/BILLDKVODAFONEINDIAL",
+      "category": "Bills & Utilities",
+      "debit": 264.32,
+      "credit": 0,
+      "balance": 5832.51,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-08",
+      "description": "NWD-416021XXXXXXXX8060-CCCC0004-THANE",
+      "category": "Cash",
+      "debit": 500,
+      "credit": 0,
+      "balance": 5332.51,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-13",
+      "description": "Unknown Transaction",
+      "category": "Other",
+      "debit": 1500,
+      "credit": 0,
+      "balance": 3832.51,
+      "refNumber": "DR-KKBK0001418-SHIVAM"
+    },
+    {
+      "date": "2018-08-16",
+      "description": "MICRO ATM CASH DEP - HDFC MUMBAI MH IN - BNAKMU29",
+      "category": "Cash",
+      "debit": 2800,
+      "credit": 0,
+      "balance": 6632.51,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-18",
+      "description": "ACH D- TP ACH HOME-119599954",
+      "category": "Loan/EMI",
+      "debit": 2284.98,
+      "credit": 0,
+      "balance": 4347.53,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-21",
+      "description": "Unknown Transaction",
+      "category": "Other",
+      "debit": 1200,
+      "credit": 0,
+      "balance": 3147.53,
+      "refNumber": "823317383520-SHIVAM"
+    },
+    {
+      "date": "2018-08-21",
+      "description": "Unknown Transaction",
+      "category": "Other",
+      "debit": 1140,
+      "credit": 0,
+      "balance": 2007.53,
+      "refNumber": "051030821081813264- CBDT TAX"
+    },
+    {
+      "date": "2018-08-21",
+      "description": "Unknown Transaction",
+      "category": "Other",
+      "debit": 1200,
+      "credit": 0,
+      "balance": 3207.53,
+      "refNumber": "823317220801-SHIVAM"
+    },
+    {
+      "date": "2018-08-22",
+      "description": "Unknown Transaction",
+      "category": "Transfer Out",
+      "debit": 2300,
+      "credit": 0,
+      "balance": 5507.53,
+      "refNumber": "30370201141409044"
+    },
+    {
+      "date": "2018-08-23",
+      "description": "POS 416021XXXXXXXX8060 DCSIRELIANCE POS DE BIT",
+      "category": "Shopping",
+      "debit": 1250,
+      "credit": 0,
+      "balance": 4257.53,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-23",
+      "description": "NHDF6607489313/BILLDKRELIANCEJIOINF",
+      "category": "Bills & Utilities",
+      "debit": 399,
+      "credit": 0,
+      "balance": 3858.53,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-08-31",
+      "description": "NWD-416021XXXXXXXX8060-SB002702-MUMBAI",
+      "category": "Cash",
+      "debit": 500,
+      "credit": 0,
+      "balance": 3358.53,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-09-01",
+      "description": "FT - CR - 000303400017385 - INDIABULLS HO",
+      "category": "Salary/Income",
+      "debit": 0,
+      "credit": 15230.39,
+      "balance": 18588.92,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-09-01",
+      "description": "USING FINANCE LTD",
+      "category": "Loan/EMI",
+      "debit": 4987,
+      "credit": 0,
+      "balance": 13601.92,
+      "refNumber": "545964XXXXXX3563"
+    },
+    {
+      "date": "2018-09-04",
+      "description": "Unknown Transaction",
+      "category": "Other",
+      "debit": 8000,
+      "credit": 0,
+      "balance": 5601.92,
+      "refNumber": "50100193506379-TPT-PERSONAL"
+    },
+    {
+      "date": "2018-09-05",
+      "description": "EMI",
+      "category": "Loan/EMI",
+      "debit": 2268,
+      "credit": 0,
+      "balance": 3333.92,
+      "refNumber": "4923306"
+    },
+    {
+      "date": "2018-09-07",
+      "description": "MICRO ATM CASH DEP - HDFC",
+      "category": "Cash",
+      "debit": 3000,
+      "credit": 0,
+      "balance": 6333.92,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-09-07",
+      "description": "-HDFC--ANUP",
+      "category": "Transfer Out",
+      "debit": 8000,
+      "credit": 0,
+      "balance": 14333.92,
+      "refNumber": "8250111661610-NANDU"
+    },
+    {
+      "date": "2018-09-07",
+      "description": "EMI",
+      "category": "Loan/EMI",
+      "debit": 5333,
+      "credit": 0,
+      "balance": 9000.92,
+      "refNumber": "50037630"
+    },
+    {
+      "date": "2018-09-07",
+      "description": "ETBANK, MUM-N250180627361441-PERSONAL",
+      "category": "Transfer Out",
+      "debit": 4000,
+      "credit": 0,
+      "balance": 5000.92,
+      "refNumber": "DR-VIJB0005051-PANKAJ"
+    },
+    {
+      "date": "2018-09-09",
+      "description": "Unknown Transaction",
+      "category": "Shopping",
+      "debit": 500,
+      "credit": 0,
+      "balance": 4500.92,
+      "refNumber": "416021XXXXXXXXXXXX8060-MUOD9463-THANE"
+    },
+    {
+      "date": "2018-09-10",
+      "description": "Unknown Transaction",
+      "category": "Other",
+      "debit": 3372,
+      "credit": 0,
+      "balance": 1128.92,
+      "refNumber": "NHDF6669071973"
+    },
+    {
+      "date": "2018-09-12",
+      "description": "1907785-OK",
+      "category": "Transfer Out",
+      "debit": 5000,
+      "credit": 0,
+      "balance": 6128.92,
+      "refNumber": "303702011409044-93097676700"
+    },
+    {
+      "date": "2018-09-17",
+      "description": "DFC-XXXXXXXX4802-COMMENTS",
+      "category": "Transfer Out",
+      "debit": 900,
+      "credit": 0,
+      "balance": 7028.92,
+      "refNumber": "826022873450-ANIL"
+    },
+    {
+      "date": "2018-09-18",
+      "description": "Unknown Transaction",
+      "category": "Other",
+      "debit": 2284.98,
+      "credit": 0,
+      "balance": 4743.94,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-09-18",
+      "description": "Unknown Transaction",
+      "category": "Shopping",
+      "debit": 500,
+      "credit": 0,
+      "balance": 4243.94,
+      "refNumber": "416021XXXXXXXXXXXX8060-S1ACM594-THANE"
+    },
+    {
+      "date": "2018-09-22",
+      "description": "BIT",
+      "category": "Shopping",
+      "debit": 1160,
+      "credit": 0,
+      "balance": 3083.94,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-09-25",
+      "description": "Unknown Transaction",
+      "category": "Transfer Out",
+      "debit": 5000,
+      "credit": 0,
+      "balance": 8083.94,
+      "refNumber": "826819207683-ARUNA"
+    },
+    {
+      "date": "2018-09-25",
+      "description": "Unknown Transaction",
+      "category": "Transfer Out",
+      "debit": 4430,
+      "credit": 0,
+      "balance": 3653.94,
+      "refNumber": "826820317252-RAMNAYAN"
+    },
+    {
+      "date": "2018-09-26",
+      "description": "Unknown Transaction",
+      "category": "Shopping",
+      "debit": 300,
+      "credit": 0,
+      "balance": 3353.94,
+      "refNumber": "416021XXXXXXXXXXXX8060-P3AWMII10-MUMBAI"
+    },
+    {
+      "date": "2018-09-26",
+      "description": "XXXXXXXXXXXX9986-PERSONAL",
+      "category": "Transfer Out",
+      "debit": 1000,
+      "credit": 0,
+      "balance": 2353.94,
+      "refNumber": "826918345862-ADITYA"
+    },
+    {
+      "date": "2018-09-30",
+      "description": "CREDIT INTEREST CAPITALISED",
+      "category": "Other",
+      "debit": 0,
+      "credit": 60,
+      "balance": 2413.94,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-10-03",
+      "description": "CASH DEP MIRA ROAD -",
+      "category": "Cash",
+      "debit": 0,
+      "credit": 6800,
+      "balance": 9213.94,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-10-04",
+      "description": "Unknown Transaction",
+      "category": "Loan/EMI",
+      "debit": 3348,
+      "credit": 0,
+      "balance": 5865.94,
+      "refNumber": "545964XXXXXX3563"
+    },
+    {
+      "date": "2018-10-04",
+      "description": "FT - CR - 0000030340017385 - INDABULLS HO USING FINANCE LTD",
+      "category": "Salary/Income",
+      "debit": 0,
+      "credit": 20649,
+      "balance": 26514.94,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-10-05",
+      "description": "EMI 4923306 CHQ S492330600091 1018492330 6",
+      "category": "Loan/EMI",
+      "debit": 2268,
+      "credit": 0,
+      "balance": 24246.94,
+      "refNumber": "4923306"
+    },
+    {
+      "date": "2018-10-08",
+      "description": "EMI 50037630 CHQ S500376300131 101850037 630",
+      "category": "Loan/EMI",
+      "debit": 5333,
+      "credit": 0,
+      "balance": 18913.94,
+      "refNumber": "50037630"
+    },
+    {
+      "date": "2018-10-09",
+      "description": "ACH D- HOMECRINDFINDPVT LTD-38062210600110",
+      "category": "Loan/EMI",
+      "debit": 1659,
+      "credit": 0,
+      "balance": 17254.94,
+      "refNumber": ""
+    },
+    {
+      "date": "2018-10-10",
+      "description": "PHDF67748694440 /SBI CARDS",
+      "category": "Bills & Utilities",
+      "debit": 10060,
+      "credit": 0,
+      "balance": 7194.94,
+      "refNumber": ""
+    }
+  ]
+}

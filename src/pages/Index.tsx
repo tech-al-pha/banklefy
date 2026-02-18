@@ -15,6 +15,8 @@ const LandingPageContent = lazyWithRetry(() =>
   import("@/components/LandingPageContent").then((module) => ({ default: module.LandingPageContent })),
 );
 
+const CHAT_AURA_TEMP_UNAVAILABLE = true;
+
 const Index = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -123,7 +125,7 @@ const Index = () => {
                 <span>{t('nav.features')}</span>
               </Link>
 
-              {user && (
+              {user && !CHAT_AURA_TEMP_UNAVAILABLE && (
                 <Link
                   to="/chat"
                   className="text-glow-link text-xs font-medium"
@@ -241,7 +243,7 @@ const Index = () => {
                       </Button>
                     </SheetClose>
 
-                    {user && (
+                    {user && !CHAT_AURA_TEMP_UNAVAILABLE && (
                       <SheetClose asChild>
                         <Button
                           asChild

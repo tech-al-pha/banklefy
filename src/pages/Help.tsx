@@ -119,7 +119,7 @@ const Help = () => {
       icon: Download,
       title: "Exports and Downloads",
       items: [
-        "Export to Excel (.xlsx), CSV, DOCX, ODS, and PDF reports.",
+        "Export to Excel (.xlsx), CSV, JSON, MT940, and PDF reports.",
         "Download files immediately after conversion to avoid expiration.",
         "If a download fails, refresh the page and retry the export.",
         "For accounting tools, Excel or CSV is recommended.",

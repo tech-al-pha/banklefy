@@ -34,7 +34,7 @@ const monthlyPlans: Plan[] = [
     unit: "/month",
     description: "Perfect for regular analysis",
     statements: "300 Pages/month",
-    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura", "FOIR/Loan Analysis (Basic)"],
+    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "FOIR/Loan Analysis (Basic)"],
   },
   {
     planId: "monthly_pro",
@@ -48,7 +48,6 @@ const monthlyPlans: Plan[] = [
     features: [
       "Download in 4 Formats",
       "Free Analyzed PDF Report",
-      "AI Chat Aura",
       "FOIR/Loan Analysis (Pro)",
       "Tally XML (25 exports/month)",
     ],
@@ -67,7 +66,6 @@ const monthlyPlans: Plan[] = [
     features: [
       "Download in 4 Formats",
       "Free Analyzed PDF Report",
-      "AI Chat Aura",
       "FOIR/Loan Analysis (Advanced - Enterprise)",
       "Tally XML (150 exports/month)",
     ],
@@ -86,7 +84,7 @@ const yearlyPlans: Plan[] = [
     description: "Great for regular users",
     statements: "5000 Pages/year",
     savings: "Save 8% vs Monthly",
-    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "AI Chat Aura", "FOIR/Loan Analysis (Basic)"],
+    features: ["Download in 4 Formats", "Free Analyzed PDF Report", "FOIR/Loan Analysis (Basic)"],
   },
   {
     planId: "yearly_full",
@@ -101,7 +99,6 @@ const yearlyPlans: Plan[] = [
     features: [
       "Download in 4 Formats",
       "Free Analyzed PDF Report",
-      "AI Chat Aura",
       "FOIR/Loan Analysis (Pro)",
       "Tally XML (300 exports/year)",
     ],
@@ -121,7 +118,6 @@ const yearlyPlans: Plan[] = [
     features: [
       "Download in 4 Formats",
       "Free Analyzed PDF Report",
-      "AI Chat Aura",
       "FOIR/Loan Analysis (Advanced - Enterprise)",
       "Tally XML (1200 exports/year)",
     ],

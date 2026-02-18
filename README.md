@@ -13,7 +13,7 @@ Secure • Fast • Mobile-Friendly
 - Anonymous users: 2 free conversions per day
 - Logged-in users: 5 free conversions per day
 - All users: 2 free export formats (Excel + CSV)
-- Paid users: 4 premium formats (Excel, CSV, ODS, DOCX)
+- Paid users: 4 premium formats (Excel, CSV, JSON, MT940)
 - Direct Tally Prime XML export – ready for seamless import (no manual tweaks needed)
 
 ### Advanced Detection & Insights

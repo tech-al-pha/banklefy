@@ -76,7 +76,7 @@ const benefits: Benefit[] = [
   {
     icon: FileText,
     title: "Multiple Format Support",
-    description: "Download results in DOCX, Excel, CSV, or ODS format for seamless integration.",
+    description: "Download results in JSON, MT940, Excel, or CSV format for seamless integration.",
     category: "Flexibility",
   },
   {

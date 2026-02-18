@@ -27,10 +27,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type {
-  MultiConversionResponse,
-  ConversionResponse,
+  AiStatus,
+  Analytics,
+  BankInfo,
   BatchFilePayload,
   BatchRequestBody,
+  ConversionResponse,
+  MergeInfo,
+  MultiConversionResponse,
+  Transaction,
 } from "./uploadDemo/types";
 
 const PURCHASE_TOAST_STORAGE_KEY = "banklefy:last-plan-purchase";
@@ -83,7 +88,10 @@ export const UploadDemo = () => {
     mergeResult,
     transactions,
     analytics,
+    bankInfo,
     currencyCode,
+    jsonData,
+    mt940Data,
     aiStatus,
     downloading,
     batchDownloading,
@@ -125,7 +133,10 @@ export const UploadDemo = () => {
     dispatch({ type: "set", payload: { mergeResult: value } });
   const setTransactions = (value: Transaction[]) => dispatch({ type: "set", payload: { transactions: value } });
   const setAnalytics = (value: Analytics | null) => dispatch({ type: "set", payload: { analytics: value } });
+  const setBankInfo = (value: BankInfo | null) => dispatch({ type: "set", payload: { bankInfo: value } });
   const setCurrencyCode = (value: string) => dispatch({ type: "set", payload: { currencyCode: value } });
+  const setJsonData = (value: string | null) => dispatch({ type: "set", payload: { jsonData: value } });
+  const setMt940Data = (value: string | null) => dispatch({ type: "set", payload: { mt940Data: value } });
   const setAiStatus = (value: AiStatus | null) => dispatch({ type: "set", payload: { aiStatus: value } });
   const setDownloading = (value: boolean) => dispatch({ type: "set", payload: { downloading: value } });
   const setBatchDownloading = (value: boolean) =>
@@ -178,12 +189,31 @@ export const UploadDemo = () => {
     if (typeof error === 'string') return error;
     return fallback;
   };
+  const getExportBaseName = () => {
+    const preferredName =
+      singleDownloadFileName ||
+      mergeResult?.fileName ||
+      batchResults.find((result) => result.status === 'success')?.downloadFileName ||
+      batchResults.find((result) => result.status === 'success')?.fileName ||
+      selectedFile?.name ||
+      selectedFiles[0]?.name ||
+      "bank-statement";
+
+    const noExtension = preferredName.replace(/\.[^/.\\]+$/, "");
+    const safe = noExtension
+      .replace(/[<>:"/\\|?*]/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/\.+$/g, "")
+      .trim();
+    return safe || "bank-statement";
+  };
   const exportAsCSV = async () => {
     const { exportAsCSV: exportCsv } = await loadExporters();
     return exportCsv({
       transactions,
       analytics,
       currencyCode,
+      exportBaseName: getExportBaseName(),
       toast,
       getErrorMessage,
       sumMoney,
@@ -196,30 +226,39 @@ export const UploadDemo = () => {
       transactions,
       analytics,
       currencyCode,
+      exportBaseName: getExportBaseName(),
       toast,
       getErrorMessage,
       sumMoney,
       truncateDecimals,
     });
   };
-  const exportAsODS = async () => {
-    const { exportAsODS: exportOds } = await loadExporters();
-    return exportOds({
+  const exportAsJSON = async () => {
+    const { exportAsJSON: exportJson } = await loadExporters();
+    return exportJson({
       transactions,
       analytics,
+      bankInfo,
       currencyCode,
+      jsonData,
+      mt940Data,
+      exportBaseName: getExportBaseName(),
       toast,
       getErrorMessage,
       sumMoney,
       truncateDecimals,
     });
   };
-  const exportAsDOCX = async () => {
-    const { exportAsDOCX: exportDocx } = await loadExporters();
-    return exportDocx({
+  const exportAsMT940 = async () => {
+    const { exportAsMT940: exportMt940 } = await loadExporters();
+    return exportMt940({
       transactions,
       analytics,
+      bankInfo,
       currencyCode,
+      jsonData,
+      mt940Data,
+      exportBaseName: getExportBaseName(),
       toast,
       getErrorMessage,
       sumMoney,
@@ -232,6 +271,7 @@ export const UploadDemo = () => {
       transactions,
       analytics,
       currencyCode,
+      exportBaseName: getExportBaseName(),
       toast,
       getErrorMessage,
       sumMoney,
@@ -639,6 +679,9 @@ export const UploadDemo = () => {
     if (shouldBlockForEditedPdf) return;
 
     setCurrencyCode('');
+    setBankInfo(null);
+    setJsonData(null);
+    setMt940Data(null);
     setUploading(true);
 
     try {
@@ -815,6 +858,9 @@ export const UploadDemo = () => {
         setAnalytics(data.analytics);
       }
       setCurrencyCode(responseCurrency);
+      setBankInfo(data?.bankInfo || null);
+      setJsonData(data?.jsonData || null);
+      setMt940Data(data?.mt940Data || null);
 
       // Store AI processing status for display
       if (data?.aiStatus) {
@@ -964,6 +1010,9 @@ Analytics Summary:
 
     setUploading(true);
     setCurrencyCode('');
+    setBankInfo(null);
+    setJsonData(null);
+    setMt940Data(null);
     setBatchResults([]);
     setMergeInfo(null);
     setMergeResult(null);
@@ -1164,6 +1213,9 @@ Analytics Summary:
         data?.bankInfo?.currency || results.find((r) => r.bankInfo?.currency)?.bankInfo?.currency,
       );
       setCurrencyCode(batchCurrency);
+      setBankInfo(data?.bankInfo || results.find((r) => r.bankInfo)?.bankInfo || null);
+      setJsonData(data?.jsonData || null);
+      setMt940Data(data?.mt940Data || null);
 
       refreshUsageLimit();
 
@@ -1484,15 +1536,15 @@ Analytics Summary:
     });
   };
 
-  const handlePremiumExport = (format: 'docx' | 'ods') => {
+  const handlePremiumExport = (format: 'json' | 'mt940') => {
     if (!isPaidUser) {
       setShowUpgradeDialog(true);
       return;
     }
-    if (format === 'docx') {
-      exportAsDOCX();
+    if (format === 'json') {
+      exportAsJSON();
     } else {
-      exportAsODS();
+      exportAsMT940();
     }
   };
 
@@ -1886,7 +1938,7 @@ Analytics Summary:
             <DialogDescription className="space-y-4 pt-4">
               <p>This export is available for paid users only.</p>
               <p className="text-sm text-muted-foreground">
-                Upgrade your plan to unlock DOCX and ODS exports for your financial data.
+                Upgrade your plan to unlock JSON and MT940 exports for your financial data.
               </p>
               <div className="flex flex-col sm:flex-row gap-2 pt-4">
                 <Button

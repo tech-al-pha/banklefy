@@ -44,6 +44,7 @@ import {
   calculateIntegrityScore,
 } from '../_shared/risk-alert-engine.ts';
 import { generateProfessionalExcel } from '../_shared/excel-generator.ts';
+import { buildJsonExport, buildMt940Export } from '../_shared/export-formatters.ts';
 import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
@@ -1043,17 +1044,30 @@ Deno.serve(async (req) => {
     // Create conversion record for authenticated users
     let conversion = null;
     if (user) {
-      const { data: convData, error: convError } = await supabase
+      const insertPayload: Record<string, unknown> = {
+        user_id: user.id,
+        original_filename: fileName,
+        file_path: fileId,
+        status: 'processing',
+      };
+      insertPayload.pages_processed = pageCount;
+
+      let { data: convData, error: convError } = await supabase
         .from('conversions')
-        .insert({
-          user_id: user.id,
-          original_filename: fileName,
-          file_path: fileId,
-          status: 'processing',
-          pages_processed: pageCount,
-        })
+        .insert(insertPayload)
         .select()
         .single();
+
+      // Some deployed DBs do not have `pages_processed` column yet.
+      // Retry without it so history records are still created.
+      if (convError && /pages_processed/i.test(convError.message || '')) {
+        delete insertPayload.pages_processed;
+        ({ data: convData, error: convError } = await supabase
+          .from('conversions')
+          .insert(insertPayload)
+          .select()
+          .single());
+      }
 
       if (convError) {
         console.error('Failed to create conversion record:', convError);
@@ -1548,6 +1562,21 @@ Deno.serve(async (req) => {
       remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
     }
 
+    const jsonData = buildJsonExport({
+      transactions,
+      bankMetadata: bankInfo,
+      summary: {
+        totalCredits,
+        totalDebits,
+        netFlow,
+      },
+    });
+    const mt940Data = buildMt940Export({
+      transactions,
+      bankMetadata: bankInfo,
+      statementReference: conversion?.id ?? undefined,
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -1557,6 +1586,8 @@ Deno.serve(async (req) => {
         analytics: analytics,
         bankInfo,
         excelData: excelBase64 ?? undefined,
+        jsonData,
+        mt940Data,
         message: 'Conversion completed successfully',
         remaining,
         isAuthenticated: !!user,

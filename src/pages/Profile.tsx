@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
+import { buildMt940, buildStatementJson, downloadTextFile } from "@/lib/statement-export";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -171,6 +172,113 @@ const Profile = () => {
     return safe || fallback;
   };
 
+  const parseAmount = (value: unknown): number => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const cleaned = value.replace(/,/g, "").trim();
+      if (!cleaned) return 0;
+      const parsed = Number(cleaned);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
+
+  const parseWorkbookExportData = async (buffer: ArrayBuffer) => {
+    const XLSX = await import("xlsx");
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, {
+      header: 1,
+      raw: false,
+      defval: "",
+    }) as (string | number)[][];
+
+    const bankMeta: {
+      bankName?: string;
+      accountNumber?: string;
+      accountHolder?: string;
+      currency?: string;
+      iban?: string;
+      statementPeriod?: string;
+    } = {};
+
+    const hasLabel = (label: string, rowValue: string) => rowValue.trim().toLowerCase() === label;
+    for (const row of rows.slice(0, 16)) {
+      const key = String(row[0] ?? "").trim().toLowerCase();
+      const value = String(row[1] ?? "").trim();
+      if (!value) continue;
+
+      if (hasLabel("bank name", key)) bankMeta.bankName = value;
+      if (hasLabel("currency type", key)) bankMeta.currency = value;
+      if (hasLabel("account number", key)) bankMeta.accountNumber = value;
+      if (hasLabel("account holder name", key)) bankMeta.accountHolder = value;
+      if (hasLabel("statement period", key)) bankMeta.statementPeriod = value;
+      if (hasLabel("iban", key)) bankMeta.iban = value;
+    }
+
+    const headerRowIndex = rows.findIndex((row) => {
+      const cells = row.map((cell) => String(cell ?? "").trim().toLowerCase());
+      return (
+        cells.some((cell) => cell === "date" || cell.includes("transaction date")) &&
+        cells.some((cell) => cell.includes("description") || cell.includes("narration")) &&
+        cells.some((cell) => cell.includes("debit")) &&
+        cells.some((cell) => cell.includes("credit")) &&
+        cells.some((cell) => cell.includes("balance"))
+      );
+    });
+
+    if (headerRowIndex < 0) {
+      throw new Error("Could not locate transaction table in workbook.");
+    }
+
+    const headers = rows[headerRowIndex].map((cell) => String(cell ?? "").trim().toLowerCase());
+    const dateIndex = headers.findIndex((header) => header === "date" || header.includes("transaction date"));
+    const referenceIndex = headers.findIndex((header) => header.includes("reference"));
+    const descriptionIndex = headers.findIndex((header) => header.includes("description") || header.includes("narration"));
+    const debitIndex = headers.findIndex((header) => header.includes("debit"));
+    const creditIndex = headers.findIndex((header) => header.includes("credit"));
+    const balanceIndex = headers.findIndex((header) => header.includes("balance"));
+
+    if (dateIndex < 0 || descriptionIndex < 0 || debitIndex < 0 || creditIndex < 0 || balanceIndex < 0) {
+      throw new Error("Workbook columns are missing required transaction fields.");
+    }
+
+    const transactions = rows
+      .slice(headerRowIndex + 1)
+      .map((row) => {
+        const description = String(row[descriptionIndex] ?? "").trim();
+        const date = String(row[dateIndex] ?? "").trim();
+        if (!date || !description) return null;
+        if (description.toLowerCase() === "total") return null;
+
+        const referenceText = referenceIndex >= 0 ? String(row[referenceIndex] ?? "").trim() : "";
+        return {
+          date,
+          description,
+          refNumber: referenceText || undefined,
+          debit: parseAmount(row[debitIndex]),
+          credit: parseAmount(row[creditIndex]),
+          balance: parseAmount(row[balanceIndex]),
+          category: "Uncategorized",
+        };
+      })
+      .filter((item): item is {
+        date: string;
+        description: string;
+        refNumber?: string;
+        debit: number;
+        credit: number;
+        balance: number;
+        category: string;
+      } => Boolean(item));
+
+    if (transactions.length === 0) {
+      throw new Error("No transactions found in workbook.");
+    }
+
+    return { transactions, bankMeta };
+  };
+
   const getExpiryLabel = (createdAt: string, referenceNowMs: number) => {
     const expiresAt = new Date(new Date(createdAt).getTime() + ONE_DAY_MS);
     const msLeft = expiresAt.getTime() - referenceNowMs;
@@ -263,89 +371,55 @@ const Profile = () => {
     }
   };
 
-  const downloadAsOds = async (item: RecentConversion) => {
+  const downloadAsJson = async (item: RecentConversion) => {
     try {
       setDownloadingId(item.id);
       const buffer = await fetchResultBuffer(item);
-      const XLSX = await import("xlsx");
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const wbout = XLSX.write(workbook, { bookType: "ods", type: "array" });
-      const blob = new Blob([wbout], { type: "application/vnd.oasis.opendocument.spreadsheet" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${sanitizeFileBaseName(item.original_filename)}.ods`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const { transactions, bankMeta } = await parseWorkbookExportData(buffer);
+      const content = buildStatementJson({
+        transactions,
+        bankInfo: bankMeta,
+        currencyCode: bankMeta.currency,
+      });
+
+      downloadTextFile(
+        content,
+        `${sanitizeFileBaseName(item.original_filename)}.json`,
+        "application/json;charset=utf-8",
+      );
     } catch (error: unknown) {
       toast({
         variant: "destructive",
-        title: "ODS export failed",
-        description: error instanceof Error ? error.message : "Failed to export ODS.",
+        title: "JSON export failed",
+        description: error instanceof Error ? error.message : "Failed to export JSON.",
       });
     } finally {
       setDownloadingId(null);
     }
   };
 
-  const downloadAsDocx = async (item: RecentConversion) => {
+  const downloadAsMt940 = async (item: RecentConversion) => {
     try {
       setDownloadingId(item.id);
       const buffer = await fetchResultBuffer(item);
-      const XLSX = await import("xlsx");
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows: (string | number)[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as (string | number)[][];
-      const { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel } = await import("docx");
-
-      const safeRows = rows.slice(0, 100);
-      const header = safeRows[0] ?? [];
-      const bodyRows = safeRows.slice(1);
-
-      const headerRow = new TableRow({
-        children: header.map((cell) =>
-          new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text: String(cell ?? ""), bold: true })] })],
-          })
-        ),
+      const { transactions, bankMeta } = await parseWorkbookExportData(buffer);
+      const content = buildMt940({
+        transactions,
+        bankInfo: bankMeta,
+        currencyCode: bankMeta.currency,
+        statementReference: item.id,
       });
 
-      const dataRows = bodyRows.map((row) =>
-        new TableRow({
-          children: header.map((_, idx) =>
-            new TableCell({ children: [new Paragraph(String(row[idx] ?? ""))] })
-          ),
-        })
+      downloadTextFile(
+        content,
+        `${sanitizeFileBaseName(item.original_filename)}.mt940`,
+        "text/plain;charset=utf-8",
       );
-
-      const doc = new Document({
-        sections: [
-          {
-            properties: {},
-            children: [
-              new Paragraph({ text: "Banklefy Export", heading: HeadingLevel.HEADING_1 }),
-              new Table({ rows: [headerRow, ...dataRows] }),
-            ],
-          },
-        ],
-      });
-
-      const blob = await Packer.toBlob(doc);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${sanitizeFileBaseName(item.original_filename)}.docx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
     } catch (error: unknown) {
       toast({
         variant: "destructive",
-        title: "DOCX export failed",
-        description: error instanceof Error ? error.message : "Failed to export DOCX.",
+        title: "MT940 export failed",
+        description: error instanceof Error ? error.message : "Failed to export MT940.",
       });
     } finally {
       setDownloadingId(null);
@@ -532,18 +606,18 @@ const Profile = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => downloadAsOds(item)}
+                                  onClick={() => downloadAsJson(item)}
                                   disabled={downloadingId === item.id}
                                 >
-                                  ODS
+                                  JSON
                                 </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => downloadAsDocx(item)}
+                                  onClick={() => downloadAsMt940(item)}
                                   disabled={downloadingId === item.id}
                                 >
-                                  DOCX
+                                  MT940
                                 </Button>
                               </>
                             ) : item.status === "failed" ? (
