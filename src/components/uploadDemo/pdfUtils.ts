@@ -822,9 +822,74 @@ export const pdfToPageImages = async (
   }
 
   const images: string[] = [];
+  const estimateDataUrlBytes = (dataUrl: string): number => {
+    const commaIndex = dataUrl.indexOf(",");
+    if (commaIndex < 0) return 0;
+    const base64 = dataUrl.slice(commaIndex + 1);
+    return Math.floor((base64.length * 3) / 4);
+  };
+
+  const toOcrFriendlyDataUrl = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): string => {
+    // OCR-friendly preprocessing: grayscale + global thresholding keeps table digits crisp.
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const { data } = imageData;
+    const histogram = new Uint32Array(256);
+
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = Math.round((data[i] * 0.299) + (data[i + 1] * 0.587) + (data[i + 2] * 0.114));
+      histogram[gray] += 1;
+    }
+
+    const totalPixels = canvas.width * canvas.height;
+    let sum = 0;
+    for (let i = 0; i < 256; i += 1) sum += i * histogram[i];
+
+    let sumB = 0;
+    let wB = 0;
+    let maxVariance = 0;
+    let otsuThreshold = 165;
+    for (let i = 0; i < 256; i += 1) {
+      wB += histogram[i];
+      if (wB === 0) continue;
+      const wF = totalPixels - wB;
+      if (wF === 0) break;
+      sumB += i * histogram[i];
+      const mB = sumB / wB;
+      const mF = (sum - sumB) / wF;
+      const variance = wB * wF * (mB - mF) * (mB - mF);
+      if (variance > maxVariance) {
+        maxVariance = variance;
+        otsuThreshold = i;
+      }
+    }
+
+    const threshold = Math.max(125, Math.min(200, otsuThreshold - 10));
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = (data[i] * 0.299) + (data[i + 1] * 0.587) + (data[i + 2] * 0.114);
+      const bw = gray > threshold ? 255 : 0;
+      data[i] = bw;
+      data[i + 1] = bw;
+      data[i + 2] = bw;
+      data[i + 3] = 255;
+    }
+    ctx.putImageData(imageData, 0, 0);
+
+    // PNG keeps OCR edges sharp; fallback to JPEG if approaching per-image upload limits.
+    const png = canvas.toDataURL("image/png");
+    if (estimateDataUrlBytes(png) <= 2_850_000) return png;
+
+    const jpegQualities = [0.95, 0.9, 0.86, 0.82];
+    for (const quality of jpegQualities) {
+      const jpeg = canvas.toDataURL("image/jpeg", quality);
+      if (estimateDataUrlBytes(jpeg) <= 2_850_000) return jpeg;
+    }
+    return canvas.toDataURL("image/jpeg", 0.8);
+  };
+
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.6 });
+    // Higher render scale materially improves OCR on dense bank statement tables.
+    const viewport = page.getViewport({ scale: 2.7 });
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) continue;
@@ -833,7 +898,7 @@ export const pdfToPageImages = async (
     canvas.height = Math.floor(viewport.height);
 
     await page.render({ canvasContext: ctx, viewport }).promise;
-    images.push(canvas.toDataURL("image/jpeg", 0.82));
+    images.push(toOcrFriendlyDataUrl(canvas, ctx));
   }
 
   await pdf.destroy?.();
