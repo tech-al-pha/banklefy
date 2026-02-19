@@ -9,6 +9,8 @@ import {
   classifyDocument,
   callGroqVisionOCR,
   normalizeRawTransactions,
+  recoverAdcbTransactionsFromOcrText,
+  scoreRunningBalanceFlow,
   type RawTransaction,
   type BankMetadata,
 } from '../_shared/ocr-processor.ts';
@@ -1201,6 +1203,24 @@ Deno.serve(async (req) => {
 
     rawTransactions = extractionResult.transactions;
     extractedText = extractionResult.extractedText || '';
+
+    const recoveredAdcbTransactions = recoverAdcbTransactionsFromOcrText(extractedText);
+    if (recoveredAdcbTransactions.length > 0) {
+      const rawFlow = scoreRunningBalanceFlow(rawTransactions);
+      const recoveredFlow = scoreRunningBalanceFlow(recoveredAdcbTransactions);
+      const rawMismatch = rawFlow.total > 0 ? rawFlow.mismatchRatio : 1;
+      const recoveredMismatch = recoveredFlow.total > 0 ? recoveredFlow.mismatchRatio : 1;
+      const shouldUseRecovered =
+        recoveredAdcbTransactions.length >= Math.max(5, rawTransactions.length - 2) &&
+        (rawTransactions.length === 0 || recoveredMismatch + 0.15 < rawMismatch);
+
+      if (shouldUseRecovered) {
+        console.log(
+          `Using ADCB OCR recovery parser (${recoveredAdcbTransactions.length} rows, mismatch ${recoveredMismatch.toFixed(3)} vs ${rawMismatch.toFixed(3)})`,
+        );
+        rawTransactions = recoveredAdcbTransactions;
+      }
+    }
 
     // Log extraction status
     console.log(generateStatusReport(extractionResult.status));

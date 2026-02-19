@@ -6,6 +6,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import {
   callGroqVisionOCR,
   normalizeRawTransactions,
+  recoverAdcbTransactionsFromOcrText,
+  scoreRunningBalanceFlow,
   type RawTransaction,
   type BankMetadata,
 } from '../_shared/ocr-processor.ts';
@@ -606,7 +608,25 @@ const processStatement = async (params: {
     extractionResult = await performExtraction(base64Data, mimeType, '');
   }
 
-  const rawTransactions = extractionResult.transactions;
+  let rawTransactions = extractionResult.transactions;
+  const extractedText = extractionResult.extractedText || '';
+  const recoveredAdcbTransactions = recoverAdcbTransactionsFromOcrText(extractedText);
+  if (recoveredAdcbTransactions.length > 0) {
+    const rawFlow = scoreRunningBalanceFlow(rawTransactions);
+    const recoveredFlow = scoreRunningBalanceFlow(recoveredAdcbTransactions);
+    const rawMismatch = rawFlow.total > 0 ? rawFlow.mismatchRatio : 1;
+    const recoveredMismatch = recoveredFlow.total > 0 ? recoveredFlow.mismatchRatio : 1;
+    const shouldUseRecovered =
+      recoveredAdcbTransactions.length >= Math.max(5, rawTransactions.length - 2) &&
+      (rawTransactions.length === 0 || recoveredMismatch + 0.15 < rawMismatch);
+
+    if (shouldUseRecovered) {
+      console.log(
+        `Using ADCB OCR recovery parser (${recoveredAdcbTransactions.length} rows, mismatch ${recoveredMismatch.toFixed(3)} vs ${rawMismatch.toFixed(3)})`,
+      );
+      rawTransactions = recoveredAdcbTransactions;
+    }
+  }
   console.log(generateStatusReport(extractionResult.status));
 
   if (!rawTransactions || rawTransactions.length === 0) {

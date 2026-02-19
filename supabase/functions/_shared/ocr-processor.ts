@@ -486,6 +486,283 @@ export async function callGroqVisionOCR(
   }
 }
 
+const MONTH_TO_NUM: Record<string, string> = {
+  jan: '01',
+  feb: '02',
+  mar: '03',
+  apr: '04',
+  may: '05',
+  jun: '06',
+  jul: '07',
+  aug: '08',
+  sep: '09',
+  oct: '10',
+  nov: '11',
+  dec: '12',
+};
+
+const parseStatementDate = (value: string, defaultYear?: string): string | undefined => {
+  const clean = value.trim();
+  const iso = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  const slash = clean.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (slash) {
+    const dd = slash[1].padStart(2, '0');
+    const mm = slash[2].padStart(2, '0');
+    const yyyy = slash[3].length === 2 ? `20${slash[3]}` : slash[3];
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  const monthText = clean.match(/^(\d{1,2})[-/ ]([A-Za-z]{3})[-/ ](\d{2,4})$/);
+  const monthTextWithoutYear = clean.match(/^(\d{1,2})[-/ ]([A-Za-z]{3})[-/]?$/);
+  const dateMatch = monthText || monthTextWithoutYear;
+  if (!dateMatch) return undefined;
+  const dd = dateMatch[1].padStart(2, '0');
+  const mm = MONTH_TO_NUM[dateMatch[2].toLowerCase()];
+  if (!mm) return undefined;
+  const yearTokenRaw = monthText ? monthText[3] : defaultYear;
+  let yearToken = yearTokenRaw;
+  if (yearToken && defaultYear) {
+    const yearNum = Number(yearToken);
+    // OCR often repeats the day token as a fake year (e.g., 07-Jan-07). Treat it as missing year.
+    if (Number.isFinite(yearNum) && yearNum >= 0 && yearNum <= 31) {
+      yearToken = defaultYear;
+    }
+  }
+  if (!yearToken) return undefined;
+  const yyyy = yearToken.length === 2 ? `20${yearToken}` : yearToken;
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const parseMoney = (value: string): number => {
+  const cleaned = value.replace(/[, ]/g, '').trim();
+  const num = Number(cleaned);
+  return Number.isFinite(num) ? num : 0;
+};
+
+const isLikelyAdcbStatementText = (value: string): boolean => {
+  const lower = value.toLowerCase();
+  return (
+    (lower.includes('statement of accounts') || lower.includes('statement of account')) &&
+    (lower.includes('adcb') || lower.includes('procash')) &&
+    lower.includes('debit') &&
+    lower.includes('credit')
+  );
+};
+
+type AdcbRowDraft = {
+  date: string;
+  rawText: string;
+  amount: number;
+  balance: number;
+  refNumber?: string;
+};
+
+const scoreBalanceTransition = (
+  prevBalance: number,
+  amount: number,
+  nextBalance: number,
+): { asCreditDiff: number; asDebitDiff: number } => {
+  const asCreditDiff = Math.abs((prevBalance + amount) - nextBalance);
+  const asDebitDiff = Math.abs((prevBalance - amount) - nextBalance);
+  return { asCreditDiff, asDebitDiff };
+};
+
+const buildDescriptionFromAdcbRow = (raw: string): string => {
+  return raw
+    .replace(/^\s*[\[(]?\d+\s*/g, ' ')
+    .replace(/\b\d{1,2}[-/](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[-/]\d{2,4}\b/gi, ' ')
+    .replace(/\b\d{1,2}[-/](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/gi, ' ')
+    .replace(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, ' ')
+    .replace(/\b(?:phub|mob|m\d{6,}|ae\d{5,}|e\d{6,})[a-z0-9/.-]*\b/gi, ' ')
+    .replace(/\b\d{1,3}(?:,\d{3})*\.\d{2}\b/g, ' ')
+    .replace(/\b(?:debit|credit|running|balance|value|date|reference|amount)\b/gi, ' ')
+    .replace(/[_[\]{}|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const determineDefaultStatementYear = (ocrText: string): string | undefined => {
+  const startDate = ocrText.match(/start\s+date[^0-9]*(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i);
+  if (startDate) {
+    const parsed = parseStatementDate(startDate[1]);
+    if (parsed) return parsed.slice(0, 4);
+  }
+  const reportDate = ocrText.match(/report\s+date[^0-9]*(\d{1,2}[-/][A-Za-z]{3}[-/]\d{2,4}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i);
+  if (reportDate) {
+    const parsed = parseStatementDate(reportDate[1]);
+    if (parsed) return parsed.slice(0, 4);
+  }
+  return undefined;
+};
+
+const extractAdcbDraftRowsFromText = (ocrText: string): AdcbRowDraft[] => {
+  const normalizedLines = ocrText
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/[|]/g, ' ')
+        .replace(/[_]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .filter(Boolean);
+
+  const tableHeaderPattern = /value\s+bank\s+customer\s+description/i;
+  const rowStartPattern =
+    /^\s*[\[(]?\d+\s+[^\n]*?\d{1,2}\s*[-/]\s*[A-Za-z]{3}\s*[-/]/i;
+  const rowStartDateLeadPattern = /^\s*[\[(]?\d{1,2}\s*[-/]\s*[A-Za-z]{3}\s*[-/]?/i;
+  const rowStartHintPattern = /\b(?:phub|mob|b\/o|trf|salary|o\/w)\b/i;
+  const dateTokenPattern = /(\d{1,2}\s*[-/]\s*[A-Za-z]{3}(?:\s*[-/]\s*\d{2,4})?)/i;
+  const amountPattern = /\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2}/g;
+  const drafts: AdcbRowDraft[] = [];
+  const defaultYear = determineDefaultStatementYear(ocrText);
+  let tableSeen = false;
+
+  let current: { dateRaw: string; parts: string[] } | null = null;
+  const flushCurrent = () => {
+    if (!current) return;
+    const joined = current.parts.join(' ').replace(/\s+/g, ' ').trim();
+    const amounts = joined.match(amountPattern) || [];
+    if (amounts.length >= 2) {
+      const amountToken = amounts[amounts.length - 2];
+      const balanceToken = amounts[amounts.length - 1];
+      const amount = parseMoney(amountToken);
+      const balance = parseMoney(balanceToken);
+      const parsedDate =
+        parseStatementDate(current.dateRaw.replace(/\s+/g, ''), defaultYear) ||
+        parseStatementDate(current.dateRaw, defaultYear);
+      if (parsedDate && Number.isFinite(amount) && Number.isFinite(balance) && amount > 0) {
+        const refMatch = joined.match(/\b(?:PHUB|MOB|M\d{6,}|AE\d{5,})[A-Z0-9/.-]*\b/i);
+        drafts.push({
+          date: parsedDate,
+          rawText: joined,
+          amount,
+          balance,
+          refNumber: refMatch?.[0],
+        });
+      }
+    }
+    current = null;
+  };
+
+  for (const line of normalizedLines) {
+    if (tableHeaderPattern.test(line)) {
+      tableSeen = true;
+      continue;
+    }
+    if (!tableSeen) continue;
+    if (/^date value date|statement of accounts|total debit amount|total credit amount|this is a system generated statement/i.test(line)) continue;
+    const fixedLine = line.replace(/(\d{1,2})\s*-\s*([A-Za-z]{3})\s*-\s*(\d{2,4})/g, '$1-$2-$3');
+    const isRowStart =
+      rowStartPattern.test(fixedLine) ||
+      (rowStartDateLeadPattern.test(fixedLine) && rowStartHintPattern.test(fixedLine));
+
+    if (isRowStart) {
+      flushCurrent();
+      const dateToken = fixedLine.match(dateTokenPattern)?.[1];
+      if (!dateToken) continue;
+      current = { dateRaw: dateToken, parts: [fixedLine] };
+      continue;
+    }
+
+    if (current) {
+      current.parts.push(fixedLine);
+    }
+  }
+  flushCurrent();
+
+  return drafts;
+};
+
+const determineFirstBalance = (ocrText: string): number | undefined => {
+  const match = ocrText.match(/opening\s+balance[^0-9]*(\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2})/i);
+  if (!match) return undefined;
+  const value = parseMoney(match[1]);
+  return Number.isFinite(value) ? value : undefined;
+};
+
+const inferDebitCreditFromDrafts = (drafts: AdcbRowDraft[], openingBalance?: number): RawTransaction[] => {
+  if (drafts.length === 0) return [];
+
+  const rows: RawTransaction[] = [];
+  let prevBalance = Number.isFinite(openingBalance as number) ? Number(openingBalance) : undefined;
+
+  for (let i = 0; i < drafts.length; i += 1) {
+    const draft = drafts[i];
+    const description = buildDescriptionFromAdcbRow(draft.rawText) || 'Transaction';
+
+    let debit = 0;
+    let credit = 0;
+    const amount = Math.abs(draft.amount);
+
+    if (prevBalance !== undefined) {
+      const { asCreditDiff, asDebitDiff } = scoreBalanceTransition(prevBalance, amount, draft.balance);
+      if (asCreditDiff <= asDebitDiff) {
+        credit = amount;
+      } else {
+        debit = amount;
+      }
+    } else if (i + 1 < drafts.length) {
+      const nextDelta = drafts[i + 1].balance - draft.balance;
+      if (nextDelta < 0) {
+        credit = amount;
+      } else {
+        debit = amount;
+      }
+    } else {
+      debit = amount;
+    }
+
+    rows.push({
+      date: draft.date,
+      description,
+      debit,
+      credit,
+      balance: draft.balance,
+      refNumber: draft.refNumber,
+    });
+
+    prevBalance = draft.balance;
+  }
+
+  return rows;
+};
+
+export const scoreRunningBalanceFlow = (transactions: RawTransaction[]): { mismatchRatio: number; total: number; matched: number } => {
+  if (transactions.length <= 1) {
+    return { mismatchRatio: 0, total: Math.max(0, transactions.length - 1), matched: Math.max(0, transactions.length - 1) };
+  }
+
+  let matched = 0;
+  let total = 0;
+  for (let i = 1; i < transactions.length; i += 1) {
+    const prev = Number(transactions[i - 1].balance ?? NaN);
+    const current = Number(transactions[i].balance ?? NaN);
+    const debit = Math.abs(Number(transactions[i].debit ?? 0));
+    const credit = Math.abs(Number(transactions[i].credit ?? 0));
+    if (!Number.isFinite(prev) || !Number.isFinite(current)) continue;
+
+    total += 1;
+    const diff = Math.abs((prev + credit - debit) - current);
+    const tolerance = Math.max(0.02, Math.abs(debit || credit) * 0.03);
+    if (diff <= tolerance) matched += 1;
+  }
+
+  const mismatchRatio = total > 0 ? (total - matched) / total : 1;
+  return { mismatchRatio, total, matched };
+};
+
+export const recoverAdcbTransactionsFromOcrText = (ocrText: string): RawTransaction[] => {
+  if (!ocrText || !isLikelyAdcbStatementText(ocrText)) return [];
+  const drafts = extractAdcbDraftRowsFromText(ocrText);
+  if (drafts.length === 0) return [];
+  const openingBalance = determineFirstBalance(ocrText);
+  return inferDebitCreditFromDrafts(drafts, openingBalance);
+};
+
 // ============= DOCUMENT TYPE CLASSIFIER =============
 export interface DocumentClassification {
   type: 'digital' | 'scanned' | 'image';
