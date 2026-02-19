@@ -617,6 +617,74 @@ export async function callGroqVisionOCR(
   }
 }
 
+export async function callMistralVisionOCR(
+  imageBase64: string,
+  mimeType: string,
+): Promise<OCRResult> {
+  const MISTRAL_API_KEY = Deno.env.get('MISTRAL_API_KEY');
+  if (!MISTRAL_API_KEY) {
+    return { success: false, error: 'Mistral API key not configured' };
+  }
+
+  try {
+    const dataUrl = `data:${mimeType};base64,${imageBase64}`;
+    const response = await fetch('https://api.mistral.ai/v1/ocr', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${MISTRAL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'mistral-ocr-latest',
+        document: {
+          type: 'image_url',
+          image_url: dataUrl,
+        },
+        include_image_base64: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Mistral OCR error:', response.status, errorText);
+      return { success: false, error: `Mistral OCR API error: ${response.status}` };
+    }
+
+    const payload = await response.json() as Record<string, unknown>;
+    const pages = Array.isArray(payload.pages) ? payload.pages as Array<Record<string, unknown>> : [];
+    const markdownText = pages
+      .map((page) => (typeof page.markdown === 'string' ? page.markdown : ''))
+      .filter(Boolean)
+      .join('\n');
+
+    const bankMetadata = pages.length > 0 && typeof pages[0].dimensions === 'object'
+      ? undefined
+      : undefined;
+
+    if (!markdownText.trim()) {
+      return { success: true, text: '', transactions: [] };
+    }
+
+    let transactions = parseTransactionsFromMarkdownTables(markdownText);
+    if (transactions.length === 0) {
+      transactions = recoverAdcbTransactionsFromOcrText(markdownText);
+    }
+
+    return {
+      success: true,
+      text: markdownText,
+      transactions,
+      bankMetadata,
+    };
+  } catch (error) {
+    console.error('Mistral OCR failure:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Mistral OCR request failed',
+    };
+  }
+}
+
 const MONTH_TO_NUM: Record<string, string> = {
   jan: '01',
   feb: '02',
@@ -670,6 +738,314 @@ const parseMoney = (value: string): number => {
   const cleaned = value.replace(/[, ]/g, '').trim();
   const num = Number(cleaned);
   return Number.isFinite(num) ? num : 0;
+};
+
+const parseMoneyMaybe = (value: string | undefined): number | undefined => {
+  if (!value) return undefined;
+  const match = value.match(/-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/);
+  if (!match) return undefined;
+  const parsed = parseMoney(match[0]);
+  return Number.isFinite(parsed) ? Math.abs(parsed) : undefined;
+};
+
+const normalizeMarkdownText = (value: string): string =>
+  value
+    .replace(/\r/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\t/g, ' ')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+const splitMarkdownRow = (line: string): string[] => {
+  const trimmed = line.trim();
+  if (!trimmed.includes('|')) return [];
+  const rawParts = trimmed.split('|').map((part) => part.trim());
+  const startsWithPipe = trimmed.startsWith('|');
+  const endsWithPipe = trimmed.endsWith('|');
+  const parts = [...rawParts];
+  if (startsWithPipe && parts.length > 0 && parts[0] === '') parts.shift();
+  if (endsWithPipe && parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
+  return parts;
+};
+
+const isMarkdownSeparatorRow = (cells: string[]): boolean => {
+  if (cells.length === 0) return false;
+  return cells.every((cell) => /^:?-{2,}:?$/.test(cell.replace(/\s+/g, '')));
+};
+
+const normalizeHeaderCell = (value: string): string =>
+  value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+type MarkdownHeaderMap = {
+  dateIndex: number;
+  valueDateIndex?: number;
+  descriptionIndex?: number;
+  refIndex?: number;
+  debitIndex?: number;
+  creditIndex?: number;
+  balanceIndex?: number;
+};
+
+const buildMarkdownHeaderMap = (headers: string[]): MarkdownHeaderMap | null => {
+  let dateIndex = -1;
+  let valueDateIndex = -1;
+  let descriptionIndex = -1;
+  let refIndex = -1;
+  let debitIndex = -1;
+  let creditIndex = -1;
+  let balanceIndex = -1;
+
+  headers.forEach((header, index) => {
+    const h = normalizeHeaderCell(header);
+    if (h.includes('transaction date') || h === 'date' || h.startsWith('txn date')) {
+      dateIndex = index;
+      return;
+    }
+    if (h.includes('value date') || h.includes('posting date')) {
+      valueDateIndex = index;
+      return;
+    }
+    if (h.includes('narration') || h.includes('description') || h.includes('particular')) {
+      descriptionIndex = index;
+      return;
+    }
+    if (h.includes('reference') || h.includes('txn id') || h.includes('transaction id') || h.includes('ref no')) {
+      refIndex = index;
+      return;
+    }
+    if (h.startsWith('debit') || h.endsWith(' debit') || h.includes('debit amount')) {
+      debitIndex = index;
+      return;
+    }
+    if (h.startsWith('credit') || h.endsWith(' credit') || h.includes('credit amount')) {
+      creditIndex = index;
+      return;
+    }
+    if (h.includes('running balance') || h === 'balance' || h.endsWith(' balance')) {
+      balanceIndex = index;
+    }
+  });
+
+  if (dateIndex < 0 && valueDateIndex >= 0) dateIndex = valueDateIndex;
+  if (dateIndex < 0) return null;
+  if (debitIndex < 0 && creditIndex < 0 && balanceIndex < 0) return null;
+
+  return {
+    dateIndex,
+    valueDateIndex: valueDateIndex >= 0 ? valueDateIndex : undefined,
+    descriptionIndex: descriptionIndex >= 0 ? descriptionIndex : undefined,
+    refIndex: refIndex >= 0 ? refIndex : undefined,
+    debitIndex: debitIndex >= 0 ? debitIndex : undefined,
+    creditIndex: creditIndex >= 0 ? creditIndex : undefined,
+    balanceIndex: balanceIndex >= 0 ? balanceIndex : undefined,
+  };
+};
+
+const parseTransactionsFromMarkdownTables = (markdown: string): RawTransaction[] => {
+  const lines = normalizeMarkdownText(markdown).split('\n').map((line) => line.trim()).filter(Boolean);
+  const rows: RawTransaction[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const headerCells = splitMarkdownRow(lines[index]);
+    if (headerCells.length < 3) {
+      index += 1;
+      continue;
+    }
+
+    const headerMap = buildMarkdownHeaderMap(headerCells);
+    if (!headerMap) {
+      index += 1;
+      continue;
+    }
+
+    const separatorCells = splitMarkdownRow(lines[index + 1] || '');
+    if (!isMarkdownSeparatorRow(separatorCells)) {
+      index += 1;
+      continue;
+    }
+
+    index += 2;
+    while (index < lines.length) {
+      const cells = splitMarkdownRow(lines[index]);
+      if (cells.length === 0) break;
+      if (isMarkdownSeparatorRow(cells)) {
+        index += 1;
+        continue;
+      }
+      if (cells.length < headerCells.length - 2) break;
+
+      const dateToken = cells[headerMap.dateIndex];
+      const parsedDate = parseStatementDate(dateToken || '');
+      if (!parsedDate) {
+        index += 1;
+        continue;
+      }
+
+      const descriptionPieces: string[] = [];
+      if (headerMap.descriptionIndex !== undefined && cells[headerMap.descriptionIndex]) {
+        descriptionPieces.push(cells[headerMap.descriptionIndex]);
+      }
+      if (descriptionPieces.length === 0) {
+        cells.forEach((cell, colIdx) => {
+          if (
+            colIdx === headerMap.dateIndex ||
+            colIdx === headerMap.valueDateIndex ||
+            colIdx === headerMap.debitIndex ||
+            colIdx === headerMap.creditIndex ||
+            colIdx === headerMap.balanceIndex ||
+            colIdx === headerMap.refIndex
+          ) {
+            return;
+          }
+          if (cell) descriptionPieces.push(cell);
+        });
+      }
+
+      const debit = parseMoneyMaybe(headerMap.debitIndex !== undefined ? cells[headerMap.debitIndex] : undefined) || 0;
+      const credit = parseMoneyMaybe(headerMap.creditIndex !== undefined ? cells[headerMap.creditIndex] : undefined) || 0;
+      const balance = parseMoneyMaybe(headerMap.balanceIndex !== undefined ? cells[headerMap.balanceIndex] : undefined);
+      const refNumber = headerMap.refIndex !== undefined ? normalizeReferenceToken(cells[headerMap.refIndex] || '') : '';
+
+      if ((debit <= 0 && credit <= 0) || !Number.isFinite(balance as number)) {
+        index += 1;
+        continue;
+      }
+
+      rows.push({
+        date: parsedDate,
+        description: collapseWhitespace(descriptionPieces.join(' ').replace(/\|/g, ' ')) || 'Transaction',
+        debit: Math.abs(debit),
+        credit: Math.abs(credit),
+        balance: Number(balance),
+        refNumber: refNumber || undefined,
+      });
+
+      index += 1;
+    }
+  }
+
+  return rows;
+};
+
+type CandidateRow = {
+  row: RawTransaction;
+  index: number;
+};
+
+const normalizeDateKey = (date: string | undefined): string => {
+  if (!date) return '';
+  const parsed = parseStatementDate(date);
+  return parsed || date.trim();
+};
+
+const toMinor = (value: number | undefined): number => Math.round((Number(value) || 0) * 100);
+
+const rowQualityScore = (row: RawTransaction, previousBalance?: number): number => {
+  let score = 0;
+  const debit = Math.abs(Number(row.debit || 0));
+  const credit = Math.abs(Number(row.credit || 0));
+  const balance = Number(row.balance ?? NaN);
+  const descriptionLen = (row.description || '').trim().length;
+  const refLen = (row.refNumber || '').trim().length;
+
+  score += Math.min(26, Math.floor(descriptionLen / 3));
+  if (refLen > 0) score += Math.min(8, Math.floor(refLen / 3) + 2);
+  if ((debit > 0 && credit === 0) || (credit > 0 && debit === 0)) score += 24;
+  if (debit > 0 && credit > 0) score -= 14;
+  if (debit === 0 && credit === 0) score -= 30;
+
+  if (Number.isFinite(previousBalance) && Number.isFinite(balance)) {
+    const diff = Math.abs((Number(previousBalance) + credit - debit) - balance);
+    score += Math.max(-30, 16 - Math.round(diff * 4));
+  }
+
+  return score;
+};
+
+const buildFallbackMatchKey = (row: RawTransaction): string => {
+  const dateKey = normalizeDateKey(row.date);
+  const amountMinor = Math.max(toMinor(row.debit), toMinor(row.credit));
+  return `${dateKey}|${amountMinor}`;
+};
+
+const findBestSecondaryMatch = (
+  primaryRow: RawTransaction,
+  secondaryRows: CandidateRow[],
+): number => {
+  if (secondaryRows.length === 0) return -1;
+
+  const primaryDate = normalizeDateKey(primaryRow.date);
+  const primaryBalanceMinor = toMinor(primaryRow.balance);
+  const primaryFallbackKey = buildFallbackMatchKey(primaryRow);
+  let bestIndex = -1;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < secondaryRows.length; i += 1) {
+    const candidate = secondaryRows[i].row;
+    const candidateDate = normalizeDateKey(candidate.date);
+    if (primaryDate && candidateDate && primaryDate !== candidateDate) continue;
+
+    const candidateBalanceMinor = toMinor(candidate.balance);
+    const balanceDiff = Math.abs(primaryBalanceMinor - candidateBalanceMinor);
+
+    let score = Number.POSITIVE_INFINITY;
+    if (Number.isFinite(primaryBalanceMinor) && Number.isFinite(candidateBalanceMinor)) {
+      score = balanceDiff;
+    } else if (buildFallbackMatchKey(candidate) === primaryFallbackKey) {
+      score = 0;
+    }
+
+    if (score < bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
+  }
+
+  if (bestIndex < 0) return -1;
+  return bestScore <= 75 ? bestIndex : -1; // <= 0.75 balance difference
+};
+
+export const mergeOcrTransactionsDeterministic = (
+  primaryRows: RawTransaction[],
+  secondaryRows: RawTransaction[],
+): RawTransaction[] => {
+  if (primaryRows.length === 0) return secondaryRows;
+  if (secondaryRows.length === 0) return primaryRows;
+
+  const secondaryPool: CandidateRow[] = secondaryRows.map((row, index) => ({ row, index }));
+  const merged: RawTransaction[] = [];
+  const dedupe = new Set<string>();
+  let previousBalance: number | undefined;
+
+  const commitRow = (row: RawTransaction) => {
+    const key = `${normalizeDateKey(row.date)}|${toMinor(row.debit)}|${toMinor(row.credit)}|${toMinor(row.balance)}`;
+    if (dedupe.has(key)) return;
+    dedupe.add(key);
+    merged.push(row);
+    const b = Number(row.balance ?? NaN);
+    previousBalance = Number.isFinite(b) ? b : previousBalance;
+  };
+
+  for (const primaryRow of primaryRows) {
+    const matchIndex = findBestSecondaryMatch(primaryRow, secondaryPool);
+    if (matchIndex < 0) {
+      commitRow(primaryRow);
+      continue;
+    }
+
+    const [matched] = secondaryPool.splice(matchIndex, 1);
+    const primaryScore = rowQualityScore(primaryRow, previousBalance);
+    const secondaryScore = rowQualityScore(matched.row, previousBalance);
+    commitRow(secondaryScore > primaryScore ? matched.row : primaryRow);
+  }
+
+  for (const leftover of secondaryPool.sort((a, b) => a.index - b.index)) {
+    commitRow(leftover.row);
+  }
+
+  return merged;
 };
 
 const isLikelyAdcbStatementText = (value: string): boolean => {

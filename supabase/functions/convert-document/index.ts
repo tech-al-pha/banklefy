@@ -8,7 +8,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import {
   classifyDocument,
   callGroqVisionOCR,
+  callMistralVisionOCR,
   callTesseractOcrWorker,
+  mergeOcrTransactionsDeterministic,
   normalizeRawTransactions,
   recoverAdcbTransactionsFromOcrText,
   scoreRunningBalanceFlow,
@@ -60,6 +62,17 @@ const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES
 type OcrWorkerMode = 'off' | 'primary';
 const OCR_WORKER_MODE: OcrWorkerMode =
   (Deno.env.get('OCR_WORKER_MODE') || '').trim().toLowerCase() === 'primary' ? 'primary' : 'off';
+type DualOcrMode = 'off' | 'smart' | 'always';
+const normalizeDualOcrMode = (value: string | undefined): DualOcrMode => {
+  const mode = (value || '').trim().toLowerCase();
+  if (mode === 'off' || mode === 'always' || mode === 'smart') return mode;
+  return 'smart';
+};
+const OCR_DUAL_PROVIDER_MODE = normalizeDualOcrMode(Deno.env.get('OCR_DUAL_PROVIDER_MODE'));
+const OCR_DUAL_PROVIDER_MAX_PAGES = Math.max(
+  0,
+  Number(Deno.env.get('OCR_DUAL_PROVIDER_MAX_PAGES') ?? (OCR_DUAL_PROVIDER_MODE === 'always' ? '120' : '2')),
+);
 type StrictOcrRetryMode = 'off' | 'smart' | 'always';
 const normalizeStrictOcrRetryMode = (value: string | undefined): StrictOcrRetryMode => {
   const mode = (value || '').trim().toLowerCase();
@@ -366,6 +379,69 @@ const chooseBetterVisionResult = (primaryResult: OCRResult, strictResult: OCRRes
     return strictResult;
   }
   return primaryResult;
+};
+
+const shouldRunMistralDualPass = (
+  fileNameLower: string,
+  groqResult: OCRResult,
+  mode: DualOcrMode,
+): boolean => {
+  if (mode === 'off') return false;
+  if (mode === 'always') return true;
+
+  const tx = groqResult.transactions || [];
+  const likelyDenseTableBank = /(adcb|procash|statement of accounts)/i.test(fileNameLower);
+  if (!groqResult.success || tx.length === 0) return true;
+  if (likelyDenseTableBank && tx.length <= 20) return true;
+
+  const mismatchRatio = balanceMismatchRatio(tx);
+  if (tx.length >= 8 && mismatchRatio > 0.08) return true;
+  if (tx.length >= 4 && mismatchRatio > 0.18) return true;
+  return false;
+};
+
+const mergeProviderResults = (primary: OCRResult, secondary: OCRResult): OCRResult => {
+  if (!secondary.success || !secondary.transactions || secondary.transactions.length === 0) {
+    return primary;
+  }
+  if (!primary.success || !primary.transactions || primary.transactions.length === 0) {
+    return secondary;
+  }
+
+  const mergedTransactions = mergeOcrTransactionsDeterministic(primary.transactions, secondary.transactions);
+  const primaryMismatch = balanceMismatchRatio(primary.transactions);
+  const secondaryMismatch = balanceMismatchRatio(secondary.transactions);
+  const mergedMismatch = balanceMismatchRatio(mergedTransactions);
+
+  // Keep deterministic winner by balance consistency + row coverage.
+  let chosenTransactions = primary.transactions;
+  let chosenMismatch = primaryMismatch;
+  if (
+    mergedTransactions.length >= Math.max(primary.transactions.length, secondary.transactions.length) - 1 &&
+    mergedMismatch <= Math.min(primaryMismatch, secondaryMismatch) + 0.02
+  ) {
+    chosenTransactions = mergedTransactions;
+    chosenMismatch = mergedMismatch;
+  } else if (
+    secondary.transactions.length >= Math.max(4, primary.transactions.length - 2) &&
+    secondaryMismatch + 0.05 < primaryMismatch
+  ) {
+    chosenTransactions = secondary.transactions;
+    chosenMismatch = secondaryMismatch;
+  }
+
+  if (chosenTransactions === primary.transactions) return primary;
+
+  console.log(
+    `Dual OCR merge selected non-primary result (primary mismatch ${primaryMismatch.toFixed(3)}, secondary ${secondaryMismatch.toFixed(3)}, merged ${mergedMismatch.toFixed(3)}, chosen ${chosenMismatch.toFixed(3)})`,
+  );
+
+  return {
+    success: true,
+    transactions: chosenTransactions,
+    text: [primary.text, secondary.text].filter(Boolean).join('\n').trim(),
+    bankMetadata: mergeBankMetadata(primary.bankMetadata, secondary.bankMetadata),
+  };
 };
 
 const normalizePlan = (value: unknown): string =>
@@ -1208,6 +1284,7 @@ Deno.serve(async (req) => {
       pagesWithData = 0;
       let combinedText = '';
       let strictRetryCount = 0;
+      let dualProviderCount = 0;
 
       for (const img of pdfPageImages as string[]) {
         if (typeof img !== 'string') continue;
@@ -1244,6 +1321,17 @@ Deno.serve(async (req) => {
           }
         }
 
+        if (
+          pageResult &&
+          OCR_WORKER_MODE !== 'primary' &&
+          dualProviderCount < OCR_DUAL_PROVIDER_MAX_PAGES &&
+          shouldRunMistralDualPass(lowerFileName, pageResult, OCR_DUAL_PROVIDER_MODE)
+        ) {
+          const mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
+          dualProviderCount += 1;
+          pageResult = mergeProviderResults(pageResult, mistralResult);
+        }
+
         if (pageResult && pageResult.success && pageResult.transactions && pageResult.transactions.length > 0) {
           pagesWithData += 1;
           collected.push(...pageResult.transactions);
@@ -1258,6 +1346,9 @@ Deno.serve(async (req) => {
       }
       if (strictRetryCount > 0) {
         console.log(`Strict OCR retries used: ${strictRetryCount}/${STRICT_OCR_RETRY_MAX_PAGES} (mode=${STRICT_OCR_RETRY_MODE})`);
+      }
+      if (dualProviderCount > 0) {
+        console.log(`Dual OCR pages used: ${dualProviderCount}/${OCR_DUAL_PROVIDER_MAX_PAGES} (mode=${OCR_DUAL_PROVIDER_MODE})`);
       }
 
       status.groqVision.time = Date.now() - start;
