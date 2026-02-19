@@ -64,6 +64,7 @@ const isNonTransactionRow = (transaction: Transaction): boolean => {
 };
 
 const toMinor = (value: number | undefined): number => Math.round((Number(value) || 0) * 100);
+const roundTo2 = (value: number): number => Math.round(value * 100) / 100;
 
 const transactionKey = (transaction: Transaction): string => [
   String(transaction.date || '').trim(),
@@ -358,6 +359,57 @@ const chooseBetterTransaction = (first: Transaction, second: Transaction): Trans
   return first;
 };
 
+const maybeApplyBalanceOffset = (transactions: Transaction[], options?: SanitizerOptions): Transaction[] => {
+  if (transactions.length === 0) return transactions;
+
+  const opening = Number(options?.openingBalance);
+  const closing = Number(options?.closingBalance);
+  const first = transactions[0];
+  const last = transactions[transactions.length - 1];
+
+  const firstBalance = Number(first.balance ?? NaN);
+  const firstDebit = Number(first.debit || 0);
+  const firstCredit = Number(first.credit || 0);
+  const lastBalance = Number(last.balance ?? NaN);
+
+  const deltas: number[] = [];
+  if (Number.isFinite(opening) && Number.isFinite(firstBalance)) {
+    const inferredOpening = firstBalance - firstCredit + firstDebit;
+    deltas.push(roundTo2(opening - inferredOpening));
+  }
+  if (Number.isFinite(closing) && Number.isFinite(lastBalance)) {
+    deltas.push(roundTo2(closing - lastBalance));
+  }
+
+  if (deltas.length === 0) return transactions;
+
+  const MAX_ALLOWED_OFFSET = 0.1;
+  const MIN_MEANINGFUL_OFFSET = 0.01;
+  let chosenOffset: number | null = null;
+
+  if (deltas.length === 2) {
+    const [d1, d2] = deltas;
+    if (Math.abs(d1 - d2) <= 0.01 && Math.abs(d1) <= MAX_ALLOWED_OFFSET) {
+      chosenOffset = roundTo2((d1 + d2) / 2);
+    }
+  } else if (Math.abs(deltas[0]) <= MAX_ALLOWED_OFFSET) {
+    chosenOffset = deltas[0];
+  }
+
+  if (chosenOffset === null || Math.abs(chosenOffset) < MIN_MEANINGFUL_OFFSET) {
+    return transactions;
+  }
+
+  return transactions.map((transaction) => {
+    const balance = Number(transaction.balance ?? NaN);
+    if (!Number.isFinite(balance)) return transaction;
+    return {
+      ...transaction,
+      balance: roundTo2(balance + chosenOffset),
+    };
+  });
+};
+
 export const sanitizeTransactions = (transactions: Transaction[], options?: SanitizerOptions): Transaction[] => {
   const filtered = transactions.filter((t) => {
     if (!isDateLike(t.date)) return false;
@@ -368,19 +420,20 @@ export const sanitizeTransactions = (transactions: Transaction[], options?: Sani
     return true;
   });
   const directionCorrected = correctAmountDirection(filtered);
-  const direction = inferBalanceDirection(directionCorrected);
+  const offsetAligned = maybeApplyBalanceOffset(directionCorrected, options);
+  const direction = inferBalanceDirection(offsetAligned);
 
   // Resolve edge-row ambiguity using opening balance when available.
   if (Number.isFinite(Number(options?.openingBalance))) {
-    const edgeIndex = direction === 'forward' ? 0 : directionCorrected.length - 1;
-    trySwapByOpeningBalance(directionCorrected, edgeIndex, Number(options?.openingBalance));
+    const edgeIndex = direction === 'forward' ? 0 : offsetAligned.length - 1;
+    trySwapByOpeningBalance(offsetAligned, edgeIndex, Number(options?.openingBalance));
   }
 
   // Remove OCR/AI duplicate rows that represent the same movement and balance.
   const deduped: Transaction[] = [];
   const indexByKey = new Map<string, number>();
 
-  for (const transaction of directionCorrected) {
+  for (const transaction of offsetAligned) {
     const key = transactionKey(transaction);
     const existingIndex = indexByKey.get(key);
 
