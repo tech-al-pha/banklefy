@@ -10,6 +10,8 @@ import {
   callGroqVisionOCR,
   callMistralVisionOCR,
   callTesseractOcrWorker,
+  correctMinorBalanceDrift,
+  extractBankMetadataFromOcrText,
   mergeOcrTransactionsDeterministic,
   normalizeRawTransactions,
   recoverAdcbTransactionsFromOcrText,
@@ -1410,6 +1412,15 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Repair tiny OCR balance tail drift (e.g., 0.02/0.05) while preserving debit/credit.
+    const balanceDriftCorrection = correctMinorBalanceDrift(rawTransactions, 0.1);
+    if (balanceDriftCorrection.correctedCount > 0) {
+      console.log(`Corrected minor OCR balance drift on ${balanceDriftCorrection.correctedCount} row(s)`);
+      rawTransactions = balanceDriftCorrection.transactions;
+    }
+
+    const ocrTextBankMetadata = extractBankMetadataFromOcrText(extractedText);
+
     // Log extraction status
     console.log(generateStatusReport(extractionResult.status));
 
@@ -1490,6 +1501,7 @@ Deno.serve(async (req) => {
     }));
     const provisionalBankInfo = mergeBankMetadata(
       clientParsedBankMetadata,
+      ocrTextBankMetadata,
       collectedBankMetadata,
       extractionResult.bankMetadata,
     );
@@ -1617,6 +1629,7 @@ Deno.serve(async (req) => {
     // Generate Excel (styled)
     const bankInfo = mergeBankMetadata(
       clientParsedBankMetadata,
+      ocrTextBankMetadata,
       collectedBankMetadata,
       extractionResult.bankMetadata,
     );

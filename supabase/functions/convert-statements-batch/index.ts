@@ -7,6 +7,8 @@ import {
   callGroqVisionOCR,
   callMistralVisionOCR,
   callTesseractOcrWorker,
+  correctMinorBalanceDrift,
+  extractBankMetadataFromOcrText,
   mergeOcrTransactionsDeterministic,
   normalizeRawTransactions,
   recoverAdcbTransactionsFromOcrText,
@@ -814,6 +816,13 @@ const processStatement = async (params: {
       rawTransactions = recoveredAdcbTransactions;
     }
   }
+
+  const balanceDriftCorrection = correctMinorBalanceDrift(rawTransactions, 0.1);
+  if (balanceDriftCorrection.correctedCount > 0) {
+    console.log(`Corrected minor OCR balance drift on ${balanceDriftCorrection.correctedCount} row(s)`);
+    rawTransactions = balanceDriftCorrection.transactions;
+  }
+  const ocrTextBankMetadata = extractBankMetadataFromOcrText(extractedText);
   console.log(generateStatusReport(extractionResult.status));
 
   if (!rawTransactions || rawTransactions.length === 0) {
@@ -839,6 +848,7 @@ const processStatement = async (params: {
   }));
   const provisionalBankInfo = mergeBankMetadata(
     clientParsedBankMetadata,
+    ocrTextBankMetadata,
     collectedBankMetadata,
     extractionResult.bankMetadata,
   );
@@ -907,6 +917,7 @@ const processStatement = async (params: {
     reconciliation,
     bankInfo: mergeBankMetadata(
       clientParsedBankMetadata,
+      ocrTextBankMetadata,
       collectedBankMetadata,
       extractionResult.bankMetadata,
     ),
@@ -914,6 +925,7 @@ const processStatement = async (params: {
 
   const bankMetadata = mergeBankMetadata(
     clientParsedBankMetadata,
+    ocrTextBankMetadata,
     collectedBankMetadata,
     extractionResult.bankMetadata,
   );

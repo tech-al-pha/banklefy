@@ -748,6 +748,186 @@ const parseMoneyMaybe = (value: string | undefined): number | undefined => {
   return Number.isFinite(parsed) ? Math.abs(parsed) : undefined;
 };
 
+const roundTo2 = (value: number): number => Math.round(value * 100) / 100;
+
+const toFiniteAmount = (value: unknown): number => {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) return 0;
+  return roundTo2(Math.abs(n));
+};
+
+const toFiniteBalance = (value: unknown): number | undefined => {
+  const n = Number(value ?? NaN);
+  if (!Number.isFinite(n)) return undefined;
+  return roundTo2(n);
+};
+
+export const correctMinorBalanceDrift = (
+  transactions: RawTransaction[],
+  maxDiff = 0.1,
+): { transactions: RawTransaction[]; correctedCount: number } => {
+  if (!transactions || transactions.length <= 1) {
+    return {
+      transactions: (transactions || []).map((row) => ({
+        ...row,
+        debit: toFiniteAmount(row.debit),
+        credit: toFiniteAmount(row.credit),
+        balance: toFiniteBalance(row.balance),
+      })),
+      correctedCount: 0,
+    };
+  }
+
+  const normalized = transactions.map((row) => ({
+    ...row,
+    debit: toFiniteAmount(row.debit),
+    credit: toFiniteAmount(row.credit),
+    balance: toFiniteBalance(row.balance),
+  }));
+
+  let correctedCount = 0;
+  let prevBalance = normalized[0].balance;
+
+  for (let i = 1; i < normalized.length; i += 1) {
+    const row = normalized[i];
+    const currentBalance = row.balance;
+    if (!Number.isFinite(Number(prevBalance)) || !Number.isFinite(Number(currentBalance))) {
+      prevBalance = currentBalance;
+      continue;
+    }
+
+    const expected = roundTo2(Number(prevBalance) + Number(row.credit || 0) - Number(row.debit || 0));
+    const diff = roundTo2(Number(currentBalance) - expected);
+
+    if (Math.abs(diff) > 0 && Math.abs(diff) <= maxDiff) {
+      normalized[i] = {
+        ...row,
+        balance: expected,
+      };
+      correctedCount += 1;
+      prevBalance = expected;
+      continue;
+    }
+
+    prevBalance = currentBalance;
+  }
+
+  return { transactions: normalized, correctedCount };
+};
+
+const detectBankNameFromText = (text: string): string | undefined => {
+  const lower = text.toLowerCase();
+  const knownBanks: Array<[RegExp, string]> = [
+    [/adcb|abu dhabi commercial bank/i, 'ADCB'],
+    [/emirates\s+nbd/i, 'Emirates NBD'],
+    [/hdfc/i, 'HDFC Bank'],
+    [/icici/i, 'ICICI Bank'],
+    [/state bank of india|sbi/i, 'SBI'],
+    [/axis bank/i, 'Axis Bank'],
+    [/fab|first abu dhabi bank/i, 'FAB'],
+    [/wio bank|wio/i, 'Wio Bank'],
+  ];
+
+  for (const [pattern, label] of knownBanks) {
+    if (pattern.test(lower)) return label;
+  }
+  return undefined;
+};
+
+const pickLongest = (values: string[]): string | undefined => {
+  const cleaned = values.map((v) => v.trim()).filter(Boolean);
+  if (cleaned.length === 0) return undefined;
+  return cleaned.sort((a, b) => b.length - a.length)[0];
+};
+
+const extractCurrencyCode = (text: string): string | undefined => {
+  const match = text.toUpperCase().match(/\b(AED|USD|INR|EUR|GBP|SAR|QAR|OMR|KWD|BHD|SGD|AUD|CAD|CHF)\b/);
+  return match?.[1];
+};
+
+const extractAccountNumberFromText = (text: string): string | undefined => {
+  const accountLine =
+    text.match(/account\s*(?:no|number)\.?\s*:\s*([^\n]+)/i)?.[1] ||
+    text.match(/a\/c\s*no\.?\s*:\s*([^\n]+)/i)?.[1];
+  if (!accountLine) return undefined;
+
+  const beforeName = accountLine.split(/account\s*name\s*:/i)[0];
+  const compact = beforeName.replace(/\s+/g, ' ').trim();
+  const direct = compact.match(/\b[A-Z0-9-]{8,}\b/g);
+  if (direct && direct.length > 0) {
+    // Prefer candidate with most digits.
+    const ranked = direct
+      .map((token) => ({ token, digits: (token.match(/\d/g) || []).length }))
+      .sort((a, b) => b.digits - a.digits || b.token.length - a.token.length);
+    return ranked[0].token;
+  }
+  return undefined;
+};
+
+const extractAccountHolderFromText = (text: string): string | undefined => {
+  const direct = text.match(/account\s*name\s*:\s*([^\n]+)/i)?.[1];
+  if (direct) {
+    const value = direct.replace(/\s+/g, ' ').trim();
+    if (value) return value;
+  }
+  return undefined;
+};
+
+const extractStatementPeriodFromText = (text: string): string | undefined => {
+  const startEnd = text.match(
+    /start\s*date\s*:\s*([0-9A-Za-z/-]+)\s*end\s*date\s*:\s*([0-9A-Za-z/-]+)/i,
+  );
+  if (startEnd) {
+    const from = parseStatementDate(startEnd[1]) || startEnd[1];
+    const to = parseStatementDate(startEnd[2]) || startEnd[2];
+    return `${from} - ${to}`;
+  }
+
+  const fromTo = text.match(
+    /\bfrom\b\s*:?\s*([0-9A-Za-z/-]+)\s*(?:to|-)\s*([0-9A-Za-z/-]+)/i,
+  );
+  if (fromTo) {
+    const from = parseStatementDate(fromTo[1]) || fromTo[1];
+    const to = parseStatementDate(fromTo[2]) || fromTo[2];
+    return `${from} - ${to}`;
+  }
+  return undefined;
+};
+
+export const extractBankMetadataFromOcrText = (text: string): BankMetadata | undefined => {
+  const input = String(text || '');
+  if (!input.trim()) return undefined;
+
+  const ibanMatches = input.toUpperCase().match(/\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b/g) || [];
+  const iban = pickLongest(Array.from(new Set(ibanMatches)));
+
+  const openingBalance = parseMoneyMaybe(
+    input.match(/opening(?:\s+balance)?\s*:\s*([0-9,]+\.\d{2})/i)?.[1],
+  );
+  const closingBalance = parseMoneyMaybe(
+    input.match(/closing(?:\s*\(available\))?\s*balance\s*:\s*([0-9,]+\.\d{2})/i)?.[1],
+  );
+
+  const metadata: BankMetadata = {
+    bankName: detectBankNameFromText(input) || '',
+    accountNumber: extractAccountNumberFromText(input) || '',
+    accountHolder: extractAccountHolderFromText(input) || '',
+    currency: extractCurrencyCode(input) || '',
+    iban,
+    statementPeriod: extractStatementPeriodFromText(input),
+    openingBalance,
+    closingBalance,
+  };
+
+  const hasValue = Object.values(metadata).some((value) => {
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (typeof value === 'number') return Number.isFinite(value);
+    return false;
+  });
+
+  return hasValue ? metadata : undefined;
+};
+
 const normalizeMarkdownText = (value: string): string =>
   value
     .replace(/\r/g, '\n')
