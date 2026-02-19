@@ -507,36 +507,58 @@ export async function callGroqVisionOCR(
     console.log(`Calling Groq Llama Vision for OCR (${strictTableMode ? 'strict-table' : 'standard'})...`);
     
     const dataUrl = `data:${mimeType};base64,${imageBase64}`;
-    
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+
+    const requestPayload = {
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt + '\n\nExtract bank metadata and ALL transactions from this bank statement. Return only JSON object.' },
+            {
+              type: 'image_url',
+              image_url: { url: dataUrl }
+            }
+          ]
+        }
+      ],
+      // Keep this deterministic and structured for table extraction.
+      response_format: { type: 'json_object' as const },
+      temperature: 0.1,
+      max_tokens: strictTableMode ? 9500 : 8000,
+    };
+
+    let response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${GROQ_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt + '\n\nExtract bank metadata and ALL transactions from this bank statement. Return only JSON object.' },
-              { 
-                type: 'image_url', 
-                image_url: { url: dataUrl } 
-              }
-            ]
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: strictTableMode ? 9500 : 8000,
-      })
+      body: JSON.stringify(requestPayload)
     });
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Groq Vision OCR error:', response.status, errorText);
-      return { success: false, error: `Groq API error: ${response.status}` };
+      const firstErrorText = await response.text();
+      // Some environments may reject response_format for this endpoint/model.
+      // Retry once without response_format before failing hard.
+      if (response.status === 400) {
+        response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...requestPayload,
+            response_format: undefined,
+          })
+        });
+      }
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Groq Vision OCR error:', response.status, errorText || firstErrorText);
+        return { success: false, error: `Groq API error: ${response.status}` };
+      }
     }
     
     const data = await response.json();
