@@ -8,6 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import {
   classifyDocument,
   callGroqVisionOCR,
+  callTesseractOcrWorker,
   normalizeRawTransactions,
   recoverAdcbTransactionsFromOcrText,
   scoreRunningBalanceFlow,
@@ -56,6 +57,9 @@ const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
 const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
 const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${30 * 1024 * 1024}`); // 30MB
+type OcrWorkerMode = 'off' | 'primary';
+const OCR_WORKER_MODE: OcrWorkerMode =
+  (Deno.env.get('OCR_WORKER_MODE') || '').trim().toLowerCase() === 'primary' ? 'primary' : 'off';
 type StrictOcrRetryMode = 'off' | 'smart' | 'always';
 const normalizeStrictOcrRetryMode = (value: string | undefined): StrictOcrRetryMode => {
   const mode = (value || '').trim().toLowerCase();
@@ -1211,9 +1215,23 @@ Deno.serve(async (req) => {
         if (!match) continue;
         const pageMime = match[1];
         const pageBase64 = match[2];
-        let pageResult = await callGroqVisionOCR(pageBase64, pageMime);
+        let pageResult: OCRResult | null = null;
+
+        if (OCR_WORKER_MODE === 'primary') {
+          const workerResult = await callTesseractOcrWorker(pageBase64, pageMime, fileName);
+          if (workerResult.success && workerResult.transactions && workerResult.transactions.length > 0) {
+            pageResult = workerResult;
+            console.log('Using Tesseract OCR worker result for this page.');
+          }
+        }
+
+        if (!pageResult) {
+          pageResult = await callGroqVisionOCR(pageBase64, pageMime);
+        }
 
         if (
+          pageResult &&
+          OCR_WORKER_MODE !== 'primary' &&
           strictRetryCount < STRICT_OCR_RETRY_MAX_PAGES &&
           shouldRetryStrictVisionPass(lowerFileName, pageResult, STRICT_OCR_RETRY_MODE)
         ) {
@@ -1226,7 +1244,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        if (pageResult.success && pageResult.transactions && pageResult.transactions.length > 0) {
+        if (pageResult && pageResult.success && pageResult.transactions && pageResult.transactions.length > 0) {
           pagesWithData += 1;
           collected.push(...pageResult.transactions);
           if (pageResult.text) combinedText += (combinedText ? '\n' : '') + pageResult.text;

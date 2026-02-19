@@ -420,6 +420,71 @@ export const normalizeRawTransactions = (rows: unknown[]): RawTransaction[] => {
   return rows.map((row) => normalizeTransaction(row as Record<string, unknown>));
 };
 
+const normalizeOcrWorkerUrl = (value: string): string => value.replace(/\/+$/, '');
+
+export async function callTesseractOcrWorker(
+  imageBase64: string,
+  mimeType: string,
+  fileName?: string,
+): Promise<OCRResult> {
+  const workerUrlRaw = Deno.env.get('OCR_WORKER_URL');
+  if (!workerUrlRaw) {
+    return { success: false, error: 'OCR worker URL not configured' };
+  }
+
+  const workerUrl = normalizeOcrWorkerUrl(workerUrlRaw);
+  const workerApiKey = Deno.env.get('OCR_WORKER_API_KEY') || '';
+  const timeoutMs = Math.max(3_000, Number(Deno.env.get('OCR_WORKER_TIMEOUT_MS') ?? '45000'));
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${workerUrl}/ocr/page`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(workerApiKey ? { 'x-api-key': workerApiKey } : {}),
+      },
+      body: JSON.stringify({
+        imageBase64,
+        mimeType,
+        fileName,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        success: false,
+        error: `OCR worker error ${response.status}: ${errorText.slice(0, 200)}`,
+      };
+    }
+
+    const payload = await response.json() as Record<string, unknown>;
+    const transactionsRaw = Array.isArray(payload.transactions) ? payload.transactions : [];
+    const bankMetadataRaw =
+      payload.bankMetadata && typeof payload.bankMetadata === 'object' && !Array.isArray(payload.bankMetadata)
+        ? (payload.bankMetadata as Record<string, unknown>)
+        : undefined;
+
+    return {
+      success: payload.success === true || transactionsRaw.length > 0,
+      text: typeof payload.text === 'string' ? payload.text : undefined,
+      transactions: normalizeRawTransactions(transactionsRaw),
+      bankMetadata: bankMetadataRaw ? normalizeBankMetadata(bankMetadataRaw) : undefined,
+      error: typeof payload.error === 'string' ? payload.error : undefined,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'OCR worker request failed',
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 type GroqVisionOcrOptions = {
   strictTableMode?: boolean;
 };
