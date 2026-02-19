@@ -56,6 +56,17 @@ const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
 const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
 const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${30 * 1024 * 1024}`); // 30MB
+type StrictOcrRetryMode = 'off' | 'smart' | 'always';
+const normalizeStrictOcrRetryMode = (value: string | undefined): StrictOcrRetryMode => {
+  const mode = (value || '').trim().toLowerCase();
+  if (mode === 'off' || mode === 'always' || mode === 'smart') return mode;
+  return 'smart';
+};
+const STRICT_OCR_RETRY_MODE = normalizeStrictOcrRetryMode(Deno.env.get('OCR_STRICT_RETRY_MODE'));
+const STRICT_OCR_RETRY_MAX_PAGES = Math.max(
+  0,
+  Number(Deno.env.get('OCR_STRICT_RETRY_MAX_PAGES') ?? (STRICT_OCR_RETRY_MODE === 'always' ? '120' : '2')),
+);
 
 // ============= DEPLOYMENT-AGNOSTIC CORS =============
 // Allows requests from any origin. The edge function runs on Supabase infrastructure
@@ -313,14 +324,18 @@ const balanceMismatchRatio = (transactions: RawTransaction[] | undefined): numbe
 const shouldRetryStrictVisionPass = (
   fileNameLower: string,
   primaryResult: OCRResult,
+  mode: StrictOcrRetryMode,
 ): boolean => {
+  if (mode === 'off') return false;
+  if (mode === 'always') return true;
+
   const tx = primaryResult.transactions || [];
   const likelyDenseTableBank = /(adcb|procash|statement of accounts)/i.test(fileNameLower);
-  if (likelyDenseTableBank) return true;
+  if (likelyDenseTableBank && tx.length <= 10) return true;
   if (!primaryResult.success || tx.length === 0) return true;
 
   const mismatchRatio = balanceMismatchRatio(tx);
-  if (tx.length >= 8 && mismatchRatio > 0.05) return true;
+  if (tx.length >= 8 && mismatchRatio > 0.1) return true;
   if (tx.length >= 4 && mismatchRatio > 0.2) return true;
   return false;
 };
@@ -1188,6 +1203,7 @@ Deno.serve(async (req) => {
       const collected: RawTransaction[] = [];
       pagesWithData = 0;
       let combinedText = '';
+      let strictRetryCount = 0;
 
       for (const img of pdfPageImages as string[]) {
         if (typeof img !== 'string') continue;
@@ -1197,8 +1213,12 @@ Deno.serve(async (req) => {
         const pageBase64 = match[2];
         let pageResult = await callGroqVisionOCR(pageBase64, pageMime);
 
-        if (shouldRetryStrictVisionPass(lowerFileName, pageResult)) {
+        if (
+          strictRetryCount < STRICT_OCR_RETRY_MAX_PAGES &&
+          shouldRetryStrictVisionPass(lowerFileName, pageResult, STRICT_OCR_RETRY_MODE)
+        ) {
           const strictResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: true });
+          strictRetryCount += 1;
           const chosenResult = chooseBetterVisionResult(pageResult, strictResult);
           if (chosenResult !== pageResult) {
             console.log('Using strict-table OCR pass for a PDF page (better extraction quality).');
@@ -1217,6 +1237,9 @@ Deno.serve(async (req) => {
         } else {
           errors.push(pageResult.error || 'No data extracted');
         }
+      }
+      if (strictRetryCount > 0) {
+        console.log(`Strict OCR retries used: ${strictRetryCount}/${STRICT_OCR_RETRY_MAX_PAGES} (mode=${STRICT_OCR_RETRY_MODE})`);
       }
 
       status.groqVision.time = Date.now() - start;
