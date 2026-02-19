@@ -828,9 +828,14 @@ export const pdfToPageImages = async (
     const base64 = dataUrl.slice(commaIndex + 1);
     return Math.floor((base64.length * 3) / 4);
   };
+  const OCR_TARGET_RENDER_SCALE = 3.4;
+  const OCR_MAX_CANVAS_PIXELS = 17_000_000;
+  const OCR_MIN_RENDER_SCALE = 1.8;
+  const OCR_SOFT_IMAGE_BYTE_CAP = 2_950_000;
 
   const toOcrFriendlyDataUrl = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): string => {
-    // OCR-friendly preprocessing: grayscale + global thresholding keeps table digits crisp.
+    // OCR-friendly preprocessing for dense bank tables:
+    // grayscale + percentile contrast stretching keeps decimals/commas readable.
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const { data } = imageData;
     const histogram = new Uint32Array(256);
@@ -841,61 +846,65 @@ export const pdfToPageImages = async (
     }
 
     const totalPixels = canvas.width * canvas.height;
-    let sum = 0;
-    for (let i = 0; i < 256; i += 1) sum += i * histogram[i];
-
-    let sumB = 0;
-    let wB = 0;
-    let maxVariance = 0;
-    let otsuThreshold = 165;
-    for (let i = 0; i < 256; i += 1) {
-      wB += histogram[i];
-      if (wB === 0) continue;
-      const wF = totalPixels - wB;
-      if (wF === 0) break;
-      sumB += i * histogram[i];
-      const mB = sumB / wB;
-      const mF = (sum - sumB) / wF;
-      const variance = wB * wF * (mB - mF) * (mB - mF);
-      if (variance > maxVariance) {
-        maxVariance = variance;
-        otsuThreshold = i;
+    const percentileGray = (ratio: number): number => {
+      const target = totalPixels * ratio;
+      let cumulative = 0;
+      for (let i = 0; i < 256; i += 1) {
+        cumulative += histogram[i];
+        if (cumulative >= target) return i;
       }
-    }
+      return 255;
+    };
 
-    const threshold = Math.max(125, Math.min(200, otsuThreshold - 10));
+    const low = percentileGray(0.02);
+    const high = percentileGray(0.98);
+    const span = Math.max(24, high - low);
+
     for (let i = 0; i < data.length; i += 4) {
       const gray = (data[i] * 0.299) + (data[i + 1] * 0.587) + (data[i + 2] * 0.114);
-      const bw = gray > threshold ? 255 : 0;
-      data[i] = bw;
-      data[i + 1] = bw;
-      data[i + 2] = bw;
+      const stretched = ((gray - low) * 255) / span;
+      const clipped = Math.max(0, Math.min(255, stretched));
+      const gammaAdjusted = Math.pow(clipped / 255, 0.92) * 255;
+      // Keep near-black/near-white snapped while preserving midtones.
+      const enhanced = gammaAdjusted >= 248 ? 255 : gammaAdjusted <= 8 ? 0 : gammaAdjusted;
+      data[i] = enhanced;
+      data[i + 1] = enhanced;
+      data[i + 2] = enhanced;
       data[i + 3] = 255;
     }
     ctx.putImageData(imageData, 0, 0);
 
     // PNG keeps OCR edges sharp; fallback to JPEG if approaching per-image upload limits.
     const png = canvas.toDataURL("image/png");
-    if (estimateDataUrlBytes(png) <= 2_850_000) return png;
+    if (estimateDataUrlBytes(png) <= OCR_SOFT_IMAGE_BYTE_CAP) return png;
 
-    const jpegQualities = [0.95, 0.9, 0.86, 0.82];
+    const jpegQualities = [0.96, 0.92, 0.88, 0.84];
     for (const quality of jpegQualities) {
       const jpeg = canvas.toDataURL("image/jpeg", quality);
-      if (estimateDataUrlBytes(jpeg) <= 2_850_000) return jpeg;
+      if (estimateDataUrlBytes(jpeg) <= OCR_SOFT_IMAGE_BYTE_CAP) return jpeg;
     }
-    return canvas.toDataURL("image/jpeg", 0.8);
+    return canvas.toDataURL("image/jpeg", 0.82);
   };
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
-    // Higher render scale materially improves OCR on dense bank statement tables.
-    const viewport = page.getViewport({ scale: 2.7 });
+    const unitViewport = page.getViewport({ scale: 1 });
+    const maxScaleByPixels = Math.sqrt(
+      OCR_MAX_CANVAS_PIXELS / Math.max(1, unitViewport.width * unitViewport.height),
+    );
+    // Push scale higher for OCR while staying under a safe per-page pixel budget.
+    const renderScale =
+      maxScaleByPixels >= OCR_MIN_RENDER_SCALE
+        ? Math.min(OCR_TARGET_RENDER_SCALE, maxScaleByPixels)
+        : Math.max(1, maxScaleByPixels);
+    const viewport = page.getViewport({ scale: renderScale });
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) continue;
 
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
+    ctx.imageSmoothingEnabled = false;
 
     await page.render({ canvasContext: ctx, viewport }).promise;
     images.push(toOcrFriendlyDataUrl(canvas, ctx));

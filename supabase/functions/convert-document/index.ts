@@ -11,6 +11,7 @@ import {
   normalizeRawTransactions,
   recoverAdcbTransactionsFromOcrText,
   scoreRunningBalanceFlow,
+  type OCRResult,
   type RawTransaction,
   type BankMetadata,
 } from '../_shared/ocr-processor.ts';
@@ -301,6 +302,51 @@ const mergeBankMetadata = (...candidates: Array<BankMetadata | undefined>): Bank
   }
 
   return hasValue ? merged : undefined;
+};
+
+const balanceMismatchRatio = (transactions: RawTransaction[] | undefined): number => {
+  if (!transactions || transactions.length === 0) return 1;
+  const flow = scoreRunningBalanceFlow(transactions);
+  return flow.total > 0 ? flow.mismatchRatio : 1;
+};
+
+const shouldRetryStrictVisionPass = (
+  fileNameLower: string,
+  primaryResult: OCRResult,
+): boolean => {
+  const tx = primaryResult.transactions || [];
+  const likelyDenseTableBank = /(adcb|procash|statement of accounts)/i.test(fileNameLower);
+  if (likelyDenseTableBank) return true;
+  if (!primaryResult.success || tx.length === 0) return true;
+
+  const mismatchRatio = balanceMismatchRatio(tx);
+  if (tx.length >= 8 && mismatchRatio > 0.05) return true;
+  if (tx.length >= 4 && mismatchRatio > 0.2) return true;
+  return false;
+};
+
+const chooseBetterVisionResult = (primaryResult: OCRResult, strictResult: OCRResult): OCRResult => {
+  const primaryTx = primaryResult.transactions || [];
+  const strictTx = strictResult.transactions || [];
+  if (!strictResult.success || strictTx.length === 0) {
+    return primaryResult;
+  }
+  if (!primaryResult.success || primaryTx.length === 0) {
+    return strictResult;
+  }
+
+  const primaryMismatch = balanceMismatchRatio(primaryTx);
+  const strictMismatch = balanceMismatchRatio(strictTx);
+  const strictHasEnoughRows = strictTx.length >= Math.max(3, primaryTx.length - 2);
+  const strictHasMoreRows = strictTx.length >= primaryTx.length + 2;
+
+  if (strictHasEnoughRows && strictMismatch + 0.08 < primaryMismatch) {
+    return strictResult;
+  }
+  if (strictHasMoreRows && strictMismatch <= primaryMismatch + 0.05) {
+    return strictResult;
+  }
+  return primaryResult;
 };
 
 const normalizePlan = (value: unknown): string =>
@@ -1149,17 +1195,27 @@ Deno.serve(async (req) => {
         if (!match) continue;
         const pageMime = match[1];
         const pageBase64 = match[2];
-        const res = await callGroqVisionOCR(pageBase64, pageMime);
-        if (res.success && res.transactions && res.transactions.length > 0) {
+        let pageResult = await callGroqVisionOCR(pageBase64, pageMime);
+
+        if (shouldRetryStrictVisionPass(lowerFileName, pageResult)) {
+          const strictResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: true });
+          const chosenResult = chooseBetterVisionResult(pageResult, strictResult);
+          if (chosenResult !== pageResult) {
+            console.log('Using strict-table OCR pass for a PDF page (better extraction quality).');
+            pageResult = chosenResult;
+          }
+        }
+
+        if (pageResult.success && pageResult.transactions && pageResult.transactions.length > 0) {
           pagesWithData += 1;
-          collected.push(...res.transactions);
-          if (res.text) combinedText += (combinedText ? '\n' : '') + res.text;
-          if (res.bankMetadata) {
-            collectedBankMetadata = mergeBankMetadata(collectedBankMetadata, res.bankMetadata);
+          collected.push(...pageResult.transactions);
+          if (pageResult.text) combinedText += (combinedText ? '\n' : '') + pageResult.text;
+          if (pageResult.bankMetadata) {
+            collectedBankMetadata = mergeBankMetadata(collectedBankMetadata, pageResult.bankMetadata);
             console.log('Bank metadata detected:', collectedBankMetadata);
           }
         } else {
-          errors.push(res.error || 'No data extracted');
+          errors.push(pageResult.error || 'No data extracted');
         }
       }
 

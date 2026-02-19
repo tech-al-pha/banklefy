@@ -118,6 +118,43 @@ AMOUNT RULES:
 
 Return ONLY valid JSON. No markdown, no code blocks.`;
 
+const OCR_PROMPT_STRICT_TABLE = `You are an expert OCR engine for bank statement TABLES.
+
+Extract ONLY transaction rows from this single statement page and return JSON object:
+{
+  "bankMetadata": { ...optional metadata fields... },
+  "transactions": [
+    {
+      "date": "YYYY-MM-DD",
+      "refNumber": "identifier only when dedicated reference column exists, else \"\"",
+      "description": "narration text",
+      "debit": 0,
+      "credit": 0,
+      "balance": 0
+    }
+  ]
+}
+
+STRICT TABLE RULES:
+1) Use table COLUMN POSITION, not narration meaning.
+2) If headers include "Debit Amount", "Credit Amount", "Running Balance":
+   - debit must come only from Debit column
+   - credit must come only from Credit column
+   - running balance must come only from Running Balance column
+3) If debit or credit cell is "-" or blank, output 0 for that side.
+4) Never move an amount from Debit to Credit (or vice versa) unless running balance math proves mismatch.
+5) Keep decimals exactly with 2 places. Do not invent/round/merge values.
+6) Keep one JSON row per transaction row. Do not merge adjacent rows.
+7) Ignore summary/header/footer lines and page numbers.
+8) If both Transaction Date and Value Date exist, use Transaction Date.
+9) Never output negative debit or credit; output positive numbers.
+
+Reference number rule:
+- Populate refNumber only if there is a dedicated reference/ID column.
+- If code appears only inside narration text, keep it inside description and set refNumber to "".
+
+Return ONLY valid JSON. No markdown, no code blocks.`;
+
 const pickString = (value: unknown): string | undefined => {
   if (value === null || value === undefined) return undefined;
   if (typeof value === 'string') return value;
@@ -383,9 +420,14 @@ export const normalizeRawTransactions = (rows: unknown[]): RawTransaction[] => {
   return rows.map((row) => normalizeTransaction(row as Record<string, unknown>));
 };
 
+type GroqVisionOcrOptions = {
+  strictTableMode?: boolean;
+};
+
 export async function callGroqVisionOCR(
-  imageBase64: string, 
-  mimeType: string
+  imageBase64: string,
+  mimeType: string,
+  options?: GroqVisionOcrOptions,
 ): Promise<OCRResult> {
   const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
   
@@ -395,7 +437,9 @@ export async function callGroqVisionOCR(
   }
   
   try {
-    console.log('Calling Groq Llama Vision for OCR...');
+    const strictTableMode = options?.strictTableMode === true;
+    const prompt = strictTableMode ? OCR_PROMPT_STRICT_TABLE : OCR_PROMPT;
+    console.log(`Calling Groq Llama Vision for OCR (${strictTableMode ? 'strict-table' : 'standard'})...`);
     
     const dataUrl = `data:${mimeType};base64,${imageBase64}`;
     
@@ -411,7 +455,7 @@ export async function callGroqVisionOCR(
           {
             role: 'user',
             content: [
-              { type: 'text', text: OCR_PROMPT + '\n\nExtract bank metadata and ALL transactions from this bank statement. Return only JSON object.' },
+              { type: 'text', text: prompt + '\n\nExtract bank metadata and ALL transactions from this bank statement. Return only JSON object.' },
               { 
                 type: 'image_url', 
                 image_url: { url: dataUrl } 
@@ -420,7 +464,7 @@ export async function callGroqVisionOCR(
           }
         ],
         temperature: 0.1,
-        max_tokens: 8000,
+        max_tokens: strictTableMode ? 9500 : 8000,
       })
     });
     
@@ -747,7 +791,8 @@ export const scoreRunningBalanceFlow = (transactions: RawTransaction[]): { misma
 
     total += 1;
     const diff = Math.abs((prev + credit - debit) - current);
-    const tolerance = Math.max(0.02, Math.abs(debit || credit) * 0.03);
+    const magnitude = Math.max(Math.abs(debit), Math.abs(credit), Math.abs(prev), Math.abs(current));
+    const tolerance = Math.max(0.05, Math.min(3, magnitude * 0.0015)); // 0.15% tolerance, capped at 3
     if (diff <= tolerance) matched += 1;
   }
 
