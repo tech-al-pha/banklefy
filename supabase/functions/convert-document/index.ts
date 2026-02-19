@@ -1280,7 +1280,15 @@ Deno.serve(async (req) => {
       expectedBalance: t.expectedBalance,
       riskFlag: t.riskFlag,
     }));
-    const transactions = sanitizeTransactions(extractedTransactions);
+    const provisionalBankInfo = mergeBankMetadata(
+      clientParsedBankMetadata,
+      collectedBankMetadata,
+      extractionResult.bankMetadata,
+    );
+    const transactions = sanitizeTransactions(extractedTransactions, {
+      openingBalance: provisionalBankInfo?.openingBalance,
+      closingBalance: provisionalBankInfo?.closingBalance,
+    });
 
     // ============= LAYER 4: FINANCIAL ENGINE (Pure TypeScript) =============
     console.log('Starting financial analysis...');

@@ -81,6 +81,11 @@ const cleanText = (value: string): string =>
 
 type BalanceDirection = 'forward' | 'reverse';
 
+type SanitizerOptions = {
+  openingBalance?: number;
+  closingBalance?: number;
+};
+
 const hasFiniteBalance = (transaction: Transaction): boolean =>
   Number.isFinite(Number(transaction.balance));
 
@@ -161,7 +166,51 @@ const scoreDirection = (transactions: Transaction[], direction: BalanceDirection
   return { score, samples };
 };
 
+const parseDateToTs = (value?: string): number | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const dt = new Date(`${trimmed}T00:00:00Z`);
+    const ts = dt.getTime();
+    return Number.isFinite(ts) ? ts : null;
+  }
+
+  const m = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (m) {
+    const [, dd, mm, yyRaw] = m;
+    const yy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
+    const dt = new Date(`${yy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T00:00:00Z`);
+    const ts = dt.getTime();
+    return Number.isFinite(ts) ? ts : null;
+  }
+
+  const ts = Date.parse(trimmed);
+  return Number.isFinite(ts) ? ts : null;
+};
+
+const inferDirectionFromDates = (transactions: Transaction[]): BalanceDirection | null => {
+  let asc = 0;
+  let desc = 0;
+
+  for (let i = 1; i < transactions.length; i++) {
+    const prev = parseDateToTs(transactions[i - 1].date);
+    const curr = parseDateToTs(transactions[i].date);
+    if (prev == null || curr == null || prev === curr) continue;
+    if (curr > prev) asc += 1;
+    if (curr < prev) desc += 1;
+  }
+
+  if (asc >= 2 && asc >= desc * 2) return 'forward';
+  if (desc >= 2 && desc >= asc * 2) return 'reverse';
+  return null;
+};
+
 const inferBalanceDirection = (transactions: Transaction[]): BalanceDirection => {
+  const dateDirection = inferDirectionFromDates(transactions);
+  if (dateDirection) return dateDirection;
+
   const forward = scoreDirection(transactions, 'forward');
   const reverse = scoreDirection(transactions, 'reverse');
 
@@ -250,6 +299,37 @@ const correctAmountDirection = (transactions: Transaction[]): Transaction[] => {
   return corrected;
 };
 
+const trySwapByOpeningBalance = (
+  transactions: Transaction[],
+  edgeIndex: number,
+  openingBalance: number,
+): boolean => {
+  if (!Number.isFinite(openingBalance)) return false;
+  if (edgeIndex < 0 || edgeIndex >= transactions.length) return false;
+
+  const edge = transactions[edgeIndex];
+  const debit = Number(edge.debit || 0);
+  const credit = Number(edge.credit || 0);
+  const actual = toMinor(edge.balance || 0);
+  if ((debit > 0 && credit > 0) || (debit === 0 && credit === 0) || !Number.isFinite(actual)) return false;
+
+  const asIsExpected = toMinor(openingBalance) + toMinor(credit) - toMinor(debit);
+  const swappedExpected = toMinor(openingBalance) + toMinor(debit) - toMinor(credit);
+  const asIsDiff = Math.abs(asIsExpected - actual);
+  const swappedDiff = Math.abs(swappedExpected - actual);
+
+  const improvement = asIsDiff - swappedDiff;
+  const amountMinor = Math.max(toMinor(debit), toMinor(credit));
+  const residualLimit = Math.max(2, Math.round(amountMinor * 0.002));
+  const clearlyBetter = improvement >= 2 && swappedDiff + 1 < asIsDiff;
+  const residualAcceptable = swappedDiff <= residualLimit || swappedDiff <= Math.round(asIsDiff * 0.2);
+
+  if (!clearlyBetter || !residualAcceptable) return false;
+
+  transactions[edgeIndex] = { ...edge, debit: credit, credit: debit };
+  return true;
+};
+
 const scoreTransactionQuality = (transaction: Transaction): number => {
   const description = (transaction.description || '').trim();
   const ref = (transaction.refNumber || '').trim();
@@ -278,7 +358,7 @@ const chooseBetterTransaction = (first: Transaction, second: Transaction): Trans
   return first;
 };
 
-export const sanitizeTransactions = (transactions: Transaction[]): Transaction[] => {
+export const sanitizeTransactions = (transactions: Transaction[], options?: SanitizerOptions): Transaction[] => {
   const filtered = transactions.filter((t) => {
     if (!isDateLike(t.date)) return false;
     if (isNonTransactionRow(t)) return false;
@@ -288,6 +368,13 @@ export const sanitizeTransactions = (transactions: Transaction[]): Transaction[]
     return true;
   });
   const directionCorrected = correctAmountDirection(filtered);
+  const direction = inferBalanceDirection(directionCorrected);
+
+  // Resolve edge-row ambiguity using opening balance when available.
+  if (Number.isFinite(Number(options?.openingBalance))) {
+    const edgeIndex = direction === 'forward' ? 0 : directionCorrected.length - 1;
+    trySwapByOpeningBalance(directionCorrected, edgeIndex, Number(options?.openingBalance));
+  }
 
   // Remove OCR/AI duplicate rows that represent the same movement and balance.
   const deduped: Transaction[] = [];

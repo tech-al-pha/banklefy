@@ -630,7 +630,15 @@ const processStatement = async (params: {
     expectedBalance: t.expectedBalance,
     riskFlag: t.riskFlag,
   }));
-  const transactions = sanitizeTransactions(extractedTransactions);
+  const provisionalBankInfo = mergeBankMetadata(
+    clientParsedBankMetadata,
+    collectedBankMetadata,
+    extractionResult.bankMetadata,
+  );
+  const transactions = sanitizeTransactions(extractedTransactions, {
+    openingBalance: provisionalBankInfo?.openingBalance,
+    closingBalance: provisionalBankInfo?.closingBalance,
+  });
 
   const reconciliation = reconcileBalances(transactions);
   const duplicateCount = detectDuplicates(transactions);
