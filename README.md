@@ -5,7 +5,7 @@ Banklefy is a modern, AI-powered SaaS tool that transforms messy bank statements
 Designed specifically for Chartered Accountants (CAs), freelancers, small lenders, NBFCs, and individuals in India – delivering 99%+ accuracy, privacy-first processing, and unbeatable value.
 
 ## Live Platform
-🌐 **https://banklefy.site**  
+🌐 **https://banklefy.***  
 Secure • Fast • Mobile-Friendly
 
 ## Key Features
