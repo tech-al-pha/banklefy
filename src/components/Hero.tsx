@@ -31,7 +31,7 @@ export const Hero = () => {
               {t('hero.titleLine1')}
             </h1>
             <h2
-              className="w-full font-black uppercase font-lequire mt-2 hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#6a6a6a] bg-clip-text text-transparent leading-[0.98]"
+              className="w-full font-black uppercase font-lequire mt-2 hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[0.98]"
               style={{ fontSize: "clamp(2.8rem, 9.8vw, 7.8rem)" }}
               aria-label={titleLine2}
             >
@@ -76,11 +76,11 @@ export const Hero = () => {
             {/* Stats... (unchanged) */}
           </div>
 
-          <div className="hidden md:flex flex-col justify-center gap-4 w-full max-w-[620px] md:translate-x-4 lg:translate-x-8">
+          <div className="hidden md:flex flex-col justify-center gap-6 w-full max-w-[620px] md:translate-x-4 lg:translate-x-8">
             {heroHighlights.map((line) => (
               <div
                 key={line}
-                className="rounded-full border border-white/25 bg-gradient-to-r from-[#0b1018] via-[#1a2029] to-[#3a4655] px-6 py-3 text-center text-sm font-semibold text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_24px_rgba(142,188,232,0.15)]"
+                className="rounded-full border border-white/30 bg-gradient-to-r from-[#0a0a0b] via-[#151617] to-[#2a2d31] px-6 py-3 text-center text-sm font-semibold text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_0_12px_rgba(255,255,255,0.08)]"
               >
                 {line}
               </div>
