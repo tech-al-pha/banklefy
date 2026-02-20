@@ -45,16 +45,13 @@ export const Hero = () => {
             </h2>
             </div>
 
-            <div className="w-full max-w-3xl space-y-3 pt-2">
-              {heroHighlights.map((line) => (
-                <div
-                  key={line}
-                  className="rounded-full border border-white/25 bg-gradient-to-r from-[#0b1018] via-[#1a2029] to-[#3a4655] px-6 py-3 text-sm md:text-base font-semibold text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_24px_rgba(142,188,232,0.15)]"
-                >
-                  {line}
-                </div>
-              ))}
+            <div className="inline-flex flex-wrap items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[0.65rem] sm:text-xs md:text-sm font-semibold text-primary/80 tracking-[0.28em] uppercase shadow-[0_0_18px_rgba(255,255,255,0.08)]">
+              {t("hero.tagline")}
             </div>
+
+            <p className="text-sm md:text-lg text-white/70 max-w-2xl leading-relaxed mt-6 mb-12 italic">
+              {t("hero.subtitle")}
+            </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-start items-start sm:items-center mt-14 w-full max-w-2xl">
             <Button 
@@ -79,7 +76,16 @@ export const Hero = () => {
             {/* Stats... (unchanged) */}
           </div>
 
-          <div className="hidden md:flex justify-end md:translate-x-6 lg:translate-x-10" />
+          <div className="hidden md:flex flex-col justify-center gap-4 w-full max-w-[620px] md:translate-x-4 lg:translate-x-8">
+            {heroHighlights.map((line) => (
+              <div
+                key={line}
+                className="rounded-full border border-white/25 bg-gradient-to-r from-[#0b1018] via-[#1a2029] to-[#3a4655] px-6 py-4 text-center text-sm lg:text-base font-semibold text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_0_24px_rgba(142,188,232,0.15)]"
+              >
+                {line}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
