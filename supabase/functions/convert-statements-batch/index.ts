@@ -949,6 +949,9 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  let supabaseAdmin: ReturnType<typeof createClient> | null = null;
+  const pendingSourceCleanupPaths = new Set<string>();
+
   try {
     const { files, timezone, recaptchaToken, outputMode } = await req.json();
     const requestedOutputMode = outputMode === 'tally_only' ? 'tally_only' : 'standard';
@@ -962,7 +965,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabaseAdmin = createClient(
+    supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
@@ -1040,6 +1043,10 @@ Deno.serve(async (req) => {
           JSON.stringify({ error: `File ID required for authenticated users (${sanitizedName})` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      if (user && typeof file.fileId === 'string' && file.fileId.length > 0) {
+        pendingSourceCleanupPaths.add(`${user.id}/${file.fileId}`);
       }
 
       if (Array.isArray(file.pdfPageImages) && file.pdfPageImages.length > 0) {
@@ -1238,6 +1245,7 @@ Deno.serve(async (req) => {
 
         // Create conversion record (authenticated only)
         if (user && file.fileId) {
+          const sourcePath = `${user.id}/${file.fileId}`;
           const insertPayload: Record<string, unknown> = {
             user_id: user.id,
             original_filename: sanitizedName,
@@ -1269,6 +1277,7 @@ Deno.serve(async (req) => {
             console.error('Failed to create conversion record:', convError);
           } else {
             conversionRecord = convData;
+            pendingSourceCleanupPaths.delete(sourcePath);
           }
         }
 
@@ -1524,5 +1533,25 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
     );
+  } finally {
+    if (supabaseAdmin && pendingSourceCleanupPaths.size > 0) {
+      const pendingPaths = Array.from(pendingSourceCleanupPaths);
+      const chunkSize = 100;
+      for (let i = 0; i < pendingPaths.length; i += chunkSize) {
+        const chunk = pendingPaths.slice(i, i + chunkSize);
+        try {
+          const { error } = await supabaseAdmin.storage
+            .from('bank-statements')
+            .remove(chunk);
+          if (error) {
+            console.error('Failed to cleanup orphan batch source uploads:', chunk, error);
+          } else {
+            console.log(`Cleaned ${chunk.length} orphan batch source upload(s)`);
+          }
+        } catch (cleanupError) {
+          console.error('Unexpected cleanup failure for batch source uploads:', chunk, cleanupError);
+        }
+      }
+    }
   }
 });

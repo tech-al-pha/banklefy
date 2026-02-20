@@ -833,6 +833,10 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  let supabaseAdmin: ReturnType<typeof createClient> | null = null;
+  let shouldCleanupUploadedSource = false;
+  let uploadedSourcePath: string | null = null;
+
   try {
     // Parse request
     const {
@@ -854,7 +858,7 @@ Deno.serve(async (req) => {
     const trackingKey = await getTrackingKey(req);
 
     // Create Supabase admin client (service role for privileged operations)
-    const supabaseAdmin = createClient(
+    supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
@@ -938,6 +942,10 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'File ID required for authenticated users' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+    if (user && typeof fileId === 'string' && fileId.length > 0) {
+      uploadedSourcePath = `${user.id}/${fileId}`;
+      shouldCleanupUploadedSource = true;
     }
 
     if (typeof fileName !== 'string' || fileName.length > 255 || fileName.includes('..') || fileName.includes('/')) {
@@ -1220,6 +1228,7 @@ Deno.serve(async (req) => {
         console.error('Failed to create conversion record:', convError);
       } else {
         conversion = convData;
+        shouldCleanupUploadedSource = false;
       }
     }
 
@@ -1835,5 +1844,20 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
     );
+  } finally {
+    if (shouldCleanupUploadedSource && uploadedSourcePath && supabaseAdmin) {
+      try {
+        const { error } = await supabaseAdmin.storage
+          .from('bank-statements')
+          .remove([uploadedSourcePath]);
+        if (error) {
+          console.error('Failed to cleanup orphan source upload:', uploadedSourcePath, error);
+        } else {
+          console.log('Cleaned orphan source upload:', uploadedSourcePath);
+        }
+      } catch (cleanupError) {
+        console.error('Unexpected cleanup failure for source upload:', uploadedSourcePath, cleanupError);
+      }
+    }
   }
 });
