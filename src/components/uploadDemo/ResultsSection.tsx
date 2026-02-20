@@ -704,6 +704,9 @@ export const ResultsSection = ({
             </span>
           ))}
         </div>
+        <p className="mt-4 text-xs uppercase tracking-[0.2em] text-muted-foreground/80">
+          Many more...
+        </p>
       </div>
     </>
   );
