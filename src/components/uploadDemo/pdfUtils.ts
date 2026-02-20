@@ -70,6 +70,43 @@ const SUSPICIOUS_PRODUCER_PATTERNS: Array<{ pattern: RegExp; label: string }> = 
 ];
 
 const KNOWN_BANK_STACK_HINTS = [/finacle/i, /oracle/i, /itext/i, /core banking/i, /jasper/i];
+const SIGNATURE_MARKERS = [/\/Sig\b/i, /\/ByteRange\b/i, /\/DocMDP\b/i, /adbe\.pkcs7/i, /\/ETSI\.CAdES/i];
+const SUSPICIOUS_OBJECT_MARKERS: Array<{
+  pattern: RegExp;
+  code: string;
+  label: string;
+  score: number;
+  severity: "low" | "medium" | "high";
+}> = [
+  {
+    pattern: /\/Subtype\s*\/Redact\b|\/Redaction\b|\/Redact\b/i,
+    code: "REDACTION_OBJECT",
+    label: "Redaction object detected",
+    score: 26,
+    severity: "high",
+  },
+  {
+    pattern: /\/EmbeddedFiles\b|\/EmbeddedFile\b|\/FileAttachment\b/i,
+    code: "EMBEDDED_FILE",
+    label: "Embedded attachment object detected",
+    score: 22,
+    severity: "high",
+  },
+  {
+    pattern: /\/Subtype\s*\/FreeText\b|\/Subtype\s*\/Stamp\b/i,
+    code: "EDIT_ANNOT",
+    label: "Editable annotation/stamp objects detected",
+    score: 18,
+    severity: "high",
+  },
+  {
+    pattern: /\/XFA\b/i,
+    code: "XFA_FORM",
+    label: "Dynamic XFA form structure detected",
+    score: 14,
+    severity: "medium",
+  },
+];
 
 const parsePdfDate = (value?: string): Date | null => {
   if (!value) return null;
@@ -91,7 +128,31 @@ const pushFlag = (
   score: number,
   severity: "low" | "medium" | "high",
 ) => {
+  if (flags.some((existing) => existing.code === code)) return;
   flags.push({ code, label, score, severity });
+};
+
+const countMatches = (input: string, pattern: RegExp): number => (input.match(pattern) || []).length;
+
+const isStrictDateMonth = (value: string): boolean => /^\d{4}-\d{2}$/.test(value);
+
+const computeTextLayerBalanceMismatchRatio = (rows: ParsedPdfTransaction[]): number => {
+  if (rows.length <= 1) return 0;
+  let checked = 0;
+  let mismatches = 0;
+  for (let i = 1; i < rows.length; i += 1) {
+    const prev = Number(rows[i - 1].balance);
+    const debit = Number(rows[i].debit || 0);
+    const credit = Number(rows[i].credit || 0);
+    const current = Number(rows[i].balance);
+    if (![prev, debit, credit, current].every((value) => Number.isFinite(value))) continue;
+    checked += 1;
+    const expected = Math.round((prev + credit - debit) * 100) / 100;
+    if (Math.abs(current - expected) > 0.01) {
+      mismatches += 1;
+    }
+  }
+  return checked > 0 ? mismatches / checked : 0;
 };
 
 const summarizeFlags = (flags: DetectorFlag[]) => {
@@ -164,12 +225,15 @@ export const detectEditedPdf = async (
   options?: { tier?: DetectorTier; password?: string },
 ): Promise<{ suspected: boolean; reason: string; score: number; riskLevel: "low" | "medium" | "high"; flags: string[] }> => {
   const tier: DetectorTier = options?.tier ?? "basic";
-  const scoreFactor = tier === "advanced" ? 1.25 : 1;
+  const scoreFactor = tier === "advanced" ? 1.3 : 1;
   const buffer = await file.arrayBuffer();
   const rawText = new TextDecoder("latin1").decode(new Uint8Array(buffer));
   const flags: DetectorFlag[] = [];
 
-  const eofMatches = rawText.match(/%%EOF/g) || [];
+  const eofCount = countMatches(rawText, /%%EOF/g);
+  const startXrefCount = countMatches(rawText, /startxref/g);
+  const xrefCount = countMatches(rawText, /\bxref\b/g);
+  const objCount = countMatches(rawText, /\b\d+\s+\d+\s+obj\b/g);
   const hasPrev = /\/Prev\s+\d+/i.test(rawText);
   const hasAcroForm = /\/AcroForm\b/i.test(rawText);
   const hasAnnots = /\/Annots\b/i.test(rawText);
@@ -177,19 +241,29 @@ export const detectEditedPdf = async (
   const hasOpenAction = /\/OpenAction\b/i.test(rawText);
   const hasJavaScript = /\/JavaScript\b|\/JS\b/i.test(rawText);
   const hasLaunchAction = /\/Launch\b/i.test(rawText);
-  const imageObjectCount = (rawText.match(/\/Subtype\s*\/Image\b/g) || []).length;
+  const imageObjectCount = countMatches(rawText, /\/Subtype\s*\/Image\b/g);
+  const hasDigitalSignature = SIGNATURE_MARKERS.some((pattern) => pattern.test(rawText));
 
-  if (eofMatches.length > 1) {
+  if (eofCount > 1) {
     pushFlag(flags, "MULTI_EOF", "Multiple EOF markers (incremental updates)", Math.round(18 * scoreFactor), "medium");
+  }
+  if (startXrefCount > 1) {
+    pushFlag(flags, "MULTI_XREF", "Multiple startxref sections detected", Math.round(14 * scoreFactor), "medium");
+  }
+  if (xrefCount > startXrefCount + 2 && xrefCount >= 4) {
+    pushFlag(flags, "XREF_DENSITY", "Unusually dense xref structure detected", Math.round(10 * scoreFactor), "low");
   }
   if (hasPrev) {
     pushFlag(flags, "HAS_PREV", "Incremental update pointer (/Prev) found", Math.round(14 * scoreFactor), "medium");
   }
+  if (objCount > 0 && objCount <= 8) {
+    pushFlag(flags, "LOW_OBJECT_COUNT", "Very low PDF object count", Math.round(12 * scoreFactor), "medium");
+  }
   if (hasAcroForm) {
-    pushFlag(flags, "HAS_FORM", "Form fields detected (/AcroForm)", Math.round(16 * scoreFactor), "medium");
+    pushFlag(flags, "HAS_FORM", "Form structure detected (/AcroForm)", Math.round(10 * scoreFactor), "medium");
   }
   if (hasAnnots) {
-    pushFlag(flags, "HAS_ANNOTS", "Annotations detected (/Annots)", Math.round(18 * scoreFactor), "high");
+    pushFlag(flags, "HAS_ANNOTS", "Annotation container detected (/Annots)", Math.round(10 * scoreFactor), "medium");
   }
   if (hasLayers) {
     pushFlag(flags, "HAS_LAYERS", "Layer objects detected (/OCProperties)", Math.round(14 * scoreFactor), "medium");
@@ -197,6 +271,13 @@ export const detectEditedPdf = async (
   if (hasOpenAction || hasJavaScript || hasLaunchAction) {
     pushFlag(flags, "ACTIVE_CONTENT", "Active PDF actions/scripts detected", Math.round(26 * scoreFactor), "high");
   }
+  if (hasDigitalSignature) {
+    pushFlag(flags, "DIGITAL_SIGNATURE", "Digital signature markers detected", Math.round(4 * scoreFactor), "low");
+  }
+  SUSPICIOUS_OBJECT_MARKERS.forEach((entry) => {
+    if (!entry.pattern.test(rawText)) return;
+    pushFlag(flags, entry.code, entry.label, Math.round(entry.score * scoreFactor), entry.severity);
+  });
 
   const pdfjsLib = (await import("pdfjs-dist")) as PdfJsModule;
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
@@ -204,7 +285,10 @@ export const detectEditedPdf = async (
   let totalTextChars = 0;
   const uniqueFonts = new Set<string>();
   const fontSizes: number[] = [];
+  let tinyFontCount = 0;
   let pagesWithText = 0;
+  let pagesWithVerySparseText = 0;
+  const charsPerPage: number[] = [];
   let pages = 0;
 
   try {
@@ -250,6 +334,9 @@ export const detectEditedPdf = async (
           pushFlag(flags, "LARGE_DATE_GAP", `Large create→modify gap (${Math.round(gapDays)} days)`, Math.round(10 * scoreFactor), "low");
         }
       }
+      if (creationDate && !modDate) {
+        pushFlag(flags, "MISSING_MOD_DATE", "Creation date present without modification date", Math.round(6 * scoreFactor), "low");
+      }
     } catch {
       // Metadata extraction not mandatory.
     }
@@ -268,18 +355,22 @@ export const detectEditedPdf = async (
         const fontName = String(item.fontName || "");
         if (fontName) uniqueFonts.add(fontName);
 
-        const transform = item.transform as number[] | undefined;
-        if (Array.isArray(transform) && transform.length >= 4) {
-          const approxSize = Math.max(Math.abs(transform[0]), Math.abs(transform[3]));
-          if (Number.isFinite(approxSize) && approxSize > 0) {
-            fontSizes.push(approxSize);
+          const transform = item.transform as number[] | undefined;
+          if (Array.isArray(transform) && transform.length >= 4) {
+            const approxSize = Math.max(Math.abs(transform[0]), Math.abs(transform[3]));
+            if (Number.isFinite(approxSize) && approxSize > 0) {
+              fontSizes.push(approxSize);
+              if (approxSize < 4) tinyFontCount += 1;
+            }
           }
         }
-      }
 
-      if (pageTextChars > 20) {
-        pagesWithText += 1;
-      }
+       charsPerPage.push(pageTextChars);
+       if (pageTextChars > 20) {
+         pagesWithText += 1;
+       } else {
+         pagesWithVerySparseText += 1;
+       }
     }
 
     await pdf.destroy?.();
@@ -312,6 +403,15 @@ export const detectEditedPdf = async (
       );
     }
   }
+  if (fontSizes.length >= 50 && tinyFontCount / Math.max(1, fontSizes.length) > 0.18) {
+    pushFlag(
+      flags,
+      "MICRO_TEXT",
+      "Unusually high micro-font density in text layer",
+      Math.round(16 * scoreFactor),
+      "high",
+    );
+  }
 
   if (imageObjectCount > 0 && totalTextChars > 0) {
     const textPerImage = totalTextChars / Math.max(1, imageObjectCount);
@@ -326,6 +426,20 @@ export const detectEditedPdf = async (
     }
   }
 
+  if (charsPerPage.length >= 2) {
+    const maxChars = Math.max(...charsPerPage);
+    const minChars = Math.min(...charsPerPage);
+    if (maxChars > 120 && minChars <= 5) {
+      pushFlag(
+        flags,
+        "TEXT_LAYER_INCONSISTENT",
+        "Large text-layer inconsistency between pages",
+        Math.round(12 * scoreFactor),
+        "medium",
+      );
+    }
+  }
+
   if (pages > 0 && pagesWithText > 0 && pagesWithText < pages) {
     pushFlag(
       flags,
@@ -336,12 +450,74 @@ export const detectEditedPdf = async (
     );
   }
 
-  const totalScore = flags.reduce((sum, f) => sum + f.score, 0);
+  if (tier === "advanced") {
+    try {
+      const parsed = await extractPdfDataFromText(file, {
+        password: options?.password || undefined,
+        maxPdfRenderPages: 120,
+      });
+      const mismatchRatio = computeTextLayerBalanceMismatchRatio(parsed.transactions);
+      if (parsed.transactions.length >= 8 && mismatchRatio >= 0.22) {
+        pushFlag(
+          flags,
+          "TEXT_LAYER_BALANCE_BREAK",
+          `Text-layer rows fail balance math on ${Math.round(mismatchRatio * 100)}% of checks`,
+          Math.round(22 * scoreFactor),
+          "high",
+        );
+      } else if (parsed.transactions.length >= 8 && mismatchRatio >= 0.12) {
+        pushFlag(
+          flags,
+          "TEXT_LAYER_BALANCE_DRIFT",
+          `Text-layer rows show balance drift on ${Math.round(mismatchRatio * 100)}% of checks`,
+          Math.round(12 * scoreFactor),
+          "medium",
+        );
+      }
+
+      const parsedMonths = new Set(parsed.transactions.map((row) => row.date.slice(0, 7)).filter(isStrictDateMonth)).size;
+      if (parsed.transactions.length > 0 && parsedMonths === 1 && pages >= 3) {
+        pushFlag(
+          flags,
+          "SINGLE_MONTH_HEAVY_DOC",
+          "Multi-page statement with single-month extracted timeline",
+          Math.round(8 * scoreFactor),
+          "low",
+        );
+      }
+    } catch {
+      // Advanced cross-check is best effort only.
+    }
+  }
+
+  const severeEvidenceCodes = new Set([
+    "ACTIVE_CONTENT",
+    "REDACTION_OBJECT",
+    "EMBEDDED_FILE",
+    "EDIT_ANNOT",
+    "TEXT_LAYER_BALANCE_BREAK",
+    "MICRO_TEXT",
+  ]);
+  const severeEvidenceCount = flags.filter((flag) => severeEvidenceCodes.has(flag.code)).length;
+  const baseScore = flags.reduce((sum, f) => sum + f.score, 0);
+  const signatureOnlyPenalty = hasDigitalSignature && severeEvidenceCount === 0
+    ? Math.round(10 * scoreFactor)
+    : 0;
+  const totalScore = Math.max(0, baseScore - signatureOnlyPenalty);
   const highCount = flags.filter((f) => f.severity === "high").length;
   const mediumCount = flags.filter((f) => f.severity === "medium").length;
-  const threshold = tier === "advanced" ? 28 : 38;
-  const suspected = totalScore >= threshold || highCount >= (tier === "advanced" ? 1 : 2) || mediumCount >= 3;
-  const riskLevel: "low" | "medium" | "high" = totalScore >= 55 || highCount >= 2 ? "high" : totalScore >= 28 ? "medium" : "low";
+  const threshold = tier === "advanced" ? 24 : 36;
+  const suspected =
+    totalScore >= threshold ||
+    severeEvidenceCount >= 1 ||
+    highCount >= (tier === "advanced" ? 1 : 2) ||
+    mediumCount >= (tier === "advanced" ? 2 : 3);
+  const riskLevel: "low" | "medium" | "high" =
+    totalScore >= 54 || severeEvidenceCount >= 2 || highCount >= 2
+      ? "high"
+      : totalScore >= 26 || severeEvidenceCount >= 1
+        ? "medium"
+        : "low";
 
   return {
     suspected,
