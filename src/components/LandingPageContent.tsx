@@ -1,8 +1,6 @@
 import { Hero } from "@/components/Hero";
 import { HowItWorks } from "@/components/HowItWorks";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { scrollToId } from "@/lib/scroll";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
 const UploadDemo = lazyWithRetry(() =>
@@ -10,7 +8,6 @@ const UploadDemo = lazyWithRetry(() =>
 );
 
 export const LandingPageContent = () => {
-  const { t } = useLanguage();
   const [shouldLoadUpload, setShouldLoadUpload] = useState(false);
   const demoRef = useRef<HTMLDivElement>(null);
 
@@ -79,31 +76,6 @@ export const LandingPageContent = () => {
           </div>
         )}
       </div>
-
-      {/* Footer CTA */}
-      <section className="relative py-12 px-4 sm:px-6 overflow-hidden bg-background">
-        <div className="container mx-auto text-center relative z-10 space-y-6">
-          <h2 className="text-4xl md:text-5xl font-bold italic">
-            {t('footer.cta.title')}
-            <br />
-            <span className="text-primary">
-              {t('footer.cta.subtitle')}
-            </span>
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            {t('footer.cta.desc')}
-          </p>
-          <button 
-            type="button"
-            className="bg-primary text-primary-foreground shadow-neon transition-all duration-300 hover:scale-105 px-8 py-4 rounded-lg font-bold text-lg"
-            onClick={() => {
-              scrollToId("demo");
-            }}
-          >
-            {t('footer.cta.btn')}
-          </button>
-        </div>
-      </section>
     </>
   );
 };
