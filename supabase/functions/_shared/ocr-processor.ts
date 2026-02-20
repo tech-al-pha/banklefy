@@ -163,6 +163,7 @@ const pickString = (value: unknown): string | undefined => {
 };
 
 const collapseWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim();
+const roundMoney2 = (value: number): number => Math.round(value * 100) / 100;
 
 const normalizeReferenceToken = (value: string): string =>
   collapseWhitespace(value)
@@ -524,7 +525,8 @@ export async function callGroqVisionOCR(
       ],
       // Keep this deterministic and structured for table extraction.
       response_format: { type: 'json_object' as const },
-      temperature: 0.1,
+      temperature: 0,
+      top_p: 1,
       max_tokens: strictTableMode ? 9500 : 8000,
     };
 
@@ -1295,6 +1297,7 @@ type AdcbRowDraft = {
   amount: number;
   balance: number;
   refNumber?: string;
+  sideHint?: 'debit' | 'credit';
 };
 
 const scoreBalanceTransition = (
@@ -1319,6 +1322,33 @@ const buildDescriptionFromAdcbRow = (raw: string): string => {
     .replace(/[_[\]{}|]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+};
+
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const inferAdcbSideHintFromRawRow = (
+  rawRow: string,
+  balanceToken: string,
+): 'debit' | 'credit' | undefined => {
+  if (!rawRow || !balanceToken) return undefined;
+  const normalizedBalance = balanceToken.replace(/\s+/g, '');
+  if (!normalizedBalance) return undefined;
+
+  const normalizedRow = rawRow.replace(/\s+/g, ' ');
+  const balancePattern = new RegExp(`${escapeRegex(normalizedBalance)}\\b`, 'i');
+  const balanceMatch = normalizedRow.match(balancePattern);
+  if (!balanceMatch || typeof balanceMatch.index !== 'number') return undefined;
+
+  const beforeBalance = normalizedRow.slice(0, balanceMatch.index);
+  const tailTokens =
+    beforeBalance.match(/-|\d{1,3}(?:[., ]\d{3})+[.,]\d{2}|\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2}/g) || [];
+  if (tailTokens.length < 2) return undefined;
+
+  const prevToken = tailTokens[tailTokens.length - 2];
+  const lastToken = tailTokens[tailTokens.length - 1];
+  if (prevToken === '-' && lastToken !== '-') return 'credit';
+  if (lastToken === '-' && prevToken !== '-') return 'debit';
+  return undefined;
 };
 
 const determineDefaultStatementYear = (ocrText: string): string | undefined => {
@@ -1374,12 +1404,14 @@ const extractAdcbDraftRowsFromText = (ocrText: string): AdcbRowDraft[] => {
         parseStatementDate(current.dateRaw, defaultYear);
       if (parsedDate && Number.isFinite(amount) && Number.isFinite(balance) && amount > 0) {
         const refMatch = joined.match(/\b(?:PHUB|MOB|M\d{6,}|AE\d{5,})[A-Z0-9/.-]*\b/i);
+        const sideHint = inferAdcbSideHintFromRawRow(joined, balanceToken);
         drafts.push({
           date: parsedDate,
           rawText: joined,
           amount,
           balance,
           refNumber: refMatch?.[0],
+          sideHint,
         });
       }
     }
@@ -1416,10 +1448,42 @@ const extractAdcbDraftRowsFromText = (ocrText: string): AdcbRowDraft[] => {
 };
 
 const determineFirstBalance = (ocrText: string): number | undefined => {
-  const match = ocrText.match(/opening\s+balance[^0-9]*(\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2})/i);
-  if (!match) return undefined;
-  const value = parseMoney(match[1]);
-  return Number.isFinite(value) ? value : undefined;
+  const patterns = [
+    /opening\s*(?:\/\s*)?balance[^0-9]*(\d{1,3}(?:[., ]\d{3})+[.,]\d{2}|\d+\.\d{2})/i,
+    /openingbalance[^0-9]*(\d{1,3}(?:[., ]\d{3})+[.,]\d{2}|\d+\.\d{2})/i,
+  ];
+  for (const pattern of patterns) {
+    const match = ocrText.match(pattern);
+    if (!match) continue;
+    const value = parseMoney(match[1]);
+    if (Number.isFinite(value)) return value;
+  }
+  return undefined;
+};
+
+const correctAdcbAmountUsingBalanceDelta = (amount: number, deltaAbs: number): number => {
+  if (!Number.isFinite(amount) || amount <= 0) return amount;
+  if (!Number.isFinite(deltaAbs) || deltaAbs <= 0) return amount;
+
+  const tolerance = Math.max(1, deltaAbs * 0.015);
+  if (Math.abs(amount - deltaAbs) <= tolerance) return roundMoney2(deltaAbs);
+
+  const candidates = [amount, amount * 10, amount * 100, amount / 10, amount / 100]
+    .filter((candidate) => Number.isFinite(candidate) && candidate > 0);
+  let best = amount;
+  let bestDiff = Math.abs(amount - deltaAbs);
+  for (const candidate of candidates) {
+    const diff = Math.abs(candidate - deltaAbs);
+    if (diff < bestDiff) {
+      best = candidate;
+      bestDiff = diff;
+    }
+  }
+
+  if (bestDiff <= Math.max(2, deltaAbs * 0.05)) {
+    return roundMoney2(best);
+  }
+  return roundMoney2(amount);
 };
 
 const inferDebitCreditFromDrafts = (drafts: AdcbRowDraft[], openingBalance?: number): RawTransaction[] => {
@@ -1434,24 +1498,45 @@ const inferDebitCreditFromDrafts = (drafts: AdcbRowDraft[], openingBalance?: num
 
     let debit = 0;
     let credit = 0;
-    const amount = Math.abs(draft.amount);
+    const baseAmount = Math.abs(draft.amount);
+    let resolvedAmount = baseAmount;
 
     if (prevBalance !== undefined) {
-      const { asCreditDiff, asDebitDiff } = scoreBalanceTransition(prevBalance, amount, draft.balance);
-      if (asCreditDiff <= asDebitDiff) {
-        credit = amount;
+      const delta = draft.balance - prevBalance;
+      const deltaAbs = Math.abs(delta);
+      resolvedAmount = correctAdcbAmountUsingBalanceDelta(baseAmount, deltaAbs);
+
+      if (deltaAbs > 0.01) {
+        if (delta > 0) {
+          credit = resolvedAmount;
+        } else {
+          debit = resolvedAmount;
+        }
+      } else if (draft.sideHint === 'credit') {
+        credit = resolvedAmount;
+      } else if (draft.sideHint === 'debit') {
+        debit = resolvedAmount;
       } else {
-        debit = amount;
+        const { asCreditDiff, asDebitDiff } = scoreBalanceTransition(prevBalance, resolvedAmount, draft.balance);
+        if (asCreditDiff <= asDebitDiff) {
+          credit = resolvedAmount;
+        } else {
+          debit = resolvedAmount;
+        }
       }
+    } else if (draft.sideHint === 'credit') {
+      credit = resolvedAmount;
+    } else if (draft.sideHint === 'debit') {
+      debit = resolvedAmount;
     } else if (i + 1 < drafts.length) {
       const nextDelta = drafts[i + 1].balance - draft.balance;
       if (nextDelta < 0) {
-        credit = amount;
+        credit = resolvedAmount;
       } else {
-        debit = amount;
+        debit = resolvedAmount;
       }
     } else {
-      debit = amount;
+      debit = resolvedAmount;
     }
 
     rows.push({

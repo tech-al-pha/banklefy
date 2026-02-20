@@ -75,7 +75,7 @@ const normalizeDualOcrMode = (value: string | undefined): DualOcrMode => {
 const OCR_DUAL_PROVIDER_MODE = normalizeDualOcrMode(Deno.env.get('OCR_DUAL_PROVIDER_MODE'));
 const OCR_DUAL_PROVIDER_MAX_PAGES = Math.max(
   0,
-  Number(Deno.env.get('OCR_DUAL_PROVIDER_MAX_PAGES') ?? (OCR_DUAL_PROVIDER_MODE === 'always' ? '120' : '2')),
+  Number(Deno.env.get('OCR_DUAL_PROVIDER_MAX_PAGES') ?? (OCR_DUAL_PROVIDER_MODE === 'always' ? '120' : '4')),
 );
 type StrictOcrRetryMode = 'off' | 'smart' | 'always';
 const normalizeStrictOcrRetryMode = (value: string | undefined): StrictOcrRetryMode => {
@@ -376,9 +376,14 @@ const shouldRunMistralDualPass = (
   if (mode === 'always') return true;
 
   const tx = groqResult.transactions || [];
-  const likelyDenseTableBank = /(adcb|procash|statement of accounts)/i.test(fileNameLower);
+  const bankHints = [
+    fileNameLower,
+    String(groqResult.bankMetadata?.bankName || ''),
+    String(groqResult.text || ''),
+  ].join(' ');
+  const likelyDenseTableBank = /(adcb|procash|statement of accounts|value date|running balance|debit amount|credit amount)/i.test(bankHints);
   if (!groqResult.success || tx.length === 0) return true;
-  if (likelyDenseTableBank && tx.length <= 20) return true;
+  if (likelyDenseTableBank && tx.length <= 60) return true;
 
   const mismatchRatio = balanceMismatchRatio(tx);
   if (tx.length >= 8 && mismatchRatio > 0.08) return true;
