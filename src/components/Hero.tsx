@@ -17,13 +17,13 @@ export const Hero = () => {
             <div className="flex flex-col items-start leading-tight overflow-visible">
             <h1
               className="w-full font-bold tracking-tight max-w-[18ch] mt-4 font-lequire hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[1.02] break-words"
-              style={{ fontSize: "clamp(2.3rem, 7.2vw, 6rem)", textWrap: "balance" }}
+              style={{ fontSize: "clamp(2.1rem, 6.2vw, 5.3rem)", textWrap: "balance" }}
             >
               {t('hero.titleLine1')}
             </h1>
             <h2
               className="w-full font-black uppercase tracking-tight font-lequire mt-2 hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#6a6a6a] bg-clip-text text-transparent leading-[0.98] break-words"
-              style={{ fontSize: "clamp(3rem, 12vw, 9.2rem)", textWrap: "balance" }}
+              style={{ fontSize: "clamp(2.6rem, 9.8vw, 7.4rem)", textWrap: "balance" }}
             >
               {t('hero.titleLine2')}
             </h2>
