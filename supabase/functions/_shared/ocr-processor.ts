@@ -734,15 +734,66 @@ const parseStatementDate = (value: string, defaultYear?: string): string | undef
   return `${yyyy}-${mm}-${dd}`;
 };
 
+const normalizeMoneyToken = (value: string): string => {
+  let raw = value.trim();
+  if (!raw) return '';
+
+  // Keep only numeric/sign/separator characters.
+  raw = raw.replace(/[^\d,.\-]/g, '');
+  if (!raw) return '';
+
+  // Preserve negative sign only at the front.
+  const isNegative = raw.startsWith('-');
+  raw = raw.replace(/-/g, '');
+
+  const dotCount = (raw.match(/\./g) || []).length;
+  const commaCount = (raw.match(/,/g) || []).length;
+
+  // Determine decimal separator by the rightmost separator.
+  const lastDot = raw.lastIndexOf('.');
+  const lastComma = raw.lastIndexOf(',');
+  const decimalSeparator = lastDot > lastComma ? '.' : lastComma > -1 ? ',' : '';
+
+  let normalized = raw;
+  if (decimalSeparator) {
+    const lastSepIndex = normalized.lastIndexOf(decimalSeparator);
+    const integerPart = normalized.slice(0, lastSepIndex).replace(/[.,]/g, '');
+    const fractionPart = normalized.slice(lastSepIndex + 1).replace(/[.,]/g, '');
+    if (fractionPart.length > 0) {
+      normalized = `${integerPart}.${fractionPart}`;
+    } else {
+      normalized = integerPart;
+    }
+  } else if (dotCount > 1 || commaCount > 1) {
+    // Fallback for malformed values with repeated separators but no clear decimal split.
+    const lastSep = Math.max(lastDot, lastComma);
+    const integerPart = normalized.slice(0, lastSep).replace(/[.,]/g, '');
+    const fractionPart = normalized.slice(lastSep + 1).replace(/[.,]/g, '');
+    normalized = fractionPart ? `${integerPart}.${fractionPart}` : integerPart;
+  } else {
+    normalized = normalized.replace(/[.,]/g, '');
+  }
+
+  if (isNegative) normalized = `-${normalized}`;
+  return normalized;
+};
+
 const parseMoney = (value: string): number => {
-  const cleaned = value.replace(/[, ]/g, '').trim();
-  const num = Number(cleaned);
+  const normalized = normalizeMoneyToken(value);
+  if (!normalized) return 0;
+  const num = Number(normalized);
   return Number.isFinite(num) ? num : 0;
 };
 
 const parseMoneyMaybe = (value: string | undefined): number | undefined => {
   if (!value) return undefined;
-  const match = value.match(/-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/);
+
+  const direct = parseMoney(value);
+  if (Number.isFinite(direct) && Math.abs(direct) > 0) {
+    return Math.abs(direct);
+  }
+
+  const match = value.match(/-?\d{1,3}(?:[., ]\d{3})+[.,]\d{2}|-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/);
   if (!match) return undefined;
   const parsed = parseMoney(match[0]);
   return Number.isFinite(parsed) ? Math.abs(parsed) : undefined;
@@ -1303,7 +1354,7 @@ const extractAdcbDraftRowsFromText = (ocrText: string): AdcbRowDraft[] => {
   const rowStartDateLeadPattern = /^\s*[\[(]?\d{1,2}\s*[-/]\s*[A-Za-z]{3}\s*[-/]?/i;
   const rowStartHintPattern = /\b(?:phub|mob|b\/o|trf|salary|o\/w)\b/i;
   const dateTokenPattern = /(\d{1,2}\s*[-/]\s*[A-Za-z]{3}(?:\s*[-/]\s*\d{2,4})?)/i;
-  const amountPattern = /\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2}/g;
+  const amountPattern = /\d{1,3}(?:[., ]\d{3})+[.,]\d{2}|\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2}/g;
   const drafts: AdcbRowDraft[] = [];
   const defaultYear = determineDefaultStatementYear(ocrText);
   let tableSeen = false;
@@ -1441,6 +1492,127 @@ export const scoreRunningBalanceFlow = (transactions: RawTransaction[]): { misma
 
   const mismatchRatio = total > 0 ? (total - matched) / total : 1;
   return { mismatchRatio, total, matched };
+};
+
+export type ClientPdfParseAssessment = {
+  useDeterministic: boolean;
+  requiresHeavyOcr: boolean;
+  mismatchRatio: number;
+  anomalyRate: number;
+  reason: string;
+};
+
+const computeBalanceDeltaAmountAnomalyRate = (transactions: RawTransaction[]): { checks: number; anomalies: number; rate: number } => {
+  if (transactions.length <= 1) {
+    return { checks: 0, anomalies: 0, rate: 0 };
+  }
+
+  let checks = 0;
+  let anomalies = 0;
+
+  for (let i = 1; i < transactions.length; i += 1) {
+    const prev = Number(transactions[i - 1].balance ?? NaN);
+    const current = Number(transactions[i].balance ?? NaN);
+    if (!Number.isFinite(prev) || !Number.isFinite(current)) continue;
+
+    const delta = Math.abs(current - prev);
+    if (delta < 10) continue;
+
+    const debit = Math.abs(Number(transactions[i].debit ?? 0));
+    const credit = Math.abs(Number(transactions[i].credit ?? 0));
+    const amount = Math.max(debit, credit);
+    checks += 1;
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      anomalies += 1;
+      continue;
+    }
+
+    const diff = Math.abs(delta - amount);
+    const tolerance = Math.max(1, delta * 0.02); // 2% tolerance for OCR noise
+    const amountTooSmall = amount < delta * 0.6;
+    const largeResidual = diff > delta * 0.2;
+
+    if (diff > tolerance && (amountTooSmall || largeResidual)) {
+      anomalies += 1;
+    }
+  }
+
+  return {
+    checks,
+    anomalies,
+    rate: checks > 0 ? anomalies / checks : 0,
+  };
+};
+
+export const assessClientPdfParsedTransactions = (
+  transactions: RawTransaction[],
+  pageCount = 1,
+): ClientPdfParseAssessment => {
+  const normalizedPageCount = Number.isFinite(pageCount) ? Math.max(1, Math.floor(pageCount)) : 1;
+  const flow = scoreRunningBalanceFlow(transactions);
+  const mismatchRatio = flow.total > 0 ? flow.mismatchRatio : 0;
+  const anomalyStats = computeBalanceDeltaAmountAnomalyRate(transactions);
+  const anomalyRate = anomalyStats.rate;
+
+  if (transactions.length === 0) {
+    return {
+      useDeterministic: false,
+      requiresHeavyOcr: normalizedPageCount >= 3,
+      mismatchRatio: 1,
+      anomalyRate: 1,
+      reason:
+        normalizedPageCount >= 3
+          ? 'No reliable text-layer rows found in a multi-page PDF'
+          : 'No reliable text-layer rows found; OCR fallback required',
+    };
+  }
+
+  if (normalizedPageCount >= 3 && transactions.length < Math.max(6, normalizedPageCount * 2)) {
+    return {
+      useDeterministic: false,
+      requiresHeavyOcr: true,
+      mismatchRatio,
+      anomalyRate,
+      reason: 'Text-layer extraction is too sparse for this multi-page PDF',
+    };
+  }
+
+  const severeMismatch = transactions.length >= 8 && flow.total >= 5 && mismatchRatio >= 0.35;
+  const severeAnomaly =
+    anomalyStats.checks >= 3 &&
+    anomalyStats.anomalies >= 2 &&
+    anomalyRate >= 0.45;
+  if (severeMismatch || severeAnomaly) {
+    return {
+      useDeterministic: false,
+      requiresHeavyOcr: true,
+      mismatchRatio,
+      anomalyRate,
+      reason: 'Deterministic text-layer data is unreliable and needs heavy OCR',
+    };
+  }
+
+  const needsOcrValidation =
+    (transactions.length >= 6 && flow.total >= 4 && mismatchRatio >= 0.12) ||
+    (anomalyStats.checks >= 3 && anomalyRate >= 0.2);
+  if (needsOcrValidation) {
+    return {
+      useDeterministic: false,
+      requiresHeavyOcr: false,
+      mismatchRatio,
+      anomalyRate,
+      reason: 'Deterministic text-layer data needs OCR validation',
+    };
+  }
+
+  return {
+    useDeterministic: true,
+    requiresHeavyOcr: false,
+    mismatchRatio,
+    anomalyRate,
+    reason: 'Deterministic text-layer extraction is stable',
+  };
 };
 
 export const recoverAdcbTransactionsFromOcrText = (ocrText: string): RawTransaction[] => {

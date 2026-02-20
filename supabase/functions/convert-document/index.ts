@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 // Import modular processors
 import {
+  assessClientPdfParsedTransactions,
   classifyDocument,
   callGroqVisionOCR,
   callMistralVisionOCR,
@@ -1261,13 +1262,48 @@ Deno.serve(async (req) => {
         })
       : [];
     const clientParsedBankMetadata = normalizeClientBankMetadata(pdfParsedBankMetadata);
+    const clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
+    const canUseDeterministicClientPdf =
+      isPdf &&
+      clientParsedTransactions.length > 0 &&
+      clientPdfParseAssessment.useDeterministic;
+
+    if (isPdf && clientParsedTransactions.length > 0 && !canUseDeterministicClientPdf) {
+      console.log(
+        `Ignoring deterministic client PDF rows (${clientParsedTransactions.length}) and falling back to OCR: ${clientPdfParseAssessment.reason} ` +
+          `(mismatch=${clientPdfParseAssessment.mismatchRatio.toFixed(3)}, anomaly=${clientPdfParseAssessment.anomalyRate.toFixed(3)})`,
+      );
+    }
+
+    if (
+      isPdf &&
+      hasPdfPageImages &&
+      !canUseDeterministicClientPdf &&
+      !isAdmin &&
+      isFreeMode &&
+      clientPdfParseAssessment.requiresHeavyOcr
+    ) {
+      return new Response(
+        JSON.stringify({
+          error: 'This PDF is hard to parse accurately and requires paid processing.',
+          message: 'Hard PDF detected. Please upgrade to a paid plan for this file.',
+          status: 'hard_pdf_requires_paid',
+          limitReached: true,
+          hardPdf: true,
+          requiresPaidPlan: true,
+          pagesDetected: pageCount,
+          planType: userPlanType,
+        }),
+        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
 
     // isPdf and hasPdfPageImages already defined above for page limit check
     // Track bank metadata across pages
     let collectedBankMetadata: BankMetadata | undefined = clientParsedBankMetadata;
     let pagesWithData = 1;
 
-    if (isPdf && clientParsedTransactions.length > 0) {
+    if (canUseDeterministicClientPdf) {
       console.log(`Using deterministic client PDF text extraction: ${clientParsedTransactions.length} transactions`);
       extractionResult = {
         transactions: clientParsedTransactions,
@@ -1407,17 +1443,53 @@ Deno.serve(async (req) => {
     if (recoveredAdcbTransactions.length > 0) {
       const rawFlow = scoreRunningBalanceFlow(rawTransactions);
       const recoveredFlow = scoreRunningBalanceFlow(recoveredAdcbTransactions);
-      const rawMismatch = rawFlow.total > 0 ? rawFlow.mismatchRatio : 1;
-      const recoveredMismatch = recoveredFlow.total > 0 ? recoveredFlow.mismatchRatio : 1;
-      const shouldUseRecovered =
-        recoveredAdcbTransactions.length >= Math.max(5, rawTransactions.length - 2) &&
-        (rawTransactions.length === 0 || recoveredMismatch + 0.15 < rawMismatch);
+      const mergedAdcbTransactions = mergeOcrTransactionsDeterministic(rawTransactions, recoveredAdcbTransactions);
+      const mergedFlow = scoreRunningBalanceFlow(mergedAdcbTransactions);
 
-      if (shouldUseRecovered) {
+      const flowMismatch = (flow: { mismatchRatio: number; total: number }): number =>
+        flow.total > 0 ? flow.mismatchRatio : 1;
+      const rawMismatch = flowMismatch(rawFlow);
+      const recoveredMismatch = flowMismatch(recoveredFlow);
+      const mergedMismatch = flowMismatch(mergedFlow);
+
+      const baseLength = Math.max(1, rawTransactions.length);
+      const scoreCandidate = (length: number, mismatch: number): number => {
+        const missingPenalty = Math.max(0, baseLength - length) / baseLength;
+        const extraRowsBonus = length > baseLength ? -0.02 : 0;
+        return mismatch + (missingPenalty * 0.35) + extraRowsBonus;
+      };
+
+      const rawScore = scoreCandidate(rawTransactions.length, rawMismatch);
+      const recoveredScore = scoreCandidate(recoveredAdcbTransactions.length, recoveredMismatch);
+      const mergedScore = scoreCandidate(mergedAdcbTransactions.length, mergedMismatch);
+
+      let bestName: 'raw' | 'recovered' | 'merged' = 'raw';
+      let bestRows = rawTransactions;
+      let bestScore = rawScore;
+      let bestMismatch = rawMismatch;
+
+      if (recoveredScore < bestScore) {
+        bestName = 'recovered';
+        bestRows = recoveredAdcbTransactions;
+        bestScore = recoveredScore;
+        bestMismatch = recoveredMismatch;
+      }
+      if (mergedScore < bestScore) {
+        bestName = 'merged';
+        bestRows = mergedAdcbTransactions;
+        bestScore = mergedScore;
+        bestMismatch = mergedMismatch;
+      }
+
+      const meaningfulImprovement =
+        bestName !== 'raw' &&
+        (bestScore + 0.02 < rawScore || bestRows.length >= rawTransactions.length + 2);
+
+      if (meaningfulImprovement) {
         console.log(
-          `Using ADCB OCR recovery parser (${recoveredAdcbTransactions.length} rows, mismatch ${recoveredMismatch.toFixed(3)} vs ${rawMismatch.toFixed(3)})`,
+          `Using ADCB ${bestName} parser result (${bestRows.length} rows, mismatch ${bestMismatch.toFixed(3)} vs raw ${rawMismatch.toFixed(3)})`,
         );
-        rawTransactions = recoveredAdcbTransactions;
+        rawTransactions = bestRows;
       }
     }
 
