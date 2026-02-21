@@ -126,7 +126,7 @@ Extract ONLY transaction rows from this single statement page and return JSON ob
   "transactions": [
     {
       "date": "YYYY-MM-DD",
-      "refNumber": "identifier only when dedicated reference column exists, else \"\"",
+      "refNumber": "identifier only when dedicated reference column exists, else """,
       "description": "narration text",
       "debit": 0,
       "credit": 0,
@@ -741,7 +741,7 @@ const normalizeMoneyToken = (value: string): string => {
   if (!raw) return '';
 
   // Keep only numeric/sign/separator characters.
-  raw = raw.replace(/[^\d,.\-]/g, '');
+  raw = raw.replace(/[^\d,.-]/g, '');
   if (!raw) return '';
 
   // Preserve negative sign only at the front.
@@ -1312,7 +1312,7 @@ const scoreBalanceTransition = (
 
 const buildDescriptionFromAdcbRow = (raw: string): string => {
   return raw
-    .replace(/^\s*[\[(]?\d+\s*/g, ' ')
+    .replace(/^\s*[[(]?\d+\s*/g, ' ')
     .replace(/\b\d{1,2}[-/](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[-/]\d{2,4}\b/gi, ' ')
     .replace(/\b\d{1,2}[-/](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/gi, ' ')
     .replace(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, ' ')
@@ -1380,8 +1380,8 @@ const extractAdcbDraftRowsFromText = (ocrText: string): AdcbRowDraft[] => {
 
   const tableHeaderPattern = /value\s+bank\s+customer\s+description/i;
   const rowStartPattern =
-    /^\s*[\[(]?\d+\s+[^\n]*?\d{1,2}\s*[-/]\s*[A-Za-z]{3}\s*[-/]/i;
-  const rowStartDateLeadPattern = /^\s*[\[(]?\d{1,2}\s*[-/]\s*[A-Za-z]{3}\s*[-/]?/i;
+    /^\s*[[(]?\d+\s+[^\n]*?\d{1,2}\s*[-/]\s*[A-Za-z]{3}\s*[-/]/i;
+  const rowStartDateLeadPattern = /^\s*[[(]?\d{1,2}\s*[-/]\s*[A-Za-z]{3}\s*[-/]?/i;
   const rowStartHintPattern = /\b(?:phub|mob|b\/o|trf|salary|o\/w)\b/i;
   const dateTokenPattern = /(\d{1,2}\s*[-/]\s*[A-Za-z]{3}(?:\s*[-/]\s*\d{2,4})?)/i;
   const amountPattern = /\d{1,3}(?:[., ]\d{3})+[.,]\d{2}|\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2}/g;

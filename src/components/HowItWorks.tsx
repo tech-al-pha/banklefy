@@ -36,29 +36,29 @@ export const HowItWorks = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl w-full mx-auto mt-6">
           {steps.map((step, index) => (
             <div 
               key={index} 
               className="relative group"
             >
               {/* Card */}
-              <div className="relative bg-[#0F0E0E]/80 backdrop-blur-xl border border-primary/20 rounded-2xl p-8 space-y-4 hover:border-primary/40 transition-all duration-300 hover:shadow-neon group-hover:scale-[1.02] h-full">
+              <div className="relative bg-[#0F0E0E]/80 backdrop-blur-xl border border-primary/20 rounded-2xl p-10 space-y-5 hover:border-primary/40 transition-all duration-300 hover:shadow-neon group-hover:scale-[1.02] h-full">
                 {/* Number Badge */}
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-10 h-10 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-sm shadow-neon">
+                <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-12 h-12 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-bold text-base shadow-neon">
                   {step.number}
                 </div>
 
                 {/* Icon */}
-                <div className="w-14 h-14 bg-primary rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 mt-2">
-                  <step.icon className="w-7 h-7 text-primary-foreground" />
+                <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 mt-2">
+                  <step.icon className="w-8 h-8 text-primary-foreground" />
                 </div>
 
                 {/* Content */}
-                <h3 className="text-xl font-bold text-white">
+                <h3 className="text-2xl font-bold text-white">
                   {step.title}
                 </h3>
-                <p className="text-muted-foreground leading-relaxed text-sm">
+                <p className="text-muted-foreground leading-relaxed text-base">
                   {step.description}
                 </p>
               </div>

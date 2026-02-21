@@ -17,6 +17,7 @@ import {
   normalizeRawTransactions,
   recoverAdcbTransactionsFromOcrText,
   scoreRunningBalanceFlow,
+  type ClientPdfParseAssessment,
   type OCRResult,
   type RawTransaction,
   type BankMetadata,
@@ -356,6 +357,120 @@ const shouldForceOcrForDenseStatement = (
     if (/\bphub|mob|trf\b/.test(blob)) codeHits += 1;
   }
   return codeHits >= 4;
+};
+
+type OcrHardnessLevel = 'easy' | 'normal' | 'hard' | 'extreme';
+
+type AdaptiveOcrStrategy = {
+  level: OcrHardnessLevel;
+  strictMode: StrictOcrRetryMode;
+  strictMaxPages: number;
+  dualMode: DualOcrMode;
+  dualMaxPages: number;
+  strictFirstPass: boolean;
+  hardForFreeTier: boolean;
+  reasons: string[];
+};
+
+const clampAdaptivePageLimit = (requested: number, pageCount: number, globalLimit: number): number => {
+  const safeRequested = Number.isFinite(requested) ? Math.max(0, Math.floor(requested)) : 0;
+  const safePages = Number.isFinite(pageCount) ? Math.max(1, Math.floor(pageCount)) : 1;
+  const safeGlobal = Number.isFinite(globalLimit) ? Math.max(0, Math.floor(globalLimit)) : 0;
+  return Math.min(safeRequested, safePages, safeGlobal);
+};
+
+const deriveAdaptiveOcrStrategy = (
+  fileNameLower: string,
+  pageCount: number,
+  clientPdfParseAssessment: ClientPdfParseAssessment,
+  forceOcrForDenseStatement: boolean,
+): AdaptiveOcrStrategy => {
+  const normalizedPageCount = Number.isFinite(pageCount) ? Math.max(1, Math.floor(pageCount)) : 1;
+  let hardnessScore = 0;
+  const reasons: string[] = [];
+
+  if (forceOcrForDenseStatement) {
+    hardnessScore += 4;
+    reasons.push('dense_statement_pattern');
+  }
+  if (normalizedPageCount >= 3) {
+    hardnessScore += 1;
+    reasons.push('multi_page_pdf');
+  }
+  if (normalizedPageCount >= 7) {
+    hardnessScore += 1;
+    reasons.push('high_page_count');
+  }
+  if (clientPdfParseAssessment.requiresHeavyOcr) {
+    hardnessScore += 3;
+    reasons.push('heavy_ocr_required');
+  }
+  if (clientPdfParseAssessment.mismatchRatio >= 0.35) {
+    hardnessScore += 3;
+    reasons.push('severe_balance_mismatch');
+  } else if (clientPdfParseAssessment.mismatchRatio >= 0.18) {
+    hardnessScore += 1;
+    reasons.push('moderate_balance_mismatch');
+  }
+  if (clientPdfParseAssessment.anomalyRate >= 0.4) {
+    hardnessScore += 2;
+    reasons.push('high_amount_anomaly_rate');
+  } else if (clientPdfParseAssessment.anomalyRate >= 0.2) {
+    hardnessScore += 1;
+    reasons.push('moderate_amount_anomaly_rate');
+  }
+  if (/(adcb|procash|statement of accounts|beneficiary|remitter|swift|debit amount|credit amount|running balance)/i.test(fileNameLower)) {
+    hardnessScore += 2;
+    reasons.push('complex_table_layout_hint');
+  }
+
+  let level: OcrHardnessLevel = 'easy';
+  if (hardnessScore >= 8) level = 'extreme';
+  else if (hardnessScore >= 5) level = 'hard';
+  else if (hardnessScore >= 2) level = 'normal';
+
+  const strictMode: StrictOcrRetryMode = (() => {
+    if (STRICT_OCR_RETRY_MODE === 'off') return 'off';
+    if (STRICT_OCR_RETRY_MODE === 'always') return 'always';
+    if (level === 'easy') return 'off';
+    if (level === 'normal') return 'smart';
+    return 'always';
+  })();
+  const strictRequestedPages =
+    level === 'easy' ? 0 :
+    level === 'normal' ? Math.max(1, Math.ceil(normalizedPageCount * 0.4)) :
+    level === 'hard' ? Math.max(2, Math.ceil(normalizedPageCount * 0.8)) :
+    normalizedPageCount;
+  const strictMaxPages = strictMode === 'off'
+    ? 0
+    : clampAdaptivePageLimit(strictRequestedPages, normalizedPageCount, STRICT_OCR_RETRY_MAX_PAGES);
+
+  const dualMode: DualOcrMode = (() => {
+    if (OCR_DUAL_PROVIDER_MODE === 'off') return 'off';
+    if (OCR_DUAL_PROVIDER_MODE === 'always') return 'always';
+    if (level === 'easy') return 'off';
+    if (level === 'normal') return 'smart';
+    return 'always';
+  })();
+  const dualRequestedPages =
+    level === 'easy' ? 0 :
+    level === 'normal' ? Math.max(1, Math.ceil(normalizedPageCount * 0.35)) :
+    level === 'hard' ? Math.max(2, Math.ceil(normalizedPageCount * 0.75)) :
+    normalizedPageCount;
+  const dualMaxPages = dualMode === 'off'
+    ? 0
+    : clampAdaptivePageLimit(dualRequestedPages, normalizedPageCount, OCR_DUAL_PROVIDER_MAX_PAGES);
+
+  return {
+    level,
+    strictMode,
+    strictMaxPages,
+    dualMode,
+    dualMaxPages,
+    strictFirstPass: level === 'hard' || level === 'extreme',
+    hardForFreeTier: level === 'hard' || level === 'extreme',
+    reasons,
+  };
 };
 
 const shouldRetryStrictVisionPass = (
@@ -856,7 +971,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  let supabaseAdmin: ReturnType<typeof createClient> | null = null;
+  let supabaseAdmin: any = null;
   let shouldCleanupUploadedSource = false;
   let uploadedSourcePath: string | null = null;
 
@@ -1290,6 +1405,16 @@ Deno.serve(async (req) => {
       clientParsedBankMetadata,
       clientParsedTransactions,
     );
+    const adaptiveOcrStrategy = deriveAdaptiveOcrStrategy(
+      lowerFileName,
+      pageCount,
+      clientPdfParseAssessment,
+      forceOcrForDenseStatement,
+    );
+    console.log(
+      `Adaptive OCR strategy: level=${adaptiveOcrStrategy.level}, strict=${adaptiveOcrStrategy.strictMode}:${adaptiveOcrStrategy.strictMaxPages}, ` +
+      `dual=${adaptiveOcrStrategy.dualMode}:${adaptiveOcrStrategy.dualMaxPages}, reasons=${adaptiveOcrStrategy.reasons.join('|') || 'none'}`,
+    );
     const canUseDeterministicClientPdf =
       isPdf &&
       clientParsedTransactions.length > 0 &&
@@ -1309,7 +1434,7 @@ Deno.serve(async (req) => {
       !canUseDeterministicClientPdf &&
       !isAdmin &&
       isFreeMode &&
-      clientPdfParseAssessment.requiresHeavyOcr
+      (clientPdfParseAssessment.requiresHeavyOcr || adaptiveOcrStrategy.hardForFreeTier)
     ) {
       return new Response(
         JSON.stringify({
@@ -1360,6 +1485,11 @@ Deno.serve(async (req) => {
       let combinedText = '';
       let strictRetryCount = 0;
       let dualProviderCount = 0;
+      const effectiveStrictMode = adaptiveOcrStrategy.strictMode;
+      const effectiveStrictMaxPages = adaptiveOcrStrategy.strictMaxPages;
+      const effectiveDualMode = adaptiveOcrStrategy.dualMode;
+      const effectiveDualMaxPages = adaptiveOcrStrategy.dualMaxPages;
+      const useStrictFirstPass = OCR_WORKER_MODE !== 'primary' && adaptiveOcrStrategy.strictFirstPass;
 
       for (const img of pdfPageImages as string[]) {
         if (typeof img !== 'string') continue;
@@ -1378,14 +1508,15 @@ Deno.serve(async (req) => {
         }
 
         if (!pageResult) {
-          pageResult = await callGroqVisionOCR(pageBase64, pageMime);
+          pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
         }
 
         if (
           pageResult &&
+          !useStrictFirstPass &&
           OCR_WORKER_MODE !== 'primary' &&
-          strictRetryCount < STRICT_OCR_RETRY_MAX_PAGES &&
-          shouldRetryStrictVisionPass(lowerFileName, pageResult, STRICT_OCR_RETRY_MODE)
+          strictRetryCount < effectiveStrictMaxPages &&
+          shouldRetryStrictVisionPass(lowerFileName, pageResult, effectiveStrictMode)
         ) {
           const strictResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: true });
           strictRetryCount += 1;
@@ -1399,8 +1530,8 @@ Deno.serve(async (req) => {
         if (
           pageResult &&
           OCR_WORKER_MODE !== 'primary' &&
-          dualProviderCount < OCR_DUAL_PROVIDER_MAX_PAGES &&
-          shouldRunMistralDualPass(lowerFileName, pageResult, OCR_DUAL_PROVIDER_MODE)
+          dualProviderCount < effectiveDualMaxPages &&
+          shouldRunMistralDualPass(lowerFileName, pageResult, effectiveDualMode)
         ) {
           const mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
           dualProviderCount += 1;
@@ -1420,10 +1551,10 @@ Deno.serve(async (req) => {
         }
       }
       if (strictRetryCount > 0) {
-        console.log(`Strict OCR retries used: ${strictRetryCount}/${STRICT_OCR_RETRY_MAX_PAGES} (mode=${STRICT_OCR_RETRY_MODE})`);
+        console.log(`Strict OCR retries used: ${strictRetryCount}/${effectiveStrictMaxPages} (mode=${effectiveStrictMode})`);
       }
       if (dualProviderCount > 0) {
-        console.log(`Dual OCR pages used: ${dualProviderCount}/${OCR_DUAL_PROVIDER_MAX_PAGES} (mode=${OCR_DUAL_PROVIDER_MODE})`);
+        console.log(`Dual OCR pages used: ${dualProviderCount}/${effectiveDualMaxPages} (mode=${effectiveDualMode})`);
       }
 
       status.groqVision.time = Date.now() - start;
