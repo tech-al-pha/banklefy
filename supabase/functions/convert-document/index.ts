@@ -341,6 +341,23 @@ const balanceMismatchRatio = (transactions: RawTransaction[] | undefined): numbe
   return flow.total > 0 ? flow.mismatchRatio : 1;
 };
 
+const shouldForceOcrForDenseStatement = (
+  fileNameLower: string,
+  bankMetadata: BankMetadata | undefined,
+  transactions: RawTransaction[],
+): boolean => {
+  const bankHint = `${fileNameLower} ${String(bankMetadata?.bankName || '')}`.toLowerCase();
+  if (/(adcb|procash)/.test(bankHint)) return true;
+  if (transactions.length < 8) return false;
+
+  let codeHits = 0;
+  for (const transaction of transactions.slice(0, 200)) {
+    const blob = `${String(transaction.refNumber || '')} ${String(transaction.description || '')}`.toLowerCase();
+    if (/\bphub|mob|trf\b/.test(blob)) codeHits += 1;
+  }
+  return codeHits >= 4;
+};
+
 const shouldRetryStrictVisionPass = (
   fileNameLower: string,
   primaryResult: OCRResult,
@@ -1268,15 +1285,21 @@ Deno.serve(async (req) => {
       : [];
     const clientParsedBankMetadata = normalizeClientBankMetadata(pdfParsedBankMetadata);
     const clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
+    const forceOcrForDenseStatement = shouldForceOcrForDenseStatement(
+      lowerFileName,
+      clientParsedBankMetadata,
+      clientParsedTransactions,
+    );
     const canUseDeterministicClientPdf =
       isPdf &&
       clientParsedTransactions.length > 0 &&
-      clientPdfParseAssessment.useDeterministic;
+      clientPdfParseAssessment.useDeterministic &&
+      !forceOcrForDenseStatement;
 
     if (isPdf && clientParsedTransactions.length > 0 && !canUseDeterministicClientPdf) {
       console.log(
         `Ignoring deterministic client PDF rows (${clientParsedTransactions.length}) and falling back to OCR: ${clientPdfParseAssessment.reason} ` +
-          `(mismatch=${clientPdfParseAssessment.mismatchRatio.toFixed(3)}, anomaly=${clientPdfParseAssessment.anomalyRate.toFixed(3)})`,
+          `(mismatch=${clientPdfParseAssessment.mismatchRatio.toFixed(3)}, anomaly=${clientPdfParseAssessment.anomalyRate.toFixed(3)}, dense=${forceOcrForDenseStatement})`,
       );
     }
 
