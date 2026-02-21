@@ -368,61 +368,70 @@ const harmonizeAmountsWithRunningBalance = (
   const start = direction === 'forward' ? 1 : 0;
   const endExclusive = direction === 'forward' ? corrected.length : corrected.length - 1;
 
-  for (let index = start; index < endExclusive; index += 1) {
-    const current = corrected[index];
-    const debit = Number(current.debit || 0);
-    const credit = Number(current.credit || 0);
+  // Two passes: first pass fixes obvious OCR drift, second pass stabilizes neighboring rows.
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (let index = start; index < endExclusive; index += 1) {
+      const current = corrected[index];
+      const debit = Number(current.debit || 0);
+      const credit = Number(current.credit || 0);
 
-    const asIsDiff =
-      direction === 'forward'
-        ? getForwardDiffMinor(corrected, index, debit, credit)
-        : getReverseDiffMinor(corrected, index, debit, credit);
-    if (!Number.isFinite(asIsDiff)) continue;
-
-    const prevOrNext = direction === 'forward' ? corrected[index - 1] : corrected[index + 1];
-    const currentBalance = Number(current.balance ?? NaN);
-    const adjacentBalance = Number(prevOrNext?.balance ?? NaN);
-    if (!Number.isFinite(currentBalance) || !Number.isFinite(adjacentBalance)) continue;
-
-    const delta = roundTo2(currentBalance - adjacentBalance);
-    const deltaAbs = Math.abs(delta);
-    if (deltaAbs <= 0) continue;
-
-    const candidates: Array<{ debit: number; credit: number }> = [];
-    candidates.push(normalizeAmountPair(debit, credit));
-    candidates.push(normalizeAmountPair(credit, debit));
-    candidates.push(...buildScaleAdjustedCandidates(Math.abs(debit), Math.abs(credit)));
-    if (delta > 0) {
-      candidates.push(normalizeAmountPair(0, deltaAbs));
-    } else {
-      candidates.push(normalizeAmountPair(deltaAbs, 0));
-    }
-
-    let best = normalizeAmountPair(debit, credit);
-    let bestDiff = asIsDiff;
-    for (const candidate of candidates) {
-      const candidateDiff =
+      const asIsDiff =
         direction === 'forward'
-          ? getForwardDiffMinor(corrected, index, candidate.debit, candidate.credit)
-          : getReverseDiffMinor(corrected, index, candidate.debit, candidate.credit);
-      if (!Number.isFinite(candidateDiff)) continue;
-      if (candidateDiff < bestDiff) {
-        best = candidate;
-        bestDiff = candidateDiff;
+          ? getForwardDiffMinor(corrected, index, debit, credit)
+          : getReverseDiffMinor(corrected, index, debit, credit);
+      if (!Number.isFinite(asIsDiff)) continue;
+
+      const prevOrNext = direction === 'forward' ? corrected[index - 1] : corrected[index + 1];
+      const currentBalance = Number(current.balance ?? NaN);
+      const adjacentBalance = Number(prevOrNext?.balance ?? NaN);
+      if (!Number.isFinite(currentBalance) || !Number.isFinite(adjacentBalance)) continue;
+
+      const delta = roundTo2(currentBalance - adjacentBalance);
+      const deltaAbs = Math.abs(delta);
+      if (deltaAbs <= 0) continue;
+      const observedAmount = Math.max(Math.abs(debit), Math.abs(credit));
+
+      const candidates: Array<{ debit: number; credit: number }> = [];
+      candidates.push(normalizeAmountPair(debit, credit));
+      candidates.push(normalizeAmountPair(credit, debit));
+      candidates.push(...buildScaleAdjustedCandidates(Math.abs(debit), Math.abs(credit)));
+      const ratio = observedAmount > 0 ? deltaAbs / observedAmount : 0;
+      const likelyScaleIssue = observedAmount >= 1000 && (ratio >= 8 || ratio <= 0.125);
+      const likelyCloseAmount = observedAmount > 0 && ratio >= 0.4 && ratio <= 2.5;
+      if (likelyScaleIssue || likelyCloseAmount) {
+        if (delta > 0) {
+          candidates.push(normalizeAmountPair(0, deltaAbs));
+        } else {
+          candidates.push(normalizeAmountPair(deltaAbs, 0));
+        }
       }
+
+      let best = normalizeAmountPair(debit, credit);
+      let bestDiff = asIsDiff;
+      for (const candidate of candidates) {
+        const candidateDiff =
+          direction === 'forward'
+            ? getForwardDiffMinor(corrected, index, candidate.debit, candidate.credit)
+            : getReverseDiffMinor(corrected, index, candidate.debit, candidate.credit);
+        if (!Number.isFinite(candidateDiff)) continue;
+        if (candidateDiff < bestDiff) {
+          best = candidate;
+          bestDiff = candidateDiff;
+        }
+      }
+
+      const amountMinor = Math.max(toMinor(debit), toMinor(credit), toMinor(deltaAbs));
+      const residualLimit = Math.max(2, Math.round(amountMinor * 0.002)); // 2x stricter vs old 0.3%.
+      const clearlyBetter = bestDiff + 4 < asIsDiff; // Require stronger improvement.
+      const residualAcceptable = bestDiff <= residualLimit || bestDiff <= Math.round(asIsDiff * 0.15);
+      if (!clearlyBetter || !residualAcceptable) continue;
+
+      corrected[index] = {
+        ...current,
+        debit: best.debit,
+        credit: best.credit,
+      };
     }
-
-    const amountMinor = Math.max(toMinor(debit), toMinor(credit), toMinor(deltaAbs));
-    const residualLimit = Math.max(2, Math.round(amountMinor * 0.003)); // <= 0.3% residual or 0.02 absolute.
-    const clearlyBetter = bestDiff + 2 < asIsDiff;
-    const residualAcceptable = bestDiff <= residualLimit || bestDiff <= Math.round(asIsDiff * 0.2);
-    if (!clearlyBetter || !residualAcceptable) continue;
-
-    corrected[index] = {
-      ...current,
-      debit: best.debit,
-      credit: best.credit,
-    };
   }
 
   return corrected;

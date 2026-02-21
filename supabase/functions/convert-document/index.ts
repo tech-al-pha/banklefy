@@ -74,7 +74,7 @@ const normalizeDualOcrMode = (value: string | undefined): DualOcrMode => {
 const OCR_DUAL_PROVIDER_MODE = normalizeDualOcrMode(Deno.env.get('OCR_DUAL_PROVIDER_MODE'));
 const OCR_DUAL_PROVIDER_MAX_PAGES = Math.max(
   0,
-  Number(Deno.env.get('OCR_DUAL_PROVIDER_MAX_PAGES') ?? (OCR_DUAL_PROVIDER_MODE === 'always' ? '120' : '4')),
+  Number(Deno.env.get('OCR_DUAL_PROVIDER_MAX_PAGES') ?? (OCR_DUAL_PROVIDER_MODE === 'always' ? '120' : '8')),
 );
 type StrictOcrRetryMode = 'off' | 'smart' | 'always';
 const normalizeStrictOcrRetryMode = (value: string | undefined): StrictOcrRetryMode => {
@@ -85,7 +85,7 @@ const normalizeStrictOcrRetryMode = (value: string | undefined): StrictOcrRetryM
 const STRICT_OCR_RETRY_MODE = normalizeStrictOcrRetryMode(Deno.env.get('OCR_STRICT_RETRY_MODE'));
 const STRICT_OCR_RETRY_MAX_PAGES = Math.max(
   0,
-  Number(Deno.env.get('OCR_STRICT_RETRY_MAX_PAGES') ?? (STRICT_OCR_RETRY_MODE === 'always' ? '120' : '2')),
+  Number(Deno.env.get('OCR_STRICT_RETRY_MAX_PAGES') ?? (STRICT_OCR_RETRY_MODE === 'always' ? '120' : '4')),
 );
 
 // ============= DEPLOYMENT-AGNOSTIC CORS =============
@@ -368,7 +368,7 @@ const shouldRetryStrictVisionPass = (
 
   const tx = primaryResult.transactions || [];
   const likelyDenseTableBank = /(adcb|procash|statement of accounts)/i.test(fileNameLower);
-  if (likelyDenseTableBank && tx.length <= 10) return true;
+  if (likelyDenseTableBank && tx.length <= 40) return true;
   if (!primaryResult.success || tx.length === 0) return true;
 
   const mismatchRatio = balanceMismatchRatio(tx);
