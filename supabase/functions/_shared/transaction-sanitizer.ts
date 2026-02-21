@@ -331,6 +331,103 @@ const trySwapByOpeningBalance = (
   return true;
 };
 
+const normalizeAmountPair = (debit: number, credit: number): { debit: number; credit: number } => {
+  const d = Number.isFinite(debit) ? Math.max(0, roundTo2(debit)) : 0;
+  const c = Number.isFinite(credit) ? Math.max(0, roundTo2(credit)) : 0;
+  return { debit: d, credit: c };
+};
+
+const buildScaleAdjustedCandidates = (debit: number, credit: number): Array<{ debit: number; credit: number }> => {
+  const candidates: Array<{ debit: number; credit: number }> = [];
+  const factors = [0.01, 0.1, 10, 100, 1000];
+  for (const factor of factors) {
+    if (debit > 0 && credit === 0) {
+      candidates.push(normalizeAmountPair(debit * factor, 0));
+      candidates.push(normalizeAmountPair(0, debit * factor));
+    }
+    if (credit > 0 && debit === 0) {
+      candidates.push(normalizeAmountPair(0, credit * factor));
+      candidates.push(normalizeAmountPair(credit * factor, 0));
+    }
+  }
+  return candidates;
+};
+
+const harmonizeAmountsWithRunningBalance = (
+  transactions: Transaction[],
+  direction: BalanceDirection,
+): Transaction[] => {
+  if (transactions.length <= 1) return transactions;
+
+  const corrected = transactions.map((transaction) => ({
+    ...transaction,
+    debit: Number(transaction.debit || 0),
+    credit: Number(transaction.credit || 0),
+  }));
+
+  const start = direction === 'forward' ? 1 : 0;
+  const endExclusive = direction === 'forward' ? corrected.length : corrected.length - 1;
+
+  for (let index = start; index < endExclusive; index += 1) {
+    const current = corrected[index];
+    const debit = Number(current.debit || 0);
+    const credit = Number(current.credit || 0);
+
+    const asIsDiff =
+      direction === 'forward'
+        ? getForwardDiffMinor(corrected, index, debit, credit)
+        : getReverseDiffMinor(corrected, index, debit, credit);
+    if (!Number.isFinite(asIsDiff)) continue;
+
+    const prevOrNext = direction === 'forward' ? corrected[index - 1] : corrected[index + 1];
+    const currentBalance = Number(current.balance ?? NaN);
+    const adjacentBalance = Number(prevOrNext?.balance ?? NaN);
+    if (!Number.isFinite(currentBalance) || !Number.isFinite(adjacentBalance)) continue;
+
+    const delta = roundTo2(currentBalance - adjacentBalance);
+    const deltaAbs = Math.abs(delta);
+    if (deltaAbs <= 0) continue;
+
+    const candidates: Array<{ debit: number; credit: number }> = [];
+    candidates.push(normalizeAmountPair(debit, credit));
+    candidates.push(normalizeAmountPair(credit, debit));
+    candidates.push(...buildScaleAdjustedCandidates(Math.abs(debit), Math.abs(credit)));
+    if (delta > 0) {
+      candidates.push(normalizeAmountPair(0, deltaAbs));
+    } else {
+      candidates.push(normalizeAmountPair(deltaAbs, 0));
+    }
+
+    let best = normalizeAmountPair(debit, credit);
+    let bestDiff = asIsDiff;
+    for (const candidate of candidates) {
+      const candidateDiff =
+        direction === 'forward'
+          ? getForwardDiffMinor(corrected, index, candidate.debit, candidate.credit)
+          : getReverseDiffMinor(corrected, index, candidate.debit, candidate.credit);
+      if (!Number.isFinite(candidateDiff)) continue;
+      if (candidateDiff < bestDiff) {
+        best = candidate;
+        bestDiff = candidateDiff;
+      }
+    }
+
+    const amountMinor = Math.max(toMinor(debit), toMinor(credit), toMinor(deltaAbs));
+    const residualLimit = Math.max(2, Math.round(amountMinor * 0.003)); // <= 0.3% residual or 0.02 absolute.
+    const clearlyBetter = bestDiff + 2 < asIsDiff;
+    const residualAcceptable = bestDiff <= residualLimit || bestDiff <= Math.round(asIsDiff * 0.2);
+    if (!clearlyBetter || !residualAcceptable) continue;
+
+    corrected[index] = {
+      ...current,
+      debit: best.debit,
+      credit: best.credit,
+    };
+  }
+
+  return corrected;
+};
+
 const scoreTransactionQuality = (transaction: Transaction): number => {
   const description = (transaction.description || '').trim();
   const ref = (transaction.refNumber || '').trim();
@@ -429,11 +526,13 @@ export const sanitizeTransactions = (transactions: Transaction[], options?: Sani
     trySwapByOpeningBalance(offsetAligned, edgeIndex, Number(options?.openingBalance));
   }
 
+  const amountHarmonized = harmonizeAmountsWithRunningBalance(offsetAligned, direction);
+
   // Remove OCR/AI duplicate rows that represent the same movement and balance.
   const deduped: Transaction[] = [];
   const indexByKey = new Map<string, number>();
 
-  for (const transaction of offsetAligned) {
+  for (const transaction of amountHarmonized) {
     const key = transactionKey(transaction);
     const existingIndex = indexByKey.get(key);
 
