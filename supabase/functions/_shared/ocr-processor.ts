@@ -1,6 +1,8 @@
 // ============= GROQ VISION OCR PROCESSOR =============
 // Using Groq's Llama Vision model for OCR
 
+import { getHeaderAliasesForHint, type HeaderAliasMap } from './bank-templates.ts';
+
 export interface BankMetadata {
   bankName: string;
   accountNumber: string;
@@ -1020,7 +1022,18 @@ type MarkdownHeaderMap = {
   balanceIndex?: number;
 };
 
-const buildMarkdownHeaderMap = (headers: string[]): MarkdownHeaderMap | null => {
+const matchesHeaderAlias = (normalizedHeader: string, alias: string): boolean => {
+  if (!alias) return false;
+  if (normalizedHeader === alias) return true;
+  // Avoid broad false matches (e.g., "date" matching "value date")
+  if (alias.length < 6) return false;
+  return normalizedHeader.includes(alias);
+};
+
+const hasHeaderAlias = (normalizedHeader: string, aliases: string[]): boolean =>
+  aliases.some((alias) => matchesHeaderAlias(normalizedHeader, alias));
+
+const buildMarkdownHeaderMap = (headers: string[], aliases: HeaderAliasMap): MarkdownHeaderMap | null => {
   let dateIndex = -1;
   let valueDateIndex = -1;
   let descriptionIndex = -1;
@@ -1031,31 +1044,31 @@ const buildMarkdownHeaderMap = (headers: string[]): MarkdownHeaderMap | null => 
 
   headers.forEach((header, index) => {
     const h = normalizeHeaderCell(header);
-    if (h.includes('transaction date') || h === 'date' || h.startsWith('txn date')) {
-      dateIndex = index;
-      return;
-    }
-    if (h.includes('value date') || h.includes('posting date')) {
+    if (hasHeaderAlias(h, aliases.valueDate) || h.includes('posting date')) {
       valueDateIndex = index;
       return;
     }
-    if (h.includes('narration') || h.includes('description') || h.includes('particular')) {
+    if (hasHeaderAlias(h, aliases.date) || h.includes('transaction date') || h.startsWith('txn date')) {
+      dateIndex = index;
+      return;
+    }
+    if (hasHeaderAlias(h, aliases.description) || h.includes('particular')) {
       descriptionIndex = index;
       return;
     }
-    if (h.includes('reference') || h.includes('txn id') || h.includes('transaction id') || h.includes('ref no')) {
+    if (hasHeaderAlias(h, aliases.reference) || h.includes('reference') || h.includes('txn id')) {
       refIndex = index;
       return;
     }
-    if (h.startsWith('debit') || h.endsWith(' debit') || h.includes('debit amount')) {
+    if (hasHeaderAlias(h, aliases.debit) || h.startsWith('debit') || h.endsWith(' debit')) {
       debitIndex = index;
       return;
     }
-    if (h.startsWith('credit') || h.endsWith(' credit') || h.includes('credit amount')) {
+    if (hasHeaderAlias(h, aliases.credit) || h.startsWith('credit') || h.endsWith(' credit')) {
       creditIndex = index;
       return;
     }
-    if (h.includes('running balance') || h === 'balance' || h.endsWith(' balance')) {
+    if (hasHeaderAlias(h, aliases.balance) || h.includes('running balance') || h.endsWith(' balance')) {
       balanceIndex = index;
     }
   });
@@ -1077,6 +1090,7 @@ const buildMarkdownHeaderMap = (headers: string[]): MarkdownHeaderMap | null => 
 
 const parseTransactionsFromMarkdownTables = (markdown: string): RawTransaction[] => {
   const lines = normalizeMarkdownText(markdown).split('\n').map((line) => line.trim()).filter(Boolean);
+  const headerAliases = getHeaderAliasesForHint(markdown);
   const rows: RawTransaction[] = [];
   let index = 0;
 
@@ -1087,7 +1101,7 @@ const parseTransactionsFromMarkdownTables = (markdown: string): RawTransaction[]
       continue;
     }
 
-    const headerMap = buildMarkdownHeaderMap(headerCells);
+    const headerMap = buildMarkdownHeaderMap(headerCells, headerAliases);
     if (!headerMap) {
       index += 1;
       continue;

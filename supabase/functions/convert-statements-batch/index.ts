@@ -58,6 +58,11 @@ import {
 } from '../_shared/multi-statement.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
+import {
+  isComplexBankLayoutHint,
+  isDenseTableBankHint,
+  isDualPassBankHint,
+} from '../_shared/bank-templates.ts';
 
 // ============= ADMIN ROLE (Server-Side Only) =============
 const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
@@ -325,20 +330,13 @@ const balanceMismatchRatio = (transactions: RawTransaction[] | undefined): numbe
   return flow.total > 0 ? flow.mismatchRatio : 1;
 };
 
-const COMPLEX_BANK_LAYOUT_HINT_REGEX =
-  /(adcb|procash|statement of accounts|beneficiary|remitter|swift|debit amount|credit amount|running balance|emirates nbd|emirates islamic|mashreq|wio)/i;
-const DENSE_TABLE_BANK_HINT_REGEX =
-  /(adcb|procash|statement of accounts|emirates nbd|emirates islamic|mashreq|wio)/i;
-const DUAL_PASS_BANK_HINT_REGEX =
-  /(adcb|procash|statement of accounts|value date|running balance|debit amount|credit amount|emirates nbd|emirates islamic|mashreq|wio)/i;
-
 const shouldForceOcrForDenseStatement = (
   fileNameLower: string,
   bankMetadata: BankMetadata | undefined,
   transactions: RawTransaction[],
 ): boolean => {
   const bankHint = `${fileNameLower} ${String(bankMetadata?.bankName || '')}`.toLowerCase();
-  if (DENSE_TABLE_BANK_HINT_REGEX.test(bankHint)) return true;
+  if (isDenseTableBankHint(bankHint)) return true;
   if (transactions.length < 8) return false;
 
   let codeHits = 0;
@@ -409,7 +407,7 @@ const deriveAdaptiveOcrStrategy = (
     hardnessScore += 1;
     reasons.push('moderate_amount_anomaly_rate');
   }
-  if (COMPLEX_BANK_LAYOUT_HINT_REGEX.test(fileNameLower)) {
+  if (isComplexBankLayoutHint(fileNameLower)) {
     hardnessScore += 2;
     reasons.push('complex_table_layout_hint');
   }
@@ -472,7 +470,7 @@ const shouldRetryStrictVisionPass = (
   if (mode === 'always') return true;
 
   const tx = primaryResult.transactions || [];
-  const likelyDenseTableBank = DENSE_TABLE_BANK_HINT_REGEX.test(fileNameLower);
+  const likelyDenseTableBank = isDenseTableBankHint(fileNameLower);
   if (likelyDenseTableBank && tx.length <= 40) return true;
   if (!primaryResult.success || tx.length === 0) return true;
 
@@ -520,7 +518,7 @@ const shouldRunMistralDualPass = (
     String(groqResult.bankMetadata?.bankName || ''),
     String(groqResult.text || ''),
   ].join(' ');
-  const likelyDenseTableBank = DUAL_PASS_BANK_HINT_REGEX.test(bankHints);
+  const likelyDenseTableBank = isDualPassBankHint(bankHints);
   if (!groqResult.success || tx.length === 0) return true;
   if (likelyDenseTableBank && tx.length <= 60) return true;
 
