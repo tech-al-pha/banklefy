@@ -325,13 +325,20 @@ const balanceMismatchRatio = (transactions: RawTransaction[] | undefined): numbe
   return flow.total > 0 ? flow.mismatchRatio : 1;
 };
 
+const COMPLEX_BANK_LAYOUT_HINT_REGEX =
+  /(adcb|procash|statement of accounts|beneficiary|remitter|swift|debit amount|credit amount|running balance|emirates nbd|emirates islamic|mashreq|wio)/i;
+const DENSE_TABLE_BANK_HINT_REGEX =
+  /(adcb|procash|statement of accounts|emirates nbd|emirates islamic|mashreq|wio)/i;
+const DUAL_PASS_BANK_HINT_REGEX =
+  /(adcb|procash|statement of accounts|value date|running balance|debit amount|credit amount|emirates nbd|emirates islamic|mashreq|wio)/i;
+
 const shouldForceOcrForDenseStatement = (
   fileNameLower: string,
   bankMetadata: BankMetadata | undefined,
   transactions: RawTransaction[],
 ): boolean => {
   const bankHint = `${fileNameLower} ${String(bankMetadata?.bankName || '')}`.toLowerCase();
-  if (/(adcb|procash)/.test(bankHint)) return true;
+  if (DENSE_TABLE_BANK_HINT_REGEX.test(bankHint)) return true;
   if (transactions.length < 8) return false;
 
   let codeHits = 0;
@@ -402,7 +409,7 @@ const deriveAdaptiveOcrStrategy = (
     hardnessScore += 1;
     reasons.push('moderate_amount_anomaly_rate');
   }
-  if (/(adcb|procash|statement of accounts|beneficiary|remitter|swift|debit amount|credit amount|running balance)/i.test(fileNameLower)) {
+  if (COMPLEX_BANK_LAYOUT_HINT_REGEX.test(fileNameLower)) {
     hardnessScore += 2;
     reasons.push('complex_table_layout_hint');
   }
@@ -465,7 +472,7 @@ const shouldRetryStrictVisionPass = (
   if (mode === 'always') return true;
 
   const tx = primaryResult.transactions || [];
-  const likelyDenseTableBank = /(adcb|procash|statement of accounts)/i.test(fileNameLower);
+  const likelyDenseTableBank = DENSE_TABLE_BANK_HINT_REGEX.test(fileNameLower);
   if (likelyDenseTableBank && tx.length <= 40) return true;
   if (!primaryResult.success || tx.length === 0) return true;
 
@@ -513,7 +520,7 @@ const shouldRunMistralDualPass = (
     String(groqResult.bankMetadata?.bankName || ''),
     String(groqResult.text || ''),
   ].join(' ');
-  const likelyDenseTableBank = /(adcb|procash|statement of accounts|value date|running balance|debit amount|credit amount)/i.test(bankHints);
+  const likelyDenseTableBank = DUAL_PASS_BANK_HINT_REGEX.test(bankHints);
   if (!groqResult.success || tx.length === 0) return true;
   if (likelyDenseTableBank && tx.length <= 60) return true;
 

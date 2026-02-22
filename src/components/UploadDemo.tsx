@@ -197,6 +197,144 @@ export const UploadDemo = () => {
     if (typeof error === 'string') return error;
     return fallback;
   };
+  const parseEdgeStatusCode = (error: unknown): number | undefined => {
+    if (!error || typeof error !== "object") return undefined;
+    const maybe = error as { context?: { status?: number }; status?: number; response?: { status?: number } };
+    const statusValue = maybe.context?.status ?? maybe.status ?? maybe.response?.status;
+    return typeof statusValue === "number" ? statusValue : undefined;
+  };
+  const isLikelyEdgeResourceError = (message: string, statusCode?: number): boolean => {
+    const normalized = message.toLowerCase();
+    if ([413, 429, 504, 524, 546].includes(statusCode ?? -1)) return true;
+    if (normalized.includes("status code 546")) return true;
+    if (normalized.includes("non-2xx status code") && [413, 429, 504, 524, 546].includes(statusCode ?? -1)) return true;
+    if (normalized.includes("failed to send a request")) return true;
+    if (normalized.includes("network error")) return true;
+    if (normalized.includes("worker_limit")) return true;
+    if (normalized.includes("not having enough compute resources")) return true;
+    if (normalized.includes("request was too large/complex")) return true;
+    if (normalized.includes("deadline exceeded")) return true;
+    return false;
+  };
+  const parseStructuredErrorCode = (payload: unknown): string | null => {
+    if (!payload || typeof payload !== "object") return null;
+    const maybePayload = payload as Record<string, unknown>;
+    const code = maybePayload.code ?? maybePayload.errorCode ?? maybePayload.error_code;
+    if (typeof code !== "string") return null;
+    const normalized = code.trim().toUpperCase();
+    return normalized.length > 0 ? normalized : null;
+  };
+  const estimateDataUrlBytes = (dataUrl: string): number => {
+    const commaIndex = dataUrl.indexOf(",");
+    const base64 = commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
+    return Math.floor((base64.length * 3) / 4);
+  };
+  const estimatePdfPageImagesBytes = (images?: string[]): number => {
+    if (!Array.isArray(images)) return 0;
+    return images.reduce((total, image) => total + (typeof image === "string" ? estimateDataUrlBytes(image) : 0), 0);
+  };
+  const formatMegabytes = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  const buildPdfPayloadTooLargeMessage = (scope: "single" | "batch", pages: number, bytes: number): string => {
+    const payload = `~${formatMegabytes(bytes)} OCR payload across ${pages} PDF page${pages === 1 ? "" : "s"}`;
+    if (scope === "single") {
+      return `This PDF is too heavy for one run (${payload}). Please split into smaller PDFs (recommended 10-20 pages each).`;
+    }
+    return `Selected batch is too heavy for one run (${payload}). Please split files into smaller batches.`;
+  };
+  const AUTO_CHUNK_MAX_PDF_PAGES = 14;
+  const AUTO_CHUNK_MAX_PDF_BYTES = 8 * 1024 * 1024;
+  const AUTO_CHUNK_EAGER_MIN_PDF_PAGES = 16;
+  const HARD_AUTO_CHUNK_MAX_PDF_PAGES = 2;
+  const HARD_AUTO_CHUNK_MAX_PDF_BYTES = 4 * 1024 * 1024;
+  const HARD_AUTO_CHUNK_EAGER_MIN_PDF_PAGES = 3;
+  const HARD_AUTO_CHUNK_AVG_PAGE_BYTES = 850 * 1024;
+  const HARD_PDF_BANK_PATTERN = /(enbd|emirates[\s_-]?nbd|adcb|mashreq|wio|emirates[\s_-]?islamic)/i;
+  const splitPdfPageImagesForChunking = (
+    images: string[],
+    options?: { maxPages?: number; maxBytes?: number },
+  ): string[][] => {
+    const maxPages = Math.max(1, options?.maxPages ?? AUTO_CHUNK_MAX_PDF_PAGES);
+    const maxBytes = Math.max(256 * 1024, options?.maxBytes ?? AUTO_CHUNK_MAX_PDF_BYTES);
+    if (!Array.isArray(images) || images.length === 0) return [];
+
+    const chunks: string[][] = [];
+    let currentChunk: string[] = [];
+    let currentBytes = 0;
+
+    for (const image of images) {
+      if (typeof image !== "string") continue;
+      const imageBytes = estimateDataUrlBytes(image);
+      const nextChunkWouldOverflow =
+        currentChunk.length >= maxPages ||
+        (currentChunk.length > 0 && currentBytes + imageBytes > maxBytes);
+
+      if (nextChunkWouldOverflow) {
+        chunks.push(currentChunk);
+        currentChunk = [];
+        currentBytes = 0;
+      }
+
+      currentChunk.push(image);
+      currentBytes += imageBytes;
+    }
+
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+
+    return chunks;
+  };
+  const aggregateChunkAnalytics = (allTransactions: Transaction[]): Analytics | null => {
+    if (!allTransactions.length) return null;
+
+    const totalCredits = sumMoney(allTransactions.map((transaction) => Number(transaction.credit || 0)));
+    const totalDebits = sumMoney(allTransactions.map((transaction) => Number(transaction.debit || 0)));
+    const netFlow = sumMoney([totalCredits, -totalDebits]);
+    const duplicateCount = allTransactions.reduce(
+      (count, transaction) => count + (transaction.isDuplicate ? 1 : 0),
+      0,
+    );
+
+    const categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }> = {};
+    for (const transaction of allTransactions) {
+      const category = transaction.category?.trim() || "Other";
+      if (!categoryBreakdown[category]) {
+        categoryBreakdown[category] = { count: 0, totalDebit: 0, totalCredit: 0 };
+      }
+      categoryBreakdown[category].count += 1;
+      categoryBreakdown[category].totalDebit = sumMoney([
+        categoryBreakdown[category].totalDebit,
+        Number(transaction.debit || 0),
+      ]);
+      categoryBreakdown[category].totalCredit = sumMoney([
+        categoryBreakdown[category].totalCredit,
+        Number(transaction.credit || 0),
+      ]);
+    }
+
+    return {
+      totalTransactions: allTransactions.length,
+      totalCredits,
+      totalDebits,
+      netFlow,
+      duplicateCount,
+      categoryBreakdown,
+    };
+  };
+  const mergeChunkBankInfo = (infos: Array<BankInfo | null | undefined>): BankInfo | null => {
+    const merged: BankInfo = {};
+    for (const info of infos) {
+      if (!info) continue;
+      for (const [key, value] of Object.entries(info) as Array<[keyof BankInfo, BankInfo[keyof BankInfo]]>) {
+        if (value === undefined || value === null || value === "") continue;
+        const existing = merged[key];
+        if (existing === undefined || existing === null || existing === "") {
+          merged[key] = value;
+        }
+      }
+    }
+    return Object.keys(merged).length > 0 ? merged : null;
+  };
   const getExportBaseName = () => {
     const preferredName =
       singleDownloadFileName ||
@@ -467,6 +605,9 @@ export const UploadDemo = () => {
   const MAX_PDF_RENDER_PAGES = 120;
   const FREE_MAX_PDF_PAGES_PER_FILE = 15;
   const maxPdfRenderPages = isFreeUsageMode ? FREE_MAX_PDF_PAGES_PER_FILE : MAX_PDF_RENDER_PAGES;
+  const EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES = 18 * 1024 * 1024;
+  const EDGE_FUNCTION_SAFE_BATCH_PDF_PAYLOAD_BYTES = 20 * 1024 * 1024;
+  const EDGE_FUNCTION_SAFE_BATCH_PDF_PAGES = 45;
 
 
 
@@ -708,6 +849,9 @@ export const UploadDemo = () => {
     setJsonData(null);
     setMt940Data(null);
     setUploading(true);
+    const allowPdfAutoChunking = mode === "standard";
+    let pdfChunksForRetry: string[][] = [];
+    let runChunkingFirst = false;
 
     try {
       const timezone = getTimezone();
@@ -736,28 +880,63 @@ export const UploadDemo = () => {
       if (isPdf) {
         try {
           const { pdfToPageImages, extractPdfDataFromText } = await loadPdfUtils();
-          requestBody.pdfPageImages = await pdfToPageImages(fileToConvert, {
+          const renderedPdfPageImages = await pdfToPageImages(fileToConvert, {
             password: pdfPassword.trim() || undefined,
             maxPdfRenderPages,
             isFreeUsageMode,
             freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
           });
+          requestBody.pdfPageImages = renderedPdfPageImages;
+          const pdfPayloadBytes = estimatePdfPageImagesBytes(renderedPdfPageImages);
+          const pdfPayloadPages = renderedPdfPageImages.length;
+          const averagePageBytes = pdfPayloadPages > 0 ? pdfPayloadBytes / pdfPayloadPages : 0;
+          const isLikelyHardPdf =
+            HARD_PDF_BANK_PATTERN.test(fileToConvert.name) ||
+            averagePageBytes >= HARD_AUTO_CHUNK_AVG_PAGE_BYTES;
+          const chunkingOptions = isLikelyHardPdf
+            ? {
+                maxPages: HARD_AUTO_CHUNK_MAX_PDF_PAGES,
+                maxBytes: HARD_AUTO_CHUNK_MAX_PDF_BYTES,
+              }
+            : undefined;
+          const eagerChunkPageThreshold = isLikelyHardPdf
+            ? HARD_AUTO_CHUNK_EAGER_MIN_PDF_PAGES
+            : AUTO_CHUNK_EAGER_MIN_PDF_PAGES;
+          pdfChunksForRetry = splitPdfPageImagesForChunking(renderedPdfPageImages, chunkingOptions);
+          const hasChunkPlan = pdfChunksForRetry.length > 1;
+
+          if (
+            pdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES &&
+            (!hasChunkPlan || !allowPdfAutoChunking)
+          ) {
+            throw new Error(buildPdfPayloadTooLargeMessage("single", pdfPayloadPages, pdfPayloadBytes));
+          }
+
+          runChunkingFirst = allowPdfAutoChunking &&
+            hasChunkPlan &&
+            (
+              isLikelyHardPdf ||
+              pdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES ||
+              pdfPayloadPages >= eagerChunkPageThreshold
+            );
 
           // Deterministic path for text-based PDFs: extract rows directly from PDF text.
           // OCR remains fallback for scanned PDFs / extraction misses.
-          try {
-            const parsedPdf = await extractPdfDataFromText(fileToConvert, {
-              password: pdfPassword.trim() || undefined,
-              maxPdfRenderPages,
-            });
-            if (parsedPdf.transactions.length > 0) {
-              requestBody.pdfParsedTransactions = parsedPdf.transactions;
+          if (!runChunkingFirst) {
+            try {
+              const parsedPdf = await extractPdfDataFromText(fileToConvert, {
+                password: pdfPassword.trim() || undefined,
+                maxPdfRenderPages,
+              });
+              if (parsedPdf.transactions.length > 0) {
+                requestBody.pdfParsedTransactions = parsedPdf.transactions;
+              }
+              if (parsedPdf.bankMetadata) {
+                requestBody.pdfParsedBankMetadata = parsedPdf.bankMetadata;
+              }
+            } catch {
+              // Parser failure should not block conversion; backend OCR fallback will handle it.
             }
-            if (parsedPdf.bankMetadata) {
-              requestBody.pdfParsedBankMetadata = parsedPdf.bankMetadata;
-            }
-          } catch {
-            // Parser failure should not block conversion; backend OCR fallback will handle it.
           }
         } catch (err: unknown) {
           const error = err as { name?: string; message?: string };
@@ -829,41 +1008,219 @@ export const UploadDemo = () => {
         }
       }
 
-      const { data, error: functionError } = await supabase.functions.invoke<ConversionResponse>('convert-document', {
-        body: requestBody,
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-      });
+      type InvokeConversionError = Error & {
+        resourceError?: boolean;
+        limitReached?: boolean;
+        requiresPassword?: boolean;
+      };
+      const invokeConvertDocument = async (payload: Record<string, unknown>): Promise<ConversionResponse> => {
+        const { data, error: functionError } = await supabase.functions.invoke<ConversionResponse>('convert-document', {
+          body: payload,
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+        });
 
-      if (functionError) {
-        let message = functionError.message || 'Conversion failed';
+        if (functionError) {
+          let message = functionError.message || 'Conversion failed';
+          const statusCode = parseEdgeStatusCode(functionError);
+          let limitReachedFromPayload = false;
+          let requiresPasswordFromPayload = false;
+          const structuredErrorCode = parseStructuredErrorCode(data);
 
-        // Check if we got structured error data
-        if (data && typeof data === 'object') {
-          const payload: Partial<ConversionResponse> = data;
-          if (payload.limitReached) {
+          if (data && typeof data === 'object') {
+            const payloadData: Partial<ConversionResponse> = data;
+            limitReachedFromPayload = !!payloadData.limitReached;
+            requiresPasswordFromPayload = !!payloadData.requiresPassword;
+            if (limitReachedFromPayload) {
+              refreshUsageLimit();
+            }
+            if (requiresPasswordFromPayload) {
+              setPasswordError(true);
+              setShowPasswordInput(true);
+            }
+            if (payloadData.message || payloadData.error) {
+              message = payloadData.message || payloadData.error || message;
+            }
+          }
+
+          const resourceError =
+            structuredErrorCode === "WORKER_LIMIT" ||
+            isLikelyEdgeResourceError(message, statusCode);
+          if (resourceError) {
+            message = 'Request was too complex for one run (worker compute limit). Retrying with smart chunking; if it still fails, split into 2-5 page chunks.';
+          }
+
+          const typedError = new Error(message) as InvokeConversionError;
+          typedError.resourceError = resourceError;
+          typedError.limitReached = limitReachedFromPayload;
+          typedError.requiresPassword = requiresPasswordFromPayload;
+          throw typedError;
+        }
+
+        if (data?.error) {
+          if (data.limitReached) {
             refreshUsageLimit();
           }
-          if (payload.requiresPassword) {
+          if (data.requiresPassword) {
             setPasswordError(true);
             setShowPasswordInput(true);
           }
-          message = payload.message || payload.error || message;
+          const resourceError =
+            parseStructuredErrorCode(data) === "WORKER_LIMIT" ||
+            isLikelyEdgeResourceError(data.message || data.error || "Conversion failed");
+          const typedError = new Error(
+            resourceError
+              ? 'Request was too complex for one run (worker compute limit). Retrying with smart chunking; if it still fails, split into 2-5 page chunks.'
+              : (data.message || data.error || 'Conversion failed'),
+          ) as InvokeConversionError;
+          typedError.limitReached = !!data.limitReached;
+          typedError.requiresPassword = !!data.requiresPassword;
+          typedError.resourceError = resourceError;
+          throw typedError;
         }
 
-        throw new Error(message);
+        return data ?? {};
+      };
+
+      const runChunkedPdfConversion = async (chunks: string[][]): Promise<ConversionResponse[]> => {
+        const responses: ConversionResponse[] = [];
+        const baseChunkName = sanitizeFileBaseName(fileToConvert.name);
+
+        for (let index = 0; index < chunks.length; index += 1) {
+          const chunkImages = chunks[index];
+          const chunkBody: Record<string, unknown> = {
+            ...requestBody,
+            fileName: `${baseChunkName}_part_${index + 1}.pdf`,
+            pdfPageImages: chunkImages,
+          };
+          delete chunkBody.pdfParsedTransactions;
+
+          if (!user) {
+            const chunkToken = await executeRecaptcha('convert');
+            if (!chunkToken) {
+              throw new Error('CAPTCHA not ready');
+            }
+            chunkBody.recaptchaToken = chunkToken;
+          }
+
+          const chunkResponse = await invokeConvertDocument(chunkBody);
+          responses.push(chunkResponse);
+        }
+
+        return responses;
+      };
+
+      const applyChunkedPdfSuccess = async (chunkResponses: ConversionResponse[]) => {
+        const baseChunkName = sanitizeFileBaseName(fileToConvert.name);
+        const combinedTransactions = chunkResponses.flatMap((chunkResponse) =>
+          Array.isArray(chunkResponse.transactions) ? chunkResponse.transactions : [],
+        );
+        const combinedBankInfo = mergeChunkBankInfo(chunkResponses.map((chunkResponse) => chunkResponse.bankInfo || null));
+        const responseCurrency = normalizeCurrencyCode(
+          combinedBankInfo?.currency || chunkResponses.find((chunkResponse) => chunkResponse.bankInfo?.currency)?.bankInfo?.currency,
+        );
+        const combinedAnalytics = aggregateChunkAnalytics(combinedTransactions);
+        const chunkDownloadResults = chunkResponses.map((chunkResponse, index) => {
+          const hasDownload = !!(chunkResponse.excelData || chunkResponse.resultPath);
+          return hasDownload
+            ? {
+                fileName: `${baseChunkName}_part_${index + 1}.pdf`,
+                downloadFileName: `${baseChunkName}_part_${String(index + 1).padStart(2, "0")}.xlsx`,
+                status: 'success' as const,
+                data: {
+                  excelData: chunkResponse.excelData,
+                  resultPath: chunkResponse.resultPath ?? null,
+                },
+              }
+            : {
+                fileName: `${baseChunkName}_part_${index + 1}.pdf`,
+                status: 'error' as const,
+                error: 'No downloadable output returned for this chunk.',
+              };
+        });
+
+        setConversionResult(null);
+        setSingleDownloadFileName(buildExcelDownloadName(combinedBankInfo?.bankName, fileToConvert.name));
+        setBatchResults(chunkDownloadResults);
+        setMergeInfo(null);
+        setMergeResult(null);
+        setTransactions(combinedTransactions);
+        setAnalytics(combinedAnalytics);
+        setCurrencyCode(responseCurrency);
+        setBankInfo(combinedBankInfo);
+        setJsonData(null);
+        setMt940Data(null);
+        setAiStatus(chunkResponses[chunkResponses.length - 1]?.aiStatus || null);
+        setConversionMode("standard");
+
+        refreshUsageLimit();
+
+        const remainingFromLastChunk = chunkResponses[chunkResponses.length - 1]?.remaining;
+        toast({
+          title: "Conversion complete!",
+          description: [
+            `Large PDF processed in ${chunkResponses.length} chunks.`,
+            `Extracted ${combinedTransactions.length} transactions.`,
+            formatRemaining(remainingFromLastChunk),
+          ]
+            .filter(Boolean)
+            .join(" "),
+        });
+
+        setSelectedFile(null);
+        setSelectedFiles([]);
+        setShowPasswordInput(false);
+        setPdfPassword('');
+        setPasswordError(false);
+        setEditedPdfCheckResult(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      };
+
+      if (isPdf && allowPdfAutoChunking && runChunkingFirst && pdfChunksForRetry.length > 1) {
+        toast({
+          title: "Large PDF detected",
+          description: `Processing in ${pdfChunksForRetry.length} smaller chunks for stability...`,
+        });
+        const chunkResponses = await runChunkedPdfConversion(pdfChunksForRetry);
+        await applyChunkedPdfSuccess(chunkResponses);
+        return;
       }
 
-      if (data?.error) {
-        if (data?.limitReached) {
-          refreshUsageLimit();
-          throw new Error(data.message || 'Conversion limit reached');
+      let data: ConversionResponse;
+      try {
+        data = await invokeConvertDocument(requestBody);
+      } catch (invokeError: unknown) {
+        const error = invokeError as InvokeConversionError;
+        let retryChunks = pdfChunksForRetry;
+        if (isPdf && allowPdfAutoChunking && retryChunks.length <= 1) {
+          const payloadImages = Array.isArray(requestBody.pdfPageImages)
+            ? requestBody.pdfPageImages.filter((img): img is string => typeof img === "string")
+            : [];
+          if (payloadImages.length > 1) {
+            retryChunks = splitPdfPageImagesForChunking(payloadImages, {
+              maxPages: 2,
+              maxBytes: 3 * 1024 * 1024,
+            });
+          }
         }
-        if (data?.requiresPassword) {
-          setPasswordError(true);
-          setShowPasswordInput(true);
-          throw new Error(data.error);
+        const shouldRetryChunked =
+          isPdf &&
+          allowPdfAutoChunking &&
+          retryChunks.length > 1 &&
+          !!error.resourceError;
+
+        if (shouldRetryChunked) {
+          toast({
+            title: "Retrying with smart chunking",
+            description: `One-run processing failed. Retrying in ${retryChunks.length} chunks...`,
+          });
+          const chunkResponses = await runChunkedPdfConversion(retryChunks);
+          await applyChunkedPdfSuccess(chunkResponses);
+          return;
         }
-        throw new Error(data.error);
+
+        throw invokeError;
       }
 
       const responseCurrency = normalizeCurrencyCode(data?.bankInfo?.currency);
@@ -1075,6 +1432,8 @@ Analytics Summary:
         timezone,
         outputMode: mode,
       };
+      let batchPdfPayloadBytes = 0;
+      let batchPdfPages = 0;
       // Anonymous users are tracked server-side by fingerprint (no client IDs).
 
       if (pdfPassword.trim()) {
@@ -1111,6 +1470,21 @@ Analytics Summary:
               isFreeUsageMode,
               freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
             });
+            const filePdfPayloadBytes = estimatePdfPageImagesBytes(payload.pdfPageImages);
+            const filePdfPages = payload.pdfPageImages?.length ?? 0;
+            if (filePdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES) {
+              throw new Error(buildPdfPayloadTooLargeMessage("single", filePdfPages, filePdfPayloadBytes));
+            }
+            batchPdfPayloadBytes += filePdfPayloadBytes;
+            batchPdfPages += filePdfPages;
+            if (batchPdfPayloadBytes > EDGE_FUNCTION_SAFE_BATCH_PDF_PAYLOAD_BYTES) {
+              throw new Error(buildPdfPayloadTooLargeMessage("batch", batchPdfPages, batchPdfPayloadBytes));
+            }
+            if (batchPdfPages > EDGE_FUNCTION_SAFE_BATCH_PDF_PAGES) {
+              throw new Error(
+                `Batch has ${batchPdfPages} PDF pages. For reliable processing, split into smaller batches (recommended up to ${EDGE_FUNCTION_SAFE_BATCH_PDF_PAGES} pages at a time).`,
+              );
+            }
 
             try {
               const parsedPdf = await extractPdfDataFromText(file, {
@@ -1191,7 +1565,9 @@ Analytics Summary:
 
       if (functionError) {
         let message = functionError.message || 'Batch conversion failed';
+        const statusCode = parseEdgeStatusCode(functionError);
         const payload: Partial<MultiConversionResponse> = data ?? {};
+        const structuredErrorCode = parseStructuredErrorCode(payload);
         if (payload.limitReached) {
           refreshUsageLimit();
         }
@@ -1199,7 +1575,12 @@ Analytics Summary:
           setPasswordError(true);
           setShowPasswordInput(true);
         }
-        message = payload.message || payload.error || message;
+        if (payload.message || payload.error) {
+          message = payload.message || payload.error || message;
+        }
+        if (structuredErrorCode === "WORKER_LIMIT" || isLikelyEdgeResourceError(message, statusCode)) {
+          message = 'Batch request was too complex for one run (worker compute limit). Please split into smaller batches (recommended 5-15 PDF pages).';
+        }
         throw new Error(message);
       }
 

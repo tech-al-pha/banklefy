@@ -998,16 +998,29 @@ export const pdfToPageImages = async (
   }
 
   const images: string[] = [];
+  const pageCount = Math.max(1, pdf.numPages);
   const estimateDataUrlBytes = (dataUrl: string): number => {
     const commaIndex = dataUrl.indexOf(",");
     if (commaIndex < 0) return 0;
     const base64 = dataUrl.slice(commaIndex + 1);
     return Math.floor((base64.length * 3) / 4);
   };
-  const OCR_TARGET_RENDER_SCALE = 3.4;
-  const OCR_MAX_CANVAS_PIXELS = 17_000_000;
   const OCR_MIN_RENDER_SCALE = 1.8;
-  const OCR_SOFT_IMAGE_BYTE_CAP = 2_950_000;
+  const OCR_SOFT_TOTAL_BYTES_CAP = 18_000_000;
+  const OCR_TARGET_RENDER_SCALE =
+    pageCount > 36 ? 2.0 :
+    pageCount > 24 ? 2.3 :
+    pageCount > 14 ? 2.7 :
+    3.4;
+  const OCR_MAX_CANVAS_PIXELS =
+    pageCount > 36 ? 7_500_000 :
+    pageCount > 24 ? 9_500_000 :
+    pageCount > 14 ? 12_000_000 :
+    17_000_000;
+  const OCR_SOFT_IMAGE_BYTE_CAP = Math.max(
+    420_000,
+    Math.min(2_950_000, Math.floor(OCR_SOFT_TOTAL_BYTES_CAP / pageCount)),
+  );
 
   const toOcrFriendlyDataUrl = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D): string => {
     // OCR-friendly preprocessing for dense bank tables:
@@ -1054,14 +1067,15 @@ export const pdfToPageImages = async (
     const png = canvas.toDataURL("image/png");
     if (estimateDataUrlBytes(png) <= OCR_SOFT_IMAGE_BYTE_CAP) return png;
 
-    const jpegQualities = [0.96, 0.92, 0.88, 0.84];
+    const jpegQualities = [0.96, 0.92, 0.88, 0.84, 0.8, 0.76];
     for (const quality of jpegQualities) {
       const jpeg = canvas.toDataURL("image/jpeg", quality);
       if (estimateDataUrlBytes(jpeg) <= OCR_SOFT_IMAGE_BYTE_CAP) return jpeg;
     }
-    return canvas.toDataURL("image/jpeg", 0.82);
+    return canvas.toDataURL("image/jpeg", 0.72);
   };
 
+  let accumulatedPayloadBytes = 0;
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const unitViewport = page.getViewport({ scale: 1 });
@@ -1083,7 +1097,18 @@ export const pdfToPageImages = async (
     ctx.imageSmoothingEnabled = false;
 
     await page.render({ canvasContext: ctx, viewport }).promise;
-    images.push(toOcrFriendlyDataUrl(canvas, ctx));
+    let encoded = toOcrFriendlyDataUrl(canvas, ctx);
+    let encodedBytes = estimateDataUrlBytes(encoded);
+    if (accumulatedPayloadBytes + encodedBytes > OCR_SOFT_TOTAL_BYTES_CAP) {
+      const emergencyCompressed = canvas.toDataURL("image/jpeg", 0.66);
+      const emergencyBytes = estimateDataUrlBytes(emergencyCompressed);
+      if (emergencyBytes < encodedBytes) {
+        encoded = emergencyCompressed;
+        encodedBytes = emergencyBytes;
+      }
+    }
+    images.push(encoded);
+    accumulatedPayloadBytes += encodedBytes;
   }
 
   await pdf.destroy?.();

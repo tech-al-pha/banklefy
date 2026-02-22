@@ -342,13 +342,20 @@ const balanceMismatchRatio = (transactions: RawTransaction[] | undefined): numbe
   return flow.total > 0 ? flow.mismatchRatio : 1;
 };
 
+const COMPLEX_BANK_LAYOUT_HINT_REGEX =
+  /(adcb|procash|statement of accounts|beneficiary|remitter|swift|debit amount|credit amount|running balance|emirates nbd|emirates islamic|mashreq|wio)/i;
+const DENSE_TABLE_BANK_HINT_REGEX =
+  /(adcb|procash|statement of accounts|emirates nbd|emirates islamic|mashreq|wio)/i;
+const DUAL_PASS_BANK_HINT_REGEX =
+  /(adcb|procash|statement of accounts|value date|running balance|debit amount|credit amount|emirates nbd|emirates islamic|mashreq|wio)/i;
+
 const shouldForceOcrForDenseStatement = (
   fileNameLower: string,
   bankMetadata: BankMetadata | undefined,
   transactions: RawTransaction[],
 ): boolean => {
   const bankHint = `${fileNameLower} ${String(bankMetadata?.bankName || '')}`.toLowerCase();
-  if (/(adcb|procash)/.test(bankHint)) return true;
+  if (DENSE_TABLE_BANK_HINT_REGEX.test(bankHint)) return true;
   if (transactions.length < 8) return false;
 
   let codeHits = 0;
@@ -419,7 +426,7 @@ const deriveAdaptiveOcrStrategy = (
     hardnessScore += 1;
     reasons.push('moderate_amount_anomaly_rate');
   }
-  if (/(adcb|procash|statement of accounts|beneficiary|remitter|swift|debit amount|credit amount|running balance)/i.test(fileNameLower)) {
+  if (COMPLEX_BANK_LAYOUT_HINT_REGEX.test(fileNameLower)) {
     hardnessScore += 2;
     reasons.push('complex_table_layout_hint');
   }
@@ -482,7 +489,7 @@ const shouldRetryStrictVisionPass = (
   if (mode === 'always') return true;
 
   const tx = primaryResult.transactions || [];
-  const likelyDenseTableBank = /(adcb|procash|statement of accounts)/i.test(fileNameLower);
+  const likelyDenseTableBank = DENSE_TABLE_BANK_HINT_REGEX.test(fileNameLower);
   if (likelyDenseTableBank && tx.length <= 40) return true;
   if (!primaryResult.success || tx.length === 0) return true;
 
@@ -530,7 +537,7 @@ const shouldRunMistralDualPass = (
     String(groqResult.bankMetadata?.bankName || ''),
     String(groqResult.text || ''),
   ].join(' ');
-  const likelyDenseTableBank = /(adcb|procash|statement of accounts|value date|running balance|debit amount|credit amount)/i.test(bankHints);
+  const likelyDenseTableBank = DUAL_PASS_BANK_HINT_REGEX.test(bankHints);
   if (!groqResult.success || tx.length === 0) return true;
   if (likelyDenseTableBank && tx.length <= 60) return true;
 
@@ -1067,22 +1074,26 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
 
-    if (!user && !base64FileData && !(Array.isArray(pdfPageImages) && pdfPageImages.length > 0)) {
+    if (!user && !base64FileData && !hasPdfPageImages) {
       return new Response(
         JSON.stringify({ error: 'File data required for anonymous users' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (user && !fileId) {
+    if (user && !fileId && !hasPdfPageImages) {
       return new Response(
-        JSON.stringify({ error: 'File ID required for authenticated users' }),
+        JSON.stringify({ error: 'File ID or PDF page images required for authenticated users' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    if (user && typeof fileId === 'string' && fileId.length > 0) {
-      uploadedSourcePath = `${user.id}/${fileId}`;
+    const storageFilePath = user && typeof fileId === 'string' && fileId.length > 0
+      ? (fileId.startsWith(`${user.id}/`) ? fileId : `${user.id}/${fileId}`)
+      : null;
+    if (storageFilePath) {
+      uploadedSourcePath = storageFilePath;
       shouldCleanupUploadedSource = true;
     }
 
@@ -1127,10 +1138,10 @@ Deno.serve(async (req) => {
     // Get file bytes
     let bytes: Uint8Array;
 
-    if (user && fileId) {
+    if (user && storageFilePath && !hasPdfPageImages) {
       const { data: fileData, error: downloadError } = await supabaseAdmin.storage
         .from('bank-statements')
-        .download(`${user.id}/${fileId}`);
+        .download(storageFilePath);
 
       if (downloadError || !fileData) {
         return new Response(
@@ -1173,7 +1184,6 @@ Deno.serve(async (req) => {
     // Validate magic bytes
     const lowerFileName = fileName.toLowerCase();
     const isPdf = lowerFileName.endsWith('.pdf');
-    const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
     const pageCount = hasPdfPageImages ? (pdfPageImages as string[]).length : 1;
     if (isPdf) {
       // If client provided page images, we might not have original PDF bytes.
