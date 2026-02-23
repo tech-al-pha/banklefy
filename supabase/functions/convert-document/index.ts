@@ -36,6 +36,7 @@ import {
   reconcileBalances,
   detectDuplicates,
   analyzeLiquidity,
+  scoreTransactionConfidence,
   type FraudAlert,
   type RiskTransaction,
   type Transaction,
@@ -1788,6 +1789,10 @@ Deno.serve(async (req) => {
     }
     console.log(`Circular trading: ${circularResult ? circularResult.indices.length : 0} transactions flagged`);
 
+    // Confidence Scoring (Stage 6)
+    const confidenceSummary = scoreTransactionConfidence(transactions);
+    console.log(`Confidence scoring: avg=${confidenceSummary.averageScore}, low=${confidenceSummary.lowConfidenceCount}/${confidenceSummary.total}`);
+
     // Fetch user's category corrections for behavioral learning
     let categoryCorrections: Map<string, string> | undefined;
     if (user) {
@@ -1878,6 +1883,7 @@ Deno.serve(async (req) => {
       netFlow,
       duplicateCount,
       categoryBreakdown,
+      confidenceSummary,
       riskAnalysis,
       ...(underwritingAnalysis ? { underwriting: underwritingAnalysis } : {}),
     };

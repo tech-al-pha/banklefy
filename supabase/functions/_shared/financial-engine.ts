@@ -21,6 +21,9 @@ export interface Transaction {
   balanceMismatch?: boolean;
   expectedBalance?: number | null;
   riskFlag?: string | null;
+  confidenceScore?: number;
+  confidenceReasons?: string[];
+  lowConfidence?: boolean;
   amount?: number;
   type?: string;
   refNumber?: string; // Reference number extracted from OCR
@@ -104,6 +107,82 @@ export interface LiquidityAnalysis {
   avgBalance: number;
   maxDipDate: string | null;
   zeroDays: number;
+}
+
+export interface ConfidenceSummary {
+  averageScore: number;
+  lowConfidenceCount: number;
+  total: number;
+}
+
+const clampScore = (value: number): number => Math.max(0, Math.min(100, Math.round(value)));
+
+export function scoreTransactionConfidence(transactions: Transaction[]): ConfidenceSummary {
+  if (transactions.length === 0) {
+    return { averageScore: 0, lowConfidenceCount: 0, total: 0 };
+  }
+
+  let totalScore = 0;
+  let lowConfidenceCount = 0;
+
+  transactions.forEach((tx) => {
+    let score = 100;
+    const reasons: string[] = [];
+
+    const dateValue = (tx.date || '').trim();
+    if (!dateValue || dateValue === 'Unknown') {
+      score -= 30;
+      reasons.push('missing_date');
+    }
+    if (!tx.description || tx.description.trim().length === 0 || tx.description === 'Unknown Transaction') {
+      score -= 20;
+      reasons.push('missing_description');
+    }
+    const debit = Number(tx.debit || 0);
+    const credit = Number(tx.credit || 0);
+    if (debit > 0 && credit > 0) {
+      score -= 25;
+      reasons.push('both_debit_and_credit');
+    }
+    if (debit === 0 && credit === 0) {
+      score -= 25;
+      reasons.push('missing_amount');
+    }
+    if (!Number.isFinite(Number(tx.balance))) {
+      score -= 30;
+      reasons.push('missing_balance');
+    }
+    if (debit < 0 || credit < 0) {
+      score -= 20;
+      reasons.push('negative_amount');
+    }
+    if (tx.balanceMismatch) {
+      score -= 25;
+      reasons.push('balance_mismatch');
+    }
+    if (tx.isDuplicate) {
+      score -= 5;
+      reasons.push('duplicate');
+    }
+    if (tx.riskFlag) {
+      score -= 5;
+      reasons.push('risk_flag');
+    }
+
+    const finalScore = clampScore(score);
+    tx.confidenceScore = finalScore;
+    tx.confidenceReasons = reasons;
+    tx.lowConfidence = finalScore < 70;
+
+    totalScore += finalScore;
+    if (tx.lowConfidence) lowConfidenceCount += 1;
+  });
+
+  return {
+    averageScore: clampScore(totalScore / transactions.length),
+    lowConfidenceCount,
+    total: transactions.length,
+  };
 }
 
 // ============= BALANCE RECONCILIATION ENGINE =============

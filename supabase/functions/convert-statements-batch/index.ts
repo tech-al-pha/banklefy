@@ -29,6 +29,7 @@ import {
   reconcileBalances,
   detectDuplicates,
   analyzeLiquidity,
+  scoreTransactionConfidence,
   type Transaction,
 } from '../_shared/financial-engine.ts';
 import {
@@ -688,6 +689,7 @@ function aggregateBatchAnalytics(
   if (circularResult) {
     riskTransactions.push(circularResult);
   }
+  const confidenceSummary = scoreTransactionConfidence(allTransactions);
 
   const underwritingResult = performUnderwritingAnalysis(allTransactions);
   const underwritingPayload = buildUnderwritingPayload(underwritingResult, underwritingTier);
@@ -741,6 +743,7 @@ function aggregateBatchAnalytics(
     netFlow,
     duplicateCount,
     categoryBreakdown,
+    confidenceSummary,
     riskAnalysis: {
       integrityScore,
       balanceMismatches: reconciliation.totalMismatches,
@@ -1088,6 +1091,7 @@ const processStatement = async (params: {
   if (circularResult) {
     riskTransactions.push(circularResult);
   }
+  const confidenceSummary = scoreTransactionConfidence(transactions);
 
   const underwritingResult = performUnderwritingAnalysis(transactions, params.categoryCorrections);
   const liquidityMetrics = analyzeLiquidity(transactions);
@@ -1098,7 +1102,10 @@ const processStatement = async (params: {
     transactions.length,
   );
   const integrityScore = calculateIntegrityScore(reconciliation, riskTransactions, liquidityMetrics);
-  console.log(`Analysis complete. Integrity score: ${integrityScore}, Fraud alerts: ${fraudAlerts.length}`);
+  console.log(
+    `Analysis complete. Integrity score: ${integrityScore}, Confidence avg: ${confidenceSummary.averageScore}, ` +
+    `Low confidence: ${confidenceSummary.lowConfidenceCount}/${confidenceSummary.total}, Fraud alerts: ${fraudAlerts.length}`,
+  );
 
   // Use minor-unit math for exact debit/credit totals (no float drift).
   const totalCreditsMinor = sumMinorUnits(transactions.map((t) => t.credit || 0));

@@ -11,6 +11,9 @@ export interface Transaction {
   balanceMismatch?: boolean;
   expectedBalance?: number | null;
   riskFlag?: string | null;
+  confidenceScore?: number;
+  confidenceReasons?: string[];
+  lowConfidence?: boolean;
   // Legacy fields for backward compatibility
   amount?: number;
   type?: string;
@@ -94,6 +97,7 @@ export interface Analytics {
   netFlow: number;
   duplicateCount: number;
   categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }>;
+  confidenceSummary?: { averageScore: number; lowConfidenceCount: number; total: number };
   riskAnalysis?: RiskAnalysis;
   underwriting?: UnderwritingAnalysis;
 }
