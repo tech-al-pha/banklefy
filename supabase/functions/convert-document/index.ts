@@ -79,6 +79,9 @@ const normalizeDualOcrMode = (value: string | undefined): DualOcrMode => {
   return 'smart';
 };
 const OCR_DUAL_PROVIDER_MODE = normalizeDualOcrMode(Deno.env.get('OCR_DUAL_PROVIDER_MODE'));
+const AUTO_REPROCESS_MAX_PAGES = Number(Deno.env.get('AUTO_REPROCESS_MAX_PAGES') ?? '8');
+const AUTO_REPROCESS_MIN_LOW_RATIO = Number(Deno.env.get('AUTO_REPROCESS_MIN_LOW_RATIO') ?? '0.2');
+const AUTO_REPROCESS_MIN_AVG_SCORE = Number(Deno.env.get('AUTO_REPROCESS_MIN_AVG_SCORE') ?? '75');
 const OCR_DUAL_PROVIDER_MAX_PAGES = Math.max(
   0,
   Number(Deno.env.get('OCR_DUAL_PROVIDER_MAX_PAGES') ?? (OCR_DUAL_PROVIDER_MODE === 'always' ? '120' : '8')),
@@ -1610,6 +1613,71 @@ Deno.serve(async (req) => {
       }
 
       extractionResult = await performExtraction(base64Data, mimeType, extractedText);
+    }
+
+    // Stage 6b: auto reprocess low-confidence rows (strict OCR) only when needed.
+    if (
+      isPdf &&
+      hasPdfPageImages &&
+      OCR_WORKER_MODE !== 'primary' &&
+      extractionResult.transactions.length > 0
+    ) {
+      const prelim = scoreTransactionConfidence(extractionResult.transactions as unknown as Transaction[]);
+      const lowRatio = prelim.total > 0 ? prelim.lowConfidenceCount / prelim.total : 0;
+      const shouldReprocess =
+        (lowRatio >= AUTO_REPROCESS_MIN_LOW_RATIO || prelim.averageScore < AUTO_REPROCESS_MIN_AVG_SCORE) &&
+        pageCount <= AUTO_REPROCESS_MAX_PAGES;
+
+      if (shouldReprocess) {
+        console.log(
+          `Auto reprocess triggered (avg=${prelim.averageScore}, low=${prelim.lowConfidenceCount}/${prelim.total}, pages=${pageCount}).`,
+        );
+        const status: AIProcessingStatus = {
+          groqVision: { used: true, success: false },
+          mistral: { used: false, success: false },
+          groqText: { used: false, success: false },
+          patternFallback: { used: false, success: false },
+        };
+        const start = Date.now();
+        const reprocessCollected: RawTransaction[] = [];
+        let combinedText = '';
+        for (const img of pdfPageImages as string[]) {
+          if (typeof img !== 'string') continue;
+          const match = img.match(/^data:([^;]+);base64,(.+)$/);
+          if (!match) continue;
+          const pageMime = match[1];
+          const pageBase64 = match[2];
+          const pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: true });
+          if (pageResult?.transactions?.length) {
+            reprocessCollected.push(...pageResult.transactions);
+          }
+          if (pageResult?.text) combinedText += (combinedText ? '\n' : '') + pageResult.text;
+        }
+        status.groqVision.time = Date.now() - start;
+        status.groqVision.success = reprocessCollected.length > 0;
+
+        if (reprocessCollected.length > 0) {
+          const reprocessScore = scoreTransactionConfidence(reprocessCollected as unknown as Transaction[]);
+          const better =
+            reprocessScore.averageScore > prelim.averageScore + 3 ||
+            reprocessScore.lowConfidenceCount < prelim.lowConfidenceCount;
+          if (better) {
+            console.log(
+              `Auto reprocess accepted (avg=${reprocessScore.averageScore}, low=${reprocessScore.lowConfidenceCount}/${reprocessScore.total}).`,
+            );
+            extractionResult = {
+              transactions: reprocessCollected,
+              status,
+              extractedText: combinedText,
+              bankMetadata: extractionResult.bankMetadata,
+            };
+          } else {
+            console.log('Auto reprocess rejected (no confidence improvement).');
+          }
+        } else {
+          console.log('Auto reprocess returned no rows; keeping original extraction.');
+        }
+      }
     }
 
     rawTransactions = extractionResult.transactions;
