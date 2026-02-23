@@ -112,6 +112,9 @@ export const UploadDemo = () => {
     progressStep,
     showProgress,
   } = state;
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const setSelectedFiles = (value: File[] | ((prev: File[]) => File[])) =>
     dispatch({
       type: "set",
@@ -179,10 +182,31 @@ export const UploadDemo = () => {
   };
   const [conversionMode, setConversionMode] = useState<ConversionMode>("standard");
   const [editedPdfCheckResult, setEditedPdfCheckResult] = useState<EditedPdfCheckResult | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { hasChatAuraAccess } = useSubscriptionTier();
   const navigate = useNavigate();
+  useEffect(() => {
+    if (!conversionResult) resetFeedbackState();
+  }, [conversionResult]);
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+      const { data, error } = await supabase.rpc('has_role', { _role: 'admin' });
+      if (error) {
+        console.error('Failed to verify admin access:', error);
+        setIsAdmin(false);
+        return;
+      }
+      setIsAdmin(!!data);
+    };
+
+    void checkAdmin();
+  }, [user]);
   const formatAmountNoSymbol = (
     value: number,
     options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
@@ -215,6 +239,31 @@ export const UploadDemo = () => {
     if (normalized.includes("request was too large/complex")) return true;
     if (normalized.includes("deadline exceeded")) return true;
     return false;
+  };
+  const resetFeedbackState = () => {
+    setFeedbackSubmitted(false);
+    setFeedbackLoading(false);
+    setFeedbackError(null);
+  };
+
+  const submitConversionFeedback = async (payload: { isAccurate: boolean; allowTemplate: boolean }) => {
+    if (!user || !conversionResult?.id) return;
+    setFeedbackLoading(true);
+    setFeedbackError(null);
+    const { error } = await supabase.from("conversion_feedback").insert({
+      conversion_id: conversionResult.id,
+      user_id: user.id,
+      is_accurate: payload.isAccurate,
+      allow_template: payload.allowTemplate,
+    });
+    if (error) {
+      console.error("Failed to save conversion feedback:", error);
+      setFeedbackError("We could not save your feedback. Please try again.");
+      setFeedbackLoading(false);
+      return;
+    }
+    setFeedbackLoading(false);
+    setFeedbackSubmitted(true);
   };
   const parseStructuredErrorCode = (payload: unknown): string | null => {
     if (!payload || typeof payload !== "object") return null;
@@ -2380,6 +2429,12 @@ Analytics Summary:
                 showEditDetectorSignals={hasEditPdfDetectorAccess}
                 resultMode={conversionMode}
                 editedPdfCheckResult={editedPdfCheckResult}
+                showPipeline={isAdmin}
+                showFeedback={!!user}
+                feedbackSubmitted={feedbackSubmitted}
+                feedbackLoading={feedbackLoading}
+                feedbackError={feedbackError}
+                onSubmitFeedback={submitConversionFeedback}
               />
             </div>
           </div>

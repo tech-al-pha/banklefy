@@ -116,6 +116,44 @@ export type Database = {
         }
         Relationships: []
       }
+      conversion_feedback: {
+        Row: {
+          allow_template: boolean
+          conversion_id: string
+          created_at: string
+          id: string
+          is_accurate: boolean
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          allow_template?: boolean
+          conversion_id: string
+          created_at?: string
+          id?: string
+          is_accurate: boolean
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          allow_template?: boolean
+          conversion_id?: string
+          created_at?: string
+          id?: string
+          is_accurate?: boolean
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversion_feedback_conversion_id_fkey"
+            columns: ["conversion_id"]
+            isOneToOne: false
+            referencedRelation: "conversions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fraud_alerts: {
         Row: {
           affected_rows: Json | null

@@ -13,7 +13,36 @@ export type BankTemplateId =
   | 'adcb'
   | 'emirates_islamic'
   | 'mashreq'
-  | 'hdfc';
+  | 'hdfc'
+  | 'wio'
+  | 'hsbc'
+  | 'icici'
+  | 'axis'
+  | 'sbi'
+  | 'kotak'
+  | 'pnb'
+  | 'bank_of_baroda'
+  | 'union_bank'
+  | 'idbi'
+  | 'yes_bank'
+  | 'citibank'
+  | 'deutsche'
+  | 'chase'
+  | 'bank_of_america'
+  | 'wells_fargo'
+  | 'santander'
+  | 'bnp_paribas'
+  | 'ing'
+  | 'barclays'
+  | 'dbs'
+  | 'ocbc'
+  | 'uob'
+  | 'ccb'
+  | 'abc'
+  | 'boc'
+  | 'icbc'
+  | 'abn_amro'
+  | 'cma';
 
 export type BankTemplate = {
   id: BankTemplateId;
@@ -66,6 +95,22 @@ const TOP_BANK_TEMPLATES: BankTemplate[] = [
       reference: ['reference no transaction id', 'reference no / transaction id'],
       description: ['narration'],
       balance: ['running balance'],
+    },
+  },
+  {
+    id: 'wio',
+    label: 'Wio Bank',
+    detectPatterns: [
+      /\bwio\b/i,
+      /\bwio\s+bank\b/i,
+      /\bwio\s+business\b/i,
+    ],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['details', 'transaction details'],
+      balance: ['running balance', 'balance'],
     },
   },
   {
@@ -137,6 +182,331 @@ const TOP_BANK_TEMPLATES: BankTemplate[] = [
       balance: ['closing balance'],
     },
   },
+  {
+    id: 'hsbc',
+    label: 'HSBC',
+    detectPatterns: [/\bhsbc\b/i, /hongkong\s+and\s+shanghai/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['narration', 'details', 'transaction details'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'icici',
+    label: 'ICICI Bank',
+    detectPatterns: [/\bicici\b/i, /\bicici\s+bank\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      reference: ['transaction id', 'ref no'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'axis',
+    label: 'Axis Bank',
+    detectPatterns: [/\baxis\b/i, /\baxis\s+bank\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      reference: ['chq no', 'ref no'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'sbi',
+    label: 'State Bank of India',
+    detectPatterns: [/\bsbi\b/i, /state\s+bank\s+of\s+india/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      reference: ['ref no', 'txn id'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'kotak',
+    label: 'Kotak Bank',
+    detectPatterns: [/\bkotak\b/i, /\bkotak\s+bank\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'pnb',
+    label: 'Punjab National Bank',
+    detectPatterns: [/\bpnb\b/i, /punjab\s+national\s+bank/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'bank_of_baroda',
+    label: 'Bank of Baroda',
+    detectPatterns: [/bank\s+of\s+baroda/i, /\bbob\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'union_bank',
+    label: 'Union Bank',
+    detectPatterns: [/union\s+bank/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'idbi',
+    label: 'IDBI Bank',
+    detectPatterns: [/\bidbi\b/i, /\bidbi\s+bank\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'yes_bank',
+    label: 'Yes Bank',
+    detectPatterns: [/\byes\s+bank\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'citibank',
+    label: 'Citibank',
+    detectPatterns: [/\bciti\b/i, /\bcitibank\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description', 'details'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'deutsche',
+    label: 'Deutsche Bank',
+    detectPatterns: [/deutsche\s+bank/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'chase',
+    label: 'Chase Bank',
+    detectPatterns: [/\bchase\b/i, /jpmorgan\s+chase/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'bank_of_america',
+    label: 'Bank of America',
+    detectPatterns: [/bank\s+of\s+america/i, /\bboa\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'wells_fargo',
+    label: 'Wells Fargo',
+    detectPatterns: [/wells\s+fargo/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'santander',
+    label: 'Santander',
+    detectPatterns: [/santander/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'bnp_paribas',
+    label: 'BNP Paribas',
+    detectPatterns: [/bnp\s+paribas/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'ing',
+    label: 'ING',
+    detectPatterns: [/\bing\b/i, /ing\s+bank/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'barclays',
+    label: 'Barclays',
+    detectPatterns: [/barclays/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'dbs',
+    label: 'DBS',
+    detectPatterns: [/\bdbs\b/i, /dbs\s+bank/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'ocbc',
+    label: 'OCBC',
+    detectPatterns: [/\bocbc\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'uob',
+    label: 'UOB',
+    detectPatterns: [/\buob\b/i, /united\s+overseas\s+bank/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'ccb',
+    label: 'China Construction Bank',
+    detectPatterns: [/china\s+construction\s+bank/i, /\bccb\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'abc',
+    label: 'Agricultural Bank of China',
+    detectPatterns: [/agricultural\s+bank\s+of\s+china/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'boc',
+    label: 'Bank of China',
+    detectPatterns: [/bank\s+of\s+china/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'icbc',
+    label: 'ICBC',
+    detectPatterns: [/\bicbc\b/i, /industrial\s+and\s+commercial\s+bank\s+of\s+china/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'abn_amro',
+    label: 'ABN AMRO',
+    detectPatterns: [/abn\s+amro/i, /\babn\b/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description', 'details'],
+      balance: ['balance'],
+    },
+  },
+  {
+    id: 'cma',
+    label: 'CMA',
+    detectPatterns: [/\bcma\b/i, /cash\s+management\s+account/i],
+    complexLayout: false,
+    denseTable: false,
+    dualPassPreferred: false,
+    headerAliases: {
+      description: ['description', 'details'],
+      balance: ['balance'],
+    },
+  },
 ];
 
 const GENERIC_COMPLEX_LAYOUT_REGEX =
@@ -189,4 +559,3 @@ export const isDualPassBankHint = (hintBlob: string | undefined): boolean => {
   if (template) return template.dualPassPreferred;
   return !!hintBlob && GENERIC_DUAL_PASS_REGEX.test(hintBlob);
 };
-

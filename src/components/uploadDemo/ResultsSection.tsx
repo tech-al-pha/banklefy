@@ -40,6 +40,7 @@ import type {
   MergeInfo,
   Transaction,
 } from "./types";
+import { useState } from "react";
 
 type ToneName = "excellent" | "good" | "moderate" | "bad";
 
@@ -106,6 +107,12 @@ type ResultsSectionProps = {
   showEditDetectorSignals?: boolean;
   resultMode?: "standard" | "tally_only";
   editedPdfCheckResult?: { fileName: string; status: "clean" | "suspected"; reason: string } | null;
+  showPipeline?: boolean;
+  showFeedback?: boolean;
+  feedbackSubmitted?: boolean;
+  feedbackLoading?: boolean;
+  feedbackError?: string | null;
+  onSubmitFeedback?: (payload: { isAccurate: boolean; allowTemplate: boolean }) => void;
 };
 
 export const ResultsSection = ({
@@ -139,6 +146,12 @@ export const ResultsSection = ({
   showEditDetectorSignals = true,
   resultMode = "standard",
   editedPdfCheckResult = null,
+  showPipeline = true,
+  showFeedback = false,
+  feedbackSubmitted = false,
+  feedbackLoading = false,
+  feedbackError = null,
+  onSubmitFeedback,
 }: ResultsSectionProps) => {
   const isTallyOnlyMode = resultMode === "tally_only";
   const creditTone: ToneName = analytics ? getCreditTone(analytics.totalCredits) : "good";
@@ -147,6 +160,7 @@ export const ResultsSection = ({
   const lockedFormats: string[] = [];
   if (isTallyOnlyMode && !hasTallyAccess) lockedFormats.push("Tally XML");
   if (!isPaidUser) lockedFormats.push("JSON", "MT940");
+  const [allowTemplate, setAllowTemplate] = useState(false);
 
   return (
     <>
@@ -360,6 +374,51 @@ export const ResultsSection = ({
         </div>
       )}
 
+      {showFeedback && !isTallyOnlyMode && conversionResult && batchResults.length === 0 && (
+        <Card className="p-4 border-white/10 bg-[#191919]/80">
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-white">
+              Was this Excel correct for your bank statement?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              If yes, we can learn this layout to improve future results.
+            </p>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                checked={allowTemplate}
+                onChange={(event) => setAllowTemplate(event.target.checked)}
+              />
+              You can use this layout as a template
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() => onSubmitFeedback?.({ isAccurate: true, allowTemplate })}
+                disabled={feedbackLoading || feedbackSubmitted}
+              >
+                Yes, correct
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onSubmitFeedback?.({ isAccurate: false, allowTemplate: false })}
+                disabled={feedbackLoading || feedbackSubmitted}
+              >
+                Not correct
+              </Button>
+              {feedbackSubmitted && (
+                <span className="text-xs text-emerald-300 self-center">Thanks for your feedback.</span>
+              )}
+            </div>
+            {feedbackError && (
+              <p className="text-xs text-red-300">{feedbackError}</p>
+            )}
+          </div>
+        </Card>
+      )}
+
       {isTallyOnlyMode && showEditDetectorSignals && editedPdfCheckResult && (
         <Card
           className={`p-4 border ${
@@ -384,7 +443,7 @@ export const ResultsSection = ({
         </Card>
       )}
 
-      {aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
+      {showPipeline && aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
 
       {(converting || showProgress) && (
         <div className="rounded-xl border border-white/10 bg-[#191919]/80 p-4 sm:p-5" role="status" aria-live="polite" aria-atomic="true">
