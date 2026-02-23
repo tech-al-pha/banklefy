@@ -297,6 +297,7 @@ export const UploadDemo = () => {
   const HARD_AUTO_CHUNK_MAX_PDF_BYTES = 4 * 1024 * 1024;
   const HARD_AUTO_CHUNK_EAGER_MIN_PDF_PAGES = 3;
   const HARD_AUTO_CHUNK_AVG_PAGE_BYTES = 850 * 1024;
+  const MIN_DETERMINISTIC_PDF_ROWS = 6;
   const HARD_PDF_BANK_PATTERN = /(enbd|emirates[\s_-]?nbd|adcb|mashreq|wio|emirates[\s_-]?islamic)/i;
   const splitPdfPageImagesForChunking = (
     images: string[],
@@ -925,67 +926,72 @@ export const UploadDemo = () => {
           requestBody.recaptchaToken = token;
         }
 
-      // For PDFs: render page images client-side and send to backend (Groq Vision can't accept PDFs directly)
+      // For PDFs: try deterministic text extraction first. Render page images only if needed.
       if (isPdf) {
         try {
           const { pdfToPageImages, extractPdfDataFromText } = await loadPdfUtils();
-          const renderedPdfPageImages = await pdfToPageImages(fileToConvert, {
-            password: pdfPassword.trim() || undefined,
-            maxPdfRenderPages,
-            isFreeUsageMode,
-            freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
-          });
-          requestBody.pdfPageImages = renderedPdfPageImages;
-          const pdfPayloadBytes = estimatePdfPageImagesBytes(renderedPdfPageImages);
-          const pdfPayloadPages = renderedPdfPageImages.length;
-          const averagePageBytes = pdfPayloadPages > 0 ? pdfPayloadBytes / pdfPayloadPages : 0;
-          const isLikelyHardPdf =
-            HARD_PDF_BANK_PATTERN.test(fileToConvert.name) ||
-            averagePageBytes >= HARD_AUTO_CHUNK_AVG_PAGE_BYTES;
-          const chunkingOptions = isLikelyHardPdf
-            ? {
-                maxPages: HARD_AUTO_CHUNK_MAX_PDF_PAGES,
-                maxBytes: HARD_AUTO_CHUNK_MAX_PDF_BYTES,
-              }
-            : undefined;
-          const eagerChunkPageThreshold = isLikelyHardPdf
-            ? HARD_AUTO_CHUNK_EAGER_MIN_PDF_PAGES
-            : AUTO_CHUNK_EAGER_MIN_PDF_PAGES;
-          pdfChunksForRetry = splitPdfPageImagesForChunking(renderedPdfPageImages, chunkingOptions);
-          const hasChunkPlan = pdfChunksForRetry.length > 1;
+          let parsedPdfTransactionsCount = 0;
+          let useDeterministicOnly = false;
 
-          if (
-            pdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES &&
-            (!hasChunkPlan || !allowPdfAutoChunking)
-          ) {
-            throw new Error(buildPdfPayloadTooLargeMessage("single", pdfPayloadPages, pdfPayloadBytes));
+          try {
+            const parsedPdf = await extractPdfDataFromText(fileToConvert, {
+              password: pdfPassword.trim() || undefined,
+              maxPdfRenderPages,
+            });
+            parsedPdfTransactionsCount = parsedPdf.transactions.length;
+            if (parsedPdfTransactionsCount > 0) {
+              requestBody.pdfParsedTransactions = parsedPdf.transactions;
+            }
+            if (parsedPdf.bankMetadata) {
+              requestBody.pdfParsedBankMetadata = parsedPdf.bankMetadata;
+            }
+            useDeterministicOnly =
+              parsedPdfTransactionsCount >= MIN_DETERMINISTIC_PDF_ROWS &&
+              !HARD_PDF_BANK_PATTERN.test(fileToConvert.name);
+          } catch {
+            // Parser failure should not block conversion; backend OCR fallback will handle it.
           }
 
-          runChunkingFirst = allowPdfAutoChunking &&
-            hasChunkPlan &&
-            (
-              isLikelyHardPdf ||
-              pdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES ||
-              pdfPayloadPages >= eagerChunkPageThreshold
-            );
+          if (!useDeterministicOnly) {
+            const renderedPdfPageImages = await pdfToPageImages(fileToConvert, {
+              password: pdfPassword.trim() || undefined,
+              maxPdfRenderPages,
+              isFreeUsageMode,
+              freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+            });
+            requestBody.pdfPageImages = renderedPdfPageImages;
+            const pdfPayloadBytes = estimatePdfPageImagesBytes(renderedPdfPageImages);
+            const pdfPayloadPages = renderedPdfPageImages.length;
+            const averagePageBytes = pdfPayloadPages > 0 ? pdfPayloadBytes / pdfPayloadPages : 0;
+            const isLikelyHardPdf =
+              HARD_PDF_BANK_PATTERN.test(fileToConvert.name) ||
+              averagePageBytes >= HARD_AUTO_CHUNK_AVG_PAGE_BYTES;
+            const chunkingOptions = isLikelyHardPdf
+              ? {
+                  maxPages: HARD_AUTO_CHUNK_MAX_PDF_PAGES,
+                  maxBytes: HARD_AUTO_CHUNK_MAX_PDF_BYTES,
+                }
+              : undefined;
+            const eagerChunkPageThreshold = isLikelyHardPdf
+              ? HARD_AUTO_CHUNK_EAGER_MIN_PDF_PAGES
+              : AUTO_CHUNK_EAGER_MIN_PDF_PAGES;
+            pdfChunksForRetry = splitPdfPageImagesForChunking(renderedPdfPageImages, chunkingOptions);
+            const hasChunkPlan = pdfChunksForRetry.length > 1;
 
-          // Deterministic path for text-based PDFs: extract rows directly from PDF text.
-          // OCR remains fallback for scanned PDFs / extraction misses.
-          if (!runChunkingFirst) {
-            try {
-              const parsedPdf = await extractPdfDataFromText(fileToConvert, {
-                password: pdfPassword.trim() || undefined,
-                maxPdfRenderPages,
-              });
-              if (parsedPdf.transactions.length > 0) {
-                requestBody.pdfParsedTransactions = parsedPdf.transactions;
-              }
-              if (parsedPdf.bankMetadata) {
-                requestBody.pdfParsedBankMetadata = parsedPdf.bankMetadata;
-              }
-            } catch {
-              // Parser failure should not block conversion; backend OCR fallback will handle it.
+            if (
+              pdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES &&
+              (!hasChunkPlan || !allowPdfAutoChunking)
+            ) {
+              throw new Error(buildPdfPayloadTooLargeMessage("single", pdfPayloadPages, pdfPayloadBytes));
             }
+
+            runChunkingFirst = allowPdfAutoChunking &&
+              hasChunkPlan &&
+              (
+                isLikelyHardPdf ||
+                pdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES ||
+                pdfPayloadPages >= eagerChunkPageThreshold
+              );
           }
         } catch (err: unknown) {
           const error = err as { name?: string; message?: string };
@@ -1017,8 +1023,8 @@ export const UploadDemo = () => {
 
         requestBody.fileId = filePath;
       } else {
-        if (!isPdf) {
-          // Anonymous user - send file as base64 (images)
+        if (!isPdf || !("pdfPageImages" in requestBody)) {
+          // Anonymous user - send file as base64 (images or text-based PDF)
           const base64Data = await fileToBase64(fileToConvert);
           requestBody.fileData = base64Data;
         }

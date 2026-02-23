@@ -817,6 +817,8 @@ const processStatement = async (params: {
   const clientParsedBankMetadata = normalizeClientBankMetadata(params.pdfParsedBankMetadata);
   const pageCount = hasPdfPageImages ? params.pdfPageImages!.length : 1;
   const clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
+  const mustUseDeterministicClientPdf =
+    isPdf && !hasPdfPageImages && clientParsedTransactions.length > 0;
   const forceOcrForDenseStatement = shouldForceOcrForDenseStatement(
     lowerFileName,
     clientParsedBankMetadata,
@@ -837,7 +839,13 @@ const processStatement = async (params: {
     !forceOcrForDenseStatement &&
     isPdf &&
     clientParsedTransactions.length > 0 &&
-    clientPdfParseAssessment.useDeterministic;
+    (clientPdfParseAssessment.useDeterministic || mustUseDeterministicClientPdf);
+
+  if (mustUseDeterministicClientPdf && !clientPdfParseAssessment.useDeterministic) {
+    console.log(
+      `No PDF page images provided; forcing deterministic PDF rows (${clientParsedTransactions.length}) despite assessment: ${clientPdfParseAssessment.reason}`,
+    );
+  }
 
   if (isPdf && clientParsedTransactions.length > 0 && !canUseDeterministicClientPdf) {
     console.log(

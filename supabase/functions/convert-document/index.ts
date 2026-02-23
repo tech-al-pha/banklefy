@@ -1408,6 +1408,8 @@ Deno.serve(async (req) => {
       : [];
     const clientParsedBankMetadata = normalizeClientBankMetadata(pdfParsedBankMetadata);
     const clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
+    const mustUseDeterministicClientPdf =
+      isPdf && !hasPdfPageImages && clientParsedTransactions.length > 0;
     const forceOcrForDenseStatement = shouldForceOcrForDenseStatement(
       lowerFileName,
       clientParsedBankMetadata,
@@ -1426,8 +1428,14 @@ Deno.serve(async (req) => {
     const canUseDeterministicClientPdf =
       isPdf &&
       clientParsedTransactions.length > 0 &&
-      clientPdfParseAssessment.useDeterministic &&
+      (clientPdfParseAssessment.useDeterministic || mustUseDeterministicClientPdf) &&
       !forceOcrForDenseStatement;
+
+    if (mustUseDeterministicClientPdf && !clientPdfParseAssessment.useDeterministic) {
+      console.log(
+        `No PDF page images provided; forcing deterministic PDF rows (${clientParsedTransactions.length}) despite assessment: ${clientPdfParseAssessment.reason}`,
+      );
+    }
 
     if (isPdf && clientParsedTransactions.length > 0 && !canUseDeterministicClientPdf) {
       console.log(
