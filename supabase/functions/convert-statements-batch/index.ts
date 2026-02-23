@@ -1797,21 +1797,6 @@ Deno.serve(async (req) => {
     const pagesWithDataTotal = successes.reduce((sum, s) => sum + (s.pagesWithData || 1), 0);
     const successfulConversions = successes.length;
 
-    // Update page usage once per batch based on pages that actually contained data
-    if (user && !isAdmin && !isFreeMode && (isMonthlyPlan || isYearlyPlan)) {
-      const updatedPagesUsed = pagesUsedThisMonth + pagesWithDataTotal;
-      const { error: updateError } = await supabase
-        .from('subscriptions')
-        .update({ pages_used_this_month: updatedPagesUsed })
-        .eq('user_id', user.id);
-
-      if (updateError) {
-        console.error('Failed to update pages used:', updateError);
-      } else {
-        console.log(`Updated pages used: ${updatedPagesUsed}/${userPlanLimit}`);
-      }
-    }
-
     // Increment usage count based on plan
     const incrementBy = isFreeMode ? successfulConversions : pagesWithDataTotal;
     let remaining = Math.max(0, conversionsLimit - conversionsUsed);

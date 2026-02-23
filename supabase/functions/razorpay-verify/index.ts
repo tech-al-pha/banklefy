@@ -292,7 +292,7 @@ Deno.serve(async (req) => {
     const resetDate = toIsoDate(new Date());
     const { data: existingSubscription, error: subscriptionReadError } = await supabaseAdmin
       .from('subscriptions')
-      .select('conversions_limit, tier, plan_type')
+      .select('conversions_limit, conversions_used, free_daily_limit, free_daily_used, monthly_limit, monthly_used, yearly_limit, yearly_used, pack_limit, pack_used, tier, plan_type')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -306,10 +306,20 @@ Deno.serve(async (req) => {
         user_id: userId,
         tier: planTier,
         plan_type: planId,
-        conversions_limit: pagesToAdd,
+        conversions_limit: 0,
         conversions_used: 0,
+        free_daily_limit: 5,
+        free_daily_used: 0,
+        monthly_limit: planId.startsWith('monthly_') ? pagesToAdd : 0,
+        monthly_used: 0,
+        yearly_limit: planId.startsWith('yearly_') ? pagesToAdd : 0,
+        yearly_used: 0,
+        pack_limit: planId.startsWith('per_page_') ? pagesToAdd : 0,
+        pack_used: 0,
         last_reset_date: resetDate,
         timezone: 'UTC',
+        monthly_reset_date: resetDate,
+        yearly_reset_date: resetDate,
       });
 
       if (subscriptionInsertError) {
@@ -321,21 +331,29 @@ Deno.serve(async (req) => {
         !isRecurringPlan && existingSubscription.tier && existingSubscription.tier !== 'free'
           ? existingSubscription.tier
           : planTier;
-      const nextLimit = isRecurringPlan
-        ? pagesToAdd
-        : Number(existingSubscription.conversions_limit || 0) + pagesToAdd;
+
+      const nextMonthly = Number(existingSubscription.monthly_limit || 0) + (planId.startsWith('monthly_') ? pagesToAdd : 0);
+      const nextYearly = Number(existingSubscription.yearly_limit || 0) + (planId.startsWith('yearly_') ? pagesToAdd : 0);
+      const nextPack = Number(existingSubscription.pack_limit || 0) + (planId.startsWith('per_page_') ? pagesToAdd : 0);
+      const freeDailyLimit = Math.max(5, Number(existingSubscription.free_daily_limit || 5));
+      const freeDailyUsed = Number(existingSubscription.free_daily_used || 0);
+      const monthlyUsed = Number(existingSubscription.monthly_used || 0);
+      const yearlyUsed = Number(existingSubscription.yearly_used || 0);
+      const packUsed = Number(existingSubscription.pack_used || 0);
+
+      const nextLimit = freeDailyLimit + nextMonthly + nextYearly + nextPack;
+      const nextUsed = freeDailyUsed + monthlyUsed + yearlyUsed + packUsed;
 
       const updatePayload: Record<string, unknown> = {
         conversions_limit: nextLimit,
+        conversions_used: nextUsed,
+        free_daily_limit: freeDailyLimit,
+        monthly_limit: nextMonthly,
+        yearly_limit: nextYearly,
+        pack_limit: nextPack,
         tier: retainedTier,
         plan_type: planId,
       };
-
-      if (isRecurringPlan) {
-        updatePayload.conversions_used = 0;
-        updatePayload.last_reset_date = resetDate;
-        updatePayload.timezone = 'UTC';
-      }
 
       const { error: subscriptionUpdateError } = await supabaseAdmin
         .from('subscriptions')

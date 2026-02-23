@@ -788,10 +788,48 @@ const checkLimitFallback = async ({
       }
 
       const planType = resolvePlanType(row);
-      const conversionsLimit = toNumber(row.conversions_limit, 5);
-      let conversionsUsed = toNumber(row.conversions_used, 0);
-      const lastResetDate = toDateString(row.last_reset_date);
+      const rowData = row as Record<string, unknown>;
+      const hasBuckets = Object.prototype.hasOwnProperty.call(rowData, 'free_daily_limit');
+      const lastResetDate = toDateString(rowData.last_reset_date);
       const resetBoundary = getResetBoundary(planType, dateParts);
+
+      if (hasBuckets) {
+        const freeLimit = toNumber(rowData.free_daily_limit, 5);
+        let freeUsed = toNumber(rowData.free_daily_used, 0);
+        const monthlyLimit = toNumber(rowData.monthly_limit, 0);
+        let monthlyUsed = toNumber(rowData.monthly_used, 0);
+        const yearlyLimit = toNumber(rowData.yearly_limit, 0);
+        let yearlyUsed = toNumber(rowData.yearly_used, 0);
+        const packLimit = toNumber(rowData.pack_limit, 0);
+        const packUsed = toNumber(rowData.pack_used, 0);
+
+        const monthBoundary = `${dateParts.year}-${dateParts.month}-01`;
+        const yearBoundary = `${dateParts.year}-01-01`;
+        const monthReset = toDateString(rowData.monthly_reset_date);
+        const yearReset = toDateString(rowData.yearly_reset_date);
+
+        if (!lastResetDate || lastResetDate < dateParts.isoDate) {
+          freeUsed = 0;
+        }
+        if (!monthReset || monthReset < monthBoundary) {
+          monthlyUsed = 0;
+        }
+        if (!yearReset || yearReset < yearBoundary) {
+          yearlyUsed = 0;
+        }
+
+        const conversionsLimit = freeLimit + monthlyLimit + yearlyLimit + packLimit;
+        const conversionsUsed = freeUsed + monthlyUsed + yearlyUsed + packUsed;
+
+        return {
+          conversionsUsed,
+          conversionsLimit,
+          planType,
+        };
+      }
+
+      const conversionsLimit = toNumber(rowData.conversions_limit, 5);
+      let conversionsUsed = toNumber(rowData.conversions_used, 0);
 
       if (resetBoundary && (!lastResetDate || lastResetDate < resetBoundary)) {
         const { error: resetError } = await supabaseAdmin
@@ -932,7 +970,51 @@ const incrementUsageFallback = async ({
         return { ok: !insertError, error: insertError };
       }
 
-      const nextValue = toNumber((row as Record<string, unknown>).conversions_used, 0) + incrementBy;
+      const rowData = row as Record<string, unknown>;
+      const hasBuckets = Object.prototype.hasOwnProperty.call(rowData, 'free_daily_limit');
+      if (hasBuckets) {
+        let remaining = incrementBy;
+        const freeLimit = toNumber(rowData.free_daily_limit, 5);
+        let freeUsed = toNumber(rowData.free_daily_used, 0);
+        const packLimit = toNumber(rowData.pack_limit, 0);
+        let packUsed = toNumber(rowData.pack_used, 0);
+        const monthlyLimit = toNumber(rowData.monthly_limit, 0);
+        let monthlyUsed = toNumber(rowData.monthly_used, 0);
+        const yearlyLimit = toNumber(rowData.yearly_limit, 0);
+        let yearlyUsed = toNumber(rowData.yearly_used, 0);
+
+        const take = (limit: number, used: number) => {
+          const avail = Math.max(0, limit - used);
+          const consume = Math.min(avail, remaining);
+          remaining -= consume;
+          return used + consume;
+        };
+
+        freeUsed = take(freeLimit, freeUsed);
+        packUsed = take(packLimit, packUsed);
+        monthlyUsed = take(monthlyLimit, monthlyUsed);
+        yearlyUsed = take(yearlyLimit, yearlyUsed);
+
+        const conversionsUsed = freeUsed + packUsed + monthlyUsed + yearlyUsed;
+        const conversionsLimit = freeLimit + packLimit + monthlyLimit + yearlyLimit;
+
+        const { error: updateError } = await supabaseAdmin
+          .from('subscriptions')
+          .update({
+            free_daily_used: freeUsed,
+            pack_used: packUsed,
+            monthly_used: monthlyUsed,
+            yearly_used: yearlyUsed,
+            pages_used_this_month: monthlyUsed,
+            conversions_used: conversionsUsed,
+            conversions_limit: conversionsLimit,
+            timezone,
+          } as any)
+          .eq('user_id', userId);
+        return { ok: !updateError, error: updateError };
+      }
+
+      const nextValue = toNumber(rowData.conversions_used, 0) + incrementBy;
       const { error: updateError } = await supabaseAdmin
         .from('subscriptions')
         .update({ conversions_used: nextValue, timezone } as any)
@@ -2070,22 +2152,6 @@ Deno.serve(async (req) => {
       mistral: categorizationResult.status.mistral,
       patternFallback: categorizationResult.status.patternFallback,
     };
-
-    // Update monthly page usage based on pages that actually contained data
-    if (user && !isAdmin && (isMonthlyPlan || isYearlyPlan)) {
-      const pagesToAdd = Math.max(1, pagesWithData);
-      const updatedPagesUsed = pagesUsedThisMonth + pagesToAdd;
-      const { error: updateError } = await supabase
-        .from('subscriptions')
-        .update({ pages_used_this_month: updatedPagesUsed })
-        .eq('user_id', user.id);
-
-      if (updateError) {
-        console.error('Failed to update pages used:', updateError);
-      } else {
-        console.log(`Updated pages used: ${updatedPagesUsed}/${userPlanLimit}`);
-      }
-    }
 
     // Increment usage count ONLY after successful conversion (prevents wasting credits/limit on failures)
     const incrementBy = isFreeMode ? 1 : Math.max(1, pagesWithData);
