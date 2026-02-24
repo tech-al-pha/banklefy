@@ -2374,9 +2374,12 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({
             error: 'PDF requires page images for processing. Please retry (the app will render pages) or upload JPG/PNG.',
+            message: 'PDF requires page images for processing. Please retry (the app will render pages) or upload JPG/PNG.',
             requiresPageImages: true,
+            retryable: true,
+            status: 'requires_page_images',
           }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 

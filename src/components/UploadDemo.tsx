@@ -279,6 +279,22 @@ export const UploadDemo = () => {
     const normalized = code.trim().toUpperCase();
     return normalized.length > 0 ? normalized : null;
   };
+  const parseEdgeErrorPayload = async (error: unknown): Promise<Record<string, unknown> | null> => {
+    if (!error || typeof error !== "object") return null;
+    const context = (error as { context?: unknown }).context;
+    if (!context || typeof context !== "object") return null;
+    const responseLike = context as { clone?: () => { text?: () => Promise<string> }; text?: () => Promise<string> };
+    const source = typeof responseLike.clone === "function" ? responseLike.clone() : responseLike;
+    if (typeof source?.text !== "function") return null;
+    try {
+      const body = await source.text();
+      if (!body) return null;
+      const parsed = JSON.parse(body);
+      return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  };
   const estimateDataUrlBytes = (dataUrl: string): number => {
     const commaIndex = dataUrl.indexOf(",");
     const base64 = commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
@@ -1138,10 +1154,15 @@ export const UploadDemo = () => {
           let limitReachedFromPayload = false;
           let requiresPasswordFromPayload = false;
           let requiresPageImagesFromPayload = false;
-          const structuredErrorCode = parseStructuredErrorCode(data);
+          const parsedErrorPayload = await parseEdgeErrorPayload(functionError);
+          const mergedPayload =
+            parsedErrorPayload && typeof parsedErrorPayload === "object"
+              ? { ...(data && typeof data === "object" ? data : {}), ...parsedErrorPayload }
+              : data;
+          const structuredErrorCode = parseStructuredErrorCode(mergedPayload);
 
-          if (data && typeof data === 'object') {
-            const payloadData: Partial<ConversionResponse> = data;
+          if (mergedPayload && typeof mergedPayload === 'object') {
+            const payloadData: Partial<ConversionResponse> = mergedPayload as Partial<ConversionResponse>;
             limitReachedFromPayload = !!payloadData.limitReached;
             requiresPasswordFromPayload = !!payloadData.requiresPassword;
             requiresPageImagesFromPayload = !!payloadData.requiresPageImages;
