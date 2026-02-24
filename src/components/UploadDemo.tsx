@@ -1126,6 +1126,7 @@ export const UploadDemo = () => {
         resourceError?: boolean;
         limitReached?: boolean;
         requiresPassword?: boolean;
+        requiresPageImages?: boolean;
       };
       const invokeConvertDocument = async (payload: Record<string, unknown>): Promise<ConversionResponse> => {
         const { data, error: functionError } = await supabase.functions.invoke<ConversionResponse>('convert-document', {
@@ -1138,12 +1139,14 @@ export const UploadDemo = () => {
           const statusCode = parseEdgeStatusCode(functionError);
           let limitReachedFromPayload = false;
           let requiresPasswordFromPayload = false;
+          let requiresPageImagesFromPayload = false;
           const structuredErrorCode = parseStructuredErrorCode(data);
 
           if (data && typeof data === 'object') {
             const payloadData: Partial<ConversionResponse> = data;
             limitReachedFromPayload = !!payloadData.limitReached;
             requiresPasswordFromPayload = !!payloadData.requiresPassword;
+            requiresPageImagesFromPayload = !!payloadData.requiresPageImages;
             if (limitReachedFromPayload) {
               refreshUsageLimit();
             }
@@ -1167,6 +1170,7 @@ export const UploadDemo = () => {
           typedError.resourceError = resourceError;
           typedError.limitReached = limitReachedFromPayload;
           typedError.requiresPassword = requiresPasswordFromPayload;
+          typedError.requiresPageImages = requiresPageImagesFromPayload;
           throw typedError;
         }
 
@@ -1188,6 +1192,7 @@ export const UploadDemo = () => {
           ) as InvokeConversionError;
           typedError.limitReached = !!data.limitReached;
           typedError.requiresPassword = !!data.requiresPassword;
+          typedError.requiresPageImages = !!data.requiresPageImages;
           typedError.resourceError = resourceError;
           throw typedError;
         }
@@ -1331,6 +1336,7 @@ export const UploadDemo = () => {
           isPdf &&
           !("pdfPageImages" in requestBody) &&
           (
+            (error as { requiresPageImages?: boolean })?.requiresPageImages ||
             errorMessage.includes('requires page images') ||
             errorMessage.includes('no transactions found') ||
             errorMessage.includes('no data extracted')

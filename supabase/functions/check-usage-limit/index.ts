@@ -519,11 +519,18 @@ Deno.serve(async (req) => {
         // Get user's plan type
         const { data: subData } = await supabaseUserClient
           .from('subscriptions')
-          .select('plan_type, tier')
+          .select('plan_type, tier, conversions_limit, conversions_used')
           .eq('user_id', user.id)
           .maybeSingle();
 
-        planType = resolvePlanType((subData as Record<string, unknown> | null) ?? null);
+        const subRow = (subData as Record<string, unknown> | null) ?? null;
+        planType = resolvePlanType(subRow);
+        const subLimit = toNumber(subRow?.conversions_limit, conversionsLimit);
+        const subUsed = toNumber(subRow?.conversions_used, conversionsUsed);
+        if (subLimit > conversionsLimit) {
+          conversionsLimit = subLimit;
+          conversionsUsed = Math.min(conversionsLimit, subUsed);
+        }
       } else {
         const fallback = await checkLimitFallback({
           supabaseAdmin: supabaseClient,
