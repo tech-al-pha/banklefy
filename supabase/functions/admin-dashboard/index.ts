@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
     // Fetch all conversions
     const { data: conversions, error: convError } = await supabaseAdmin
       .from('conversions')
-      .select('id, user_id, status, created_at, completed_at, original_filename, error_message')
+      .select('id, user_id, status, created_at, completed_at, original_filename, error_message, processed_via, output_tier, processing_total_ms')
       .order('created_at', { ascending: false });
 
     if (convError) {
