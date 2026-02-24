@@ -33,6 +33,19 @@ interface ConversionStats {
   todayCount: number;
 }
 
+interface ConversionRow {
+  id: string;
+  user_id: string | null;
+  status: string | null;
+  created_at: string;
+  completed_at: string | null;
+  original_filename: string | null;
+  error_message: string | null;
+  processed_via?: string | null;
+  output_tier?: string | null;
+  processing_total_ms?: number | null;
+}
+
 interface DailyStats {
   date: string;
   count: number;
@@ -90,6 +103,7 @@ export default function Admin() {
     todayCount: 0,
   });
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
+  const [conversions, setConversions] = useState<ConversionRow[]>([]);
   const [anonymousSummary, setAnonymousSummary] = useState<AnonymousSummary>({
     totalIPs: 0,
     totalConversions: 0,
@@ -194,6 +208,7 @@ export default function Admin() {
         stats?: ConversionStats;
         dailyStats?: DailyStats[];
         anonymousSummary?: AnonymousSummary;
+        conversions?: ConversionRow[];
       }>('admin-dashboard');
 
       if (error) {
@@ -214,6 +229,7 @@ export default function Admin() {
       });
       setDailyStats(data?.dailyStats || []);
       setAnonymousSummary(data?.anonymousSummary || { totalIPs: 0, totalConversions: 0 });
+      setConversions(data?.conversions || []);
 
     } catch (error: unknown) {
       const message = getErrorMessage(error, 'Failed to load dashboard data.');
@@ -779,6 +795,60 @@ export default function Admin() {
                   </div>
                   <Users className="h-6 w-6 text-orange-500" />
                 </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/70 backdrop-blur-lg border-primary/20 xl:col-span-2">
+              <CardHeader>
+                <CardTitle>Latest Conversions</CardTitle>
+                <CardDescription>Timing + pipeline mode (admin only)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="max-h-96 pr-2">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>File</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Processed Via</TableHead>
+                        <TableHead>Output Tier</TableHead>
+                        <TableHead>Total ms</TableHead>
+                        <TableHead>Created</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {conversions.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            No conversions found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        conversions.slice(0, 20).map((conv) => (
+                          <TableRow key={conv.id}>
+                            <TableCell className="font-medium">
+                              {conv.original_filename || '—'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize">
+                                {conv.status || 'unknown'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{conv.processed_via || '—'}</TableCell>
+                            <TableCell>{conv.output_tier || '—'}</TableCell>
+                            <TableCell>
+                              {typeof conv.processing_total_ms === 'number'
+                                ? `${conv.processing_total_ms} ms`
+                                : '—'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {new Date(conv.created_at).toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
               </CardContent>
             </Card>
           </div>
