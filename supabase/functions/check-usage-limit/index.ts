@@ -519,7 +519,7 @@ Deno.serve(async (req) => {
         // Get user's plan type
         const { data: subData } = await supabaseUserClient
           .from('subscriptions')
-          .select('plan_type, tier, conversions_limit, conversions_used')
+          .select('plan_type, tier, conversions_limit, conversions_used, free_daily_limit, free_daily_used, monthly_limit, monthly_used, yearly_limit, yearly_used, pack_limit, pack_used')
           .eq('user_id', user.id)
           .maybeSingle();
 
@@ -527,10 +527,20 @@ Deno.serve(async (req) => {
         planType = resolvePlanType(subRow);
         const subLimit = toNumber(subRow?.conversions_limit, conversionsLimit);
         const subUsed = toNumber(subRow?.conversions_used, conversionsUsed);
-        if (subLimit > conversionsLimit) {
-          conversionsLimit = subLimit;
-          conversionsUsed = Math.min(conversionsLimit, subUsed);
-        }
+        const stackedLimit =
+          toNumber(subRow?.free_daily_limit, 5) +
+          toNumber(subRow?.monthly_limit, 0) +
+          toNumber(subRow?.yearly_limit, 0) +
+          toNumber(subRow?.pack_limit, 0);
+        const stackedUsed =
+          toNumber(subRow?.free_daily_used, 0) +
+          toNumber(subRow?.monthly_used, 0) +
+          toNumber(subRow?.yearly_used, 0) +
+          toNumber(subRow?.pack_used, 0);
+        const resolvedLimit = Math.max(subLimit, stackedLimit, conversionsLimit);
+        const resolvedUsed = Math.min(resolvedLimit, Math.max(subUsed, stackedUsed, conversionsUsed));
+        conversionsLimit = resolvedLimit;
+        conversionsUsed = resolvedUsed;
       } else {
         const fallback = await checkLimitFallback({
           supabaseAdmin: supabaseClient,

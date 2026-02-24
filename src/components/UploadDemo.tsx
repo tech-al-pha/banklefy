@@ -1042,16 +1042,8 @@ export const UploadDemo = () => {
             // Parser failure should not block conversion; backend OCR fallback will handle it.
           }
 
-          // If text parse returned no rows, pre-render images to avoid requiresPageImages round-trip.
-          if (parsedPdfTransactionsCount === 0) {
-            const renderedPdfPageImages = await pdfToPageImages(fileToConvert, {
-              password: pdfPassword.trim() || undefined,
-              maxPdfRenderPages,
-              isFreeUsageMode,
-              freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
-            });
-            requestBody.pdfPageImages = renderedPdfPageImages;
-          }
+          // If text parse returned no rows, let the server attempt text extraction first.
+          // If it still needs images, the retry flow will render pages and re-send.
         } catch (err: unknown) {
           const error = err as { name?: string; message?: string };
           // Surface password errors in existing UX
