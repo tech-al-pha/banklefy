@@ -279,14 +279,27 @@ export default function Admin() {
 
   const checkAdminAccess = useCallback(async () => {
     try {
+      let isAdmin = false;
       const { data, error } = await supabase.rpc('has_role', {
         _user_id: user!.id,
         _role: 'admin'
       });
 
-      if (error) throw error;
+      if (!error) {
+        isAdmin = !!data;
+      } else {
+        console.error('Admin RPC failed, checking roles table:', error);
+        const { data: roleRow, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user!.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+        if (roleError) throw roleError;
+        isAdmin = !!roleRow;
+      }
 
-      if (!data) {
+      if (!isAdmin) {
         toast({
           variant: 'destructive',
           title: 'Access Denied',

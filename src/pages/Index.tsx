@@ -28,11 +28,21 @@ const Index = () => {
   useEffect(() => {
     const checkAdmin = async () => {
       if (user) {
-        const { data } = await supabase.rpc('has_role', {
+        const { data, error } = await supabase.rpc('has_role', {
           _user_id: user.id,
           _role: 'admin'
         });
-        setIsAdmin(!!data);
+        if (!error) {
+          setIsAdmin(!!data);
+          return;
+        }
+        const { data: roleRow } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+        setIsAdmin(!!roleRow);
       } else {
         setIsAdmin(false);
       }

@@ -197,12 +197,18 @@ export const UploadDemo = () => {
         return;
       }
       const { data, error } = await supabase.rpc('has_role', { _role: 'admin' });
-      if (error) {
-        console.error('Failed to verify admin access:', error);
-        setIsAdmin(false);
+      if (!error) {
+        setIsAdmin(!!data);
         return;
       }
-      setIsAdmin(!!data);
+      console.error('Failed to verify admin access:', error);
+      const { data: roleRow } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      setIsAdmin(!!roleRow);
     };
 
     void checkAdmin();
