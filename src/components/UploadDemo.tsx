@@ -1023,9 +1023,8 @@ export const UploadDemo = () => {
       // For PDFs: try deterministic text extraction first. Render page images only if needed.
       if (isPdf) {
         try {
-          const { extractPdfDataFromText } = await loadPdfUtils();
+          const { extractPdfDataFromText, pdfToPageImages } = await loadPdfUtils();
           let parsedPdfTransactionsCount = 0;
-          let useDeterministicOnly = false;
 
           try {
             const parsedPdf = await extractPdfDataFromText(fileToConvert, {
@@ -1039,10 +1038,19 @@ export const UploadDemo = () => {
             if (parsedPdf.bankMetadata) {
               requestBody.pdfParsedBankMetadata = parsedPdf.bankMetadata;
             }
-            useDeterministicOnly =
-              parsedPdfTransactionsCount >= MIN_DETERMINISTIC_PDF_ROWS;
           } catch {
             // Parser failure should not block conversion; backend OCR fallback will handle it.
+          }
+
+          // If text parse returned no rows, pre-render images to avoid requiresPageImages round-trip.
+          if (parsedPdfTransactionsCount === 0) {
+            const renderedPdfPageImages = await pdfToPageImages(fileToConvert, {
+              password: pdfPassword.trim() || undefined,
+              maxPdfRenderPages,
+              isFreeUsageMode,
+              freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+            });
+            requestBody.pdfPageImages = renderedPdfPageImages;
           }
         } catch (err: unknown) {
           const error = err as { name?: string; message?: string };
