@@ -92,9 +92,21 @@ const TOP_BANK_TEMPLATES: BankTemplate[] = [
     denseTable: true,
     dualPassPreferred: true,
     headerAliases: {
-      reference: ['reference no transaction id', 'reference no / transaction id'],
-      description: ['narration'],
-      balance: ['running balance'],
+      reference: [
+        'reference no transaction id',
+        'reference no / transaction id',
+        'reference no',
+        'transaction id',
+      ],
+      description: [
+        'narration',
+        'description',
+        'details',
+        'transaction details',
+      ],
+      debit: ['debit', 'debit amount'],
+      credit: ['credit', 'credit amount'],
+      balance: ['running balance', 'balance'],
     },
   },
   {
@@ -525,6 +537,11 @@ const mergeHeaderAliases = (templateAliases?: Partial<HeaderAliasMap>): HeaderAl
   credit: dedupeAliases([...BASE_HEADER_ALIASES.credit, ...(templateAliases?.credit ?? [])]),
   balance: dedupeAliases([...BASE_HEADER_ALIASES.balance, ...(templateAliases?.balance ?? [])]),
 });
+
+export const getBankTemplateById = (id: string | null | undefined): BankTemplate | null => {
+  if (!id) return null;
+  return TOP_BANK_TEMPLATES.find((template) => template.id === id) ?? null;
+};
 
 export const detectBankTemplate = (hintBlob: string | undefined): BankTemplate | null => {
   if (!hintBlob || !hintBlob.trim()) return null;
