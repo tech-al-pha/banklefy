@@ -385,6 +385,100 @@ export const UploadDemo = () => {
     }
     return Object.keys(merged).length > 0 ? merged : null;
   };
+  const buildChunkedMergedExcelBase64 = async (
+    allTransactions: Transaction[],
+    mergedBankInfo: BankInfo | null,
+    resolvedCurrency: string,
+  ): Promise<string> => {
+    const XLSX = await import("xlsx");
+    const rows: Array<Array<string | number>> = [];
+
+    const metadataRows: Array<[string, string | number | undefined | null]> = [
+      ["Bank Name", mergedBankInfo?.bankName],
+      ["Currency Type", mergedBankInfo?.currency || resolvedCurrency],
+      ["Account Number", mergedBankInfo?.accountNumber],
+      ["Account Holder Name", mergedBankInfo?.accountHolder],
+      ["Statement Period", mergedBankInfo?.statementPeriod],
+      ["IBAN", mergedBankInfo?.iban],
+      ["IFSC", mergedBankInfo?.ifsc],
+      ["SWIFT", mergedBankInfo?.swift],
+      ["Routing Number", mergedBankInfo?.routingNumber],
+      ["Opening Balance", mergedBankInfo?.openingBalance],
+      ["Closing Balance", mergedBankInfo?.closingBalance],
+      ["Generated On", new Date().toLocaleString("en-IN")],
+    ];
+
+    metadataRows.forEach(([label, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      rows.push([label, value]);
+    });
+
+    if (rows.length > 0) rows.push([]);
+
+    rows.push([
+      "Date",
+      "Description",
+      "Debit",
+      "Credit",
+      "Balance",
+      "Category",
+      "Duplicate",
+      "Balance Mismatch",
+      "Confidence",
+    ]);
+
+    allTransactions.forEach((transaction) => {
+      const debitValue = Number(transaction.debit || 0);
+      const creditValue = Number(transaction.credit || 0);
+      const balanceValue =
+        transaction.balance === null || transaction.balance === undefined || transaction.balance === ""
+          ? ""
+          : Number(transaction.balance);
+      rows.push([
+        transaction.date || "",
+        transaction.description || "",
+        debitValue === 0 ? "" : debitValue,
+        creditValue === 0 ? "" : creditValue,
+        Number.isFinite(Number(balanceValue)) ? Number(balanceValue) : "",
+        transaction.category || "",
+        transaction.isDuplicate ? "YES" : "",
+        transaction.balanceMismatch ? "YES" : "",
+        Number.isFinite(Number(transaction.confidenceScore))
+          ? Number(Number(transaction.confidenceScore).toFixed(3))
+          : "",
+      ]);
+    });
+
+    rows.push([]);
+    rows.push([
+      "",
+      "TOTAL",
+      Number(sumMoney(allTransactions.map((transaction) => Number(transaction.debit || 0))).toFixed(2)),
+      Number(sumMoney(allTransactions.map((transaction) => Number(transaction.credit || 0))).toFixed(2)),
+      "",
+      "",
+      "",
+      "",
+      "",
+    ]);
+
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    worksheet["!cols"] = [
+      { wch: 14 },
+      { wch: 60 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 16 },
+      { wch: 12 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Statement");
+    return XLSX.write(workbook, { bookType: "xlsx", type: "base64" });
+  };
   const getExportBaseName = () => {
     const preferredName =
       singleDownloadFileName ||
@@ -929,7 +1023,7 @@ export const UploadDemo = () => {
       // For PDFs: try deterministic text extraction first. Render page images only if needed.
       if (isPdf) {
         try {
-          const { pdfToPageImages, extractPdfDataFromText } = await loadPdfUtils();
+          const { extractPdfDataFromText } = await loadPdfUtils();
           let parsedPdfTransactionsCount = 0;
           let useDeterministicOnly = false;
 
@@ -946,52 +1040,9 @@ export const UploadDemo = () => {
               requestBody.pdfParsedBankMetadata = parsedPdf.bankMetadata;
             }
             useDeterministicOnly =
-              parsedPdfTransactionsCount >= MIN_DETERMINISTIC_PDF_ROWS &&
-              !HARD_PDF_BANK_PATTERN.test(fileToConvert.name);
+              parsedPdfTransactionsCount >= MIN_DETERMINISTIC_PDF_ROWS;
           } catch {
             // Parser failure should not block conversion; backend OCR fallback will handle it.
-          }
-
-          if (!useDeterministicOnly) {
-            const renderedPdfPageImages = await pdfToPageImages(fileToConvert, {
-              password: pdfPassword.trim() || undefined,
-              maxPdfRenderPages,
-              isFreeUsageMode,
-              freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
-            });
-            requestBody.pdfPageImages = renderedPdfPageImages;
-            const pdfPayloadBytes = estimatePdfPageImagesBytes(renderedPdfPageImages);
-            const pdfPayloadPages = renderedPdfPageImages.length;
-            const averagePageBytes = pdfPayloadPages > 0 ? pdfPayloadBytes / pdfPayloadPages : 0;
-            const isLikelyHardPdf =
-              HARD_PDF_BANK_PATTERN.test(fileToConvert.name) ||
-              averagePageBytes >= HARD_AUTO_CHUNK_AVG_PAGE_BYTES;
-            const chunkingOptions = isLikelyHardPdf
-              ? {
-                  maxPages: HARD_AUTO_CHUNK_MAX_PDF_PAGES,
-                  maxBytes: HARD_AUTO_CHUNK_MAX_PDF_BYTES,
-                }
-              : undefined;
-            const eagerChunkPageThreshold = isLikelyHardPdf
-              ? HARD_AUTO_CHUNK_EAGER_MIN_PDF_PAGES
-              : AUTO_CHUNK_EAGER_MIN_PDF_PAGES;
-            pdfChunksForRetry = splitPdfPageImagesForChunking(renderedPdfPageImages, chunkingOptions);
-            const hasChunkPlan = pdfChunksForRetry.length > 1;
-
-            if (
-              pdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES &&
-              (!hasChunkPlan || !allowPdfAutoChunking)
-            ) {
-              throw new Error(buildPdfPayloadTooLargeMessage("single", pdfPayloadPages, pdfPayloadBytes));
-            }
-
-            runChunkingFirst = allowPdfAutoChunking &&
-              hasChunkPlan &&
-              (
-                isLikelyHardPdf ||
-                pdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES ||
-                pdfPayloadPages >= eagerChunkPageThreshold
-              );
           }
         } catch (err: unknown) {
           const error = err as { name?: string; message?: string };
@@ -1174,6 +1225,16 @@ export const UploadDemo = () => {
           combinedBankInfo?.currency || chunkResponses.find((chunkResponse) => chunkResponse.bankInfo?.currency)?.bankInfo?.currency,
         );
         const combinedAnalytics = aggregateChunkAnalytics(combinedTransactions);
+        let mergedChunkExcelData: string | null = null;
+        try {
+          mergedChunkExcelData = await buildChunkedMergedExcelBase64(
+            combinedTransactions,
+            combinedBankInfo,
+            responseCurrency,
+          );
+        } catch (mergeError) {
+          console.error("Failed to compose merged XLSX for chunked PDF:", mergeError);
+        }
         const chunkDownloadResults = chunkResponses.map((chunkResponse, index) => {
           const hasDownload = !!(chunkResponse.excelData || chunkResponse.resultPath);
           return hasDownload
@@ -1192,10 +1253,18 @@ export const UploadDemo = () => {
                 error: 'No downloadable output returned for this chunk.',
               };
         });
-
-        setConversionResult(null);
+        if (mergedChunkExcelData) {
+          setConversionResult({
+            id: null,
+            resultPath: null,
+            excelData: mergedChunkExcelData,
+          });
+          setBatchResults([]);
+        } else {
+          setConversionResult(null);
+          setBatchResults(chunkDownloadResults);
+        }
         setSingleDownloadFileName(buildExcelDownloadName(combinedBankInfo?.bankName, fileToConvert.name));
-        setBatchResults(chunkDownloadResults);
         setMergeInfo(null);
         setMergeResult(null);
         setTransactions(combinedTransactions);
@@ -1213,7 +1282,9 @@ export const UploadDemo = () => {
         toast({
           title: "Conversion complete!",
           description: [
-            `Large PDF processed in ${chunkResponses.length} chunks.`,
+            mergedChunkExcelData
+              ? `Large PDF processed in ${chunkResponses.length} chunks and merged into one Excel file.`
+              : `Large PDF processed in ${chunkResponses.length} chunks.`,
             `Extracted ${combinedTransactions.length} transactions.`,
             formatRemaining(remainingFromLastChunk),
           ]
@@ -1247,35 +1318,80 @@ export const UploadDemo = () => {
         data = await invokeConvertDocument(requestBody);
       } catch (invokeError: unknown) {
         const error = invokeError as InvokeConversionError;
-        let retryChunks = pdfChunksForRetry;
-        if (isPdf && allowPdfAutoChunking && retryChunks.length <= 1) {
-          const payloadImages = Array.isArray(requestBody.pdfPageImages)
-            ? requestBody.pdfPageImages.filter((img): img is string => typeof img === "string")
-            : [];
-          if (payloadImages.length > 1) {
-            retryChunks = splitPdfPageImagesForChunking(payloadImages, {
-              maxPages: 2,
-              maxBytes: 3 * 1024 * 1024,
-            });
-          }
-        }
-        const shouldRetryChunked =
+        const errorMessage = (error?.message || '').toLowerCase();
+        const isRequiresImageFallbackError =
           isPdf &&
-          allowPdfAutoChunking &&
-          retryChunks.length > 1 &&
-          !!error.resourceError;
+          !("pdfPageImages" in requestBody) &&
+          (
+            errorMessage.includes('requires page images') ||
+            errorMessage.includes('no transactions found') ||
+            errorMessage.includes('no data extracted')
+          );
 
-        if (shouldRetryChunked) {
+        if (isRequiresImageFallbackError) {
           toast({
-            title: "Retrying with smart chunking",
-            description: `One-run processing failed. Retrying in ${retryChunks.length} chunks...`,
+            title: "Retrying with OCR fallback",
+            description: "Deterministic parse was insufficient. Rendering only now and retrying...",
           });
-          const chunkResponses = await runChunkedPdfConversion(retryChunks);
-          await applyChunkedPdfSuccess(chunkResponses);
-          return;
-        }
 
-        throw invokeError;
+          const { pdfToPageImages } = await loadPdfUtils();
+          const renderedPdfPageImages = await pdfToPageImages(fileToConvert, {
+            password: pdfPassword.trim() || undefined,
+            maxPdfRenderPages,
+            isFreeUsageMode,
+            freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+          });
+          requestBody.pdfPageImages = renderedPdfPageImages;
+          delete requestBody.pdfParsedTransactions;
+          const pdfPayloadBytes = estimatePdfPageImagesBytes(renderedPdfPageImages);
+          const pdfPayloadPages = renderedPdfPageImages.length;
+          const averagePageBytes = pdfPayloadPages > 0 ? pdfPayloadBytes / pdfPayloadPages : 0;
+          const isLikelyHardPdf =
+            HARD_PDF_BANK_PATTERN.test(fileToConvert.name) ||
+            averagePageBytes >= HARD_AUTO_CHUNK_AVG_PAGE_BYTES;
+          const chunkingOptions = isLikelyHardPdf
+            ? {
+                maxPages: HARD_AUTO_CHUNK_MAX_PDF_PAGES,
+                maxBytes: HARD_AUTO_CHUNK_MAX_PDF_BYTES,
+              }
+            : undefined;
+          const eagerChunkPageThreshold = isLikelyHardPdf
+            ? HARD_AUTO_CHUNK_EAGER_MIN_PDF_PAGES
+            : AUTO_CHUNK_EAGER_MIN_PDF_PAGES;
+          pdfChunksForRetry = splitPdfPageImagesForChunking(renderedPdfPageImages, chunkingOptions);
+          const hasChunkPlan = pdfChunksForRetry.length > 1;
+
+          if (
+            pdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES &&
+            (!hasChunkPlan || !allowPdfAutoChunking)
+          ) {
+            throw new Error(buildPdfPayloadTooLargeMessage("single", pdfPayloadPages, pdfPayloadBytes));
+          }
+
+          runChunkingFirst = allowPdfAutoChunking &&
+            hasChunkPlan &&
+            (
+              isLikelyHardPdf ||
+              pdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES ||
+              pdfPayloadPages >= eagerChunkPageThreshold
+            );
+
+          if (runChunkingFirst && pdfChunksForRetry.length > 1) {
+            toast({
+              title: "Large PDF detected",
+              description: `Processing in ${pdfChunksForRetry.length} smaller chunks for stability...`,
+            });
+            const chunkResponses = await runChunkedPdfConversion(pdfChunksForRetry);
+            await applyChunkedPdfSuccess(chunkResponses);
+            return;
+          }
+          const retryData = await invokeConvertDocument(requestBody);
+          data = retryData;
+          // Continue with normal success path below.
+        } else {
+          // Lean mode: no nested retries (only OCR fallback path above).
+          throw invokeError;
+        }
       }
 
       const responseCurrency = normalizeCurrencyCode(data?.bankInfo?.currency);
