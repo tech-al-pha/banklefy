@@ -28,3 +28,4 @@ dist-ssr
 # Temporary local Supabase debug artifacts
 .tmp_remote_public.sql
 .tmp_supabase_init/
+supabase/.temp/
