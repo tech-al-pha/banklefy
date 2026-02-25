@@ -61,6 +61,7 @@ import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts
 import { getTrackingKey } from '../_shared/client-id.ts';
 import {
   detectBankTemplate,
+  getHeaderAliasesForHint,
   getBankTemplateById,
   isComplexBankLayoutHint,
   isDenseTableBankHint,
@@ -458,10 +459,14 @@ const storeTemplateFingerprint = async (
   }
 };
 
-const attemptGroqTextRescue = async (rawText: string): Promise<RawTransaction[] | null> => {
+const attemptGroqTextRescue = async (
+  rawText: string,
+): Promise<{ rows: RawTransaction[] | null; tokenUsage: number; rescueConfidence: number }> => {
   const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
-  if (!GROQ_API_KEY) return null;
-  if (!rawText || rawText.trim().length < AI_RESCUE_MIN_TEXT_CHARS) return null;
+  if (!GROQ_API_KEY) return { rows: null, tokenUsage: 0, rescueConfidence: 0 };
+  if (!rawText || rawText.trim().length < AI_RESCUE_MIN_TEXT_CHARS) {
+    return { rows: null, tokenUsage: 0, rescueConfidence: 0 };
+  }
   try {
     const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -493,16 +498,23 @@ const attemptGroqTextRescue = async (rawText: string): Promise<RawTransaction[] 
       }),
     });
 
-    if (!groqResponse.ok) return null;
+    if (!groqResponse.ok) return { rows: null, tokenUsage: 0, rescueConfidence: 0 };
     const groqData = await groqResponse.json();
     const responseText = groqData.choices?.[0]?.message?.content || '';
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return null;
+    if (!jsonMatch) return { rows: null, tokenUsage: Number(groqData?.usage?.total_tokens || 0), rescueConfidence: 0 };
     const parsed = JSON.parse(jsonMatch[0]) as RawTransaction[];
     const normalized = normalizeRawTransactions(parsed);
-    return normalized.length > 0 ? normalized : null;
+    const flow = scoreRunningBalanceFlow(normalized);
+    const mismatch = flow.total > 0 ? flow.mismatchRatio : 1;
+    const rescueConfidence = clamp01(1 - mismatch);
+    return {
+      rows: normalized.length > 0 ? normalized : null,
+      tokenUsage: Number(groqData?.usage?.total_tokens || 0),
+      rescueConfidence,
+    };
   } catch {
-    return null;
+    return { rows: null, tokenUsage: 0, rescueConfidence: 0 };
   }
 };
 
@@ -646,6 +658,316 @@ const PDF_DETERMINISTIC_FAST_PATH_MAX_MISMATCH = Math.max(
   0,
   Number(Deno.env.get('PDF_DETERMINISTIC_FAST_PATH_MAX_MISMATCH') ?? '0.28'),
 );
+const DETERMINISTIC_CONFIDENCE_THRESHOLD = Math.max(
+  0,
+  Math.min(1, Number(Deno.env.get('DETERMINISTIC_CONFIDENCE_THRESHOLD') ?? '0.9')),
+);
+const OCR_ACCEPTABLE_CONFIDENCE_THRESHOLD = Math.max(
+  0,
+  Math.min(1, Number(Deno.env.get('OCR_ACCEPTABLE_CONFIDENCE_THRESHOLD') ?? '0.75')),
+);
+const AI_RESCUE_ENABLED = (Deno.env.get('AI_RESCUE_ENABLED') ?? 'true').trim().toLowerCase() !== 'false';
+const AI_RESCUE_MIN_ROWS = Math.max(3, Number(Deno.env.get('AI_RESCUE_MIN_ROWS') ?? '6'));
+const AI_RESCUE_MIN_MISMATCH = Math.max(0, Math.min(1, Number(Deno.env.get('AI_RESCUE_MIN_MISMATCH') ?? '0.18')));
+const AI_RESCUE_MIN_TEXT_CHARS = Math.max(200, Number(Deno.env.get('AI_RESCUE_MIN_TEXT_CHARS') ?? '1200'));
+const EXPECTED_TEXT_TOTAL_MS = Math.max(500, Number(Deno.env.get('EXPECTED_TEXT_TOTAL_MS') ?? '3500'));
+const EXPECTED_OCR_TOTAL_MS = Math.max(1500, Number(Deno.env.get('EXPECTED_OCR_TOTAL_MS') ?? '14000'));
+const EXPECTED_AI_TOTAL_MS = Math.max(2500, Number(Deno.env.get('EXPECTED_AI_TOTAL_MS') ?? '18000'));
+
+type ParseMode = 'deterministic' | 'ocr' | 'ai_rescue';
+
+type StructuralScanResult = {
+  pdfType: 'TEXT' | 'IMAGE' | 'HYBRID' | 'UNKNOWN';
+  hasSelectableText: boolean;
+  isDigitallyGenerated: boolean;
+  pageCount: number;
+  rawMetadata: {
+    producer: string | null;
+    creator: string | null;
+    modifiedDate: string | null;
+    creationDate: string | null;
+  };
+  fraudFlags: string[];
+};
+
+type BankDetectionLayerResult = {
+  bankId: string;
+  detectionConfidence: number;
+  signals: string[];
+};
+
+type TemplateMappingLayerResult = {
+  templateId: string;
+  templateFound: boolean;
+  templateSource: 'fingerprint' | 'bank_detection' | 'generic';
+  allowSingleDate: boolean;
+};
+
+type ConfidenceBreakdown = {
+  score: number;
+  parseSuccessRatio: number;
+  dateContinuityScore: number;
+  balanceValidationScore: number;
+  headerMatchScore: number;
+  columnAlignmentScore: number;
+  errorFlags: string[];
+};
+
+const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+
+const decodePdfSegment = (bytes: Uint8Array, maxBytes = 300_000): string => {
+  if (!bytes || bytes.length === 0) return '';
+  const segment = bytes.subarray(0, Math.min(bytes.length, maxBytes));
+  return new TextDecoder('latin1', { fatal: false }).decode(segment);
+};
+
+const extractPdfInfoString = (payload: string, key: string): string | null => {
+  const regex = new RegExp(`/${key}\\s*\\(([^)]{1,180})\\)`, 'i');
+  const match = payload.match(regex);
+  if (!match) return null;
+  const value = match[1].replace(/\\[nrt]/g, ' ').replace(/\s+/g, ' ').trim();
+  return value || null;
+};
+
+const runStructuralScan = ({
+  isPdf,
+  fileName,
+  bytes,
+  pageCount,
+  extractedText,
+}: {
+  isPdf: boolean;
+  fileName: string;
+  bytes: Uint8Array;
+  pageCount: number;
+  extractedText: string;
+}): StructuralScanResult => {
+  const payload = isPdf ? decodePdfSegment(bytes) : '';
+  const producer = isPdf ? extractPdfInfoString(payload, 'Producer') : null;
+  const creator = isPdf ? extractPdfInfoString(payload, 'Creator') : null;
+  const modifiedDate = isPdf ? extractPdfInfoString(payload, 'ModDate') : null;
+  const creationDate = isPdf ? extractPdfInfoString(payload, 'CreationDate') : null;
+  const selectableTextChars = (extractedText || '').replace(/\s+/g, '').length;
+  const hasSelectableText = selectableTextChars >= 80;
+  const isDigitallyGenerated = isPdf && hasSelectableText;
+
+  let pdfType: StructuralScanResult['pdfType'] = 'UNKNOWN';
+  if (!isPdf) {
+    pdfType = 'IMAGE';
+  } else if (hasSelectableText && pageCount <= 1) {
+    pdfType = 'TEXT';
+  } else if (hasSelectableText) {
+    pdfType = 'HYBRID';
+  } else {
+    pdfType = 'IMAGE';
+  }
+
+  const fraudFlags: string[] = [];
+  const suspiciousProducerPattern =
+    /(photoshop|canva|ms word|word|excel|libreoffice|ilovepdf|smallpdf|pdfelement|nitro|foxit editor)/i;
+  const producerBlob = `${producer || ''} ${creator || ''}`.trim();
+  if (producerBlob && suspiciousProducerPattern.test(producerBlob)) {
+    fraudFlags.push('abnormal_producer_string');
+  }
+  if (creationDate && modifiedDate && modifiedDate < creationDate) {
+    fraudFlags.push('edited_timestamp_mismatch');
+  }
+  if (fileName.toLowerCase().includes('edited')) {
+    fraudFlags.push('filename_edit_hint');
+  }
+
+  return {
+    pdfType,
+    hasSelectableText,
+    isDigitallyGenerated,
+    pageCount,
+    rawMetadata: {
+      producer,
+      creator,
+      modifiedDate,
+      creationDate,
+    },
+    fraudFlags,
+  };
+};
+
+const countDateLikeRows = (text: string): number => {
+  if (!text) return 0;
+  const matches = text.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g);
+  return matches ? matches.length : 0;
+};
+
+const computeDateContinuityScore = (rows: RawTransaction[]): number => {
+  if (!rows.length) return 0;
+  const parsed = rows
+    .map((row) => new Date(String(row.date || '').trim()))
+    .filter((d) => !Number.isNaN(d.getTime()));
+  if (!parsed.length) return 0;
+  if (parsed.length === 1) return 1;
+
+  let plausibleForward = 0;
+  let plausibleReverse = 0;
+  for (let i = 1; i < parsed.length; i += 1) {
+    const forwardDelta = (parsed[i].getTime() - parsed[i - 1].getTime()) / (1000 * 60 * 60 * 24);
+    const reverseDelta = (parsed[i - 1].getTime() - parsed[i].getTime()) / (1000 * 60 * 60 * 24);
+    if (forwardDelta >= -2 && forwardDelta <= 45) plausibleForward += 1;
+    if (reverseDelta >= -2 && reverseDelta <= 45) plausibleReverse += 1;
+  }
+  const best = Math.max(plausibleForward, plausibleReverse);
+  return clamp01(best / Math.max(1, parsed.length - 1));
+};
+
+const computeHeaderMatchScore = (text: string, bankId: string): number => {
+  if (!text) return 0;
+  const aliases = getHeaderAliasesForHint(bankId);
+  const headerBlob = text.slice(0, 5000).toLowerCase();
+  const expectedGroups = [aliases.date, aliases.description, aliases.debit, aliases.credit, aliases.balance];
+  const matchedGroups = expectedGroups.filter((group) =>
+    group.some((alias) => headerBlob.includes(alias.toLowerCase())),
+  ).length;
+  return clamp01(matchedGroups / expectedGroups.length);
+};
+
+const computeColumnAlignmentScore = (rows: RawTransaction[], text: string): number => {
+  if (!rows.length) return 0;
+  const sideIntegrity = rows.filter((row) => {
+    const debit = Math.abs(Number(row.debit || 0));
+    const credit = Math.abs(Number(row.credit || 0));
+    return (debit > 0 && credit === 0) || (credit > 0 && debit === 0) || (debit === 0 && credit === 0);
+  }).length / rows.length;
+
+  const amountTriples = (text.match(/(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})/g) || []).length;
+  const layoutSignal = clamp01(amountTriples / Math.max(1, rows.length));
+
+  return clamp01((sideIntegrity * 0.7) + (layoutSignal * 0.3));
+};
+
+const computeConfidenceBreakdown = ({
+  rows,
+  sourceText,
+  bankId,
+  headerConfidenceHint,
+}: {
+  rows: RawTransaction[];
+  sourceText: string;
+  bankId: string;
+  headerConfidenceHint: number;
+}): ConfidenceBreakdown => {
+  const estimatedRows = Math.max(rows.length, countDateLikeRows(sourceText));
+  const parseSuccessRatio = clamp01(rows.length / Math.max(1, estimatedRows));
+  const dateContinuityScore = computeDateContinuityScore(rows);
+  const flow = scoreRunningBalanceFlow(rows);
+  const mismatchRatio = flow.total > 0 ? flow.mismatchRatio : 1;
+  const balanceValidationScore = clamp01(1 - mismatchRatio);
+  const headerMatchScore = clamp01((computeHeaderMatchScore(sourceText, bankId) * 0.7) + (headerConfidenceHint * 0.3));
+  const columnAlignmentScore = computeColumnAlignmentScore(rows, sourceText);
+  const score = clamp01(
+    (parseSuccessRatio * 0.3) +
+      (dateContinuityScore * 0.15) +
+      (balanceValidationScore * 0.3) +
+      (headerMatchScore * 0.15) +
+      (columnAlignmentScore * 0.1),
+  );
+
+  const errorFlags: string[] = [];
+  if (parseSuccessRatio < 0.7) errorFlags.push('low_row_parse_rate');
+  if (dateContinuityScore < 0.6) errorFlags.push('date_continuity_issue');
+  if (balanceValidationScore < 0.75) errorFlags.push('balance_arithmetic_issue');
+  if (headerMatchScore < 0.5) errorFlags.push('header_match_low');
+  if (columnAlignmentScore < 0.6) errorFlags.push('column_alignment_low');
+  if (rows.length === 0) errorFlags.push('no_rows');
+
+  return {
+    score,
+    parseSuccessRatio,
+    dateContinuityScore,
+    balanceValidationScore,
+    headerMatchScore,
+    columnAlignmentScore,
+    errorFlags,
+  };
+};
+
+const pickBankBySignals = ({
+  fileName,
+  extractedText,
+  cachedTemplateId,
+}: {
+  fileName: string;
+  extractedText: string;
+  cachedTemplateId: string | null;
+}): BankDetectionLayerResult => {
+  const signals: string[] = [];
+  if (cachedTemplateId) {
+    return {
+      bankId: cachedTemplateId,
+      detectionConfidence: 0.98,
+      signals: ['fingerprint_template_match'],
+    };
+  }
+
+  const signalText = `${fileName}\n${extractedText}`;
+  const template = detectBankTemplate(signalText);
+  if (template) {
+    signals.push('header_keyword_match');
+  }
+  if (/\b[A-Z]{4}0[A-Z0-9]{6}\b/.test(signalText)) {
+    signals.push('ifsc_pattern');
+  }
+  if (/statement of account|account statement|bank statement/i.test(signalText)) {
+    signals.push('statement_title_pattern');
+  }
+
+  if (template) {
+    return {
+      bankId: template.id,
+      detectionConfidence: clamp01(0.65 + (signals.length * 0.1)),
+      signals,
+    };
+  }
+
+  return {
+    bankId: 'generic',
+    detectionConfidence: 0.25,
+    signals: signals.length > 0 ? signals : ['generic_fallback'],
+  };
+};
+
+const mapTemplateForBank = ({
+  bankId,
+  extractedText,
+  cachedAllowSingleDate,
+}: {
+  bankId: string;
+  extractedText: string;
+  cachedAllowSingleDate: boolean;
+}): TemplateMappingLayerResult => {
+  const template = getBankTemplateById(bankId) ?? detectBankTemplate(extractedText);
+  if (template) {
+    return {
+      templateId: template.id,
+      templateFound: true,
+      templateSource: template.id === bankId ? 'fingerprint' : 'bank_detection',
+      allowSingleDate: cachedAllowSingleDate,
+    };
+  }
+  return {
+    templateId: 'generic',
+    templateFound: false,
+    templateSource: 'generic',
+    allowSingleDate: cachedAllowSingleDate,
+  };
+};
+
+const buildMinimalStructuredLines = (rawText: string): string => {
+  const lines = rawText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => /\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/.test(line))
+    .slice(0, 220);
+  return lines.join('\n');
+};
 
 // ============= DEPLOYMENT-AGNOSTIC CORS =============
 // Allows requests from any origin. The edge function runs on Supabase infrastructure
@@ -892,6 +1214,44 @@ const mergeBankMetadata = (...candidates: Array<BankMetadata | undefined>): Bank
   }
 
   return hasValue ? merged : undefined;
+};
+
+const normalizeCurrencyCode = (value: string | undefined): string => {
+  if (!value) return '';
+  const cleaned = value.replace(/[^A-Za-z]/g, '').toUpperCase();
+  if (cleaned.length === 3) return cleaned;
+  if (cleaned.startsWith('RS') || cleaned.includes('INR')) return 'INR';
+  if (cleaned.includes('AED')) return 'AED';
+  if (cleaned.includes('USD')) return 'USD';
+  if (cleaned.includes('EUR')) return 'EUR';
+  if (cleaned.includes('GBP')) return 'GBP';
+  return cleaned.slice(0, 3);
+};
+
+const dedupeAndSortTransactions = (rows: Transaction[]): Transaction[] => {
+  const seen = new Set<string>();
+  const deduped: Transaction[] = [];
+  for (const row of rows) {
+    const key = [
+      String(row.date || '').trim(),
+      String(row.description || '').trim().toLowerCase(),
+      Number(row.debit || 0).toFixed(2),
+      Number(row.credit || 0).toFixed(2),
+      Number(row.balance || 0).toFixed(2),
+    ].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(row);
+  }
+  deduped.sort((a, b) => {
+    const aTime = new Date(a.date || '').getTime();
+    const bTime = new Date(b.date || '').getTime();
+    if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
+    if (Number.isNaN(aTime)) return 1;
+    if (Number.isNaN(bTime)) return -1;
+    return aTime - bTime;
+  });
+  return deduped;
 };
 
 const balanceMismatchRatio = (transactions: RawTransaction[] | undefined): number => {
@@ -1625,6 +1985,7 @@ Deno.serve(async (req) => {
     output_ms: 0,
     total_ms: 0,
   };
+  const pipelineDiagnostics: Record<string, Record<string, unknown>> = {};
 
   try {
     // Parse request
@@ -1858,6 +2219,15 @@ Deno.serve(async (req) => {
       );
     }
 
+    pipelineDiagnostics.uploadReceive = {
+      ok: true,
+      fileName,
+      fileSizeBytes: bytes.length,
+      pageCount,
+      isPdf,
+      hasPdfPageImages,
+    };
+
     // ============= USAGE LIMITS ENFORCEMENT =============
     // Check usage limits - IP-based for anonymous, user-based for authenticated
     let conversionsUsed = 0;
@@ -2052,7 +2422,20 @@ Deno.serve(async (req) => {
     }
 
     const classification = classifyDocument(extractedText, bytes, fileName);
+    const structuralScan = runStructuralScan({
+      isPdf,
+      fileName,
+      bytes,
+      pageCount,
+      extractedText,
+    });
+    pipelineDiagnostics.structuralScan = {
+      ok: true,
+      classification,
+      ...structuralScan,
+    };
     console.log('Document classification:', classification);
+    console.log('Structural scan:', structuralScan);
 
     // ============= SPECIALIZED AI EXTRACTION =============
     // NOTE: Groq Vision models do NOT accept PDFs directly.
@@ -2109,13 +2492,37 @@ Deno.serve(async (req) => {
         cachedAllowSingleDate = false;
       }
     }
-    let templateSelectedId: string | null = cachedTemplateId;
+    const bankDetection = pickBankBySignals({
+      fileName,
+      extractedText,
+      cachedTemplateId,
+    });
+    pipelineDiagnostics.bankDetection = {
+      ok: true,
+      bankId: bankDetection.bankId,
+      detectionConfidence: bankDetection.detectionConfidence,
+      signals: bankDetection.signals,
+    };
+
+    const templateMapping = mapTemplateForBank({
+      bankId: bankDetection.bankId,
+      extractedText,
+      cachedAllowSingleDate,
+    });
+    pipelineDiagnostics.templateMapping = {
+      ok: true,
+      ...templateMapping,
+    };
+
+    let templateSelectedId: string | null = templateMapping.templateId === 'generic'
+      ? null
+      : templateMapping.templateId;
     let templateSingleDateUsed = false;
     if (clientParsedTransactions.length > 0 && extractedText) {
-      const template = getBankTemplateById(cachedTemplateId) ?? detectBankTemplate(extractedText);
+      const template = getBankTemplateById(templateSelectedId) ?? detectBankTemplate(extractedText);
       const needsTemplateRecheck = clientPdfParseAssessment.useDeterministic === false &&
         clientPdfParseAssessment.mismatchRatio < 0.9;
-      const shouldRecheck = needsTemplateRecheck || cachedAllowSingleDate;
+      const shouldRecheck = needsTemplateRecheck || templateMapping.allowSingleDate;
       if (template && shouldRecheck) {
         templateSelectedId = template.id;
         try {
@@ -2147,22 +2554,14 @@ Deno.serve(async (req) => {
         }
       }
     }
-    const deterministicConfidence = (() => {
-      if (clientParsedTransactions.length === 0) return 0;
-      const mismatch = Math.min(1, Math.max(0, clientPdfParseAssessment.mismatchRatio));
-      const anomaly = Math.min(1, Math.max(0, clientPdfParseAssessment.anomalyRate));
-      const flow = scoreRunningBalanceFlow(clientParsedTransactions);
-      const flowMismatch = flow.total > 0 ? Math.min(1, Math.max(0, flow.mismatchRatio)) : 1;
-      const rowFactor = Math.min(1, clientParsedTransactions.length / 50);
-      const continuityScore = 1 - Math.min(1, (mismatch * 0.6) + (flowMismatch * 0.4));
-      const base =
-        (continuityScore * 0.5) +
-        (rowFactor * 0.3) +
-        ((1 - anomaly) * 0.2);
-      return Math.max(0, Math.min(1, base));
-    })();
-    const deterministicConfidenceHigh = deterministicConfidence >= 0.9;
-    const deterministicConfidenceMid = deterministicConfidence >= 0.6;
+    const deterministicConfidenceBreakdown = computeConfidenceBreakdown({
+      rows: clientParsedTransactions,
+      sourceText: extractedText,
+      bankId: templateSelectedId ?? bankDetection.bankId,
+      headerConfidenceHint: bankDetection.detectionConfidence,
+    });
+    const deterministicConfidence = deterministicConfidenceBreakdown.score;
+    const deterministicConfidenceHigh = deterministicConfidence >= DETERMINISTIC_CONFIDENCE_THRESHOLD;
     const preferDeterministicFastPath =
       PDF_DETERMINISTIC_FAST_PATH_ENABLED &&
       isPdf &&
@@ -2174,21 +2573,33 @@ Deno.serve(async (req) => {
     );
     if (clientParsedTransactions.length > 0) {
       console.log(
-        `Deterministic confidence=${deterministicConfidence.toFixed(3)} (mismatch=${clientPdfParseAssessment.mismatchRatio.toFixed(3)}, anomaly=${clientPdfParseAssessment.anomalyRate.toFixed(3)}).`,
+        `Deterministic confidence=${deterministicConfidence.toFixed(3)} (parse=${deterministicConfidenceBreakdown.parseSuccessRatio.toFixed(3)}, date=${deterministicConfidenceBreakdown.dateContinuityScore.toFixed(3)}, balance=${deterministicConfidenceBreakdown.balanceValidationScore.toFixed(3)}).`,
       );
     }
+    pipelineDiagnostics.confidenceScoring = {
+      ok: true,
+      deterministic: deterministicConfidenceBreakdown,
+      threshold: DETERMINISTIC_CONFIDENCE_THRESHOLD,
+    };
     const canUseDeterministicClientPdf =
       isPdf &&
       clientParsedTransactions.length > 0 &&
       (
-        clientPdfParseAssessment.useDeterministic ||
-        mustUseDeterministicClientPdf ||
-        preferDeterministicFastPath ||
         deterministicConfidenceHigh ||
-        deterministicConfidenceMid
+        (mustUseDeterministicClientPdf && !hasPdfPageImages) ||
+        (preferDeterministicFastPath && deterministicConfidenceHigh)
       ) &&
-      (!forceOcrForDenseStatement || mustUseDeterministicClientPdf || preferDeterministicFastPath || deterministicConfidenceHigh);
+      (!forceOcrForDenseStatement || deterministicConfidenceHigh || (mustUseDeterministicClientPdf && !hasPdfPageImages));
     let processedVia: 'deterministic' | 'ocr' | 'ai_rescue' = 'ocr';
+    let finalConfidenceScore = deterministicConfidence;
+    let finalErrorFlags = [...deterministicConfidenceBreakdown.errorFlags];
+    let aiUsed = false;
+    pipelineDiagnostics.decisionGate = {
+      ok: true,
+      confidenceScore: deterministicConfidence,
+      threshold: DETERMINISTIC_CONFIDENCE_THRESHOLD,
+      skipOcr: canUseDeterministicClientPdf,
+    };
 
     if (preferDeterministicFastPath && !clientPdfParseAssessment.useDeterministic) {
       console.log(
@@ -2196,7 +2607,7 @@ Deno.serve(async (req) => {
       );
     }
     if (deterministicConfidenceHigh) {
-      console.log('Deterministic confidence >= 0.90: forcing fast output path (no OCR).');
+      console.log(`Deterministic confidence >= ${DETERMINISTIC_CONFIDENCE_THRESHOLD}: forcing fast output path (no OCR).`);
     }
 
     if (mustUseDeterministicClientPdf && !clientPdfParseAssessment.useDeterministic) {
@@ -2239,6 +2650,8 @@ Deno.serve(async (req) => {
     // Track bank metadata across pages
     let collectedBankMetadata: BankMetadata | undefined = clientParsedBankMetadata;
     let pagesWithData = 1;
+    const deterministicDataset = clientParsedTransactions.map((row) => ({ ...row }));
+    let ocrDataset: RawTransaction[] = [];
 
     if (canUseDeterministicClientPdf) {
       console.log(`Using deterministic client PDF text extraction: ${clientParsedTransactions.length} transactions`);
@@ -2254,6 +2667,11 @@ Deno.serve(async (req) => {
       };
       processedVia = 'deterministic';
       pagesWithData = Math.max(1, pageCount);
+      pipelineDiagnostics.ocrStage = {
+        ok: true,
+        skipped: true,
+        reason: 'deterministic_confidence_high',
+      };
     } else if (isPdf && hasPdfPageImages) {
       // Build a minimal status object consistent with ai-orchestrator
       const status: AIProcessingStatus = {
@@ -2361,6 +2779,15 @@ Deno.serve(async (req) => {
         extractedText: combinedText,
         bankMetadata: collectedBankMetadata,
       };
+      ocrDataset = collected.map((row) => ({ ...row }));
+      pipelineDiagnostics.ocrStage = {
+        ok: true,
+        skipped: false,
+        pagesWithData,
+        extractedRows: collected.length,
+        strictRetryCount,
+        dualProviderCount,
+      };
 
       if (collected.length === 0 && clientParsedTransactions.length > 0) {
         console.log(
@@ -2389,6 +2816,11 @@ Deno.serve(async (req) => {
         lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
       if (isPdf) {
+        pipelineDiagnostics.ocrStage = {
+          ok: false,
+          skipped: false,
+          requiresPageImages: true,
+        };
         return new Response(
           JSON.stringify({
             error: 'PDF requires page images for processing. Please retry (the app will render pages) or upload JPG/PNG.',
@@ -2404,6 +2836,13 @@ Deno.serve(async (req) => {
       const ocrStart = Date.now();
       extractionResult = await performExtraction(base64Data, mimeType, extractedText);
       timing.ocr_ms += Date.now() - ocrStart;
+      ocrDataset = (extractionResult.transactions || []).map((row) => ({ ...row }));
+      pipelineDiagnostics.ocrStage = {
+        ok: true,
+        skipped: false,
+        pagesWithData: ocrDataset.length > 0 ? 1 : 0,
+        extractedRows: ocrDataset.length,
+      };
     }
 
     // Stage 6b: auto reprocess low-confidence rows (strict OCR) only when needed.
@@ -2472,8 +2911,83 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (processedVia !== 'deterministic' && extractionResult.transactions.length > 0) {
+      ocrDataset = extractionResult.transactions.map((row) => ({ ...row }));
+    }
+
+    const deterministicReconcileConfidence = computeConfidenceBreakdown({
+      rows: deterministicDataset,
+      sourceText: extractedText,
+      bankId: templateSelectedId ?? bankDetection.bankId,
+      headerConfidenceHint: bankDetection.detectionConfidence,
+    });
+    const ocrReconcileConfidence = computeConfidenceBreakdown({
+      rows: ocrDataset.length > 0 ? ocrDataset : extractionResult.transactions,
+      sourceText: extractionResult.extractedText || extractedText,
+      bankId: templateSelectedId ?? bankDetection.bankId,
+      headerConfidenceHint: bankDetection.detectionConfidence,
+    });
+
     rawTransactions = extractionResult.transactions;
     extractedText = extractionResult.extractedText || '';
+
+    if (deterministicDataset.length > 0 && ocrDataset.length > 0) {
+      const mergedDataset = mergeOcrTransactionsDeterministic(deterministicDataset, ocrDataset);
+      const mergedConfidence = computeConfidenceBreakdown({
+        rows: mergedDataset,
+        sourceText: extractionResult.extractedText || extractedText,
+        bankId: templateSelectedId ?? bankDetection.bankId,
+        headerConfidenceHint: bankDetection.detectionConfidence,
+      });
+
+      const confidenceGap = Math.abs(deterministicReconcileConfidence.score - ocrReconcileConfidence.score);
+      const safeMerge =
+        mergedDataset.length >= Math.max(deterministicDataset.length, ocrDataset.length) - 1 &&
+        mergedConfidence.score >= Math.max(deterministicReconcileConfidence.score, ocrReconcileConfidence.score) - 0.03;
+
+      if (safeMerge) {
+        rawTransactions = mergedDataset;
+        finalConfidenceScore = mergedConfidence.score;
+        processedVia = 'ocr';
+      } else if (ocrReconcileConfidence.score >= deterministicReconcileConfidence.score + 0.03) {
+        rawTransactions = ocrDataset;
+        finalConfidenceScore = ocrReconcileConfidence.score;
+        processedVia = 'ocr';
+      } else {
+        rawTransactions = deterministicDataset;
+        finalConfidenceScore = deterministicReconcileConfidence.score;
+        processedVia = 'deterministic';
+      }
+
+      if (confidenceGap >= 0.2 && !safeMerge) {
+        finalErrorFlags.push('reconciliation_high_conflict');
+      }
+      pipelineDiagnostics.reconciliation = {
+        ok: true,
+        deterministicConfidence: deterministicReconcileConfidence.score,
+        ocrConfidence: ocrReconcileConfidence.score,
+        mergedConfidence: mergedConfidence.score,
+        chosenMode: processedVia,
+        lowConfidence: finalConfidenceScore < OCR_ACCEPTABLE_CONFIDENCE_THRESHOLD,
+        confidenceGap,
+      };
+    } else if (processedVia === 'deterministic') {
+      finalConfidenceScore = deterministicReconcileConfidence.score;
+      pipelineDiagnostics.reconciliation = {
+        ok: true,
+        chosenMode: processedVia,
+        deterministicConfidence: deterministicReconcileConfidence.score,
+        ocrConfidence: 0,
+      };
+    } else {
+      finalConfidenceScore = ocrReconcileConfidence.score;
+      pipelineDiagnostics.reconciliation = {
+        ok: true,
+        chosenMode: processedVia,
+        deterministicConfidence: deterministicReconcileConfidence.score,
+        ocrConfidence: ocrReconcileConfidence.score,
+      };
+    }
 
     const recoveredAdcbTransactions = recoverAdcbTransactionsFromOcrText(extractedText);
     if (recoveredAdcbTransactions.length > 0) {
@@ -2536,22 +3050,44 @@ Deno.serve(async (req) => {
       rawTransactions = balanceDriftCorrection.transactions;
     }
 
-    if (AI_RESCUE_ENABLED && extractedText && rawTransactions.length >= AI_RESCUE_MIN_ROWS) {
+    const shouldAttemptAiRescue =
+      AI_RESCUE_ENABLED &&
+      extractedText &&
+      rawTransactions.length >= AI_RESCUE_MIN_ROWS &&
+      finalConfidenceScore < OCR_ACCEPTABLE_CONFIDENCE_THRESHOLD &&
+      finalErrorFlags.some((flag) => [
+        'low_row_parse_rate',
+        'date_continuity_issue',
+        'balance_arithmetic_issue',
+        'column_alignment_low',
+        'reconciliation_high_conflict',
+      ].includes(flag));
+
+    if (shouldAttemptAiRescue) {
       const flow = scoreRunningBalanceFlow(rawTransactions);
       const mismatch = flow.total > 0 ? flow.mismatchRatio : 1;
       if (mismatch >= AI_RESCUE_MIN_MISMATCH) {
-        console.log(`AI rescue triggered (mismatch=${mismatch.toFixed(3)}, rows=${rawTransactions.length}).`);
+        const rescueReason = `low_confidence_${finalConfidenceScore.toFixed(3)}_mismatch_${mismatch.toFixed(3)}`;
+        const minimalStructuredLines = buildMinimalStructuredLines(extractedText);
+        console.log(`AI rescue triggered (reason=${rescueReason}, rows=${rawTransactions.length}).`);
         const rescueStart = Date.now();
         extractionResult.status.groqText.used = true;
-        const rescueRows = await attemptGroqTextRescue(extractedText);
+        const rescueResult = await attemptGroqTextRescue(minimalStructuredLines);
+        const rescueRows = rescueResult.rows;
         const rescueDuration = Date.now() - rescueStart;
         extractionResult.status.groqText.time = rescueDuration;
         timing.ai_ms += rescueDuration;
+        aiUsed = true;
         if (rescueRows && rescueRows.length > 0) {
-          const rescueFlow = scoreRunningBalanceFlow(rescueRows);
-          const rescueMismatch = rescueFlow.total > 0 ? rescueFlow.mismatchRatio : 1;
+          const rescueConfidence = computeConfidenceBreakdown({
+            rows: rescueRows,
+            sourceText: minimalStructuredLines,
+            bankId: templateSelectedId ?? bankDetection.bankId,
+            headerConfidenceHint: bankDetection.detectionConfidence,
+          });
+          const rescueMismatch = 1 - rescueConfidence.balanceValidationScore;
           const preferRescue =
-            rescueMismatch + 0.05 < mismatch ||
+            rescueConfidence.score >= finalConfidenceScore + 0.05 ||
             rescueRows.length >= rawTransactions.length + 3;
           if (preferRescue) {
             console.log(
@@ -2559,15 +3095,46 @@ Deno.serve(async (req) => {
             );
             rawTransactions = rescueRows;
             processedVia = 'ai_rescue';
+            finalConfidenceScore = rescueConfidence.score;
             extractionResult.status.groqText.success = true;
+            pipelineDiagnostics.aiRescue = {
+              ok: true,
+              used: true,
+              reason: rescueReason,
+              tokenUsage: rescueResult.tokenUsage,
+              rescueConfidence: rescueResult.rescueConfidence,
+              finalConfidenceScore,
+            };
           } else {
             console.log('AI rescue rejected (no quality improvement).');
+            pipelineDiagnostics.aiRescue = {
+              ok: true,
+              used: true,
+              reason: rescueReason,
+              tokenUsage: rescueResult.tokenUsage,
+              rescueConfidence: rescueResult.rescueConfidence,
+              accepted: false,
+            };
           }
         } else {
           extractionResult.status.groqText.success = false;
           extractionResult.status.groqText.error = 'AI rescue returned no rows';
+          pipelineDiagnostics.aiRescue = {
+            ok: false,
+            used: true,
+            reason: rescueReason,
+            tokenUsage: rescueResult.tokenUsage,
+            rescueConfidence: rescueResult.rescueConfidence,
+            error: 'no_rows',
+          };
         }
       }
+    } else {
+      pipelineDiagnostics.aiRescue = {
+        ok: true,
+        used: false,
+        reason: 'confidence_or_flags_not_matching',
+      };
     }
 
     const hardRuleResult = processedVia === 'deterministic'
@@ -2673,10 +3240,20 @@ Deno.serve(async (req) => {
       collectedBankMetadata,
       extractionResult.bankMetadata,
     );
-    const transactions = sanitizeTransactions(extractedTransactions, {
+    let transactions = sanitizeTransactions(extractedTransactions, {
       openingBalance: provisionalBankInfo?.openingBalance,
       closingBalance: provisionalBankInfo?.closingBalance,
     });
+    const preDedupCount = transactions.length;
+    transactions = dedupeAndSortTransactions(transactions);
+    const removedDuplicatesByValidation = Math.max(0, preDedupCount - transactions.length);
+    pipelineDiagnostics.finalValidation = {
+      ok: true,
+      preDedupCount,
+      postDedupCount: transactions.length,
+      removedDuplicates: removedDuplicatesByValidation,
+      sortedByDate: true,
+    };
 
     // ============= LAYER 4: FINANCIAL ENGINE (Pure TypeScript) =============
     console.log('Starting financial analysis...');
@@ -2704,6 +3281,7 @@ Deno.serve(async (req) => {
     // Confidence Scoring (Stage 6)
     const confidenceSummary = scoreTransactionConfidence(transactions);
     console.log(`Confidence scoring: avg=${confidenceSummary.averageScore}, low=${confidenceSummary.lowConfidenceCount}/${confidenceSummary.total}`);
+    finalConfidenceScore = clamp01(confidenceSummary.averageScore / 100);
 
     // Fetch user's category corrections for behavioral learning
     let categoryCorrections: Map<string, string> | undefined;
@@ -2742,6 +3320,12 @@ Deno.serve(async (req) => {
     const integrityScore = calculateIntegrityScore(reconciliation, riskTransactions, liquidityMetrics);
     console.log(`Analysis complete. Integrity score: ${integrityScore}, Fraud alerts: ${fraudAlerts.length}`);
     timing.validation_ms += Date.now() - validationStart;
+    const fraudFlags = Array.from(
+      new Set<string>([
+        ...structuralScan.fraudFlags,
+        ...fraudAlerts.map((alert) => String(alert.type || '')).filter(Boolean),
+      ]),
+    );
 
     // ============= LAYER 5: PROFESSIONAL EXCEL EXPORT =============
     console.log('Generating professional Excel export...');
@@ -2824,6 +3408,9 @@ Deno.serve(async (req) => {
       collectedBankMetadata,
       extractionResult.bankMetadata,
     );
+    if (bankInfo) {
+      bankInfo.currency = normalizeCurrencyCode(bankInfo.currency);
+    }
     const excelResult = generateProfessionalExcel({
       transactions,
       analytics: {
@@ -3017,6 +3604,11 @@ Deno.serve(async (req) => {
         conversionId: conversion?.id || null,
         resultPath: resultPath,
         transactions: transactions,
+        bankId: templateSelectedId ?? bankDetection.bankId,
+        confidenceScore: finalConfidenceScore,
+        fraudFlags,
+        aiUsed: aiUsed || processedVia === 'ai_rescue',
+        parseMode: processedVia as ParseMode,
         analytics: analytics,
         bankInfo,
         excelData: excelBase64 ?? undefined,
