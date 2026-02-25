@@ -51,6 +51,7 @@ const getCorsHeaders = (req: Request) => ({
 });
 
 import { getTrackingKey } from '../_shared/client-id.ts';
+import { resolveEffectiveLimit } from '../_shared/limit-resolver.ts';
 
 // Sanitize error messages to prevent information leakage
 const sanitizeError = (error: unknown): string => {
@@ -454,13 +455,17 @@ Deno.serve(async (req) => {
     // Public edge client (anon key). Keep this function least-privileged.
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      supabaseServiceRoleKey || supabaseAnonKey,
+    );
 
     // ============= AUTHENTICATION CHECK =============
     // Use token validation without elevating to service-role.
     const authHeader = req.headers.get('Authorization');
     let user = null;
-    let supabaseUserClient = supabaseClient;
     
     if (authHeader && authHeader.startsWith('Bearer ') && authHeader !== 'Bearer null') {
       const token = authHeader.replace('Bearer ', '');
@@ -469,206 +474,59 @@ Deno.serve(async (req) => {
       
       if (!authError && authUser) {
         user = authUser;
-        supabaseUserClient = createClient(supabaseUrl, supabaseAnonKey, {
-          global: { headers: { Authorization: authHeader } },
-        });
         console.log('Authenticated user detected');
       } else {
         console.log('Token validation failed:', authError?.message || 'Invalid token');
       }
     }
 
-    let conversionsUsed = 0;
-    let conversionsLimit = 2; // Default for anonymous (2 free conversions per IP)
-    let isAuthenticated = false;
-    let planType = 'free';
-
-    if (user) {
-      // Registered user - check subscription
-      isAuthenticated = true;
-
-      // Check if user has an admin role (no limits) or owner email.
-      const ownerEmails = getOwnerEmailSet();
-      const userEmail = (user.email ?? '').trim().toLowerCase();
-      if (userEmail && ownerEmails.has(userEmail)) {
-        console.log('Owner email detected - unlimited access');
-        return new Response(
-          JSON.stringify({
-            conversionsUsed: 0,
-            conversionsLimit: 999999,
-            remaining: 999999,
-            limitReached: false,
-            isAuthenticated: true,
-            planType: 'unlimited',
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Role-based admin check
-      const { data: roleData, error: roleError } = await supabaseUserClient.rpc('has_role', {
-        _user_id: user.id,
-        _role: 'admin',
+    let effectiveLimit;
+    try {
+      effectiveLimit = await resolveEffectiveLimit({
+        supabaseAdmin,
+        user,
+        trackingKey,
+        timezone: userTimezone,
       });
-
-      if (roleError) {
-        console.error('Failed to fetch user roles:', roleError);
-      }
-
-      const isAdmin = !!roleData;
-      if (isAdmin) {
-        console.log('Admin role detected - unlimited access');
-        return new Response(
-          JSON.stringify({
-            conversionsUsed: 0,
-            conversionsLimit: 999999, // Unlimited
-            remaining: 999999,
-            limitReached: false,
-            isAuthenticated: true,
-            planType: 'unlimited',
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      let result: Array<{ conversions_used?: number; conversions_limit?: number }> | null = null;
-      let error: unknown = null;
-      try {
-        const rpcResponse = await supabaseUserClient.rpc('check_and_reset_daily_limit', {
-          p_ip_address: null,
-          p_user_id: user.id,
-          p_timezone: userTimezone
-        });
-        result = (rpcResponse.data as Array<{ conversions_used?: number; conversions_limit?: number }> | null) ?? null;
-        error = rpcResponse.error;
-      } catch (rpcThrownError) {
-        error = rpcThrownError;
-      }
-
-      if (error) {
-        console.error('Error checking user limit via RPC, using fallback:', error);
-        const fallback = await checkLimitFallback({
-          supabaseAdmin: supabaseUserClient,
-          userId: user.id,
-          trackingKey,
-          timezone: userTimezone,
-        });
-        conversionsUsed = fallback.conversionsUsed;
-        conversionsLimit = fallback.conversionsLimit;
-        planType = fallback.planType;
-      } else if (result && result.length > 0) {
-        conversionsUsed = toNumber(result[0].conversions_used, 0);
-        conversionsLimit = toNumber(result[0].conversions_limit, 5);
-
-        // Get user's plan type
-        const { data: subData } = await supabaseUserClient
-          .from('subscriptions')
-          .select('plan_type, tier, conversions_limit, conversions_used, free_daily_limit, free_daily_used, monthly_limit, monthly_used, yearly_limit, yearly_used, pack_limit, pack_used')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        const subRow = (subData as Record<string, unknown> | null) ?? null;
-        planType = resolvePlanType(subRow);
-        const subLimit = toNumber(subRow?.conversions_limit, conversionsLimit);
-        const subUsed = toNumber(subRow?.conversions_used, conversionsUsed);
-        const stackedLimit =
-          toNumber(subRow?.free_daily_limit, 5) +
-          toNumber(subRow?.monthly_limit, 0) +
-          toNumber(subRow?.yearly_limit, 0) +
-          toNumber(subRow?.pack_limit, 0);
-        const stackedUsed =
-          toNumber(subRow?.free_daily_used, 0) +
-          toNumber(subRow?.monthly_used, 0) +
-          toNumber(subRow?.yearly_used, 0) +
-          toNumber(subRow?.pack_used, 0);
-        const resolvedLimit = Math.max(subLimit, stackedLimit, conversionsLimit);
-        const resolvedUsed = Math.min(resolvedLimit, Math.max(subUsed, stackedUsed, conversionsUsed));
-        conversionsLimit = resolvedLimit;
-        conversionsUsed = resolvedUsed;
-      } else {
-        const fallback = await checkLimitFallback({
-          supabaseAdmin: supabaseUserClient,
-          userId: user.id,
-          trackingKey,
-          timezone: userTimezone,
-        });
-        conversionsUsed = fallback.conversionsUsed;
-        conversionsLimit = fallback.conversionsLimit;
-        planType = fallback.planType;
-      }
-    } else {
-      // Anonymous user - STRICT IP-based tracking
-      // This prevents abuse via multiple emails/browsers on same IP
-      let result: Array<{ conversions_used?: number; conversions_limit?: number }> | null = null;
-      let error: unknown = null;
-      try {
-        const rpcResponse = await supabaseClient.rpc('check_and_reset_daily_limit', {
-          p_ip_address: trackingKey,
-          p_user_id: null,
-          p_timezone: userTimezone
-        });
-        result = (rpcResponse.data as Array<{ conversions_used?: number; conversions_limit?: number }> | null) ?? null;
-        error = rpcResponse.error;
-      } catch (rpcThrownError) {
-        error = rpcThrownError;
-      }
-
-      if (error) {
-        console.error('Error checking anonymous limit via RPC, using fallback:', error);
-        const fallback = await checkLimitFallback({
-          supabaseAdmin: supabaseClient,
-          userId: null,
-          trackingKey,
-          timezone: userTimezone,
-        });
-        conversionsUsed = fallback.conversionsUsed;
-        conversionsLimit = fallback.conversionsLimit;
-      } else if (result && result.length > 0) {
-        conversionsUsed = toNumber(result[0].conversions_used, 0);
-        conversionsLimit = toNumber(result[0].conversions_limit, 2);
-      } else {
-        const fallback = await checkLimitFallback({
-          supabaseAdmin: supabaseClient,
-          userId: null,
-          trackingKey,
-          timezone: userTimezone,
-        });
-        conversionsUsed = fallback.conversionsUsed;
-        conversionsLimit = fallback.conversionsLimit;
-      }
+    } catch (limitError) {
+      console.error('Failed to resolve effective limit:', limitError);
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to resolve effective limit',
+          code: 'LIMIT_RESOLUTION_FAILED',
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    const remaining = Math.max(0, conversionsLimit - conversionsUsed);
-    const limitReached = remaining === 0;
-
-    console.log('Usage check result:', { conversionsUsed, conversionsLimit, remaining, limitReached, isAuthenticated, planType });
+    console.log('Usage check result:', {
+      conversionsUsed: effectiveLimit.conversionsUsed,
+      conversionsLimit: effectiveLimit.conversionsLimit,
+      remaining: effectiveLimit.remaining,
+      limitReached: effectiveLimit.limitReached,
+      isAuthenticated: effectiveLimit.isAuthenticated,
+      planType: effectiveLimit.planType,
+    });
 
     return new Response(
       JSON.stringify({
-        conversionsUsed,
-        conversionsLimit,
-        remaining,
-        limitReached,
-        isAuthenticated,
-        planType,
+        conversionsUsed: effectiveLimit.conversionsUsed,
+        conversionsLimit: effectiveLimit.conversionsLimit,
+        remaining: effectiveLimit.remaining,
+        limitReached: effectiveLimit.limitReached,
+        isAuthenticated: effectiveLimit.isAuthenticated,
+        planType: effectiveLimit.planType,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Internal error:', error);
-    const errorMessage = sanitizeError(error);
     return new Response(
       JSON.stringify({
-        conversionsUsed: 0,
-        conversionsLimit: 2,
-        remaining: 2,
-        limitReached: false,
-        isAuthenticated: false,
-        planType: 'free',
-        degraded: true,
-        warning: errorMessage,
+        error: 'Internal server error',
+        code: 'USAGE_LIMIT_CHECK_FAILED',
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

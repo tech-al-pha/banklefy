@@ -67,6 +67,7 @@ import {
   isDenseTableBankHint,
   isDualPassBankHint,
 } from '../_shared/bank-templates.ts';
+import { resolveEffectiveLimit } from '../_shared/limit-resolver.ts';
 
 type PdfJsModule = {
   getDocument: (options: Record<string, unknown>) => { promise: Promise<unknown> };
@@ -2241,74 +2242,38 @@ Deno.serve(async (req) => {
     };
 
     // ============= USAGE LIMITS ENFORCEMENT =============
-    // Check usage limits - IP-based for anonymous, user-based for authenticated
-    let conversionsUsed = 0;
-    let conversionsLimit = user ? 5 : 2;
-    let userPlanType = 'free';
-
-    let limitResult: Array<{ conversions_used?: number; conversions_limit?: number }> | null = null;
-    let limitError: unknown = null;
+    // Shared limit resolver (single source of truth with check-usage-limit)
+    let limitState;
     try {
-      const rpcResponse = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
-        p_ip_address: user ? null : trackingKey,
-        p_user_id: user ? user.id : null,
-        p_timezone: userTimezone,
-      });
-      limitResult = (rpcResponse.data as Array<{ conversions_used?: number; conversions_limit?: number }> | null) ?? null;
-      limitError = rpcResponse.error;
-    } catch (rpcThrownError) {
-      limitError = rpcThrownError;
-    }
-
-    if (limitError) {
-      console.error('Error checking limit via RPC, using fallback:', limitError);
-      const fallback = await checkLimitFallback({
+      limitState = await resolveEffectiveLimit({
         supabaseAdmin,
-        userId: user?.id ?? null,
+        user,
         trackingKey,
         timezone: userTimezone,
       });
-      conversionsUsed = fallback.conversionsUsed;
-      conversionsLimit = fallback.conversionsLimit;
-      userPlanType = fallback.planType;
-    } else {
-      const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
-      conversionsUsed = toNumber(usageInfo?.conversions_used, 0);
-      conversionsLimit = toNumber(usageInfo?.conversions_limit, user ? 5 : 2);
+    } catch (limitError) {
+      console.error('Failed to resolve effective limit:', limitError);
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to resolve effective limit',
+          code: 'LIMIT_RESOLUTION_FAILED',
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    console.log('Usage info:', { conversionsUsed, conversionsLimit, user: !!user });
+    const conversionsUsed = limitState.conversionsUsed;
+    const conversionsLimit = limitState.conversionsLimit;
+    const userPlanType = limitState.planType;
+    const isAdmin = limitState.isUnlimited || limitState.isAdmin || limitState.isOwner;
 
-    // Check if admin (role-based)
-    let isAdmin = false;
-    if (user) {
-      const { data: roleData, error: roleError } = await supabaseAdmin.rpc('has_role', {
-        _user_id: user.id,
-        _role: 'admin',
-      });
-      if (roleError) {
-        console.error('Admin role check failed:', roleError);
-      }
-      isAdmin = !!roleData;
-    }
-    console.log('Admin check:', { isAdmin });
-    let pagesUsedThisMonth = 0;
-    const userPlanLimit = conversionsLimit;
-
-    if (user && !isAdmin) {
-      const { data: subData, error: subError } = await supabase
-        .from('subscriptions')
-        .select('plan_type, tier, pages_used_this_month')
-        .eq('user_id', user.id)
-        .single();
-
-      if (subError) {
-        console.error('Failed to load subscription plan type:', subError);
-      } else if (subData) {
-        userPlanType = resolvePlanType((subData as Record<string, unknown> | null) ?? null) || userPlanType;
-        pagesUsedThisMonth = subData.pages_used_this_month || 0;
-      }
-    }
+    console.log('Usage info:', {
+      conversionsUsed,
+      conversionsLimit,
+      user: !!user,
+      planType: userPlanType,
+      isAdmin,
+    });
 
     const normalizedPlanType = userPlanType.toLowerCase();
     const isMonthlyPlan = normalizedPlanType.startsWith('monthly') || normalizedPlanType === 'daily';
