@@ -2244,15 +2244,13 @@ Analytics Summary:
         <div className="max-w-4xl mx-auto">
           <div className="space-y-8">
             {/* Usage Limit Banner */}
-            {!usageLimitLoading && (
-              <UsageLimitBanner
-                remaining={remaining}
-                limit={conversionsLimit}
-                isAuthenticated={isAuthenticated}
-                limitReached={limitReached}
-                planType={planType}
-              />
-            )}
+            <UsageLimitBanner
+              remaining={remaining}
+              limit={conversionsLimit}
+              isAuthenticated={isAuthenticated}
+              limitReached={limitReached}
+              planType={planType}
+            />
 
             <div className="space-y-8">
               {/* Hidden File Input - Multiple Files */}

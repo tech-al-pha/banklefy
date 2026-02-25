@@ -111,6 +111,20 @@ const getDatePartsInTimezone = (timezone: string) => {
 const normalizePlan = (value: unknown): string =>
   typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'free';
 
+const DEFAULT_OWNER_EMAILS = ['inspirexali@gmail.com'];
+
+const getOwnerEmailSet = (): Set<string> => {
+  const envRaw =
+    Deno.env.get('OWNER_EMAILS') ??
+    Deno.env.get('VITE_OWNER_EMAILS') ??
+    '';
+  const configured = envRaw
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set([...DEFAULT_OWNER_EMAILS, ...configured]);
+};
+
 const toNumber = (value: unknown, fallback: number): number => {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -282,8 +296,20 @@ const checkLimitFallback = async ({
       }
 
       const planType = resolvePlanType(row);
-      const conversionsLimit = toNumber(row.conversions_limit, 5);
-      let conversionsUsed = toNumber(row.conversions_used, 0);
+      const baseLimit = toNumber(row.conversions_limit, 5);
+      const baseUsed = toNumber(row.conversions_used, 0);
+      const stackedLimit =
+        toNumber(row.free_daily_limit, 5) +
+        toNumber(row.monthly_limit, 0) +
+        toNumber(row.yearly_limit, 0) +
+        toNumber(row.pack_limit, 0);
+      const stackedUsed =
+        toNumber(row.free_daily_used, 0) +
+        toNumber(row.monthly_used, 0) +
+        toNumber(row.yearly_used, 0) +
+        toNumber(row.pack_used, 0);
+      const conversionsLimit = Math.max(baseLimit, stackedLimit);
+      let conversionsUsed = Math.min(conversionsLimit, Math.max(baseUsed, stackedUsed));
       const lastResetDate = toDateString(row.last_reset_date);
       const resetBoundary = getResetBoundary(planType, dateParts);
 
@@ -460,32 +486,50 @@ Deno.serve(async (req) => {
     if (user) {
       // Registered user - check subscription
       isAuthenticated = true;
-      
-    // Check if user has an admin role (no limits). No email-based bypass allowed.
-    const { data: roleData, error: roleError } = await supabaseUserClient.rpc('has_role', {
-      _user_id: user.id,
-      _role: 'admin',
-    });
 
-    if (roleError) {
-      console.error('Failed to fetch user roles:', roleError);
-    }
+      // Check if user has an admin role (no limits) or owner email.
+      const ownerEmails = getOwnerEmailSet();
+      const userEmail = (user.email ?? '').trim().toLowerCase();
+      if (userEmail && ownerEmails.has(userEmail)) {
+        console.log('Owner email detected - unlimited access');
+        return new Response(
+          JSON.stringify({
+            conversionsUsed: 0,
+            conversionsLimit: 999999,
+            remaining: 999999,
+            limitReached: false,
+            isAuthenticated: true,
+            planType: 'unlimited',
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    const isAdmin = !!roleData;
-    if (isAdmin) {
-      console.log('Admin role detected - unlimited access');
-      return new Response(
-        JSON.stringify({
-          conversionsUsed: 0,
-          conversionsLimit: 999999, // Unlimited
-          remaining: 999999,
-          limitReached: false,
-          isAuthenticated: true,
-          planType: 'unlimited',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      // Role-based admin check
+      const { data: roleData, error: roleError } = await supabaseUserClient.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'admin',
+      });
+
+      if (roleError) {
+        console.error('Failed to fetch user roles:', roleError);
+      }
+
+      const isAdmin = !!roleData;
+      if (isAdmin) {
+        console.log('Admin role detected - unlimited access');
+        return new Response(
+          JSON.stringify({
+            conversionsUsed: 0,
+            conversionsLimit: 999999, // Unlimited
+            remaining: 999999,
+            limitReached: false,
+            isAuthenticated: true,
+            planType: 'unlimited',
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       
       let result: Array<{ conversions_used?: number; conversions_limit?: number }> | null = null;
       let error: unknown = null;
