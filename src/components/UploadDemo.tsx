@@ -12,6 +12,7 @@ import { UsageLimitBanner } from "./UsageLimitBanner";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 import { isPaidPlan } from "@/lib/entitlements";
+import { hasAdminAccess } from "@/lib/adminAccess";
 import banklefyLogo from "@/assets/banklefy-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -196,19 +197,8 @@ export const UploadDemo = () => {
         setIsAdmin(false);
         return;
       }
-      const { data, error } = await supabase.rpc('has_role', { _role: 'admin' });
-      if (!error) {
-        setIsAdmin(!!data);
-        return;
-      }
-      console.error('Failed to verify admin access:', error);
-      const { data: roleRow } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-      setIsAdmin(!!roleRow);
+      const nextIsAdmin = await hasAdminAccess(user);
+      setIsAdmin(nextIsAdmin);
     };
 
     void checkAdmin();
@@ -2590,6 +2580,7 @@ Analytics Summary:
                 feedbackLoading={feedbackLoading}
                 feedbackError={feedbackError}
                 onSubmitFeedback={submitConversionFeedback}
+                showUnderwriting={isPaidUser || isAdmin}
               />
             </div>
           </div>

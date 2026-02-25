@@ -4,12 +4,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Shield, Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/Logo";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
+import { hasAdminAccess } from "@/lib/adminAccess";
 
 const LandingPageContent = lazyWithRetry(() =>
   import("@/components/LandingPageContent").then((module) => ({ default: module.LandingPageContent })),
@@ -28,21 +28,8 @@ const Index = () => {
   useEffect(() => {
     const checkAdmin = async () => {
       if (user) {
-        const { data, error } = await supabase.rpc('has_role', {
-          _user_id: user.id,
-          _role: 'admin'
-        });
-        if (!error) {
-          setIsAdmin(!!data);
-          return;
-        }
-        const { data: roleRow } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'admin')
-          .maybeSingle();
-        setIsAdmin(!!roleRow);
+        const nextIsAdmin = await hasAdminAccess(user);
+        setIsAdmin(nextIsAdmin);
       } else {
         setIsAdmin(false);
       }

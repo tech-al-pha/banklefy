@@ -2285,44 +2285,48 @@ Deno.serve(async (req) => {
         const pageMime = match[1];
         const pageBase64 = match[2];
         let pageResult: OCRResult | null = null;
-
-        if (OCR_WORKER_MODE === 'primary') {
-          const workerResult = await callTesseractOcrWorker(pageBase64, pageMime, fileName);
-          if (workerResult.success && workerResult.transactions && workerResult.transactions.length > 0) {
-            pageResult = workerResult;
-            console.log('Using Tesseract OCR worker result for this page.');
+        try {
+          if (OCR_WORKER_MODE === 'primary') {
+            const workerResult = await callTesseractOcrWorker(pageBase64, pageMime, fileName);
+            if (workerResult.success && workerResult.transactions && workerResult.transactions.length > 0) {
+              pageResult = workerResult;
+              console.log('Using Tesseract OCR worker result for this page.');
+            }
           }
-        }
 
-        if (!pageResult) {
-          pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
-        }
-
-        if (
-          pageResult &&
-          !useStrictFirstPass &&
-          OCR_WORKER_MODE !== 'primary' &&
-          strictRetryCount < effectiveStrictMaxPages &&
-          shouldRetryStrictVisionPass(lowerFileName, pageResult, effectiveStrictMode)
-        ) {
-          const strictResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: true });
-          strictRetryCount += 1;
-          const chosenResult = chooseBetterVisionResult(pageResult, strictResult);
-          if (chosenResult !== pageResult) {
-            console.log('Using strict-table OCR pass for a PDF page (better extraction quality).');
-            pageResult = chosenResult;
+          if (!pageResult) {
+            pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
           }
-        }
 
-        if (
-          pageResult &&
-          OCR_WORKER_MODE !== 'primary' &&
-          dualProviderCount < effectiveDualMaxPages &&
-          shouldRunMistralDualPass(lowerFileName, pageResult, effectiveDualMode)
-        ) {
-          const mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
-          dualProviderCount += 1;
-          pageResult = mergeProviderResults(pageResult, mistralResult);
+          if (
+            pageResult &&
+            !useStrictFirstPass &&
+            OCR_WORKER_MODE !== 'primary' &&
+            strictRetryCount < effectiveStrictMaxPages &&
+            shouldRetryStrictVisionPass(lowerFileName, pageResult, effectiveStrictMode)
+          ) {
+            const strictResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: true });
+            strictRetryCount += 1;
+            const chosenResult = chooseBetterVisionResult(pageResult, strictResult);
+            if (chosenResult !== pageResult) {
+              console.log('Using strict-table OCR pass for a PDF page (better extraction quality).');
+              pageResult = chosenResult;
+            }
+          }
+
+          if (
+            pageResult &&
+            OCR_WORKER_MODE !== 'primary' &&
+            dualProviderCount < effectiveDualMaxPages &&
+            shouldRunMistralDualPass(lowerFileName, pageResult, effectiveDualMode)
+          ) {
+            const mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
+            dualProviderCount += 1;
+            pageResult = mergeProviderResults(pageResult, mistralResult);
+          }
+        } catch (pageError) {
+          errors.push(pageError instanceof Error ? pageError.message : 'OCR page processing failed');
+          continue;
         }
 
         if (pageResult && pageResult.success && pageResult.transactions && pageResult.transactions.length > 0) {
@@ -2357,6 +2361,20 @@ Deno.serve(async (req) => {
         extractedText: combinedText,
         bankMetadata: collectedBankMetadata,
       };
+
+      if (collected.length === 0 && clientParsedTransactions.length > 0) {
+        console.log(
+          `OCR unavailable/empty; falling back to deterministic parse (${clientParsedTransactions.length} rows).`,
+        );
+        extractionResult = {
+          transactions: clientParsedTransactions,
+          status,
+          extractedText: extractedText || combinedText,
+          bankMetadata: collectedBankMetadata,
+        };
+        processedVia = 'deterministic';
+        pagesWithData = Math.max(1, pageCount);
+      }
     } else {
       // Convert bytes to base64 for OCR
       const chunkSize = 8192;

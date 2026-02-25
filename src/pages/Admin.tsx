@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, Users, FileText, TrendingUp, Calendar, Shield, RefreshCw, BarChart3, ShieldAlert, Database, KeyRound, Settings, Server } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import banklefyLogo from '@/assets/banklefy-logo.svg';
+import { hasAdminAccess } from '@/lib/adminAccess';
 
 interface UserProfile {
   id: string;
@@ -279,25 +280,7 @@ export default function Admin() {
 
   const checkAdminAccess = useCallback(async () => {
     try {
-      let isAdmin = false;
-      const { data, error } = await supabase.rpc('has_role', {
-        _user_id: user!.id,
-        _role: 'admin'
-      });
-
-      if (!error) {
-        isAdmin = !!data;
-      } else {
-        console.error('Admin RPC failed, checking roles table:', error);
-        const { data: roleRow, error: roleError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user!.id)
-          .eq('role', 'admin')
-          .maybeSingle();
-        if (roleError) throw roleError;
-        isAdmin = !!roleRow;
-      }
+      const isAdmin = await hasAdminAccess(user!);
 
       if (!isAdmin) {
         toast({

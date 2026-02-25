@@ -113,6 +113,7 @@ type ResultsSectionProps = {
   feedbackLoading?: boolean;
   feedbackError?: string | null;
   onSubmitFeedback?: (payload: { isAccurate: boolean; allowTemplate: boolean }) => void;
+  showUnderwriting?: boolean;
 };
 
 export const ResultsSection = ({
@@ -152,6 +153,7 @@ export const ResultsSection = ({
   feedbackLoading = false,
   feedbackError = null,
   onSubmitFeedback,
+  showUnderwriting = true,
 }: ResultsSectionProps) => {
   const isTallyOnlyMode = resultMode === "tally_only";
   const creditTone: ToneName = analytics ? getCreditTone(analytics.totalCredits) : "good";
@@ -495,8 +497,8 @@ export const ResultsSection = ({
         </div>
       )}
 
-      {converting && <UnderwritingPanelSkeleton />}
-      {!converting && !isTallyOnlyMode && analytics?.underwriting && (
+      {showUnderwriting && converting && <UnderwritingPanelSkeleton />}
+      {showUnderwriting && !converting && !isTallyOnlyMode && analytics?.underwriting && (
         <UnderwritingPanel underwriting={analytics.underwriting} currencyCode={currencyCode} />
       )}
 

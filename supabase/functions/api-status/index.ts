@@ -161,16 +161,35 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: isAdmin, error: roleError } = await supabaseAdmin.rpc('has_role', {
-      _user_id: user.id,
-      _role: 'admin',
-    });
+    const ownerEmails = new Set(
+      ((Deno.env.get('OWNER_EMAILS') || 'inspirexali@gmail.com')
+        .split(',')
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean))
+    );
+    const userEmail = (user.email || '').trim().toLowerCase();
+    let isAdmin = userEmail ? ownerEmails.has(userEmail) : false;
 
-    if (roleError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to verify admin access' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+    if (!isAdmin) {
+      const { data: roleRow, error: roleRowError } = await supabaseAdmin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      if (!roleRowError) {
+        isAdmin = !!roleRow;
+      }
+    }
+
+    if (!isAdmin) {
+      const { data: roleData, error: roleError } = await supabaseAdmin.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'admin',
+      });
+      if (!roleError) {
+        isAdmin = !!roleData;
+      }
     }
 
     if (!isAdmin) {
@@ -244,5 +263,4 @@ Deno.serve(async (req) => {
     );
   }
 });
-
 
