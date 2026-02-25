@@ -2,7 +2,7 @@
 // Routes tasks to the best AI for each job, with error tracking
 // IMPORTANT: Gemini removed - Groq Vision only for OCR, rule-based for everything else
 
-import { callGroqVisionOCR, normalizeRawTransactions, type RawTransaction, type BankMetadata } from '../_shared/ocr-processor.ts';
+import { callGroqVisionOCR, normalizeOcrRawTransactions, type RawTransaction, type BankMetadata } from '../_shared/ocr-processor.ts';
 import { callMistralCategorizer, type ProcessedTransaction } from '../_shared/mistral-processor.ts';
 import { callGroqCategorizer, applyPatternCategorization, CATEGORY_LIST } from '../_shared/categorizer.ts';
 
@@ -118,7 +118,7 @@ Return ONLY the JSON array, no markdown.`,
           const jsonMatch = responseText.match(/\[[\s\S]*\]/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]) as RawTransaction[];
-            transactions = normalizeRawTransactions(parsed);
+            transactions = normalizeOcrRawTransactions(parsed);
             status.groqText.success = true;
             console.log(`✅ Groq Text extracted ${transactions.length} transactions in ${status.groqText.time}ms`);
             return { transactions, status, extractedText: finalExtractedText, bankMetadata };

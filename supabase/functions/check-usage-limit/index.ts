@@ -490,7 +490,7 @@ Deno.serve(async (req) => {
       let result: Array<{ conversions_used?: number; conversions_limit?: number }> | null = null;
       let error: unknown = null;
       try {
-        const rpcResponse = await supabaseClient.rpc('check_and_reset_daily_limit', {
+        const rpcResponse = await supabaseUserClient.rpc('check_and_reset_daily_limit', {
           p_ip_address: null,
           p_user_id: user.id,
           p_timezone: userTimezone
@@ -504,7 +504,7 @@ Deno.serve(async (req) => {
       if (error) {
         console.error('Error checking user limit via RPC, using fallback:', error);
         const fallback = await checkLimitFallback({
-          supabaseAdmin: supabaseClient,
+          supabaseAdmin: supabaseUserClient,
           userId: user.id,
           trackingKey,
           timezone: userTimezone,
@@ -543,7 +543,7 @@ Deno.serve(async (req) => {
         conversionsUsed = resolvedUsed;
       } else {
         const fallback = await checkLimitFallback({
-          supabaseAdmin: supabaseClient,
+          supabaseAdmin: supabaseUserClient,
           userId: user.id,
           trackingKey,
           timezone: userTimezone,

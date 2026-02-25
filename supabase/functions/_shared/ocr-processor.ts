@@ -423,6 +423,328 @@ export const normalizeRawTransactions = (rows: unknown[]): RawTransaction[] => {
   return rows.map((row) => normalizeTransaction(row as Record<string, unknown>));
 };
 
+type OcrNormalizeOptions = {
+  strictColumnLock?: boolean;
+};
+
+const OCR_NOISE_ROW_PATTERN =
+  /\b(transaction date|value date|running balance|debit amount|credit amount|description|narration|statement of accounts|account statement|total records|page\s+\d+)\b/i;
+
+const sanitizeStrictNumericToken = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return null;
+    return String(value);
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  // Keep only numeric-safe characters for OCR.
+  const cleaned = raw.replace(/[^\d,.\-]/g, '');
+  if (!cleaned || cleaned === '-') return null;
+
+  const minusMatches = cleaned.match(/-/g) || [];
+  if (minusMatches.length > 1) return null;
+  if (minusMatches.length === 1 && !cleaned.startsWith('-')) return null;
+
+  const unsigned = cleaned.replace(/-/g, '');
+  if (!unsigned) return null;
+
+  // Strict numeric format validation.
+  const usStyle = /^\d{1,3}(?:,\d{3})*(?:\.\d{1,3})?$/.test(unsigned);
+  const euStyle = /^\d{1,3}(?:\.\d{3})*(?:,\d{1,3})?$/.test(unsigned);
+  const plainStyle = /^\d+(?:[.,]\d{1,3})?$/.test(unsigned);
+  if (!usStyle && !euStyle && !plainStyle) return null;
+
+  const lastDot = unsigned.lastIndexOf('.');
+  const lastComma = unsigned.lastIndexOf(',');
+  const decimalSep = lastDot > lastComma ? '.' : lastComma > -1 ? ',' : '';
+
+  let normalized = unsigned;
+  if (decimalSep) {
+    const parts = unsigned.split(decimalSep);
+    if (parts.length !== 2) return null;
+    const integerPart = parts[0].replace(/[.,]/g, '');
+    const fractionPart = parts[1].replace(/[.,]/g, '');
+    if (!/^\d+$/.test(integerPart) || !/^\d+$/.test(fractionPart)) return null;
+    normalized = fractionPart.length > 0 ? `${integerPart}.${fractionPart}` : integerPart;
+  } else {
+    normalized = unsigned.replace(/[.,]/g, '');
+    if (!/^\d+$/.test(normalized)) return null;
+  }
+
+  if (cleaned.startsWith('-')) normalized = `-${normalized}`;
+  return normalized;
+};
+
+const parseStrictOcrNumber = (value: unknown, abs = true): number | undefined => {
+  const normalized = sanitizeStrictNumericToken(value);
+  if (!normalized) return undefined;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return undefined;
+  const rounded = roundMoney2(parsed);
+  return abs ? Math.abs(rounded) : rounded;
+};
+
+const isValidOcrTransactionDate = (value: unknown): value is string =>
+  typeof value === 'string' && !!parseStatementDate(value.trim());
+
+const isValidOcrDescription = (value: unknown): value is string => {
+  if (typeof value !== 'string') return false;
+  const text = collapseWhitespace(value);
+  if (!text) return false;
+  return !OCR_NOISE_ROW_PATTERN.test(text);
+};
+
+const normalizeOcrTransaction = (raw: Record<string, unknown>): RawTransaction | null => {
+  const dateRaw =
+    raw.txnDate ??
+    raw.transactionDate ??
+    raw.transaction_date ??
+    raw.txn_date ??
+    raw.transDate ??
+    raw.trans_date ??
+    raw.date ??
+    raw.valueDate ??
+    raw.value_date ??
+    raw.postingDate;
+
+  const descriptionRaw =
+    raw.description ??
+    raw.narration ??
+    raw.details ??
+    raw.memo ??
+    raw.particulars;
+
+  if (!isValidOcrTransactionDate(pickString(dateRaw))) return null;
+  if (!isValidOcrDescription(pickString(descriptionRaw))) return null;
+
+  const normalizedDate = parseStatementDate(String(dateRaw).trim()) || String(dateRaw).trim();
+  const description = collapseWhitespace(String(descriptionRaw));
+  const rawRef =
+    raw.refNumber ??
+    raw.refNo ??
+    raw.referenceNo ??
+    raw.referenceNumber ??
+    raw.reference ??
+    raw.ref ??
+    raw.transactionId ??
+    raw.transactionID ??
+    raw.txnId ??
+    raw.txnID ??
+    raw.id;
+  const cleanedRef = selectBestReference(pickString(rawRef), description);
+  const normalizedType = pickString(raw.type ?? raw.txnType ?? raw.transactionType)?.trim();
+
+  let debit = parseStrictOcrNumber(
+    raw.debit ?? raw.dr ?? raw.debitAmount ?? raw.withdrawal ?? raw.withdraw,
+    true,
+  ) ?? 0;
+  let credit = parseStrictOcrNumber(
+    raw.credit ?? raw.cr ?? raw.creditAmount ?? raw.deposit,
+    true,
+  ) ?? 0;
+  const balance = parseStrictOcrNumber(raw.balance ?? raw.bal ?? raw.runningBalance, false);
+
+  if (!Number.isFinite(balance as number)) return null;
+  if (debit <= 0 && credit <= 0) {
+    const amount = parseStrictOcrNumber(raw.amount, true) ?? 0;
+    const typeLower = (normalizedType || '').toLowerCase();
+    if (amount > 0 && /\b(cr|credit)\b/.test(typeLower)) {
+      credit = amount;
+    } else if (amount > 0 && /\b(dr|debit)\b/.test(typeLower)) {
+      debit = amount;
+    }
+  }
+  if (debit <= 0 && credit <= 0) return null;
+
+  const typeLower = (normalizedType || '').toLowerCase();
+  if (debit > 0 && credit > 0) {
+    if (/\b(cr|credit)\b/.test(typeLower)) {
+      credit = Math.max(credit, debit);
+      debit = 0;
+    } else if (/\b(dr|debit)\b/.test(typeLower)) {
+      debit = Math.max(debit, credit);
+      credit = 0;
+    }
+  }
+
+  return {
+    date: normalizedDate,
+    description,
+    category: pickString(raw.category)?.trim(),
+    debit: roundMoney2(debit),
+    credit: roundMoney2(credit),
+    balance: roundMoney2(Number(balance)),
+    amount: parseStrictOcrNumber(raw.amount, true),
+    type: normalizedType,
+    refNumber: cleanedRef,
+  };
+};
+
+const setLowConfidence = (row: RawTransaction): RawTransaction => {
+  if (!row.type) return { ...row, type: 'low_confidence' };
+  if (row.type.toLowerCase().includes('low_confidence')) return row;
+  return { ...row, type: `${row.type}|low_confidence` };
+};
+
+const lockColumnsByBalanceDirection = (rows: RawTransaction[], strictMode: boolean): RawTransaction[] => {
+  if (!strictMode || rows.length <= 1) return rows;
+  const normalized = rows.map((row) => ({ ...row }));
+
+  for (let i = 1; i < normalized.length; i += 1) {
+    const prev = Number(normalized[i - 1].balance ?? NaN);
+    const curr = Number(normalized[i].balance ?? NaN);
+    if (!Number.isFinite(prev) || !Number.isFinite(curr)) continue;
+    const delta = roundMoney2(curr - prev);
+    if (Math.abs(delta) < 0.01) continue;
+
+    const debit = roundMoney2(Math.abs(Number(normalized[i].debit || 0)));
+    const credit = roundMoney2(Math.abs(Number(normalized[i].credit || 0)));
+    const amount = Math.max(debit, credit);
+    if (amount <= 0) continue;
+
+    if (delta > 0) {
+      normalized[i].credit = amount;
+      normalized[i].debit = 0;
+    } else {
+      normalized[i].debit = amount;
+      normalized[i].credit = 0;
+    }
+  }
+
+  return normalized;
+};
+
+const replaceDigitAt = (value: string, index: number, digit: string): string =>
+  `${value.slice(0, index)}${digit}${value.slice(index + 1)}`;
+
+const toAmountString = (value: number): string => roundMoney2(value).toFixed(2);
+
+const tryDigitCorrectionForMismatch = (
+  observedAmount: number,
+  expectedAmount: number,
+): number | undefined => {
+  const mismatch = roundMoney2(Math.abs(observedAmount - expectedAmount));
+  const allowedMismatch =
+    Math.abs(mismatch - 10) <= 0.01 ||
+    Math.abs(mismatch - 100) <= 0.01 ||
+    Math.abs(mismatch - 0.1) <= 0.01;
+  if (!allowedMismatch) return undefined;
+
+  const candidates = new Set<number>();
+  const addCandidate = (value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return;
+    candidates.add(roundMoney2(value));
+  };
+
+  addCandidate(observedAmount * 10);
+  addCandidate(observedAmount * 100);
+  addCandidate(observedAmount / 10);
+  addCandidate(observedAmount / 100);
+
+  const observedText = toAmountString(observedAmount).replace('.', '');
+  for (let i = 0; i < observedText.length; i += 1) {
+    const current = observedText[i];
+    if (!/\d/.test(current)) continue;
+    for (let d = 0; d <= 9; d += 1) {
+      const digit = String(d);
+      if (digit === current) continue;
+      const swapped = replaceDigitAt(observedText, i, digit);
+      const normalized = Number(`${swapped.slice(0, -2)}.${swapped.slice(-2)}`);
+      addCandidate(normalized);
+    }
+    if (current === '6') addCandidate(Number(replaceDigitAt(observedText, i, '8').replace(/(\d{2})$/, '.$1')));
+    if (current === '6') addCandidate(Number(replaceDigitAt(observedText, i, '9').replace(/(\d{2})$/, '.$1')));
+    if (current === '8') addCandidate(Number(replaceDigitAt(observedText, i, '6').replace(/(\d{2})$/, '.$1')));
+    if (current === '8') addCandidate(Number(replaceDigitAt(observedText, i, '9').replace(/(\d{2})$/, '.$1')));
+    if (current === '9') addCandidate(Number(replaceDigitAt(observedText, i, '6').replace(/(\d{2})$/, '.$1')));
+    if (current === '9') addCandidate(Number(replaceDigitAt(observedText, i, '8').replace(/(\d{2})$/, '.$1')));
+  }
+
+  for (const candidate of candidates) {
+    if (Math.abs(candidate - expectedAmount) <= 0.01) {
+      return roundMoney2(candidate);
+    }
+  }
+
+  return undefined;
+};
+
+const applyRowLevelBalanceValidation = (rows: RawTransaction[]): RawTransaction[] => {
+  if (rows.length <= 1) return rows;
+  const normalized = rows.map((row) => ({ ...row }));
+  const tolerance = 1;
+
+  for (let i = 1; i < normalized.length; i += 1) {
+    const prevBalance = Number(normalized[i - 1].balance ?? NaN);
+    const currentBalance = Number(normalized[i].balance ?? NaN);
+    if (!Number.isFinite(prevBalance) || !Number.isFinite(currentBalance)) {
+      normalized[i] = setLowConfidence(normalized[i]);
+      continue;
+    }
+
+    let debit = roundMoney2(Math.abs(Number(normalized[i].debit || 0)));
+    let credit = roundMoney2(Math.abs(Number(normalized[i].credit || 0)));
+    const expectedBalance = roundMoney2(prevBalance + credit - debit);
+    const diff = roundMoney2(Math.abs(expectedBalance - currentBalance));
+    if (diff <= tolerance) {
+      normalized[i].debit = debit;
+      normalized[i].credit = credit;
+      continue;
+    }
+
+    const delta = roundMoney2(currentBalance - prevBalance);
+    const deltaAbs = roundMoney2(Math.abs(delta));
+    if (deltaAbs <= 0) {
+      normalized[i] = setLowConfidence({ ...normalized[i], debit, credit });
+      continue;
+    }
+
+    const direction: 'credit' | 'debit' = delta >= 0 ? 'credit' : 'debit';
+    const observed = direction === 'credit'
+      ? (credit > 0 ? credit : debit)
+      : (debit > 0 ? debit : credit);
+    const corrected = tryDigitCorrectionForMismatch(observed, deltaAbs);
+    const finalAmount = corrected ?? observed;
+
+    if (direction === 'credit') {
+      credit = finalAmount;
+      debit = 0;
+    } else {
+      debit = finalAmount;
+      credit = 0;
+    }
+
+    const correctedExpectedBalance = roundMoney2(prevBalance + credit - debit);
+    const correctedDiff = roundMoney2(Math.abs(correctedExpectedBalance - currentBalance));
+    if (correctedDiff <= tolerance) {
+      normalized[i].debit = debit;
+      normalized[i].credit = credit;
+    } else {
+      normalized[i] = setLowConfidence({ ...normalized[i], debit, credit });
+    }
+  }
+
+  return normalized;
+};
+
+export const normalizeOcrRawTransactions = (
+  rows: unknown[],
+  options?: OcrNormalizeOptions,
+): RawTransaction[] => {
+  const normalizedRows: RawTransaction[] = [];
+  for (const row of rows) {
+    const parsed = normalizeOcrTransaction(row as Record<string, unknown>);
+    if (!parsed) continue;
+    normalizedRows.push(parsed);
+  }
+
+  const locked = lockColumnsByBalanceDirection(normalizedRows, options?.strictColumnLock === true);
+  return applyRowLevelBalanceValidation(locked);
+};
+
 const normalizeOcrWorkerUrl = (value: string): string => value.replace(/\/+$/, '');
 
 export async function callTesseractOcrWorker(
@@ -474,7 +796,7 @@ export async function callTesseractOcrWorker(
     return {
       success: payload.success === true || transactionsRaw.length > 0,
       text: typeof payload.text === 'string' ? payload.text : undefined,
-      transactions: normalizeRawTransactions(transactionsRaw),
+      transactions: normalizeOcrRawTransactions(transactionsRaw),
       bankMetadata: bankMetadataRaw ? normalizeBankMetadata(bankMetadataRaw) : undefined,
       error: typeof payload.error === 'string' ? payload.error : undefined,
     };
@@ -583,7 +905,7 @@ export async function callGroqVisionOCR(
           console.log(`Groq Vision OCR extracted ${parsed.transactions.length} transactions with bank metadata`);
           return {
             success: true,
-            transactions: normalizeRawTransactions(parsed.transactions),
+            transactions: normalizeOcrRawTransactions(parsed.transactions, { strictColumnLock: strictTableMode }),
             bankMetadata: normalizeBankMetadata(parsed.bankMetadata),
             text: textContent
           };
@@ -591,7 +913,11 @@ export async function callGroqVisionOCR(
 
         // If it's just an object but has date/description, it might be a single transaction
         if (parsed.date && parsed.description) {
-          return { success: true, transactions: normalizeRawTransactions([parsed]), text: textContent };
+          return {
+            success: true,
+            transactions: normalizeOcrRawTransactions([parsed], { strictColumnLock: strictTableMode }),
+            text: textContent,
+          };
         }
       } catch (parseError) {
         console.log('Object parse failed, trying array format...');
@@ -604,7 +930,11 @@ export async function callGroqVisionOCR(
       try {
         const transactions = JSON.parse(jsonMatch[0]);
         console.log(`Groq Vision OCR extracted ${transactions.length} transactions (legacy format)`);
-        return { success: true, transactions: normalizeRawTransactions(transactions), text: textContent };
+        return {
+          success: true,
+          transactions: normalizeOcrRawTransactions(transactions, { strictColumnLock: strictTableMode }),
+          text: textContent,
+        };
       } catch (parseError) {
         console.error('Failed to parse Groq JSON:', parseError);
         return { success: true, text: textContent };
@@ -677,7 +1007,7 @@ export async function callMistralVisionOCR(
     return {
       success: true,
       text: markdownText,
-      transactions,
+      transactions: normalizeOcrRawTransactions(transactions),
       bankMetadata,
     };
   } catch (error) {
