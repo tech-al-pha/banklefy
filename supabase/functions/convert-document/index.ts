@@ -54,8 +54,8 @@ import {
   generateFraudAlerts,
   calculateIntegrityScore,
 } from '../_shared/risk-alert-engine.ts';
-import { generateProfessionalExcel } from '../_shared/excel-generator.ts';
-import { buildJsonExport, buildMt940Export } from '../_shared/export-formatters.ts';
+import { runStandardizedExportPipeline, decodeArtifactToText, encodeArtifactToBase64 } from '../_shared/export-orchestrator.ts';
+import type { ExportFormat } from '../_shared/export-builders.ts';
 import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
@@ -1505,6 +1505,16 @@ const mergeProviderResults = (primary: OCRResult, secondary: OCRResult): OCRResu
 const normalizePlan = (value: unknown): string =>
   typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'free';
 
+const normalizeRequestedFormat = (value: unknown): ExportFormat => {
+  const raw = typeof value === 'string' ? value.trim().toLowerCase() : 'xlsx';
+  if (raw === 'csv') return 'csv';
+  if (raw === 'json') return 'json';
+  if (raw === 'mt940') return 'mt940';
+  if (raw === 'fraud_report') return 'fraud_report';
+  if (raw === 'foir_report') return 'foir_report';
+  return 'xlsx';
+};
+
 const normalizeLegacyPlanType = (planType: string, conversionsLimit: number): string => {
   if (
     planType === 'free' ||
@@ -1996,12 +2006,14 @@ Deno.serve(async (req) => {
       timezone,
       recaptchaToken,
       outputMode,
+      requestedFormat,
       pdfPassword,
       pdfPageImages,
       pdfParsedTransactions,
       pdfParsedBankMetadata,
     } = await req.json();
     const requestedOutputMode = outputMode === 'tally_only' ? 'tally_only' : 'standard';
+    const normalizedRequestedFormat = normalizeRequestedFormat(requestedFormat);
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
     
     // Robust client tracking to prevent bypasses
@@ -3327,8 +3339,8 @@ Deno.serve(async (req) => {
       ]),
     );
 
-    // ============= LAYER 5: PROFESSIONAL EXCEL EXPORT =============
-    console.log('Generating professional Excel export...');
+    // ============= LAYER 5: STANDARDIZED EXPORT ORCHESTRATION =============
+    console.log('Starting standardized export orchestration...');
 
     // Use minor-unit math for exact debit/credit totals (no float drift).
     const totalCreditsMinor = sumMinorUnits(transactions.map((t) => t.credit || 0));
@@ -3337,7 +3349,6 @@ Deno.serve(async (req) => {
     const totalDebits = fromMinorUnits(totalDebitsMinor);
     const netFlow = fromMinorUnits(totalCreditsMinor - totalDebitsMinor);
 
-    // Category breakdown
     const categoryBreakdownMinor: Record<string, { count: number; totalDebitMinor: number; totalCreditMinor: number }> = {};
     transactions.forEach((t) => {
       if (!categoryBreakdownMinor[t.category]) {
@@ -3356,17 +3367,14 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Build underwriting analysis for response
     const underwritingAnalysis = buildUnderwritingPayload(underwritingResult, underwritingTier);
-
-    // Build risk analysis for response
     const riskAnalysis = {
       integrityScore,
       balanceMismatches: reconciliation.mismatches.length,
       averageDailyBalance: liquidityMetrics.avgBalance,
       maxDip: { amount: liquidityMetrics.minBalance, date: liquidityMetrics.maxDipDate },
       maxPeak: liquidityMetrics.maxBalance,
-      riskFlags: riskTransactions.map(r => ({ type: r.type, count: r.indices.length })),
+      riskFlags: riskTransactions.map((r) => ({ type: r.type, count: r.indices.length })),
       fraudAlerts,
       foirScore: underwritingResult.foir.score,
       avgMonthlyIncome: underwritingResult.foir.avgMonthlyIncome,
@@ -3400,7 +3408,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Generate Excel (styled)
     const outputStart = Date.now();
     const bankInfo = mergeBankMetadata(
       clientParsedBankMetadata,
@@ -3411,165 +3418,306 @@ Deno.serve(async (req) => {
     if (bankInfo) {
       bankInfo.currency = normalizeCurrencyCode(bankInfo.currency);
     }
-    const excelResult = generateProfessionalExcel({
-      transactions,
-      analytics: {
+
+    let resultPath: string | null = null;
+    let downloadUrl: string | null = null;
+    let remaining = Math.max(0, conversionsLimit - conversionsUsed);
+    const incrementBy = isFreeMode ? 1 : Math.max(1, pagesWithData);
+    const creditsBeforeExport = remaining;
+
+    const exportResult = await runStandardizedExportPipeline({
+      sessionId: conversion?.id ?? crypto.randomUUID(),
+      structuredTransactions: transactions,
+      bankId: templateSelectedId ?? bankDetection.bankId,
+      confidenceScore: finalConfidenceScore,
+      parseMode: processedVia,
+      fraudAnalysis: riskAnalysis,
+      analytics,
+      userPlan: userPlanType,
+      requestedFormat: normalizedRequestedFormat,
+      fraudFlags,
+      creditsRemainingBefore: creditsBeforeExport,
+      planAllowsFraudOverride: isAdmin,
+      allowFraudReport: isAdmin || underwritingTier !== 'none',
+      allowFoirReport: isAdmin || underwritingTier !== 'none',
+      statementReference: conversion?.id ?? undefined,
+      bankInfo,
+      xlsxContext: {
+        analytics: {
+          totalCredits,
+          totalDebits,
+          netFlow,
+          duplicateCount,
+          categoryBreakdown,
+        },
+        underwriting: underwritingResult,
+        fraudAlerts,
+        liquidity: liquidityMetrics,
+        reconciliation,
+        bankInfo,
+      },
+      jsonSummary: {
         totalCredits,
         totalDebits,
         netFlow,
-        duplicateCount,
-        categoryBreakdown,
       },
-      underwriting: underwritingResult,
-      fraudAlerts,
-      liquidity: liquidityMetrics,
-      reconciliation,
-      bankInfo, // NEW: Pass bank metadata
-    });
-    const excelBuffer = excelResult.buffer;
-
-    let resultPath = null;
-
-    // Upload for authenticated users
-    if (user && conversion) {
-      resultPath = `${user.id}/results/${conversion.id}.xlsx`;
-      // Use octet-stream to avoid storage MIME type restrictions
-      const { error: uploadResultError } = await supabase.storage
-        .from('bank-statements')
-        .upload(resultPath, excelBuffer, {
-          contentType: 'application/octet-stream',
-          upsert: false,
-        });
-
-      if (uploadResultError) {
-        console.error('Failed to upload result:', uploadResultError);
-        resultPath = null;
-      } else {
-        console.log('Excel file uploaded successfully');
-
-        // Update conversion status
-        await supabase
-          .from('conversions')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            result_path: resultPath,
-          })
-          .eq('id', conversion.id);
-
-        // Store risk analysis
-        await supabaseAdmin
-          .from('risk_analysis')
-          .upsert({
-            user_id: user.id,
-            conversion_id: conversion.id,
-            integrity_score: integrityScore,
-            balance_mismatches: reconciliation.mismatches.length,
-            average_daily_balance: liquidityMetrics.avgBalance,
-            max_dip_amount: liquidityMetrics.minBalance,
-            max_dip_date: liquidityMetrics.maxDipDate,
-            total_inflow: totalCredits,
-            total_outflow: totalDebits,
-            net_cashflow: netFlow,
-            foir_score: underwritingResult.foir.score,
-            salary_credits: underwritingResult.salaryCredits,
-            emi_debits: underwritingResult.emiDebits,
-            risk_flags: riskAnalysis.riskFlags,
-          });
-
-        // Store fraud alerts
-        for (const alert of fraudAlerts) {
-          await supabaseAdmin
-            .from('fraud_alerts')
-            .insert({
-              user_id: user.id,
-              conversion_id: conversion.id,
-              alert_type: alert.type,
-              severity: alert.severity,
-              description: alert.description,
-              affected_rows: alert.affectedRows,
-              metadata: alert.metadata,
-            });
+      includeCompatibilityBundle: true,
+      prepareDownload: async (artifact) => {
+        const fileSize = artifact.fileBuffer.byteLength;
+        if (!user || !conversion || artifact.format !== 'xlsx') {
+          return { downloadUrl: null, storagePath: null, fileSize };
         }
-      }
+
+        const storagePath = `${user.id}/results/${conversion.id}.xlsx`;
+        const { error: uploadResultError } = await supabase.storage
+          .from('bank-statements')
+          .upload(storagePath, artifact.fileBuffer, {
+            contentType: artifact.mimeType,
+            upsert: true,
+          });
+        if (uploadResultError) {
+          throw new Error(`EXPORT_UPLOAD_FAILED:${uploadResultError.message}`);
+        }
+
+        const { data: signedData, error: signedUrlError } = await supabaseAdmin.storage
+          .from('bank-statements')
+          .createSignedUrl(storagePath, 600);
+        if (signedUrlError) {
+          console.error('Signed URL generation failed:', signedUrlError);
+          return { downloadUrl: null, storagePath, fileSize };
+        }
+        return {
+          downloadUrl: signedData?.signedUrl ?? null,
+          storagePath,
+          fileSize,
+        };
+      },
+      commitExportTransaction: async (payload) => {
+        const currentRemaining = Math.max(0, conversionsLimit - conversionsUsed);
+        const remainingAfterDebit = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
+
+        let existingAuditEntry: Record<string, unknown> | null = null;
+        let existingTimings: Record<string, unknown> = {};
+        if (user && conversion) {
+          const { data: conversionRow, error: conversionError } = await supabaseAdmin
+            .from('conversions')
+            .select('processing_timings')
+            .eq('id', conversion.id)
+            .single();
+
+          if (conversionError) {
+            return {
+              ok: false,
+              creditsRemaining: currentRemaining,
+              error: `Failed to load export ledger: ${conversionError.message}`,
+            };
+          }
+
+          const rawTimings =
+            conversionRow && typeof conversionRow === 'object'
+              ? (conversionRow as Record<string, unknown>).processing_timings
+              : null;
+          existingTimings =
+            rawTimings && typeof rawTimings === 'object' && !Array.isArray(rawTimings)
+              ? { ...(rawTimings as Record<string, unknown>) }
+              : {};
+
+          const exportAudit =
+            existingTimings.export_audit && typeof existingTimings.export_audit === 'object' && !Array.isArray(existingTimings.export_audit)
+              ? (existingTimings.export_audit as Record<string, unknown>)
+              : {};
+
+          const already = exportAudit[payload.exportId];
+          if (already && typeof already === 'object' && !Array.isArray(already)) {
+            existingAuditEntry = already as Record<string, unknown>;
+            const status = String(existingAuditEntry.status ?? '').toLowerCase();
+            if (status === 'success') {
+              return {
+                ok: true,
+                alreadyProcessed: true,
+                creditsRemaining: Number(existingAuditEntry.creditsRemaining ?? currentRemaining),
+                previous: {
+                  downloadUrl: (existingAuditEntry.downloadUrl as string | null | undefined) ?? null,
+                  storagePath: (existingAuditEntry.storagePath as string | null | undefined) ?? null,
+                  fileSize: Number(existingAuditEntry.fileSize ?? payload.fileSize),
+                },
+              };
+            }
+          }
+        }
+
+        const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
+          p_ip_address: user ? null : trackingKey,
+          p_user_id: user ? user.id : null,
+          p_increment: incrementBy,
+        });
+        if (incrementError) {
+          return {
+            ok: false,
+            creditsRemaining: currentRemaining,
+            error: `Credit deduction failed: ${incrementError.message}`,
+          };
+        }
+
+        if (user && conversion) {
+          const exportEntry = {
+            exportId: payload.exportId,
+            userId: user.id,
+            format: payload.format,
+            creditsUsed: payload.creditsUsed,
+            timestamp: payload.timestamp,
+            status: 'success',
+            rowCount: payload.rowCount,
+            fileSize: payload.fileSize,
+            downloadUrl: payload.downloadUrl,
+            storagePath: payload.storagePath,
+            planName: payload.planName,
+            creditsRemaining: remainingAfterDebit,
+            sessionId: payload.sessionId,
+          };
+
+          const currentAudit =
+            existingTimings.export_audit && typeof existingTimings.export_audit === 'object' && !Array.isArray(existingTimings.export_audit)
+              ? (existingTimings.export_audit as Record<string, unknown>)
+              : {};
+
+          const updatedTimings = {
+            ...existingTimings,
+            export_audit: {
+              ...currentAudit,
+              [payload.exportId]: exportEntry,
+            },
+          };
+
+          const { error: ledgerError } = await supabaseAdmin
+            .from('conversions')
+            .update({ processing_timings: updatedTimings } as any)
+            .eq('id', conversion.id);
+
+          if (ledgerError) {
+            return {
+              ok: false,
+              creditsRemaining: remainingAfterDebit,
+              error: `Export audit commit failed: ${ledgerError.message}`,
+            };
+          }
+        }
+
+        return {
+          ok: true,
+          creditsRemaining: remainingAfterDebit,
+        };
+      },
+      auditExport: async (payload) => {
+        console.log('EXPORT_AUDIT', {
+          ...payload,
+          userId: user?.id ?? null,
+        });
+      },
+    });
+
+    if (!exportResult.ok) {
+      const status =
+        exportResult.error.code === 'EXPORT_CREDITS_EXHAUSTED'
+          ? 402
+          : exportResult.error.code === 'EXPORT_PLAN_RESTRICTED_FORMAT'
+            ? 403
+            : 400;
+      return new Response(
+        JSON.stringify({
+          error: exportResult.error.message,
+          code: exportResult.error.code,
+          details: exportResult.error.details,
+          exportMode: 'standardized',
+        }),
+        { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
-    // Convert Excel buffer to base64 only when needed (anonymous or upload failed)
+    transactions = exportResult.transactions;
+    remaining = exportResult.creditsRemaining;
+    resultPath = exportResult.storagePath;
+    downloadUrl = exportResult.downloadUrl;
+
+    const compatibility = exportResult.compatibility;
+    const excelArtifact = compatibility.xlsx ?? (exportResult.primary.format === 'xlsx' ? exportResult.primary : undefined);
+    const jsonArtifact = compatibility.json ?? (exportResult.primary.format === 'json' ? exportResult.primary : undefined);
+    const mt940Artifact = compatibility.mt940 ?? (exportResult.primary.format === 'mt940' ? exportResult.primary : undefined);
+
+    const jsonData = decodeArtifactToText(jsonArtifact) ?? undefined;
+    const mt940Data = decodeArtifactToText(mt940Artifact) ?? undefined;
+
     let excelBase64: string | null = null;
     if (!user || !resultPath) {
-      const excelBytes = new Uint8Array(excelBuffer);
-      let excelBinary = '';
-      const excelChunkSize = 8192;
-      for (let i = 0; i < excelBytes.length; i += excelChunkSize) {
-        const chunk = excelBytes.subarray(i, i + excelChunkSize);
-        excelBinary += String.fromCharCode(...chunk);
-      }
-      excelBase64 = btoa(excelBinary);
+      excelBase64 = encodeArtifactToBase64(excelArtifact);
     }
+
+    if (user && conversion && resultPath) {
+      await supabase
+        .from('conversions')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          result_path: resultPath,
+        })
+        .eq('id', conversion.id);
+
+      await supabaseAdmin
+        .from('risk_analysis')
+        .upsert({
+          user_id: user.id,
+          conversion_id: conversion.id,
+          integrity_score: integrityScore,
+          balance_mismatches: reconciliation.mismatches.length,
+          average_daily_balance: liquidityMetrics.avgBalance,
+          max_dip_amount: liquidityMetrics.minBalance,
+          max_dip_date: liquidityMetrics.maxDipDate,
+          total_inflow: totalCredits,
+          total_outflow: totalDebits,
+          net_cashflow: netFlow,
+          foir_score: underwritingResult.foir.score,
+          salary_credits: underwritingResult.salaryCredits,
+          emi_debits: underwritingResult.emiDebits,
+          risk_flags: riskAnalysis.riskFlags,
+        });
+
+      for (const alert of fraudAlerts) {
+        await supabaseAdmin
+          .from('fraud_alerts')
+          .insert({
+            user_id: user.id,
+            conversion_id: conversion.id,
+            alert_type: alert.type,
+            severity: alert.severity,
+            description: alert.description,
+            affected_rows: alert.affectedRows,
+            metadata: alert.metadata,
+          });
+      }
+    }
+
+    pipelineDiagnostics.export = {
+      ok: true,
+      format: exportResult.format,
+      rowCount: exportResult.rowCount,
+      fileSize: exportResult.fileSize,
+      planName: exportResult.planName,
+      creditsRemaining: exportResult.creditsRemaining,
+      downloadPrepared: !!exportResult.downloadUrl || !!resultPath || !!excelBase64,
+    };
+
     timing.output_ms += Date.now() - outputStart;
 
     console.log(`Conversion complete. ${transactions.length} transactions processed.`);
     console.log('=== Final AI Processing Report ===');
     console.log(generateStatusReport(categorizationResult.status));
 
-    // Build AI status for debugging
     const aiStatus = {
       groqVision: categorizationResult.status.groqVision,
       groqText: categorizationResult.status.groqText,
       mistral: categorizationResult.status.mistral,
       patternFallback: categorizationResult.status.patternFallback,
     };
-
-    // Increment usage count ONLY after successful conversion (prevents wasting credits/limit on failures)
-    const incrementBy = isFreeMode ? 1 : Math.max(1, pagesWithData);
-    let remaining = conversionsLimit - conversionsUsed;
-    let incrementFailed = false;
-    try {
-      const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
-        p_ip_address: user ? null : trackingKey,
-        p_user_id: user ? user.id : null,
-        p_increment: incrementBy,
-      });
-      if (incrementError) {
-        console.error('Error incrementing usage via RPC, trying fallback:', incrementError);
-        incrementFailed = true;
-      }
-    } catch (incrementRpcError) {
-      console.error('Usage increment RPC crashed, trying fallback:', incrementRpcError);
-      incrementFailed = true;
-    }
-
-    if (incrementFailed) {
-      const fallbackIncrement = await incrementUsageFallback({
-        supabaseAdmin,
-        userId: user?.id ?? null,
-        trackingKey,
-        incrementBy,
-        timezone: userTimezone,
-      });
-      if (!fallbackIncrement.ok) {
-        console.error('Fallback usage increment failed:', fallbackIncrement.error);
-      } else {
-        remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
-      }
-    } else {
-      remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
-    }
-
-    const jsonData = buildJsonExport({
-      transactions,
-      bankMetadata: bankInfo,
-      summary: {
-        totalCredits,
-        totalDebits,
-        netFlow,
-      },
-    });
-    const mt940Data = buildMt940Export({
-      transactions,
-      bankMetadata: bankInfo,
-      statementReference: conversion?.id ?? undefined,
-    });
 
     timing.total_ms = Date.now() - totalStart;
     console.log('Timing summary (ms):', timing);
@@ -3603,12 +3751,19 @@ Deno.serve(async (req) => {
         success: true,
         conversionId: conversion?.id || null,
         resultPath: resultPath,
+        downloadUrl: downloadUrl ?? undefined,
+        format: exportResult.format,
+        rowCount: exportResult.rowCount,
+        fileSize: exportResult.fileSize,
         transactions: transactions,
         bankId: templateSelectedId ?? bankDetection.bankId,
         confidenceScore: finalConfidenceScore,
         fraudFlags,
         aiUsed: aiUsed || processedVia === 'ai_rescue',
         parseMode: processedVia as ParseMode,
+        planName: exportResult.planName,
+        creditsRemaining: exportResult.creditsRemaining,
+        exportMode: exportResult.exportMode,
         analytics: analytics,
         bankInfo,
         excelData: excelBase64 ?? undefined,
