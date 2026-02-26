@@ -25,6 +25,11 @@ export interface OCRResult {
   text?: string;
   transactions?: RawTransaction[];
   bankMetadata?: BankMetadata;
+  metadata?: {
+    total_rows: number;
+    avg_confidence: number;
+    issues: string[];
+  };
   error?: string;
 }
 
@@ -38,6 +43,7 @@ export interface RawTransaction {
   amount?: number;
   type?: string;
   refNumber?: string;
+  confidence?: number;
 }
 
 const OCR_PROMPT = `You are an expert OCR and bank statement data extraction specialist for GLOBAL banks.
@@ -427,6 +433,9 @@ type OcrNormalizeOptions = {
   strictColumnLock?: boolean;
 };
 
+const LOW_CONFIDENCE_THRESHOLD = 0.8;
+const OCR_UNREADABLE_DESCRIPTION = 'UNREADABLE';
+
 const OCR_NOISE_ROW_PATTERN =
   /\b(transaction date|value date|running balance|debit amount|credit amount|description|narration|statement of accounts|account statement|total records|page\s+\d+)\b/i;
 
@@ -518,10 +527,13 @@ const normalizeOcrTransaction = (raw: Record<string, unknown>): RawTransaction |
     raw.particulars;
 
   if (!isValidOcrTransactionDate(pickString(dateRaw))) return null;
-  if (!isValidOcrDescription(pickString(descriptionRaw))) return null;
+  const rawDescriptionText = pickString(descriptionRaw);
+  const hasValidDescription = isValidOcrDescription(rawDescriptionText);
 
   const normalizedDate = parseStatementDate(String(dateRaw).trim()) || String(dateRaw).trim();
-  const description = collapseWhitespace(String(descriptionRaw));
+  const description = hasValidDescription
+    ? collapseWhitespace(String(descriptionRaw))
+    : OCR_UNREADABLE_DESCRIPTION;
   const rawRef =
     raw.refNumber ??
     raw.refNo ??
@@ -536,6 +548,9 @@ const normalizeOcrTransaction = (raw: Record<string, unknown>): RawTransaction |
     raw.id;
   const cleanedRef = selectBestReference(pickString(rawRef), description);
   const normalizedType = pickString(raw.type ?? raw.txnType ?? raw.transactionType)?.trim();
+  const typeTags: string[] = [];
+  if (normalizedType) typeTags.push(normalizedType);
+  if (!hasValidDescription) typeTags.push('low_confidence');
 
   let debit = parseStrictOcrNumber(
     raw.debit ?? raw.dr ?? raw.debitAmount ?? raw.withdrawal ?? raw.withdraw,
@@ -578,7 +593,7 @@ const normalizeOcrTransaction = (raw: Record<string, unknown>): RawTransaction |
     credit: roundMoney2(credit),
     balance: roundMoney2(Number(balance)),
     amount: parseStrictOcrNumber(raw.amount, true),
-    type: normalizedType,
+    type: typeTags.join('|') || undefined,
     refNumber: cleanedRef,
   };
 };
@@ -730,6 +745,99 @@ const applyRowLevelBalanceValidation = (rows: RawTransaction[]): RawTransaction[
   return normalized;
 };
 
+const scoreOcrRowConfidence = (
+  row: RawTransaction,
+  previousRow?: RawTransaction,
+): number => {
+  let score = 1.0;
+  const description = String(row.description || '').trim();
+  const debit = Math.abs(Number(row.debit || 0));
+  const credit = Math.abs(Number(row.credit || 0));
+  const balance = Number(row.balance ?? NaN);
+  const lowConfidenceTag = String(row.type || '').toLowerCase().includes('low_confidence');
+
+  if (!description || description === OCR_UNREADABLE_DESCRIPTION) score -= 0.45;
+  if (!Number.isFinite(balance)) score -= 0.45;
+  if ((debit <= 0 && credit <= 0) || (debit > 0 && credit > 0)) score -= 0.3;
+  if (lowConfidenceTag) score -= 0.3;
+
+  if (previousRow && Number.isFinite(Number(previousRow.balance)) && Number.isFinite(balance)) {
+    const prevBalance = Number(previousRow.balance ?? NaN);
+    const expected = roundMoney2(prevBalance + credit - debit);
+    const diff = Math.abs(expected - balance);
+    if (diff > 1) score -= 0.35;
+    else if (diff > 0.2) score -= 0.1;
+  }
+
+  return Math.max(0.2, Math.min(1, roundMoney2(score)));
+};
+
+const addOcrConfidence = (rows: RawTransaction[]): RawTransaction[] => {
+  return rows.map((row, index) => ({
+    ...row,
+    confidence: scoreOcrRowConfidence(row, index > 0 ? rows[index - 1] : undefined),
+  }));
+};
+
+const summarizeOcrMetadata = (rows: RawTransaction[], issues: string[] = []) => {
+  const totalRows = rows.length;
+  const avgConfidence =
+    totalRows > 0
+      ? roundMoney2(
+          rows.reduce((sum, row) => sum + Number(row.confidence ?? 0.5), 0) / totalRows,
+        )
+      : 0;
+
+  const lowConfidenceRows = rows.filter((row) => Number(row.confidence ?? 0) < LOW_CONFIDENCE_THRESHOLD).length;
+  const unreadableRows = rows.filter((row) => row.description === OCR_UNREADABLE_DESCRIPTION).length;
+  const uniqueIssues = [...issues];
+  if (lowConfidenceRows > 0) uniqueIssues.push(`low_confidence_rows:${lowConfidenceRows}`);
+  if (unreadableRows > 0) uniqueIssues.push(`unreadable_rows:${unreadableRows}`);
+
+  return {
+    total_rows: totalRows,
+    avg_confidence: avgConfidence,
+    issues: Array.from(new Set(uniqueIssues)),
+  };
+};
+
+const hasLowConfidenceRows = (rows: RawTransaction[]): boolean =>
+  rows.some((row) => Number(row.confidence ?? 0) < LOW_CONFIDENCE_THRESHOLD);
+
+const scoreDatasetQuality = (rows: RawTransaction[]): number => {
+  if (!rows.length) return 0;
+  const flow = scoreRunningBalanceFlow(rows);
+  const avgConfidence =
+    rows.reduce((sum, row) => sum + Number(row.confidence ?? 0.5), 0) / rows.length;
+  const sizeBoost = Math.min(0.1, rows.length / 500);
+  return roundMoney2(avgConfidence - flow.mismatchRatio * 0.7 + sizeBoost);
+};
+
+const selectBetterOcrDataset = (
+  currentRows: RawTransaction[],
+  candidateRows: RawTransaction[],
+): RawTransaction[] => {
+  if (candidateRows.length === 0) return currentRows;
+  if (currentRows.length === 0) return candidateRows;
+
+  const currentScore = scoreDatasetQuality(currentRows);
+  const candidateScore = scoreDatasetQuality(candidateRows);
+  if (candidateScore > currentScore + 0.03) return candidateRows;
+
+  const currentFlow = scoreRunningBalanceFlow(currentRows);
+  const candidateFlow = scoreRunningBalanceFlow(candidateRows);
+  const scoreGap = Math.abs(candidateScore - currentScore);
+  if (
+    scoreGap <= 0.02 &&
+    candidateRows.length > currentRows.length &&
+    candidateFlow.mismatchRatio <= currentFlow.mismatchRatio + 0.05
+  ) {
+    return candidateRows;
+  }
+
+  return currentRows;
+};
+
 export const normalizeOcrRawTransactions = (
   rows: unknown[],
   options?: OcrNormalizeOptions,
@@ -742,7 +850,8 @@ export const normalizeOcrRawTransactions = (
   }
 
   const locked = lockColumnsByBalanceDirection(normalizedRows, options?.strictColumnLock === true);
-  return applyRowLevelBalanceValidation(locked);
+  const validated = applyRowLevelBalanceValidation(locked);
+  return addOcrConfidence(validated);
 };
 
 const normalizeOcrWorkerUrl = (value: string): string => value.replace(/\/+$/, '');
@@ -793,11 +902,13 @@ export async function callTesseractOcrWorker(
         ? (payload.bankMetadata as Record<string, unknown>)
         : undefined;
 
+    const normalizedTransactions = normalizeOcrRawTransactions(transactionsRaw);
     return {
       success: payload.success === true || transactionsRaw.length > 0,
       text: typeof payload.text === 'string' ? payload.text : undefined,
-      transactions: normalizeOcrRawTransactions(transactionsRaw),
+      transactions: normalizedTransactions,
       bankMetadata: bankMetadataRaw ? normalizeBankMetadata(bankMetadataRaw) : undefined,
+      metadata: summarizeOcrMetadata(normalizedTransactions),
       error: typeof payload.error === 'string' ? payload.error : undefined,
     };
   } catch (error) {
@@ -903,19 +1014,31 @@ export async function callGroqVisionOCR(
         // Check if it's the new format with bankMetadata
         if (parsed.bankMetadata && parsed.transactions) {
           console.log(`Groq Vision OCR extracted ${parsed.transactions.length} transactions with bank metadata`);
+          let normalizedTransactions = normalizeOcrRawTransactions(parsed.transactions, { strictColumnLock: strictTableMode });
+          const issues: string[] = [];
+
+          if (!strictTableMode && normalizedTransactions.length > 0 && hasLowConfidenceRows(normalizedTransactions)) {
+            // Lean pipeline: avoid nested OCR retries inside provider-level function.
+            // Retry orchestration is controlled only by convert-document.
+            issues.push('low_confidence_detected');
+          }
+
           return {
             success: true,
-            transactions: normalizeOcrRawTransactions(parsed.transactions, { strictColumnLock: strictTableMode }),
+            transactions: normalizedTransactions,
             bankMetadata: normalizeBankMetadata(parsed.bankMetadata),
+            metadata: summarizeOcrMetadata(normalizedTransactions, issues),
             text: textContent
           };
         }
 
         // If it's just an object but has date/description, it might be a single transaction
         if (parsed.date && parsed.description) {
+          const normalizedTransactions = normalizeOcrRawTransactions([parsed], { strictColumnLock: strictTableMode });
           return {
             success: true,
-            transactions: normalizeOcrRawTransactions([parsed], { strictColumnLock: strictTableMode }),
+            transactions: normalizedTransactions,
+            metadata: summarizeOcrMetadata(normalizedTransactions),
             text: textContent,
           };
         }
@@ -930,9 +1053,11 @@ export async function callGroqVisionOCR(
       try {
         const transactions = JSON.parse(jsonMatch[0]);
         console.log(`Groq Vision OCR extracted ${transactions.length} transactions (legacy format)`);
+        const normalizedTransactions = normalizeOcrRawTransactions(transactions, { strictColumnLock: strictTableMode });
         return {
           success: true,
-          transactions: normalizeOcrRawTransactions(transactions, { strictColumnLock: strictTableMode }),
+          transactions: normalizedTransactions,
+          metadata: summarizeOcrMetadata(normalizedTransactions),
           text: textContent,
         };
       } catch (parseError) {
@@ -1003,11 +1128,13 @@ export async function callMistralVisionOCR(
     if (transactions.length === 0) {
       transactions = recoverAdcbTransactionsFromOcrText(markdownText);
     }
+    const normalizedTransactions = normalizeOcrRawTransactions(transactions);
 
     return {
       success: true,
       text: markdownText,
-      transactions: normalizeOcrRawTransactions(transactions),
+      transactions: normalizedTransactions,
+      metadata: summarizeOcrMetadata(normalizedTransactions),
       bankMetadata,
     };
   } catch (error) {
@@ -2007,7 +2134,7 @@ export const assessClientPdfParsedTransactions = (
     };
   }
 
-  const severeMismatch = transactions.length >= 8 && flow.total >= 5 && mismatchRatio >= 0.35;
+  const severeMismatch = transactions.length >= 8 && flow.total >= 5 && mismatchRatio >= 0.45;
   const severeAnomaly =
     anomalyStats.checks >= 3 &&
     anomalyStats.anomalies >= 2 &&
@@ -2023,7 +2150,7 @@ export const assessClientPdfParsedTransactions = (
   }
 
   const needsOcrValidation =
-    (transactions.length >= 6 && flow.total >= 4 && mismatchRatio >= 0.12) ||
+    (transactions.length >= 6 && flow.total >= 4 && mismatchRatio >= 0.22) ||
     (anomalyStats.checks >= 3 && anomalyRate >= 0.2);
   if (needsOcrValidation) {
     return {

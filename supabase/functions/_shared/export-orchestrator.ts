@@ -19,13 +19,14 @@ const CRITICAL_FRAUD_FLAGS = new Set([
   'high_conflict_reconciliation',
 ]);
 
-const DEFAULT_MIN_CONFIDENCE = Number(Deno.env.get('EXPORT_MIN_CONFIDENCE') ?? '0.55');
+const DEFAULT_MIN_CONFIDENCE = Number(Deno.env.get('EXPORT_MIN_CONFIDENCE') ?? '0.6');
 const MAX_EXPORT_FILE_SIZE_BYTES = Number(Deno.env.get('EXPORT_MAX_SIZE_BYTES') ?? String(25 * 1024 * 1024));
-const BALANCE_TOLERANCE = Number(Deno.env.get('EXPORT_BALANCE_TOLERANCE') ?? '0.5');
+const BALANCE_TOLERANCE = Number(Deno.env.get('EXPORT_BALANCE_TOLERANCE') ?? '0.01');
 const MAX_BALANCE_MISMATCH_RATIO = Number(Deno.env.get('EXPORT_MAX_MISMATCH_RATIO') ?? '0.2');
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 const asIsoDate = (value: string): string | null => {
   const source = String(value || '').trim();
@@ -44,6 +45,30 @@ const toNumber = (value: unknown): number => {
   return Number.isFinite(n) ? n : NaN;
 };
 
+type ValidationSeverity = 'minor' | 'major';
+
+type ExportValidationIssue = {
+  index: number;
+  code:
+    | 'invalid_date'
+    | 'invalid_debit'
+    | 'invalid_credit'
+    | 'invalid_balance'
+    | 'negative_amount_normalized'
+    | 'balance_minor_rounding_fix'
+    | 'balance_major_mismatch';
+  message: string;
+  severity: ValidationSeverity;
+};
+
+type PreparedTransactions = {
+  transactions: Transaction[];
+  issues: ExportValidationIssue[];
+  flaggedIndices: number[];
+  invalidFieldCount: number;
+  normalizedNegativeCount: number;
+};
+
 const txHash = (tx: Transaction): string =>
   [
     tx.date,
@@ -53,60 +78,186 @@ const txHash = (tx: Transaction): string =>
     Number(tx.balance || 0).toFixed(2),
   ].join('|');
 
-const normalizeTransactions = (transactions: ReadonlyArray<Transaction>) => {
-  const normalized: Transaction[] = [];
-  const seen = new Set<string>();
+const prepareTransactions = (transactions: ReadonlyArray<Transaction>): PreparedTransactions => {
+  const output: Transaction[] = [];
+  const issues: ExportValidationIssue[] = [];
+  const flagged = new Set<number>();
+  let invalidFieldCount = 0;
+  let normalizedNegativeCount = 0;
 
-  for (const row of transactions) {
-    const date = asIsoDate(row.date);
-    if (!date) {
-      continue;
+  for (let index = 0; index < transactions.length; index += 1) {
+    const row = transactions[index];
+    const isoDate = asIsoDate(row.date);
+    const debitRaw = toNumber(row.debit);
+    const creditRaw = toNumber(row.credit);
+    const balanceRaw = toNumber(row.balance);
+
+    let debit = Number.isFinite(debitRaw) ? debitRaw : 0;
+    let credit = Number.isFinite(creditRaw) ? creditRaw : 0;
+    let balance = Number.isFinite(balanceRaw) ? balanceRaw : 0;
+
+    if (!isoDate) {
+      invalidFieldCount += 1;
+      flagged.add(index);
+      issues.push({
+        index,
+        code: 'invalid_date',
+        message: 'Transaction date is invalid; using UNKNOWN.',
+        severity: 'major',
+      });
     }
-    const debit = Math.abs(Number(row.debit || 0));
-    const credit = Math.abs(Number(row.credit || 0));
-    const balance = Number(row.balance || 0);
-    if (!Number.isFinite(debit) || !Number.isFinite(credit) || !Number.isFinite(balance)) continue;
+    if (!Number.isFinite(debitRaw)) {
+      invalidFieldCount += 1;
+      flagged.add(index);
+      issues.push({
+        index,
+        code: 'invalid_debit',
+        message: 'Debit is invalid; normalized to 0.',
+        severity: 'major',
+      });
+    }
+    if (!Number.isFinite(creditRaw)) {
+      invalidFieldCount += 1;
+      flagged.add(index);
+      issues.push({
+        index,
+        code: 'invalid_credit',
+        message: 'Credit is invalid; normalized to 0.',
+        severity: 'major',
+      });
+    }
+    if (!Number.isFinite(balanceRaw)) {
+      invalidFieldCount += 1;
+      flagged.add(index);
+      issues.push({
+        index,
+        code: 'invalid_balance',
+        message: 'Balance is invalid; normalized to 0.',
+        severity: 'major',
+      });
+    }
 
-    const tx: Transaction = {
+    if (debit < 0 || credit < 0) {
+      normalizedNegativeCount += 1;
+      flagged.add(index);
+      issues.push({
+        index,
+        code: 'negative_amount_normalized',
+        message: 'Negative amount normalized to positive for export integrity.',
+        severity: 'minor',
+      });
+    }
+
+    debit = Math.abs(debit);
+    credit = Math.abs(credit);
+
+    output.push({
       ...row,
-      date,
-      debit,
-      credit,
-      balance,
-    };
-    const hash = txHash(tx);
-    if (seen.has(hash)) continue;
-    seen.add(hash);
-    normalized.push(tx);
+      date: isoDate ?? 'UNKNOWN',
+      debit: round2(debit),
+      credit: round2(credit),
+      balance: round2(balance),
+    });
   }
 
-  normalized.sort((a, b) => a.date.localeCompare(b.date));
-  return normalized;
+  return {
+    transactions: output,
+    issues,
+    flaggedIndices: Array.from(flagged.values()).sort((a, b) => a - b),
+    invalidFieldCount,
+    normalizedNegativeCount,
+  };
 };
 
-const validateRunningBalance = (transactions: ReadonlyArray<Transaction>) => {
-  if (transactions.length <= 1) {
-    return { mismatchRatio: 0, mismatchCount: 0, isValid: true };
+type BalanceValidationResult = {
+  transactions: Transaction[];
+  mismatchRatio: number;
+  mismatchCount: number;
+  majorMismatchCount: number;
+  minorFixCount: number;
+  issues: ExportValidationIssue[];
+  flaggedIndices: number[];
+  isValid: boolean;
+};
+
+const validateAndRepairRunningBalance = (transactions: ReadonlyArray<Transaction>): BalanceValidationResult => {
+  const output = transactions.map((tx) => ({ ...tx }));
+  if (output.length <= 1) {
+    return {
+      transactions: output,
+      mismatchRatio: 0,
+      mismatchCount: 0,
+      majorMismatchCount: 0,
+      minorFixCount: 0,
+      issues: [],
+      flaggedIndices: [],
+      isValid: true,
+    };
   }
-  let mismatches = 0;
-  for (let i = 1; i < transactions.length; i++) {
-    const prev = transactions[i - 1];
-    const curr = transactions[i];
-    const expected = Number(prev.balance || 0) + Number(curr.credit || 0) - Number(curr.debit || 0);
-    const actual = Number(curr.balance || 0);
+
+  let mismatchCount = 0;
+  let majorMismatchCount = 0;
+  let minorFixCount = 0;
+  const issues: ExportValidationIssue[] = [];
+  const flagged = new Set<number>();
+
+  for (let index = 1; index < output.length; index += 1) {
+    const prev = output[index - 1];
+    const curr = output[index];
+    const expected = round2(Number(prev.balance || 0) + Number(curr.credit || 0) - Number(curr.debit || 0));
+    const actual = round2(Number(curr.balance || 0));
+
     if (!Number.isFinite(expected) || !Number.isFinite(actual)) {
-      mismatches++;
+      mismatchCount += 1;
+      majorMismatchCount += 1;
+      flagged.add(index);
+      issues.push({
+        index,
+        code: 'balance_major_mismatch',
+        message: 'Running balance contains non-finite values.',
+        severity: 'major',
+      });
       continue;
     }
-    if (Math.abs(expected - actual) > BALANCE_TOLERANCE) {
-      mismatches++;
+
+    const diff = round2(expected - actual);
+    const absDiff = Math.abs(diff);
+
+    if (absDiff === 0) continue;
+
+    mismatchCount += 1;
+    if (absDiff <= BALANCE_TOLERANCE) {
+      curr.balance = expected;
+      minorFixCount += 1;
+      flagged.add(index);
+      issues.push({
+        index,
+        code: 'balance_minor_rounding_fix',
+        message: `Minor rounding correction applied (${diff.toFixed(2)}).`,
+        severity: 'minor',
+      });
+    } else {
+      majorMismatchCount += 1;
+      flagged.add(index);
+      issues.push({
+        index,
+        code: 'balance_major_mismatch',
+        message: `Balance mismatch detected (${diff.toFixed(2)}).`,
+        severity: 'major',
+      });
     }
   }
-  const total = Math.max(1, transactions.length - 1);
-  const mismatchRatio = mismatches / total;
+
+  const total = Math.max(1, output.length - 1);
+  const mismatchRatio = mismatchCount / total;
   return {
+    transactions: output,
     mismatchRatio,
-    mismatchCount: mismatches,
+    mismatchCount,
+    majorMismatchCount,
+    minorFixCount,
+    issues,
+    flaggedIndices: Array.from(flagged.values()).sort((a, b) => a - b),
     isValid: mismatchRatio <= MAX_BALANCE_MISMATCH_RATIO,
   };
 };
@@ -267,6 +418,17 @@ const FORMAT_EXTENSION: Record<ExportFormat, string> = {
 
 const inFlightExportCommits = new Map<string, Promise<ExportCommitResult>>();
 const completedExportCommits = new Map<string, ExportCommitResult>();
+const completedAuditExportIds = new Set<string>();
+
+const hashBytes = async (value: Uint8Array | string): Promise<string> => {
+  const bytes = typeof value === 'string' ? encoder.encode(value) : value;
+  const digestInput = new Uint8Array(bytes.byteLength);
+  digestInput.set(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', digestInput);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+};
 
 const createDeterministicExportId = async (
   sessionId: string,
@@ -373,9 +535,10 @@ export const runStandardizedExportPipeline = async (
     };
   }
 
-  const minConfidence = Number.isFinite(input.minimumConfidenceScore ?? NaN)
+  const configuredThreshold = Number.isFinite(input.minimumConfidenceScore ?? NaN)
     ? Number(input.minimumConfidenceScore)
     : DEFAULT_MIN_CONFIDENCE;
+  const minConfidence = Math.max(0.6, configuredThreshold);
   if (!Array.isArray(input.structuredTransactions) || input.structuredTransactions.length === 0) {
     return {
       ok: false,
@@ -385,7 +548,7 @@ export const runStandardizedExportPipeline = async (
       },
     };
   }
-  if (!Number.isFinite(input.confidenceScore) || input.confidenceScore < minConfidence) {
+  if (!Number.isFinite(input.confidenceScore)) {
     return {
       ok: false,
       error: {
@@ -399,75 +562,64 @@ export const runStandardizedExportPipeline = async (
     };
   }
 
-  const normalized = normalizeTransactions(input.structuredTransactions);
-  if (normalized.length === 0) {
+  const prepared = prepareTransactions(input.structuredTransactions);
+  if (prepared.transactions.length !== input.structuredTransactions.length) {
     return {
       ok: false,
       error: {
-        code: 'EXPORT_NORMALIZATION_FAILED',
-        message: 'Transactions failed normalization checks.',
-      },
-    };
-  }
-
-  for (const row of normalized) {
-    const debit = toNumber(row.debit);
-    const credit = toNumber(row.credit);
-    const balance = toNumber(row.balance);
-    if (!Number.isFinite(debit) || !Number.isFinite(credit) || !Number.isFinite(balance)) {
-      return {
-        ok: false,
-        error: {
-          code: 'EXPORT_NUMERIC_INTEGRITY_FAILED',
-          message: 'Numeric integrity validation failed for debit/credit/balance.',
-        },
-      };
-    }
-  }
-
-  const balanceValidation = validateRunningBalance(normalized);
-  if (!balanceValidation.isValid) {
-    return {
-      ok: false,
-      error: {
-        code: 'EXPORT_BALANCE_VALIDATION_FAILED',
-        message: 'Running balance arithmetic validation failed.',
+        code: 'EXPORT_ZERO_LOSS_FAILED',
+        message: 'Export pipeline dropped rows during preparation.',
         details: {
-          mismatchRatio: balanceValidation.mismatchRatio,
-          mismatchCount: balanceValidation.mismatchCount,
+          inputCount: input.structuredTransactions.length,
+          preparedCount: prepared.transactions.length,
         },
       },
     };
   }
+
+  const balanceValidation = validateAndRepairRunningBalance(prepared.transactions);
+  const normalized = balanceValidation.transactions;
+  const validationIssues: ExportValidationIssue[] = [...prepared.issues, ...balanceValidation.issues];
+  const flaggedIndices = Array.from(new Set<number>([
+    ...prepared.flaggedIndices,
+    ...balanceValidation.flaggedIndices,
+  ].values())).sort((a, b) => a - b);
+
+  const majorIssues = validationIssues.filter((issue) => issue.severity === 'major');
+  const minorIssues = validationIssues.filter((issue) => issue.severity === 'minor');
 
   const fraudFlags = input.fraudFlags ?? [];
   const hasCriticalFraudFlag = fraudFlags.some((flag) => CRITICAL_FRAUD_FLAGS.has(String(flag).toLowerCase()));
-  if (hasCriticalFraudFlag && !input.planAllowsFraudOverride) {
-    return {
-      ok: false,
-      error: {
-        code: 'EXPORT_BLOCKED_CRITICAL_FRAUD_FLAG',
-        message: 'Critical fraud flags detected. Export blocked for current plan.',
-        details: { fraudFlags },
-      },
-    };
-  }
+  const fraudRisk = hasCriticalFraudFlag ? 'high' : fraudFlags.length > 0 ? 'medium' : 'low';
 
   const planCaps = resolvePlanCapabilities(input.userPlan, !!input.planAllowsFraudOverride);
-  if (!planCaps.allowedFormats.has(input.requestedFormat)) {
-    return {
-      ok: false,
-      error: {
-        code: 'EXPORT_PLAN_RESTRICTED_FORMAT',
-        message: `Format '${input.requestedFormat}' is not allowed for current plan.`,
-        details: {
-          requestedFormat: input.requestedFormat,
-          allowedFormats: Array.from(planCaps.allowedFormats.values()),
-          planName: planCaps.planName,
-        },
-      },
-    };
+  let effectiveFormat = input.requestedFormat;
+  const formatFallbackApplied = !planCaps.allowedFormats.has(input.requestedFormat);
+  if (formatFallbackApplied) {
+    if (planCaps.allowedFormats.has('json')) {
+      effectiveFormat = 'json';
+    } else if (planCaps.allowedFormats.has('csv')) {
+      effectiveFormat = 'csv';
+    } else {
+      const firstAllowed = Array.from(planCaps.allowedFormats.values())[0];
+      if (!firstAllowed) {
+        return {
+          ok: false,
+          error: {
+            code: 'EXPORT_PLAN_RESTRICTED_FORMAT',
+            message: `Format '${input.requestedFormat}' is not allowed for current plan.`,
+            details: {
+              requestedFormat: input.requestedFormat,
+              allowedFormats: [],
+              planName: planCaps.planName,
+            },
+          },
+        };
+      }
+      effectiveFormat = firstAllowed;
+    }
   }
+
   if (input.creditsRemainingBefore <= 0 && !input.previewOnly) {
     return {
       ok: false,
@@ -482,43 +634,152 @@ export const runStandardizedExportPipeline = async (
     };
   }
 
-  const metadata: ExportMetadata = {
+  let exportConfidence = Math.max(0, Math.min(1, Number(input.confidenceScore)));
+  if (minorIssues.length > 0) exportConfidence -= 0.08;
+  if (majorIssues.length > 0) exportConfidence -= Math.min(0.35, 0.1 + (majorIssues.length * 0.05));
+  if (fraudFlags.length > 0) exportConfidence -= 0.05;
+  if (fraudRisk === 'high') exportConfidence -= 0.1;
+  exportConfidence = Math.max(0, Math.min(1, round2(exportConfidence)));
+
+  if (exportConfidence <= minConfidence) {
+    return {
+      ok: false,
+      error: {
+        code: 'EXPORT_LOW_CONFIDENCE',
+        message: `Export confidence below threshold (${minConfidence}).`,
+        details: {
+          confidenceScore: input.confidenceScore,
+          exportConfidence,
+          threshold: minConfidence,
+          flaggedTransactions: flaggedIndices.map((index) => ({
+            index,
+            transaction: normalized[index] ?? null,
+            issues: validationIssues
+              .filter((issue) => issue.index === index)
+              .map((issue) => issue.code),
+          })),
+        },
+      },
+    };
+  }
+
+  const warnings: string[] = [];
+  if (formatFallbackApplied) {
+    warnings.push(`Requested format '${input.requestedFormat}' downgraded to '${effectiveFormat}' by plan gate.`);
+  }
+  if (majorIssues.length > 0) {
+    warnings.push(`Detected ${majorIssues.length} major validation issue(s).`);
+  }
+  if (minorIssues.length > 0) {
+    warnings.push(`Applied ${minorIssues.length} minor validation fix(es).`);
+  }
+  if (fraudFlags.length > 0) {
+    warnings.push(`Fraud flags detected (${fraudFlags.length}).`);
+  }
+
+  const fraudMeta = planCaps.allowFraudPreview
+    ? {
+      ...(typeof input.fraudAnalysis === 'object' && input.fraudAnalysis !== null
+        ? input.fraudAnalysis as Record<string, unknown>
+        : {}),
+      fraud_risk: fraudRisk,
+      fraud_flags_count: fraudFlags.length,
+      fraud_flags: fraudFlags,
+      warnings,
+    }
+    : undefined;
+
+  const metadata = {
     bankId: input.bankId,
     exportTimestamp: new Date().toISOString(),
-    confidenceScore: input.confidenceScore,
+    confidenceScore: exportConfidence,
     parseMode: input.parseMode,
     userPlan: planCaps.planName,
-    requestedFormat: input.requestedFormat,
-    fraudAnalysis: planCaps.allowFraudPreview ? input.fraudAnalysis : undefined,
+    requestedFormat: effectiveFormat,
+    fraudAnalysis: fraudMeta,
     analytics: planCaps.allowFoirExport ? input.analytics : undefined,
     bankInfo: input.bankInfo,
-  };
+  } as ExportMetadata;
 
-  const primary = buildForFormat(input.requestedFormat, normalized, metadata, input);
-  const integrity = validateBufferIntegrity(primary, normalized.length);
+  const inputDataHash = await hashBytes(JSON.stringify(normalized.map((tx) => txHash(tx))));
+  let primary = buildForFormat(effectiveFormat, normalized, metadata, input);
+  let integrity = validateBufferIntegrity(primary, normalized.length);
   if (!integrity.ok) {
     return {
       ok: false,
       error: {
         code: 'EXPORT_FILE_INTEGRITY_FAILED',
         message: 'Export artifact failed integrity checks.',
-        details: { reason: integrity.reason, format: input.requestedFormat },
+        details: { reason: integrity.reason, format: effectiveFormat },
       },
     };
   }
 
+  let outputHash = await hashBytes(primary.fileBuffer);
+  const deterministicCandidate = buildForFormat(effectiveFormat, normalized, metadata, input);
+  const deterministicIntegrity = validateBufferIntegrity(deterministicCandidate, normalized.length);
+  if (!deterministicIntegrity.ok) {
+    return {
+      ok: false,
+      error: {
+        code: 'EXPORT_FILE_INTEGRITY_FAILED',
+        message: 'Rebuild integrity check failed.',
+        details: { reason: deterministicIntegrity.reason, format: effectiveFormat },
+      },
+    };
+  }
+  const deterministicHash = await hashBytes(deterministicCandidate.fileBuffer);
+  if (outputHash !== deterministicHash) {
+    const finalCandidate = buildForFormat(effectiveFormat, normalized, metadata, input);
+    const finalIntegrity = validateBufferIntegrity(finalCandidate, normalized.length);
+    if (!finalIntegrity.ok) {
+      return {
+        ok: false,
+        error: {
+          code: 'EXPORT_FILE_INTEGRITY_FAILED',
+          message: 'File hash mismatch and rebuild failed.',
+          details: { reason: finalIntegrity.reason, format: effectiveFormat },
+        },
+      };
+    }
+    const finalHash = await hashBytes(finalCandidate.fileBuffer);
+    if (finalHash !== deterministicHash) {
+      return {
+        ok: false,
+        error: {
+          code: 'EXPORT_FILE_HASH_MISMATCH',
+          message: 'Export artifact hash mismatch after rebuild.',
+          details: {
+            format: effectiveFormat,
+            inputDataHash,
+            firstHash: outputHash,
+            secondHash: deterministicHash,
+            thirdHash: finalHash,
+          },
+        },
+      };
+    }
+    primary = finalCandidate;
+    integrity = finalIntegrity;
+    outputHash = finalHash;
+  }
+
   console.log('EXPORT_METRIC', {
     stage: 'post_build_integrity',
-    format: input.requestedFormat,
+    format: effectiveFormat,
     plan: planCaps.planName,
     rowCount: primary.rowCount,
     fileSize: integrity.size,
+    inputHash: inputDataHash,
+    outputHash,
+    fraudRisk,
+    issues: validationIssues.length,
     fps: primary.rowCount > 0 ? Number((primary.rowCount / Math.max(1, integrity.size / 1024)).toFixed(4)) : 0,
   });
 
   const exportId =
     input.exportId ??
-    await createDeterministicExportId(input.sessionId, input.requestedFormat, primary.rowCount, integrity.size);
+    await createDeterministicExportId(input.sessionId, effectiveFormat, primary.rowCount, integrity.size);
 
   let downloadPrep = await input.prepareDownload(primary);
   if (!downloadPrep || (downloadPrep.fileSize ?? 0) <= 0) {
@@ -540,7 +801,7 @@ export const runStandardizedExportPipeline = async (
           exportId,
           sessionId: input.sessionId,
           timestamp,
-          format: input.requestedFormat,
+          format: effectiveFormat,
           planName: planCaps.planName,
           rowCount: primary.rowCount,
           fileSize: downloadPrep.fileSize,
@@ -582,7 +843,7 @@ export const runStandardizedExportPipeline = async (
   }
 
   const compatibility: Partial<Record<'xlsx' | 'csv' | 'json' | 'mt940', ExportPreparedArtifact>> = {};
-  if (input.includeCompatibilityBundle !== false) {
+  if (input.includeCompatibilityBundle === true) {
     const baseFormats: Array<'xlsx' | 'csv' | 'json' | 'mt940'> = ['xlsx', 'csv', 'json', 'mt940'];
     for (const format of baseFormats) {
       if (!planCaps.allowedFormats.has(format)) continue;
@@ -594,26 +855,29 @@ export const runStandardizedExportPipeline = async (
     }
   }
 
-  await input.auditExport({
-    exportId,
-    planName: planCaps.planName,
-    creditsUsed: input.previewOnly ? 0 : 1,
-    timestamp: new Date().toISOString(),
-    format: input.requestedFormat,
-    rowCount: primary.rowCount,
-    fileSize: downloadPrep.fileSize,
-    status: 'success',
-    sessionId: input.sessionId,
-  });
+  if (!completedAuditExportIds.has(exportId)) {
+    await input.auditExport({
+      exportId,
+      planName: planCaps.planName,
+      creditsUsed: input.previewOnly ? 0 : 1,
+      timestamp: new Date().toISOString(),
+      format: effectiveFormat,
+      rowCount: primary.rowCount,
+      fileSize: downloadPrep.fileSize,
+      status: 'success',
+      sessionId: input.sessionId,
+    });
+    completedAuditExportIds.add(exportId);
+  }
 
   return {
     ok: true,
     exportId,
     downloadUrl: downloadPrep.downloadUrl,
-    format: input.requestedFormat,
+    format: effectiveFormat,
     rowCount: primary.rowCount,
     fileSize: downloadPrep.fileSize,
-    confidenceScore: input.confidenceScore,
+    confidenceScore: exportConfidence,
     parseMode: input.parseMode,
     planName: planCaps.planName,
     creditsRemaining,

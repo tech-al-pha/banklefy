@@ -274,12 +274,18 @@ const extractAmountsWithDashPlaceholders = (
 };
 
 const ROW_START_PATTERN_SINGLE = /^(\d{2}[/-]\d{2}[/-]\d{4})\s+(.+)$/;
-const extractPdfTextTransactionsFromBytes = async (
+
+type ExtractPdfTextOptions = {
+  allowSingleDate?: boolean;
+  pageStart?: number;
+  pageEnd?: number;
+  pdfDocument?: PdfDocumentProxy;
+};
+
+const loadPdfDocumentFromBytes = async (
   bytes: Uint8Array,
   password?: string,
-  options?: { allowSingleDate?: boolean },
-): Promise<{ transactions: RawTransaction[]; text: string }> => {
-  if (!bytes || bytes.length === 0) return { transactions: [], text: '' };
+): Promise<PdfDocumentProxy> => {
   const pdfjsLib = (await import('https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs')) as PdfJsModule;
   const loadingTask = pdfjsLib.getDocument({
     data: bytes,
@@ -288,36 +294,59 @@ const extractPdfTextTransactionsFromBytes = async (
     isEvalSupported: false,
     useSystemFonts: true,
   });
-  const pdf = (await loadingTask.promise) as PdfDocumentProxy;
+  return (await loadingTask.promise) as PdfDocumentProxy;
+};
 
-  const rows: Array<RawTransaction & { _descriptionParts: string[] }> = [];
-  let current: (RawTransaction & { _descriptionParts: string[] }) | null = null;
-  const allLines: string[] = [];
-  const allLineEntries: LineEntry[] = [];
-
-  const flushCurrent = () => {
-    if (!current) return;
-    if (!current.date || (!current.debit && !current.credit && !current.balance)) {
-      current = null;
-      return;
-    }
-    current.description = current._descriptionParts.join(' ').replace(/\s+/g, ' ').trim();
-    rows.push(current);
-    current = null;
-  };
-
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
-    const page = await pdf.getPage(pageNum);
-    const textContent = await page.getTextContent?.();
-    const lineEntries = groupTokensIntoLines((textContent?.items || []) as Array<Record<string, unknown>>);
-    allLineEntries.push(...lineEntries);
-    allLines.push(...lineEntries.map((entry) => entry.text));
+const detectPdfTotalPagesFromBytes = async (bytes: Uint8Array, password?: string): Promise<number> => {
+  if (!bytes || bytes.length === 0) return 0;
+  const pdf = await loadPdfDocumentFromBytes(bytes, password);
+  try {
+    return Number(pdf.numPages || 0);
+  } finally {
+    await pdf.destroy?.();
   }
+};
 
-  const amountCenters = detectAmountColumns(allLineEntries);
+const extractPdfTextTransactionsFromBytes = async (
+  bytes: Uint8Array,
+  password?: string,
+  options?: ExtractPdfTextOptions,
+): Promise<{ transactions: RawTransaction[]; text: string }> => {
+  if ((!bytes || bytes.length === 0) && !options?.pdfDocument) return { transactions: [], text: '' };
+  const shouldDestroyPdf = !options?.pdfDocument;
+  const pdf = options?.pdfDocument ?? await loadPdfDocumentFromBytes(bytes, password);
 
-  for (const entry of allLineEntries) {
-    const line = entry.text;
+  try {
+    const rows: Array<RawTransaction & { _descriptionParts: string[] }> = [];
+    let current: (RawTransaction & { _descriptionParts: string[] }) | null = null;
+    const allLines: string[] = [];
+    const allLineEntries: LineEntry[] = [];
+
+    const flushCurrent = () => {
+      if (!current) return;
+      if (!current.date || (!current.debit && !current.credit && !current.balance)) {
+        current = null;
+        return;
+      }
+      current.description = current._descriptionParts.join(' ').replace(/\s+/g, ' ').trim();
+      rows.push(current);
+      current = null;
+    };
+
+    const startPage = Math.max(1, Math.min(pdf.numPages, options?.pageStart ?? 1));
+    const endPage = Math.max(startPage, Math.min(pdf.numPages, options?.pageEnd ?? pdf.numPages));
+    for (let pageNum = startPage; pageNum <= endPage; pageNum += 1) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent?.();
+      const lineEntries = groupTokensIntoLines((textContent?.items || []) as Array<Record<string, unknown>>);
+      allLineEntries.push(...lineEntries);
+      allLines.push(...lineEntries.map((entry) => entry.text));
+    }
+
+    const amountCenters = detectAmountColumns(allLineEntries);
+
+    for (const entry of allLineEntries) {
+      const line = entry.text;
       if (isNoiseLine(line)) continue;
 
       let rowStart = line.match(ROW_START_PATTERN);
@@ -366,16 +395,189 @@ const extractPdfTextTransactionsFromBytes = async (
       }
 
       current._descriptionParts.push(line);
+    }
+
+    flushCurrent();
+
+    const transactions = rows
+      .filter((row) => row.date && row.description && Number.isFinite(row.balance as number))
+      .map(({ _descriptionParts, ...rest }) => rest);
+
+    return { transactions, text: allLines.join('\n') };
+  } finally {
+    if (shouldDestroyPdf) {
+      await pdf.destroy?.();
+    }
+  }
+};
+
+const extractDeterministicPdfTransactions = async ({
+  bytes,
+  password,
+  totalPages,
+  useChunkMode,
+  allowSingleDate,
+}: {
+  bytes: Uint8Array;
+  password?: string;
+  totalPages: number;
+  useChunkMode: boolean;
+  allowSingleDate?: boolean;
+}): Promise<{ transactions: RawTransaction[]; text: string; chunked: boolean; chunksProcessed: number }> => {
+  if (!useChunkMode) {
+    const parsed = await extractPdfTextTransactionsFromBytes(bytes, password, { allowSingleDate });
+    return {
+      transactions: parsed.transactions,
+      text: parsed.text,
+      chunked: false,
+      chunksProcessed: 1,
+    };
   }
 
-  flushCurrent();
-  await pdf.destroy?.();
+  const canonicalTransactions: RawTransaction[] = [];
+  const textParts: string[] = [];
+  let chunksProcessed = 0;
 
-  const transactions = rows
-    .filter((row) => row.date && row.description && Number.isFinite(row.balance as number))
-    .map(({ _descriptionParts, ...rest }) => rest);
+  const pdf = await loadPdfDocumentFromBytes(bytes, password);
+  try {
+    const cappedTotalPages = Math.max(0, Math.min(pdf.numPages, totalPages));
+    for (let start = 0; start < cappedTotalPages; start += CHUNK_SIZE) {
+      const end = Math.min(start + CHUNK_SIZE, cappedTotalPages);
+      let parsedChunk: { transactions: RawTransaction[]; text: string } | null =
+        await extractPdfTextTransactionsFromBytes(bytes, password, {
+          allowSingleDate,
+          pageStart: start + 1,
+          pageEnd: end,
+          pdfDocument: pdf,
+        });
 
-  return { transactions, text: allLines.join('\n') };
+      if (parsedChunk.transactions.length > 0) {
+        canonicalTransactions.push(...parsedChunk.transactions);
+      }
+      let chunkText: string | null = parsedChunk.text || null;
+      if (chunkText) {
+        textParts.push(chunkText);
+      }
+      chunksProcessed += 1;
+
+      // Memory safety: release per-chunk intermediates immediately.
+      chunkText = null;
+      parsedChunk = null;
+    }
+  } finally {
+    await pdf.destroy?.();
+  }
+
+  return {
+    transactions: canonicalTransactions,
+    text: textParts.join('\n'),
+    chunked: true,
+    chunksProcessed,
+  };
+};
+
+type SelectiveOcrPagePlan = {
+  selected: Array<{ pageNumber: number; imageDataUrl: string }>;
+  totalProvidedPages: number;
+  reasons: string[];
+  pageDiagnostics: Array<{
+    pageNumber: number;
+    rows: number;
+    useDeterministic: boolean;
+    mismatchRatio: number;
+    anomalyRate: number;
+    needsOcr: boolean;
+  }>;
+};
+
+const buildSelectiveOcrPagePlan = async ({
+  bytes,
+  password,
+  totalPages,
+  pageImages,
+}: {
+  bytes: Uint8Array;
+  password?: string;
+  totalPages: number;
+  pageImages: string[];
+}): Promise<SelectiveOcrPagePlan> => {
+  const totalProvidedPages = Array.isArray(pageImages) ? pageImages.length : 0;
+  const fallbackAll = pageImages.map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }));
+  const reasons: string[] = [];
+
+  if (!bytes || bytes.length === 0 || totalProvidedPages === 0) {
+    reasons.push('no_pdf_bytes_or_page_images');
+    return {
+      selected: fallbackAll,
+      totalProvidedPages,
+      reasons,
+      pageDiagnostics: [],
+    };
+  }
+
+  const lastPage = Math.max(0, Math.min(totalPages, totalProvidedPages));
+  if (lastPage === 0) {
+    reasons.push('no_pages_to_process');
+    return {
+      selected: [],
+      totalProvidedPages,
+      reasons,
+      pageDiagnostics: [],
+    };
+  }
+
+  const diagnostics: SelectiveOcrPagePlan['pageDiagnostics'] = [];
+  const selectedIndexes = new Set<number>();
+  const pdf = await loadPdfDocumentFromBytes(bytes, password);
+  try {
+    for (let pageNumber = 1; pageNumber <= lastPage; pageNumber += 1) {
+      const singlePage = await extractPdfTextTransactionsFromBytes(bytes, password, {
+        pageStart: pageNumber,
+        pageEnd: pageNumber,
+        pdfDocument: pdf,
+      });
+      const assessment = assessClientPdfParsedTransactions(singlePage.transactions, 1);
+      const sparseRows = singlePage.transactions.length < 2;
+      const needsOcr =
+        sparseRows ||
+        !assessment.useDeterministic ||
+        assessment.mismatchRatio >= 0.22 ||
+        assessment.anomalyRate >= 0.2;
+
+      diagnostics.push({
+        pageNumber,
+        rows: singlePage.transactions.length,
+        useDeterministic: assessment.useDeterministic,
+        mismatchRatio: assessment.mismatchRatio,
+        anomalyRate: assessment.anomalyRate,
+        needsOcr,
+      });
+
+      if (needsOcr) {
+        selectedIndexes.add(pageNumber - 1);
+      }
+    }
+  } finally {
+    await pdf.destroy?.();
+  }
+
+  if (selectedIndexes.size === 0) {
+    reasons.push('all_pages_deterministic_stable_using_first_page_guard');
+    selectedIndexes.add(0);
+  }
+
+  const selected = Array.from(selectedIndexes.values())
+    .sort((a, b) => a - b)
+    .map((index) => ({ pageNumber: index + 1, imageDataUrl: pageImages[index] }))
+    .filter((entry) => typeof entry.imageDataUrl === 'string' && entry.imageDataUrl.length > 0);
+
+  reasons.push(`selected_${selected.length}_of_${totalProvidedPages}`);
+  return {
+    selected: selected.length > 0 ? selected : fallbackAll,
+    totalProvidedPages,
+    reasons,
+    pageDiagnostics: diagnostics,
+  };
 };
 
 const extractHeaderHints = (text: string): string => {
@@ -501,17 +703,63 @@ const attemptGroqTextRescue = async (
 
     if (!groqResponse.ok) return { rows: null, tokenUsage: 0, rescueConfidence: 0 };
     const groqData = await groqResponse.json();
-    const responseText = groqData.choices?.[0]?.message?.content || '';
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return { rows: null, tokenUsage: Number(groqData?.usage?.total_tokens || 0), rescueConfidence: 0 };
-    const parsed = JSON.parse(jsonMatch[0]) as RawTransaction[];
+    const responseText = String(groqData.choices?.[0]?.message?.content || '').trim();
+    const tokenUsage = Number(groqData?.usage?.total_tokens || 0);
+
+    const tryParseRows = (candidate: string): RawTransaction[] | null => {
+      try {
+        const parsed = JSON.parse(candidate);
+        return Array.isArray(parsed) ? (parsed as RawTransaction[]) : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const tryRepairTruncatedArray = (candidate: string): RawTransaction[] | null => {
+      const start = candidate.indexOf('[');
+      if (start < 0) return null;
+      let repaired = candidate.slice(start);
+
+      if (!repaired.includes(']')) {
+        const lastComplete = Math.max(repaired.lastIndexOf('},'), repaired.lastIndexOf('}'));
+        if (lastComplete > 0) {
+          repaired = repaired.slice(0, lastComplete + 1);
+        }
+        repaired = repaired.replace(/,\s*$/, '');
+        repaired = `${repaired}]`;
+      }
+
+      const openBraces = (repaired.match(/\{/g) || []).length;
+      const closeBraces = (repaired.match(/\}/g) || []).length;
+      if (openBraces > closeBraces) {
+        repaired += '}'.repeat(openBraces - closeBraces);
+      }
+
+      return tryParseRows(repaired);
+    };
+
+    const candidates: string[] = [];
+    const markdownMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (markdownMatch?.[1]) candidates.push(markdownMatch[1].trim());
+    const jsonArrayMatch = responseText.match(/\[[\s\S]*\]/);
+    if (jsonArrayMatch?.[0]) candidates.push(jsonArrayMatch[0].trim());
+    candidates.push(responseText);
+
+    let parsed: RawTransaction[] | null = null;
+    for (const candidate of candidates) {
+      parsed = tryParseRows(candidate);
+      if (parsed) break;
+      parsed = tryRepairTruncatedArray(candidate);
+      if (parsed) break;
+    }
+    if (!parsed) return { rows: null, tokenUsage, rescueConfidence: 0 };
     const normalized = normalizeRawTransactions(parsed);
     const flow = scoreRunningBalanceFlow(normalized);
     const mismatch = flow.total > 0 ? flow.mismatchRatio : 1;
     const rescueConfidence = clamp01(1 - mismatch);
     return {
       rows: normalized.length > 0 ? normalized : null,
-      tokenUsage: Number(groqData?.usage?.total_tokens || 0),
+      tokenUsage,
       rescueConfidence,
     };
   } catch {
@@ -615,6 +863,9 @@ const applyOcrPostParseAdjustments = (rows: RawTransaction[]): { rows: RawTransa
 };
 
 const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
+const GLOBAL_PDF_PAGE_CAP = 50;
+const CHUNK_THRESHOLD = 10;
+const CHUNK_SIZE = 5;
 const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
 const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${30 * 1024 * 1024}`); // 30MB
@@ -627,7 +878,7 @@ const normalizeDualOcrMode = (value: string | undefined): DualOcrMode => {
   if (mode === 'off' || mode === 'always' || mode === 'smart') return mode;
   return 'smart';
 };
-const OCR_DUAL_PROVIDER_MODE = normalizeDualOcrMode(Deno.env.get('OCR_DUAL_PROVIDER_MODE'));
+const OCR_DUAL_PROVIDER_MODE = normalizeDualOcrMode(Deno.env.get('OCR_DUAL_PROVIDER_MODE') ?? 'off');
 const OCR_SINGLE_PASS_ONLY = (Deno.env.get('OCR_SINGLE_PASS_ONLY') ?? 'true')
   .trim()
   .toLowerCase() !== 'false';
@@ -661,16 +912,17 @@ const PDF_DETERMINISTIC_FAST_PATH_MAX_MISMATCH = Math.max(
 );
 const DETERMINISTIC_CONFIDENCE_THRESHOLD = Math.max(
   0,
-  Math.min(1, Number(Deno.env.get('DETERMINISTIC_CONFIDENCE_THRESHOLD') ?? '0.9')),
+  Math.min(1, Number(Deno.env.get('DETERMINISTIC_CONFIDENCE_THRESHOLD') ?? '0.80')),
 );
 const OCR_ACCEPTABLE_CONFIDENCE_THRESHOLD = Math.max(
   0,
   Math.min(1, Number(Deno.env.get('OCR_ACCEPTABLE_CONFIDENCE_THRESHOLD') ?? '0.75')),
 );
 const AI_RESCUE_ENABLED = (Deno.env.get('AI_RESCUE_ENABLED') ?? 'true').trim().toLowerCase() !== 'false';
-const AI_RESCUE_MIN_ROWS = Math.max(3, Number(Deno.env.get('AI_RESCUE_MIN_ROWS') ?? '6'));
+const AI_RESCUE_MAX_ROWS = Math.max(1, Number(Deno.env.get('AI_RESCUE_MAX_ROWS') ?? '4'));
 const AI_RESCUE_MIN_MISMATCH = Math.max(0, Math.min(1, Number(Deno.env.get('AI_RESCUE_MIN_MISMATCH') ?? '0.18')));
 const AI_RESCUE_MIN_TEXT_CHARS = Math.max(200, Number(Deno.env.get('AI_RESCUE_MIN_TEXT_CHARS') ?? '1200'));
+const ENABLE_STAGE_6B_AUTO_REPROCESS = false;
 const EXPECTED_TEXT_TOTAL_MS = Math.max(500, Number(Deno.env.get('EXPECTED_TEXT_TOTAL_MS') ?? '3500'));
 const EXPECTED_OCR_TOTAL_MS = Math.max(1500, Number(Deno.env.get('EXPECTED_OCR_TOTAL_MS') ?? '14000'));
 const EXPECTED_AI_TOTAL_MS = Math.max(2500, Number(Deno.env.get('EXPECTED_AI_TOTAL_MS') ?? '18000'));
@@ -715,6 +967,28 @@ type ConfidenceBreakdown = {
 };
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
+
+const isPdfPasswordError = (error: unknown): boolean => {
+  const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    msg.includes('password') ||
+    msg.includes('encrypted') ||
+    msg.includes('need a password') ||
+    msg.includes('incorrect password') ||
+    msg.includes('passwordexception')
+  );
+};
+
+const toBase64FromBytes = (bytes: Uint8Array): string => {
+  if (!bytes || bytes.length === 0) return '';
+  const chunkSize = 8192;
+  let result = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    result += String.fromCharCode(...chunk);
+  }
+  return btoa(result);
+};
 
 const decodePdfSegment = (bytes: Uint8Array, maxBytes = 300_000): string => {
   if (!bytes || bytes.length === 0) return '';
@@ -2202,7 +2476,44 @@ Deno.serve(async (req) => {
     // Validate magic bytes
     const lowerFileName = fileName.toLowerCase();
     const isPdf = lowerFileName.endsWith('.pdf');
-    const pageCount = hasPdfPageImages ? (pdfPageImages as string[]).length : 1;
+    let pageCount = hasPdfPageImages ? (pdfPageImages as string[]).length : 1;
+    if (isPdf && bytes.length > 0) {
+      try {
+        const detectedPageCount = await detectPdfTotalPagesFromBytes(bytes, pdfPassword);
+        if (Number.isFinite(detectedPageCount) && detectedPageCount > 0) {
+          pageCount = detectedPageCount;
+        }
+      } catch (pageCountError) {
+        if (isPdfPasswordError(pageCountError)) {
+          const hasPassword = typeof pdfPassword === 'string' && pdfPassword.trim().length > 0;
+          return new Response(
+            JSON.stringify({
+              error: hasPassword ? 'INVALID_PASSWORD' : 'PASSWORD_REQUIRED',
+              message: hasPassword
+                ? 'Incorrect password. Please try again.'
+                : 'This PDF is password protected. Please enter the password to continue.',
+              requiresPassword: true,
+              status: hasPassword ? 'invalid_password' : 'password_required',
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+        console.warn('Failed to detect total PDF pages from bytes:', pageCountError);
+      }
+    }
+
+    if (isPdf && pageCount > GLOBAL_PDF_PAGE_CAP) {
+      return new Response(
+        JSON.stringify({
+          code: 'PAGE_LIMIT_EXCEEDED',
+          message: 'Maximum 50 pages allowed per document.',
+          error: 'Maximum 50 pages allowed per document.',
+        }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const useChunkMode = isPdf && bytes.length > 0 && pageCount > CHUNK_THRESHOLD;
     if (isPdf) {
       // If client provided page images, we might not have original PDF bytes.
       if (bytes.length > 0 && (bytes[0] !== 0x25 || bytes[1] !== 0x50 || bytes[2] !== 0x44 || bytes[3] !== 0x46)) {
@@ -2239,6 +2550,8 @@ Deno.serve(async (req) => {
       pageCount,
       isPdf,
       hasPdfPageImages,
+      chunkMode: useChunkMode,
+      chunkSize: useChunkMode ? CHUNK_SIZE : undefined,
     };
 
     // ============= USAGE LIMITS ENFORCEMENT =============
@@ -2386,15 +2699,49 @@ Deno.serve(async (req) => {
     ) {
       try {
         const textStart = Date.now();
-        const serverParsed = await extractPdfTextTransactionsFromBytes(bytes, pdfPassword);
+        const serverParsed = await extractDeterministicPdfTransactions({
+          bytes,
+          password: pdfPassword,
+          totalPages: pageCount,
+          useChunkMode,
+        });
         timing.text_extract_ms += Date.now() - textStart;
         if (serverParsed.text) extractedText = serverParsed.text;
         serverParsedTransactions = serverParsed.transactions;
         if (serverParsedTransactions.length > 0) {
           console.log(`Server text parse extracted ${serverParsedTransactions.length} transactions.`);
         }
+        pipelineDiagnostics.deterministicChunking = {
+          ok: true,
+          enabled: serverParsed.chunked,
+          chunkSize: serverParsed.chunked ? CHUNK_SIZE : undefined,
+          chunksProcessed: serverParsed.chunksProcessed,
+          totalPages: pageCount,
+          extractedRows: serverParsedTransactions.length,
+        };
       } catch (error) {
+        if (isPdfPasswordError(error)) {
+          const hasPassword = typeof pdfPassword === 'string' && pdfPassword.trim().length > 0;
+          return new Response(
+            JSON.stringify({
+              error: hasPassword ? 'INVALID_PASSWORD' : 'PASSWORD_REQUIRED',
+              message: hasPassword
+                ? 'Incorrect password. Please try again.'
+                : 'This PDF is password protected. Please enter the password to continue.',
+              requiresPassword: true,
+              status: hasPassword ? 'invalid_password' : 'password_required',
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
         console.error('Server text extraction failed:', error);
+        pipelineDiagnostics.deterministicChunking = {
+          ok: false,
+          enabled: useChunkMode,
+          chunkSize: useChunkMode ? CHUNK_SIZE : undefined,
+          totalPages: pageCount,
+          error: sanitizeError(error),
+        };
       }
     }
 
@@ -2504,7 +2851,11 @@ Deno.serve(async (req) => {
         templateSelectedId = template.id;
         try {
           const templateStart = Date.now();
-          const templateReparse = await extractPdfTextTransactionsFromBytes(bytes, pdfPassword, {
+          const templateReparse = await extractDeterministicPdfTransactions({
+            bytes,
+            password: pdfPassword,
+            totalPages: pageCount,
+            useChunkMode,
             allowSingleDate: true,
           });
           timing.template_recheck_ms += Date.now() - templateStart;
@@ -2524,6 +2875,9 @@ Deno.serve(async (req) => {
               clientParsedTransactions = templateReparse.transactions;
               clientPdfParseAssessment = reparseAssessment;
               templateSingleDateUsed = true;
+              if (!extractedText && templateReparse.text) {
+                extractedText = templateReparse.text;
+              }
             }
           }
         } catch (error) {
@@ -2537,8 +2891,8 @@ Deno.serve(async (req) => {
       bankId: templateSelectedId ?? bankDetection.bankId,
       headerConfidenceHint: bankDetection.detectionConfidence,
     });
-    const deterministicConfidence = deterministicConfidenceBreakdown.score;
-    const deterministicConfidenceHigh = deterministicConfidence >= DETERMINISTIC_CONFIDENCE_THRESHOLD;
+    const internalGateConfidence = deterministicConfidenceBreakdown.score;
+    const deterministicConfidenceHigh = internalGateConfidence >= DETERMINISTIC_CONFIDENCE_THRESHOLD;
     const preferDeterministicFastPath =
       PDF_DETERMINISTIC_FAST_PATH_ENABLED &&
       isPdf &&
@@ -2550,7 +2904,7 @@ Deno.serve(async (req) => {
     );
     if (clientParsedTransactions.length > 0) {
       console.log(
-        `Deterministic confidence=${deterministicConfidence.toFixed(3)} (parse=${deterministicConfidenceBreakdown.parseSuccessRatio.toFixed(3)}, date=${deterministicConfidenceBreakdown.dateContinuityScore.toFixed(3)}, balance=${deterministicConfidenceBreakdown.balanceValidationScore.toFixed(3)}).`,
+        `Deterministic confidence=${internalGateConfidence.toFixed(3)} (parse=${deterministicConfidenceBreakdown.parseSuccessRatio.toFixed(3)}, date=${deterministicConfidenceBreakdown.dateContinuityScore.toFixed(3)}, balance=${deterministicConfidenceBreakdown.balanceValidationScore.toFixed(3)}).`,
       );
     }
     pipelineDiagnostics.confidenceScoring = {
@@ -2563,17 +2917,20 @@ Deno.serve(async (req) => {
       clientParsedTransactions.length > 0 &&
       (
         deterministicConfidenceHigh ||
+        clientPdfParseAssessment.useDeterministic ||
         (mustUseDeterministicClientPdf && !hasPdfPageImages) ||
         (preferDeterministicFastPath && deterministicConfidenceHigh)
       ) &&
-      (!forceOcrForDenseStatement || deterministicConfidenceHigh || (mustUseDeterministicClientPdf && !hasPdfPageImages));
+      (deterministicConfidenceHigh || !forceOcrForDenseStatement || (mustUseDeterministicClientPdf && !hasPdfPageImages));
     let processedVia: 'deterministic' | 'ocr' | 'ai_rescue' = 'ocr';
-    let finalConfidenceScore = deterministicConfidence;
+    // UI-facing confidence can differ from internal gate confidence.
+    let finalConfidenceScore = internalGateConfidence;
     let finalErrorFlags = [...deterministicConfidenceBreakdown.errorFlags];
     let aiUsed = false;
     pipelineDiagnostics.decisionGate = {
       ok: true,
-      confidenceScore: deterministicConfidence,
+      internalGateConfidence,
+      confidenceScore: internalGateConfidence,
       threshold: DETERMINISTIC_CONFIDENCE_THRESHOLD,
       skipOcr: canUseDeterministicClientPdf,
     };
@@ -2596,7 +2953,7 @@ Deno.serve(async (req) => {
     if (isPdf && clientParsedTransactions.length > 0 && !canUseDeterministicClientPdf) {
       console.log(
         `Ignoring deterministic client PDF rows (${clientParsedTransactions.length}) and falling back to OCR: ${clientPdfParseAssessment.reason} ` +
-          `(confidence=${deterministicConfidence.toFixed(3)}, mismatch=${clientPdfParseAssessment.mismatchRatio.toFixed(3)}, anomaly=${clientPdfParseAssessment.anomalyRate.toFixed(3)}, dense=${forceOcrForDenseStatement})`,
+          `(confidence=${internalGateConfidence.toFixed(3)}, mismatch=${clientPdfParseAssessment.mismatchRatio.toFixed(3)}, anomaly=${clientPdfParseAssessment.anomalyRate.toFixed(3)}, dense=${forceOcrForDenseStatement})`,
       );
     }
 
@@ -2629,6 +2986,9 @@ Deno.serve(async (req) => {
     let pagesWithData = 1;
     const deterministicDataset = clientParsedTransactions.map((row) => ({ ...row }));
     let ocrDataset: RawTransaction[] = [];
+    let selectedOcrPages: Array<{ pageNumber: number; imageDataUrl: string }> = Array.isArray(pdfPageImages)
+      ? (pdfPageImages as string[]).map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }))
+      : [];
 
     if (canUseDeterministicClientPdf) {
       console.log(`Using deterministic client PDF text extraction: ${clientParsedTransactions.length} transactions`);
@@ -2666,14 +3026,39 @@ Deno.serve(async (req) => {
       let strictRetryCount = 0;
       let dualProviderCount = 0;
       const effectiveStrictMode = OCR_SINGLE_PASS_ONLY ? 'off' : adaptiveOcrStrategy.strictMode;
-      const effectiveStrictMaxPages = OCR_SINGLE_PASS_ONLY ? 0 : adaptiveOcrStrategy.strictMaxPages;
-      const effectiveDualMode = OCR_SINGLE_PASS_ONLY ? 'off' : adaptiveOcrStrategy.dualMode;
-      const effectiveDualMaxPages = OCR_SINGLE_PASS_ONLY ? 0 : adaptiveOcrStrategy.dualMaxPages;
+      const effectiveStrictMaxPages = OCR_SINGLE_PASS_ONLY ? 0 : Math.min(1, adaptiveOcrStrategy.strictMaxPages);
+      // Lean mode: single OCR provider only.
+      const effectiveDualMode: DualOcrMode = 'off';
+      const effectiveDualMaxPages = 0;
       const useStrictFirstPass = !OCR_SINGLE_PASS_ONLY &&
         OCR_WORKER_MODE !== 'primary' &&
         adaptiveOcrStrategy.strictFirstPass;
 
-      for (const img of pdfPageImages as string[]) {
+      try {
+        const ocrPagePlan = await buildSelectiveOcrPagePlan({
+          bytes,
+          password: pdfPassword,
+          totalPages: pageCount,
+          pageImages: pdfPageImages as string[],
+        });
+        selectedOcrPages = ocrPagePlan.selected;
+        pipelineDiagnostics.ocrStage = {
+          ok: true,
+          skipped: false,
+          totalProvidedPages: ocrPagePlan.totalProvidedPages,
+          selectedPages: selectedOcrPages.map((entry) => entry.pageNumber),
+          selectionReasons: ocrPagePlan.reasons,
+          pageDiagnostics: ocrPagePlan.pageDiagnostics,
+        };
+        console.log(
+          `Selective OCR plan: selected ${selectedOcrPages.length}/${ocrPagePlan.totalProvidedPages} page(s)`,
+        );
+      } catch (planError) {
+        console.error('Selective OCR page planning failed, falling back to all provided pages:', planError);
+      }
+
+      for (const pageEntry of selectedOcrPages) {
+        const img = pageEntry.imageDataUrl;
         if (typeof img !== 'string') continue;
         const match = img.match(/^data:([^;]+);base64,(.+)$/);
         if (!match) continue;
@@ -2758,8 +3143,7 @@ Deno.serve(async (req) => {
       };
       ocrDataset = collected.map((row) => ({ ...row }));
       pipelineDiagnostics.ocrStage = {
-        ok: true,
-        skipped: false,
+        ...(pipelineDiagnostics.ocrStage || { ok: true, skipped: false }),
         pagesWithData,
         extractedRows: collected.length,
         strictRetryCount,
@@ -2781,13 +3165,7 @@ Deno.serve(async (req) => {
       }
     } else {
       // Convert bytes to base64 for OCR
-      const chunkSize = 8192;
-      let base64Data = '';
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        const chunk = bytes.subarray(i, i + chunkSize);
-        base64Data += String.fromCharCode(...chunk);
-      }
-      base64Data = btoa(base64Data);
+      const base64Data = toBase64FromBytes(bytes);
 
       const mimeType = isPdf ? 'application/pdf' :
         lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
@@ -2824,6 +3202,7 @@ Deno.serve(async (req) => {
 
     // Stage 6b: auto reprocess low-confidence rows (strict OCR) only when needed.
     if (
+      ENABLE_STAGE_6B_AUTO_REPROCESS &&
       isPdf &&
       hasPdfPageImages &&
       !OCR_SINGLE_PASS_ONLY &&
@@ -2849,7 +3228,8 @@ Deno.serve(async (req) => {
         const start = Date.now();
         const reprocessCollected: RawTransaction[] = [];
         let combinedText = '';
-        for (const img of pdfPageImages as string[]) {
+        for (const pageEntry of selectedOcrPages) {
+          const img = pageEntry.imageDataUrl;
           if (typeof img !== 'string') continue;
           const match = img.match(/^data:([^;]+);base64,(.+)$/);
           if (!match) continue;
@@ -3029,8 +3409,10 @@ Deno.serve(async (req) => {
 
     const shouldAttemptAiRescue =
       AI_RESCUE_ENABLED &&
+      processedVia !== 'deterministic' &&
       extractedText &&
-      rawTransactions.length >= AI_RESCUE_MIN_ROWS &&
+      rawTransactions.length > 0 &&
+      rawTransactions.length <= AI_RESCUE_MAX_ROWS &&
       finalConfidenceScore < OCR_ACCEPTABLE_CONFIDENCE_THRESHOLD &&
       finalErrorFlags.some((flag) => [
         'low_row_parse_rate',
@@ -3426,7 +3808,7 @@ Deno.serve(async (req) => {
         totalDebits,
         netFlow,
       },
-      includeCompatibilityBundle: true,
+      includeCompatibilityBundle: false,
       prepareDownload: async (artifact) => {
         const fileSize = artifact.fileBuffer.byteLength;
         if (!user || !conversion || artifact.format !== 'xlsx') {
