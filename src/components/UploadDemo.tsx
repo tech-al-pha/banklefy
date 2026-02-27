@@ -184,6 +184,7 @@ export const UploadDemo = () => {
   const [conversionMode, setConversionMode] = useState<ConversionMode>("standard");
   const [editedPdfCheckResult, setEditedPdfCheckResult] = useState<EditedPdfCheckResult | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showScanTimeCard, setShowScanTimeCard] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { hasChatAuraAccess } = useSubscriptionTier();
@@ -203,6 +204,18 @@ export const UploadDemo = () => {
 
     void checkAdmin();
   }, [user]);
+  useEffect(() => {
+    if (selectedFiles.length === 0) {
+      setShowScanTimeCard(false);
+      return;
+    }
+    const hasDirectImageUpload = selectedFiles.some((file) => /\.(png|jpe?g)$/i.test(file.name));
+    if (hasDirectImageUpload) {
+      setShowScanTimeCard(true);
+      return;
+    }
+    setShowScanTimeCard(false);
+  }, [selectedFiles]);
   const formatAmountNoSymbol = (
     value: number,
     options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
@@ -302,10 +315,10 @@ export const UploadDemo = () => {
     }
     return `Selected batch is too heavy for one run (${payload}). Please split files into smaller batches.`;
   };
-  const AUTO_CHUNK_MAX_PDF_PAGES = 14;
+  const AUTO_CHUNK_MAX_PDF_PAGES = 25;
   const AUTO_CHUNK_MAX_PDF_BYTES = 8 * 1024 * 1024;
   const AUTO_CHUNK_EAGER_MIN_PDF_PAGES = 16;
-  const HARD_AUTO_CHUNK_MAX_PDF_PAGES = 2;
+  const HARD_AUTO_CHUNK_MAX_PDF_PAGES = 8;
   const HARD_AUTO_CHUNK_MAX_PDF_BYTES = 4 * 1024 * 1024;
   const HARD_AUTO_CHUNK_EAGER_MIN_PDF_PAGES = 3;
   const HARD_AUTO_CHUNK_AVG_PAGE_BYTES = 850 * 1024;
@@ -711,31 +724,9 @@ export const UploadDemo = () => {
   }, [selectedFile]);
 
   useEffect(() => {
-    if (!converting) return;
-
-    setShowProgress(true);
+    // Progress panel intentionally disabled for cleaner UX.
+    setShowProgress(false);
     setProgressStep(0);
-
-    const timeouts: number[] = [];
-    const delays = [900, 1100, 1300, 1500];
-
-    const schedule = (nextStep: number) => {
-      const delay = delays[nextStep - 1] ?? 1200;
-      timeouts.push(
-        window.setTimeout(() => {
-          setProgressStep(nextStep);
-          if (nextStep < 3) {
-            schedule(nextStep + 1);
-          }
-        }, delay)
-      );
-    };
-
-    schedule(1);
-
-    return () => {
-      timeouts.forEach((t) => window.clearTimeout(t));
-    };
   }, [converting]);
 
   useEffect(() => {
@@ -748,15 +739,10 @@ export const UploadDemo = () => {
   }, [hasEditPdfDetectorAccess, editedPdfWarning, editedPdfCheckResult]);
 
   useEffect(() => {
-    if (converting || !showProgress) return;
-
-    setProgressStep(4);
-    const timeout = window.setTimeout(() => {
+    if (showProgress) {
       setShowProgress(false);
-    }, 900);
-
-    return () => window.clearTimeout(timeout);
-  }, [converting, showProgress]);
+    }
+  }, [showProgress]);
 
   const MAX_PDF_RENDER_PAGES = 120;
   const FREE_MAX_PDF_PAGES_PER_FILE = 15;
@@ -764,6 +750,7 @@ export const UploadDemo = () => {
   const EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES = 18 * 1024 * 1024;
   const EDGE_FUNCTION_SAFE_BATCH_PDF_PAYLOAD_BYTES = 20 * 1024 * 1024;
   const EDGE_FUNCTION_SAFE_BATCH_PDF_PAGES = 45;
+  const showConversionProgressPanel = false;
 
 
 
@@ -1093,11 +1080,6 @@ export const UploadDemo = () => {
         }
       }
 
-      toast({
-        title: user ? "File uploaded" : "Processing file",
-        description: "Starting conversion...",
-      });
-
       setUploading(false);
       setConverting(true);
 
@@ -1172,7 +1154,7 @@ export const UploadDemo = () => {
             structuredErrorCode === "WORKER_LIMIT" ||
             isLikelyEdgeResourceError(message, statusCode);
           if (resourceError) {
-            message = 'Request was too complex for one run (worker compute limit). Retrying with smart chunking; if it still fails, split into 2-5 page chunks.';
+            message = 'Processing service is temporarily busy. Please retry in a moment.';
           }
 
           const typedError = new Error(message) as InvokeConversionError;
@@ -1196,7 +1178,7 @@ export const UploadDemo = () => {
             isLikelyEdgeResourceError(data.message || data.error || "Conversion failed");
           const typedError = new Error(
             resourceError
-              ? 'Request was too complex for one run (worker compute limit). Retrying with smart chunking; if it still fails, split into 2-5 page chunks.'
+              ? 'Processing service is temporarily busy. Please retry in a moment.'
               : (data.message || data.error || 'Conversion failed'),
           ) as InvokeConversionError;
           typedError.limitReached = !!data.limitReached;
@@ -1326,10 +1308,6 @@ export const UploadDemo = () => {
       };
 
       if (isPdf && allowPdfAutoChunking && runChunkingFirst && pdfChunksForRetry.length > 1) {
-        toast({
-          title: "Large PDF detected",
-          description: `Processing in ${pdfChunksForRetry.length} smaller chunks for stability...`,
-        });
         const chunkResponses = await runChunkedPdfConversion(pdfChunksForRetry);
         await applyChunkedPdfSuccess(chunkResponses);
         return;
@@ -1341,9 +1319,13 @@ export const UploadDemo = () => {
       } catch (invokeError: unknown) {
         const error = invokeError as InvokeConversionError;
         const errorMessage = (error?.message || '').toLowerCase();
+        const hasDeterministicPdfRows =
+          Array.isArray(requestBody.pdfParsedTransactions) &&
+          requestBody.pdfParsedTransactions.length > 0;
         const isRequiresImageFallbackError =
           isPdf &&
           !("pdfPageImages" in requestBody) &&
+          !hasDeterministicPdfRows &&
           (
             (error as { requiresPageImages?: boolean })?.requiresPageImages ||
             errorMessage.includes('requires page images') ||
@@ -1352,11 +1334,7 @@ export const UploadDemo = () => {
           );
 
         if (isRequiresImageFallbackError) {
-          toast({
-            title: "Retrying with OCR fallback",
-            description: "Deterministic parse was insufficient. Rendering only now and retrying...",
-          });
-
+          setShowScanTimeCard(true);
           const { pdfToPageImages } = await loadPdfUtils();
           const renderedPdfPageImages = await pdfToPageImages(fileToConvert, {
             password: pdfPassword.trim() || undefined,
@@ -1400,10 +1378,6 @@ export const UploadDemo = () => {
             );
 
           if (runChunkingFirst && pdfChunksForRetry.length > 1) {
-            toast({
-              title: "Large PDF detected",
-              description: `Processing in ${pdfChunksForRetry.length} smaller chunks for stability...`,
-            });
             const chunkResponses = await runChunkedPdfConversion(pdfChunksForRetry);
             await applyChunkedPdfSuccess(chunkResponses);
             return;
@@ -1773,7 +1747,7 @@ Analytics Summary:
           message = payload.message || payload.error || message;
         }
         if (structuredErrorCode === "WORKER_LIMIT" || isLikelyEdgeResourceError(message, statusCode)) {
-          message = 'Batch request was too complex for one run (worker compute limit). Please split into smaller batches (recommended 5-15 PDF pages).';
+          message = 'Processing service is temporarily busy. Please retry with fewer files.';
         }
         throw new Error(message);
       }
@@ -2251,6 +2225,15 @@ Analytics Summary:
               limitReached={limitReached}
               planType={planType}
             />
+            {showScanTimeCard && (selectedFile || selectedFiles.length > 0) && !limitReached && (
+              <div className="p-4 bg-[#141414] border border-primary/25 rounded-xl">
+                <p className="text-sm font-semibold text-white">Scanning Mode Active</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This looks like an image-based statement. We run deeper OCR checks for cleaner extraction, so processing can take longer.
+                  Strong accuracy takes a little extra time.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-8">
               {/* Hidden File Input - Multiple Files */}
@@ -2560,8 +2543,8 @@ Analytics Summary:
                 exportAsPDF={exportAsPDF}
                 handlePremiumExport={handlePremiumExport}
                 aiStatus={aiStatus}
-                converting={converting}
-                showProgress={showProgress}
+                converting={showConversionProgressPanel ? converting : false}
+                showProgress={showConversionProgressPanel ? showProgress : false}
                 progressStep={progressStep}
                 analytics={analytics}
                 currencyCode={currencyCode}
