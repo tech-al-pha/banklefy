@@ -1251,7 +1251,7 @@ const runStructuralScan = ({
   const modifiedDate = isPdf ? extractPdfInfoString(payload, 'ModDate') : null;
   const creationDate = isPdf ? extractPdfInfoString(payload, 'CreationDate') : null;
   const selectableTextChars = (extractedText || '').replace(/\s+/g, '').length;
-  const hasSelectableText = selectableTextChars >= 80;
+  const hasSelectableText = selectableTextChars > 0;
   const isDigitallyGenerated = isPdf && hasSelectableText;
 
   let pdfType: StructuralScanResult['pdfType'] = 'UNKNOWN';
@@ -3199,7 +3199,10 @@ Deno.serve(async (req) => {
       const template = getBankTemplateById(templateSelectedId) ?? detectBankTemplate(extractedText);
       const needsTemplateRecheck = clientPdfParseAssessment.useDeterministic === false &&
         clientPdfParseAssessment.mismatchRatio < 0.9;
-      const shouldRecheck = needsTemplateRecheck || templateMapping.allowSingleDate;
+      const shouldRecheck =
+        needsTemplateRecheck ||
+        templateMapping.allowSingleDate ||
+        (clientParsedTransactions.length === 0 && structuralScan.hasSelectableText);
       if (template && shouldRecheck) {
         templateSelectedId = template.id;
         try {
