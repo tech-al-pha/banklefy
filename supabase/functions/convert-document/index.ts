@@ -82,16 +82,84 @@ type PdfDocumentProxy = {
   destroy?: () => void;
 };
 
-const DATE_TOKEN = /\d{2}[/-]\d{2}[/-]\d{4}/;
-const ROW_START_PATTERN = /^(\d{2}[/-]\d{2}[/-]\d{4})\s+(\d{2}[/-]\d{2}[/-]\d{4})\s+(.+)$/;
+const DATE_TOKEN_SOURCE =
+  '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}[/-]\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4})';
+const DATE_TOKEN = new RegExp(DATE_TOKEN_SOURCE);
+const FLEXIBLE_PREFIX_SOURCE = '(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]+\\s+)?';
+const ROW_START_PATTERN = new RegExp(`^${FLEXIBLE_PREFIX_SOURCE}(${DATE_TOKEN_SOURCE})\\s+(${DATE_TOKEN_SOURCE})\\s+(.+)$`);
 const AMOUNT_PATTERN = /-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g;
 const AMOUNT_TOKEN_PATTERN = /-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/;
+const DATE_TOKEN_FLEX_PATTERN = new RegExp(`(${DATE_TOKEN_SOURCE})`);
+const DASH_PLACEHOLDER = /^[\-\u2013\u2014]+$/;
+const normalizeDashToken = (token: string): string => token.replace(/[–—]/g, '-');
+
+const MONTH_INDEX: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
+};
 
 const normalizeDate = (value: string): string => {
-  const match = value.trim().match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
-  if (!match) return value.trim();
-  const [, dd, mm, yyyy] = match;
-  return `${yyyy}-${mm}-${dd}`;
+  const raw = value.trim().replace(/\s+/g, ' ');
+  const slashDate = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (slashDate) {
+    const day = Number(slashDate[1]);
+    const month = Number(slashDate[2]);
+    const yearRaw = Number(slashDate[3]);
+    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+    if (
+      Number.isFinite(day) &&
+      Number.isFinite(month) &&
+      Number.isFinite(year) &&
+      day >= 1 &&
+      day <= 31 &&
+      month >= 1 &&
+      month <= 12
+    ) {
+      return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
+  const monthDate = raw.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{2,4})$/);
+  if (monthDate) {
+    const day = Number(monthDate[1]);
+    const monthName = monthDate[2].toLowerCase();
+    const month = MONTH_INDEX[monthName];
+    const yearRaw = Number(monthDate[3]);
+    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+    if (
+      Number.isFinite(day) &&
+      Number.isFinite(month) &&
+      Number.isFinite(year) &&
+      day >= 1 &&
+      day <= 31
+    ) {
+      return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
+  return raw;
 };
 
 const parseAmount = (value: string): number => {
@@ -107,6 +175,12 @@ const isNoiseLine = (line: string): boolean => {
   if (lower.includes("total records")) return true;
   if (lower.includes("transaction date") && lower.includes("value date")) return true;
   if (lower.includes("running balance")) return true;
+  if (lower.includes('opening balance')) return true;
+  if (lower.includes('closing balance')) return true;
+  if (lower.includes('total debit')) return true;
+  if (lower.includes('total credit')) return true;
+  if (lower.includes('generated on')) return true;
+  if (lower.includes('this is a system generated')) return true;
   if (/^page\s*\d+(\s*of\s*\d+)?$/i.test(line)) return true;
   return false;
 };
@@ -241,14 +315,14 @@ const extractAmounts = (text: string): { textWithoutAmounts: string; debit: numb
 const extractAmountsWithDashPlaceholders = (
   text: string,
 ): { textWithoutAmounts: string; debit: number; credit: number; balance: number } | null => {
-  const cleaned = text.trim();
+  const cleaned = normalizeDashToken(text).trim();
   if (!cleaned) return null;
 
   const debitBlankPattern =
-    /^(.*?)(?:\s|^)[-â€“â€”]\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/;
+    /^(.*?)(?:\s|^)([-\u2013\u2014]+)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/;
   const debitBlankMatch = cleaned.match(debitBlankPattern);
-  if (debitBlankMatch) {
-    const [, prefix, creditToken, balanceToken] = debitBlankMatch;
+  if (debitBlankMatch && DASH_PLACEHOLDER.test(debitBlankMatch[2])) {
+    const [, prefix, , creditToken, balanceToken] = debitBlankMatch;
     return {
       textWithoutAmounts: prefix.trim(),
       debit: 0,
@@ -258,10 +332,10 @@ const extractAmountsWithDashPlaceholders = (
   }
 
   const creditBlankPattern =
-    /^(.*?)(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+[-â€“â€”]\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/;
+    /^(.*?)(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+([-\u2013\u2014]+)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/;
   const creditBlankMatch = cleaned.match(creditBlankPattern);
-  if (creditBlankMatch) {
-    const [, prefix, debitToken, balanceToken] = creditBlankMatch;
+  if (creditBlankMatch && DASH_PLACEHOLDER.test(creditBlankMatch[3])) {
+    const [, prefix, debitToken, , balanceToken] = creditBlankMatch;
     return {
       textWithoutAmounts: prefix.trim(),
       debit: parseAmount(debitToken),
@@ -273,7 +347,31 @@ const extractAmountsWithDashPlaceholders = (
   return null;
 };
 
-const ROW_START_PATTERN_SINGLE = /^(\d{2}[/-]\d{2}[/-]\d{4})\s+(.+)$/;
+const hasLikelyAmountTail = (text: string): boolean => {
+  const normalizedText = normalizeDashToken(text);
+  const matches = normalizedText.match(/-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g) || [];
+  if (matches.length >= 2) return true;
+  // Placeholder variants: amount + '-' + balance OR '-' + amount + balance
+  const debitBlankTail = normalizedText.match(
+    /(?:^|\s)([-\u2013\u2014]+)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/,
+  );
+  if (debitBlankTail && DASH_PLACEHOLDER.test(debitBlankTail[1])) {
+    return true;
+  }
+  const creditBlankTail = normalizedText.match(
+    /(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+([-\u2013\u2014]+)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/,
+  );
+  if (creditBlankTail && DASH_PLACEHOLDER.test(creditBlankTail[2])) {
+    return true;
+  }
+  return false;
+};
+
+const ROW_START_PATTERN_SINGLE = new RegExp(`^${FLEXIBLE_PREFIX_SOURCE}(${DATE_TOKEN_SOURCE})\\s+(.+)$`);
+const ROW_START_PATTERN_MONTH = new RegExp(`^${FLEXIBLE_PREFIX_SOURCE}(\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4})\\s+(.+)$`);
+const ROW_START_PATTERN_MONTH_PAIR =
+  new RegExp(`^${FLEXIBLE_PREFIX_SOURCE}(\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4})\\s+(\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4})\\s+(.+)$`);
+const FALLBACK_ROW_START_PATTERN = new RegExp(`^${FLEXIBLE_PREFIX_SOURCE}(${DATE_TOKEN_SOURCE})\\s+(.+)$`);
 
 type ExtractPdfTextOptions = {
   allowSingleDate?: boolean;
@@ -317,14 +415,29 @@ const extractPdfTextTransactionsFromBytes = async (
   const pdf = options?.pdfDocument ?? await loadPdfDocumentFromBytes(bytes, password);
 
   try {
-    const rows: Array<RawTransaction & { _descriptionParts: string[] }> = [];
-    let current: (RawTransaction & { _descriptionParts: string[] }) | null = null;
+    const rows: Array<RawTransaction & { _descriptionParts: string[]; _sourceLineNumber?: number; _sourceRawLine?: string }> = [];
+    let current: (RawTransaction & { _descriptionParts: string[]; _sourceLineNumber?: number; _sourceRawLine?: string }) | null = null;
     const allLines: string[] = [];
     const allLineEntries: LineEntry[] = [];
+    let currentLineNumber = 0;
 
     const flushCurrent = () => {
       if (!current) return;
-      if (!current.date || (!current.debit && !current.credit && !current.balance)) {
+      if (!current.date) {
+        console.log("[ROW_DROP]", {
+          reason: "invalid_date",
+          lineNumber: current._sourceLineNumber ?? currentLineNumber,
+          rawLine: current._sourceRawLine ?? current.description ?? "",
+        });
+        current = null;
+        return;
+      }
+      if (!current.debit && !current.credit && !current.balance) {
+        console.log("[ROW_DROP]", {
+          reason: "no_amount",
+          lineNumber: current._sourceLineNumber ?? currentLineNumber,
+          rawLine: current._sourceRawLine ?? current.description ?? "",
+        });
         current = null;
         return;
       }
@@ -346,18 +459,50 @@ const extractPdfTextTransactionsFromBytes = async (
     const amountCenters = detectAmountColumns(allLineEntries);
 
     for (const entry of allLineEntries) {
+      currentLineNumber += 1;
       const line = entry.text;
-      if (isNoiseLine(line)) continue;
+      if (isNoiseLine(line)) {
+        console.log("[ROW_DROP]", {
+          reason: "noise",
+          lineNumber: currentLineNumber,
+          rawLine: line,
+        });
+        continue;
+      }
 
       let rowStart = line.match(ROW_START_PATTERN);
-      let singleDateMatch = null;
-      if (!rowStart && options?.allowSingleDate) {
-        singleDateMatch = line.match(ROW_START_PATTERN_SINGLE);
+      let monthPairMatch = null;
+      if (!rowStart) {
+        monthPairMatch = line.match(ROW_START_PATTERN_MONTH_PAIR);
       }
-      if (rowStart || singleDateMatch) {
+      let singleDateMatch = null;
+      const matchesSingleDate = ROW_START_PATTERN_SINGLE.test(line);
+
+      const singleDateAllowed =
+        options?.allowSingleDate ||
+        hasLikelyAmountTail(line) ||
+        (
+          matchesSingleDate &&
+          !isNoiseLine(line)
+        );
+      if (!rowStart && !monthPairMatch && singleDateAllowed) {
+        singleDateMatch = line.match(ROW_START_PATTERN_SINGLE);
+        if (!singleDateMatch) {
+          singleDateMatch = line.match(ROW_START_PATTERN_MONTH);
+        }
+      }
+      if (rowStart || monthPairMatch || singleDateMatch) {
         flushCurrent();
-        const transactionDateToken = rowStart ? rowStart[1] : singleDateMatch?.[1] ?? '';
-        const trailing = rowStart ? rowStart[3] : singleDateMatch?.[2] ?? '';
+        const transactionDateToken = rowStart
+          ? rowStart[1]
+          : monthPairMatch
+            ? monthPairMatch[1]
+            : singleDateMatch?.[1] ?? '';
+        const trailing = rowStart
+          ? rowStart[3]
+          : monthPairMatch
+            ? monthPairMatch[3]
+            : singleDateMatch?.[2] ?? '';
         const amounts = extractAmounts(trailing) || extractAmountsWithDashPlaceholders(trailing);
         const anchored = extractAnchoredAmounts(entry, amountCenters);
         const debit = anchored ? anchored.debit : (amounts?.debit ?? 0);
@@ -371,6 +516,8 @@ const extractPdfTextTransactionsFromBytes = async (
           credit,
           balance,
           refNumber: '',
+          _sourceLineNumber: currentLineNumber,
+          _sourceRawLine: line,
           _descriptionParts: descriptionText ? [descriptionText] : [],
         };
         continue;
@@ -389,6 +536,31 @@ const extractPdfTextTransactionsFromBytes = async (
         continue;
       }
 
+      const singleAmountPattern = /^-?\d{1,3}(,\d{3})*(\.\d{2})?$/;
+      const singleAmountToken = line.trim();
+      if (
+        current &&
+        singleAmountPattern.test(singleAmountToken) &&
+        !ROW_START_PATTERN_SINGLE.test(line) &&
+        !ROW_START_PATTERN.test(line) &&
+        !ROW_START_PATTERN_MONTH_PAIR.test(line) &&
+        !ROW_START_PATTERN_MONTH.test(line)
+      ) {
+        const amountValue = parseAmount(singleAmountToken);
+        if (current.debit === 0 && current.credit === 0) {
+          if (amountValue < 0) {
+            current.debit = Math.abs(amountValue);
+          } else {
+            current.credit = Math.abs(amountValue);
+          }
+        } else if (current.balance === 0) {
+          current.balance = amountValue;
+        } else {
+          current._descriptionParts.push(line);
+        }
+        continue;
+      }
+
       if (DATE_TOKEN.test(line) && line.includes(':')) {
         current._descriptionParts.push(line);
         continue;
@@ -399,9 +571,65 @@ const extractPdfTextTransactionsFromBytes = async (
 
     flushCurrent();
 
-    const transactions = rows
-      .filter((row) => row.date && row.description && Number.isFinite(row.balance as number))
-      .map(({ _descriptionParts, ...rest }) => rest);
+    const totalBeforePostParseFilter = rows.length;
+    let transactions = rows
+      .filter((row) => {
+        const hasDate = Boolean(row.date);
+        const hasDescription = Boolean(row.description);
+        const hasBalance = Number.isFinite(row.balance as number);
+        const keep = hasDate && hasDescription && hasBalance;
+        if (!keep) {
+          const reason = !hasDate
+            ? "invalid_date"
+            : (!hasBalance ? "no_amount" : "normalization_reject");
+          console.log("[ROW_DROP]", {
+            reason,
+            lineNumber: row._sourceLineNumber ?? null,
+            rawLine: row._sourceRawLine ?? row.description ?? "",
+          });
+        }
+        return keep;
+      })
+      .map(({ _descriptionParts, _sourceLineNumber, _sourceRawLine, ...rest }) => rest);
+
+    // Fallback parser for text-based PDFs where line-anchored parsing under-extracts.
+    if (transactions.length < 2 && allLines.length > 0) {
+      const fallbackRows: RawTransaction[] = [];
+      for (const rawLine of allLines) {
+        const line = rawLine.trim().replace(/\s+/g, ' ');
+        if (!line || isNoiseLine(line)) continue;
+
+        const dateMatch = line.match(FALLBACK_ROW_START_PATTERN);
+        if (!dateMatch) continue;
+
+        const dateToken = dateMatch[1];
+        const remainder = dateMatch[2] || '';
+        const amounts = extractAmounts(remainder) || extractAmountsWithDashPlaceholders(remainder);
+        if (!amounts) continue;
+
+        const description = (amounts.textWithoutAmounts || remainder).trim();
+        if (!description || description.length < 2) continue;
+
+        fallbackRows.push({
+          date: normalizeDate(dateToken),
+          description,
+          debit: amounts.debit,
+          credit: amounts.credit,
+          balance: amounts.balance,
+          refNumber: '',
+        });
+      }
+
+      if (fallbackRows.length > transactions.length) {
+        transactions = fallbackRows;
+      }
+    }
+
+    console.log("[ROW_COUNT]", {
+      stage: "deterministic_parse",
+      totalBefore: totalBeforePostParseFilter,
+      totalAfter: transactions.length,
+    });
 
     return { transactions, text: allLines.join('\n') };
   } finally {
@@ -1068,8 +1296,36 @@ const runStructuralScan = ({
 
 const countDateLikeRows = (text: string): number => {
   if (!text) return 0;
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return 0;
+
+  const startPattern = /^(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})\b/;
+  let rowLikeCount = 0;
+  for (const line of lines) {
+    if (startPattern.test(line)) rowLikeCount += 1;
+  }
+  if (rowLikeCount > 0) return rowLikeCount;
+
   const matches = text.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g);
   return matches ? matches.length : 0;
+};
+
+const countAmountLikeRows = (text: string): number => {
+  if (!text) return 0;
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  let count = 0;
+  for (const line of lines) {
+    if (hasLikelyAmountTail(line)) {
+      count += 1;
+    }
+  }
+  return count;
 };
 
 const computeDateContinuityScore = (rows: RawTransaction[]): number => {
@@ -1128,7 +1384,9 @@ const computeConfidenceBreakdown = ({
   bankId: string;
   headerConfidenceHint: number;
 }): ConfidenceBreakdown => {
-  const estimatedRows = Math.max(rows.length, countDateLikeRows(sourceText));
+  const expectedRowsFromDate = countDateLikeRows(sourceText);
+  const expectedRowsFromAmounts = countAmountLikeRows(sourceText);
+  const estimatedRows = Math.max(rows.length, expectedRowsFromDate, expectedRowsFromAmounts);
   const parseSuccessRatio = clamp01(rows.length / Math.max(1, estimatedRows));
   const dateContinuityScore = computeDateContinuityScore(rows);
   const flow = scoreRunningBalanceFlow(rows);
@@ -2263,6 +2521,7 @@ Deno.serve(async (req) => {
   const timing: Record<string, number> = {
     text_extract_ms: 0,
     deterministic_parse_ms: 0,
+    confidence_ms: 0,
     template_recheck_ms: 0,
     ocr_ms: 0,
     ai_ms: 0,
@@ -2271,6 +2530,14 @@ Deno.serve(async (req) => {
     total_ms: 0,
   };
   const pipelineDiagnostics: Record<string, Record<string, unknown>> = {};
+  const traceLog = (label: string, payload?: unknown) => {
+    const ts = new Date().toISOString();
+    if (typeof payload === 'undefined') {
+      console.log(`[TRACE ${ts}] ${label}`);
+      return;
+    }
+    console.log(`[TRACE ${ts}] ${label}`, payload);
+  };
 
   try {
     // Parse request
@@ -2290,6 +2557,11 @@ Deno.serve(async (req) => {
     const requestedOutputMode = outputMode === 'tally_only' ? 'tally_only' : 'standard';
     const normalizedRequestedFormat = normalizeRequestedFormat(requestedFormat);
     const userTimezone = (timezone && isValidTimezone(timezone)) ? timezone : 'UTC';
+    traceLog('request_payload_metrics', {
+      hasFileData: typeof base64FileData === 'string',
+      fileDataLength: typeof base64FileData === 'string' ? base64FileData.length : 0,
+      pdfPageImagesCount: Array.isArray(pdfPageImages) ? pdfPageImages.length : 0,
+    });
     
     // Robust client tracking to prevent bypasses
     const trackingKey = await getTrackingKey(req);
@@ -2447,16 +2719,23 @@ Deno.serve(async (req) => {
     } else {
       try {
         // If PDF pages are provided as images, we may not have a PDF base64.
-        const base64Content = base64FileData?.split?.(',')?.[1] || base64FileData;
+        const rawBase64 = typeof base64FileData === 'string' ? base64FileData.trim() : '';
+        const dataUrlMatch = rawBase64.match(/^data:[^;]+;base64,(.+)$/);
+        const base64Content = (dataUrlMatch?.[1] || rawBase64 || '').replace(/\s+/g, '');
         if (!base64Content) {
           bytes = new Uint8Array();
         } else {
-        const binaryString = atob(base64Content);
-        bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
+          const binaryString = atob(base64Content);
+          bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
         }
-        }
+        traceLog('file_decode_metrics', {
+          hasFileData: typeof base64FileData === 'string',
+          rawLength: rawBase64.length,
+          decodedBytes: bytes.length,
+        });
       } catch {
         return new Response(
           JSON.stringify({ error: 'Invalid file data' }),
@@ -2479,7 +2758,9 @@ Deno.serve(async (req) => {
     let pageCount = hasPdfPageImages ? (pdfPageImages as string[]).length : 1;
     if (isPdf && bytes.length > 0) {
       try {
-        const detectedPageCount = await detectPdfTotalPagesFromBytes(bytes, pdfPassword);
+        // pdf.js may take ownership of the provided TypedArray buffer.
+        // Use a copy here so downstream extraction keeps the original bytes intact.
+        const detectedPageCount = await detectPdfTotalPagesFromBytes(bytes.slice(), pdfPassword);
         if (Number.isFinite(detectedPageCount) && detectedPageCount > 0) {
           pageCount = detectedPageCount;
         }
@@ -2553,26 +2834,49 @@ Deno.serve(async (req) => {
       chunkMode: useChunkMode,
       chunkSize: useChunkMode ? CHUNK_SIZE : undefined,
     };
+    traceLog('upload_metrics', {
+      fileSizeBytes: bytes.length,
+      pageCount,
+      isPdf,
+      hasPdfPageImages,
+      chunkMode: useChunkMode,
+    });
 
     // ============= USAGE LIMITS ENFORCEMENT =============
     // Shared limit resolver (single source of truth with check-usage-limit)
+    const traceSkipLimits = (Deno.env.get('TRACE_SKIP_LIMITS') ?? '').trim().toLowerCase() === 'true';
     let limitState;
-    try {
-      limitState = await resolveEffectiveLimit({
-        supabaseAdmin,
-        user,
-        trackingKey,
-        timezone: userTimezone,
-      });
-    } catch (limitError) {
-      console.error('Failed to resolve effective limit:', limitError);
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to resolve effective limit',
-          code: 'LIMIT_RESOLUTION_FAILED',
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (traceSkipLimits) {
+      traceLog('trace_skip_limits_enabled', { mode: 'debug', reason: 'TRACE_SKIP_LIMITS=true' });
+      limitState = {
+        conversionsUsed: 0,
+        conversionsLimit: 999999,
+        remaining: 999999,
+        limitReached: false,
+        isAuthenticated: !!user,
+        planType: user ? 'unlimited' : 'free',
+        isAdmin: !!user,
+        isOwner: false,
+        isUnlimited: true,
+      };
+    } else {
+      try {
+        limitState = await resolveEffectiveLimit({
+          supabaseAdmin,
+          user,
+          trackingKey,
+          timezone: userTimezone,
+        });
+      } catch (limitError) {
+        console.error('Failed to resolve effective limit:', limitError);
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to resolve effective limit',
+            code: 'LIMIT_RESOLUTION_FAILED',
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     const conversionsUsed = limitState.conversionsUsed;
@@ -2745,13 +3049,24 @@ Deno.serve(async (req) => {
       }
     }
 
-    const classification = classifyDocument(extractedText, bytes, fileName);
+    const rawTextLength = extractedText.length;
+    const charsPerPage = pageCount > 0 ? Number((rawTextLength / pageCount).toFixed(2)) : rawTextLength;
     const structuralScan = runStructuralScan({
       isPdf,
       fileName,
       bytes,
       pageCount,
       extractedText,
+    });
+    const classification = classifyDocument(extractedText, bytes, fileName, {
+      rawTextLength,
+      charsPerPage,
+      selectableTextDetected: structuralScan.hasSelectableText,
+    });
+    traceLog('raw_text_metrics', {
+      rawTextLength,
+      charsPerPage,
+      selectableTextDetected: structuralScan.hasSelectableText,
     });
     pipelineDiagnostics.structuralScan = {
       ok: true,
@@ -2772,17 +3087,38 @@ Deno.serve(async (req) => {
       ? pdfParsedTransactions
       : serverParsedTransactions;
     const deterministicStart = Date.now();
-    let clientParsedTransactions: RawTransaction[] = Array.isArray(parsedTransactionsInput)
-      ? normalizeRawTransactions(parsedTransactionsInput).filter((transaction) => {
-          const hasDate = typeof transaction.date === 'string' && transaction.date.trim() && transaction.date !== 'Unknown';
-          const hasDescription = typeof transaction.description === 'string' && transaction.description.trim().length > 0;
-          const hasAmount =
-            Number.isFinite(Number(transaction.debit ?? NaN)) ||
-            Number.isFinite(Number(transaction.credit ?? NaN)) ||
-            Number.isFinite(Number(transaction.balance ?? NaN));
-          return hasDate && hasDescription && hasAmount;
-        })
+    const normalizedParsedTransactions: RawTransaction[] = Array.isArray(parsedTransactionsInput)
+      ? normalizeRawTransactions(parsedTransactionsInput)
       : [];
+    const totalBeforeNormalization = normalizedParsedTransactions.length;
+    let clientParsedTransactions: RawTransaction[] = normalizedParsedTransactions.filter((transaction, index) => {
+      const hasDate = typeof transaction.date === 'string' && transaction.date.trim() && transaction.date !== 'Unknown';
+      const hasDescription = typeof transaction.description === 'string' && transaction.description.trim().length > 0;
+      const hasAmount =
+        Number.isFinite(Number(transaction.debit ?? NaN)) ||
+        Number.isFinite(Number(transaction.credit ?? NaN)) ||
+        Number.isFinite(Number(transaction.balance ?? NaN));
+      const keep = hasDate && hasDescription && hasAmount;
+      if (!keep) {
+        const reason = !hasDate
+          ? "invalid_date"
+          : (!hasAmount ? "no_amount" : "normalization_reject");
+        console.log("[ROW_DROP]", {
+          reason,
+          lineNumber: index + 1,
+          rawLine: transaction.description ?? "",
+        });
+      }
+      return keep;
+    });
+    console.log("[ROW_COUNT]", {
+      stage: "normalization_filter",
+      totalBefore: totalBeforeNormalization,
+      totalAfter: clientParsedTransactions.length,
+    });
+    traceLog('deterministic_rows_extracted', {
+      count: clientParsedTransactions.length,
+    });
     const clientParsedBankMetadata = normalizeClientBankMetadata(pdfParsedBankMetadata);
     let clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
     timing.deterministic_parse_ms = Date.now() - deterministicStart;
@@ -2803,6 +3139,17 @@ Deno.serve(async (req) => {
     let cachedTemplate: { template_id?: string; allow_single_date?: boolean } | null = null;
     let cachedTemplateId: string | null = null;
     let cachedAllowSingleDate = false;
+    const computeConfidenceBreakdownTimed = (payload: {
+      rows: RawTransaction[];
+      sourceText: string;
+      bankId: string;
+      headerConfidenceHint: number;
+    }): ConfidenceBreakdown => {
+      const startedAt = Date.now();
+      const result = computeConfidenceBreakdown(payload);
+      timing.confidence_ms += Date.now() - startedAt;
+      return result;
+    };
     if (extractedText) {
       try {
         fingerprintData = await buildTemplateFingerprint(extractedText);
@@ -2842,7 +3189,13 @@ Deno.serve(async (req) => {
       ? null
       : templateMapping.templateId;
     let templateSingleDateUsed = false;
-    if (clientParsedTransactions.length > 0 && extractedText) {
+    if (
+      extractedText &&
+      (
+        clientParsedTransactions.length > 0 ||
+        structuralScan.hasSelectableText
+      )
+    ) {
       const template = getBankTemplateById(templateSelectedId) ?? detectBankTemplate(extractedText);
       const needsTemplateRecheck = clientPdfParseAssessment.useDeterministic === false &&
         clientPdfParseAssessment.mismatchRatio < 0.9;
@@ -2885,19 +3238,44 @@ Deno.serve(async (req) => {
         }
       }
     }
-    const deterministicConfidenceBreakdown = computeConfidenceBreakdown({
+    const deterministicConfidenceBreakdown = computeConfidenceBreakdownTimed({
       rows: clientParsedTransactions,
       sourceText: extractedText,
       bankId: templateSelectedId ?? bankDetection.bankId,
       headerConfidenceHint: bankDetection.detectionConfidence,
     });
+    traceLog('confidence_breakdown', {
+      score: deterministicConfidenceBreakdown.score,
+      parseSuccessRatio: deterministicConfidenceBreakdown.parseSuccessRatio,
+      dateContinuityScore: deterministicConfidenceBreakdown.dateContinuityScore,
+      balanceValidationScore: deterministicConfidenceBreakdown.balanceValidationScore,
+      headerMatchScore: deterministicConfidenceBreakdown.headerMatchScore,
+      columnAlignmentScore: deterministicConfidenceBreakdown.columnAlignmentScore,
+      errorFlags: deterministicConfidenceBreakdown.errorFlags,
+    });
     const internalGateConfidence = deterministicConfidenceBreakdown.score;
     const deterministicConfidenceHigh = internalGateConfidence >= DETERMINISTIC_CONFIDENCE_THRESHOLD;
+    const selectableTextDeterministicFastPath =
+      isPdf &&
+      structuralScan.hasSelectableText &&
+      clientParsedTransactions.length >= Math.max(4, Math.min(10, pageCount)) &&
+      deterministicConfidenceBreakdown.parseSuccessRatio >= 0.65 &&
+      deterministicConfidenceBreakdown.dateContinuityScore >= 0.5 &&
+      deterministicConfidenceBreakdown.columnAlignmentScore >= 0.6 &&
+      clientPdfParseAssessment.mismatchRatio <= 0.65;
     const preferDeterministicFastPath =
       PDF_DETERMINISTIC_FAST_PATH_ENABLED &&
       isPdf &&
       clientParsedTransactions.length >= PDF_DETERMINISTIC_FAST_PATH_MIN_ROWS &&
       clientPdfParseAssessment.mismatchRatio <= PDF_DETERMINISTIC_FAST_PATH_MAX_MISMATCH;
+    const hardTextGateActive =
+      isPdf &&
+      structuralScan.hasSelectableText === true;
+    let skipOCR = false;
+    if (hardTextGateActive) {
+      console.log('HARD TEXT GATE ACTIVATED — SKIPPING OCR');
+      skipOCR = true;
+    }
     console.log(
       `Adaptive OCR strategy: level=${adaptiveOcrStrategy.level}, strict=${adaptiveOcrStrategy.strictMode}:${adaptiveOcrStrategy.strictMaxPages}, ` +
       `dual=${adaptiveOcrStrategy.dualMode}:${adaptiveOcrStrategy.dualMaxPages}, reasons=${adaptiveOcrStrategy.reasons.join('|') || 'none'}`,
@@ -2913,15 +3291,51 @@ Deno.serve(async (req) => {
       threshold: DETERMINISTIC_CONFIDENCE_THRESHOLD,
     };
     const canUseDeterministicClientPdf =
-      isPdf &&
-      clientParsedTransactions.length > 0 &&
+      skipOCR ||
       (
-        deterministicConfidenceHigh ||
-        clientPdfParseAssessment.useDeterministic ||
-        (mustUseDeterministicClientPdf && !hasPdfPageImages) ||
-        (preferDeterministicFastPath && deterministicConfidenceHigh)
-      ) &&
-      (deterministicConfidenceHigh || !forceOcrForDenseStatement || (mustUseDeterministicClientPdf && !hasPdfPageImages));
+        isPdf &&
+        clientParsedTransactions.length > 0 &&
+        (
+          deterministicConfidenceHigh ||
+          selectableTextDeterministicFastPath ||
+          clientPdfParseAssessment.useDeterministic ||
+          (mustUseDeterministicClientPdf && !hasPdfPageImages) ||
+          (preferDeterministicFastPath && deterministicConfidenceHigh)
+        ) &&
+        (
+          deterministicConfidenceHigh ||
+          selectableTextDeterministicFastPath ||
+          !forceOcrForDenseStatement ||
+          (mustUseDeterministicClientPdf && !hasPdfPageImages)
+        )
+      );
+    const ocrDecisionLineRef =
+      "supabase/functions/convert-document/index.ts:3282 (if canUseDeterministicClientPdf) / :3301 (else if isPdf && hasPdfPageImages => OCR)";
+    const ocrFailedConditions: string[] = [];
+    if (!canUseDeterministicClientPdf) {
+      if (clientParsedTransactions.length <= 0) ocrFailedConditions.push('deterministic_rows_missing');
+      if (!deterministicConfidenceHigh) ocrFailedConditions.push('deterministic_confidence_below_threshold');
+      if (!selectableTextDeterministicFastPath) ocrFailedConditions.push('selectable_text_fast_path_not_met');
+      if (!clientPdfParseAssessment.useDeterministic) ocrFailedConditions.push('assessment_useDeterministic_false');
+      if (forceOcrForDenseStatement) ocrFailedConditions.push('force_ocr_for_dense_statement_true');
+      if (mustUseDeterministicClientPdf && hasPdfPageImages) {
+        ocrFailedConditions.push('must_use_deterministic_condition_not_applicable_with_page_images');
+      }
+      if (!hasPdfPageImages) ocrFailedConditions.push('pdf_page_images_not_provided');
+    } else if (hardTextGateActive) {
+      ocrFailedConditions.push('hard_text_gate_override');
+    }
+    const ocrTriggerReason =
+      ocrFailedConditions.length > 0
+        ? ocrFailedConditions.join(' | ')
+        : 'deterministic_gate_false';
+    traceLog('ocr_decision_gate', {
+      reason: ocrTriggerReason,
+      failedConditions: ocrFailedConditions,
+      decisionLine: ocrDecisionLineRef,
+      confidence: internalGateConfidence,
+      threshold: DETERMINISTIC_CONFIDENCE_THRESHOLD,
+    });
     let processedVia: 'deterministic' | 'ocr' | 'ai_rescue' = 'ocr';
     // UI-facing confidence can differ from internal gate confidence.
     let finalConfidenceScore = internalGateConfidence;
@@ -2938,6 +3352,11 @@ Deno.serve(async (req) => {
     if (preferDeterministicFastPath && !clientPdfParseAssessment.useDeterministic) {
       console.log(
         `Deterministic fast-path override enabled (${clientParsedTransactions.length} rows, mismatch=${clientPdfParseAssessment.mismatchRatio.toFixed(3)}).`,
+      );
+    }
+    if (selectableTextDeterministicFastPath && !deterministicConfidenceHigh) {
+      console.log(
+        `Selectable-text deterministic fast-path enabled (${clientParsedTransactions.length} rows, parse=${deterministicConfidenceBreakdown.parseSuccessRatio.toFixed(3)}, mismatch=${clientPdfParseAssessment.mismatchRatio.toFixed(3)}).`,
       );
     }
     if (deterministicConfidenceHigh) {
@@ -3010,6 +3429,12 @@ Deno.serve(async (req) => {
         reason: 'deterministic_confidence_high',
       };
     } else if (isPdf && hasPdfPageImages) {
+      console.log("OCR TRIGGERED BECAUSE:", ocrTriggerReason);
+      traceLog('ocr_trigger_detail', {
+        reason: ocrTriggerReason,
+        failedConditions: ocrFailedConditions,
+        decisionLine: ocrDecisionLineRef,
+      });
       // Build a minimal status object consistent with ai-orchestrator
       const status: AIProcessingStatus = {
         groqVision: { used: true, success: false },
@@ -3162,6 +3587,16 @@ Deno.serve(async (req) => {
         };
         processedVia = 'deterministic';
         pagesWithData = Math.max(1, pageCount);
+      } else if (collected.length === 0 && structuralScan.hasSelectableText) {
+        console.log('OCR failed on selectable-text PDF; forcing deterministic-only fallback.');
+        extractionResult = {
+          transactions: clientParsedTransactions,
+          status,
+          extractedText: extractedText || combinedText,
+          bankMetadata: collectedBankMetadata,
+        };
+        processedVia = 'deterministic';
+        pagesWithData = Math.max(1, pageCount);
       }
     } else {
       // Convert bytes to base64 for OCR
@@ -3272,13 +3707,13 @@ Deno.serve(async (req) => {
       ocrDataset = extractionResult.transactions.map((row) => ({ ...row }));
     }
 
-    const deterministicReconcileConfidence = computeConfidenceBreakdown({
+    const deterministicReconcileConfidence = computeConfidenceBreakdownTimed({
       rows: deterministicDataset,
       sourceText: extractedText,
       bankId: templateSelectedId ?? bankDetection.bankId,
       headerConfidenceHint: bankDetection.detectionConfidence,
     });
-    const ocrReconcileConfidence = computeConfidenceBreakdown({
+    const ocrReconcileConfidence = computeConfidenceBreakdownTimed({
       rows: ocrDataset.length > 0 ? ocrDataset : extractionResult.transactions,
       sourceText: extractionResult.extractedText || extractedText,
       bankId: templateSelectedId ?? bankDetection.bankId,
@@ -3290,7 +3725,7 @@ Deno.serve(async (req) => {
 
     if (deterministicDataset.length > 0 && ocrDataset.length > 0) {
       const mergedDataset = mergeOcrTransactionsDeterministic(deterministicDataset, ocrDataset);
-      const mergedConfidence = computeConfidenceBreakdown({
+      const mergedConfidence = computeConfidenceBreakdownTimed({
         rows: mergedDataset,
         sourceText: extractionResult.extractedText || extractedText,
         bankId: templateSelectedId ?? bankDetection.bankId,
@@ -3438,7 +3873,7 @@ Deno.serve(async (req) => {
         timing.ai_ms += rescueDuration;
         aiUsed = true;
         if (rescueRows && rescueRows.length > 0) {
-          const rescueConfidence = computeConfidenceBreakdown({
+          const rescueConfidence = computeConfidenceBreakdownTimed({
             rows: rescueRows,
             sourceText: minimalStructuredLines,
             bankId: templateSelectedId ?? bankDetection.bankId,
@@ -3517,6 +3952,18 @@ Deno.serve(async (req) => {
 
     // Log extraction status
     console.log(generateStatusReport(extractionResult.status));
+
+    if (
+      (!rawTransactions || rawTransactions.length === 0) &&
+      structuralScan.hasSelectableText &&
+      deterministicDataset.length > 0
+    ) {
+      console.log(
+        `Safe fallback activated after OCR failure on selectable-text PDF (${deterministicDataset.length} deterministic rows).`,
+      );
+      rawTransactions = deterministicDataset.map((row) => ({ ...row }));
+      processedVia = 'deterministic';
+    }
 
     if (!rawTransactions || rawTransactions.length === 0) {
       // Generate error report for debugging
@@ -4068,6 +4515,14 @@ Deno.serve(async (req) => {
 
     timing.total_ms = Date.now() - totalStart;
     console.log('Timing summary (ms):', timing);
+    traceLog('stage_timing_trace_ms', {
+      text_extraction_ms: timing.text_extract_ms,
+      deterministic_parse_ms: timing.deterministic_parse_ms,
+      confidence_computation_ms: timing.confidence_ms,
+      ocr_call_ms: timing.ocr_ms,
+      ai_rescue_ms: timing.ai_ms,
+      total_ms: timing.total_ms,
+    });
     const expectedTotal =
       processedVia === 'deterministic'
         ? EXPECTED_TEXT_TOTAL_MS
@@ -4136,6 +4591,16 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     console.error('Internal error:', error);
+    timing.total_ms = Date.now() - totalStart;
+    traceLog('stage_timing_trace_ms', {
+      text_extraction_ms: timing.text_extract_ms,
+      deterministic_parse_ms: timing.deterministic_parse_ms,
+      confidence_computation_ms: timing.confidence_ms,
+      ocr_call_ms: timing.ocr_ms,
+      ai_rescue_ms: timing.ai_ms,
+      total_ms: timing.total_ms,
+      failed: true,
+    });
     const errorMessage = sanitizeError(error);
     return new Response(
       JSON.stringify({ error: errorMessage }),
