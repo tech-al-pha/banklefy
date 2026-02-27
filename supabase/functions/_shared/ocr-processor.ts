@@ -2181,16 +2181,23 @@ export const recoverAdcbTransactionsFromOcrText = (ocrText: string): RawTransact
 
 // ============= DOCUMENT TYPE CLASSIFIER =============
 export interface DocumentClassification {
-  type: 'digital' | 'scanned' | 'image';
+  type: 'digital' | 'text' | 'scanned' | 'image';
   textDensity: number;
   needsOCR: boolean;
   confidence: number;
 }
 
+export interface DocumentClassificationMetrics {
+  rawTextLength: number;
+  charsPerPage: number;
+  selectableTextDetected: boolean;
+}
+
 export function classifyDocument(
   extractedText: string, 
   fileBytes: Uint8Array, 
-  fileName: string
+  fileName: string,
+  metrics?: DocumentClassificationMetrics,
 ): DocumentClassification {
   const lowerName = fileName.toLowerCase();
   
@@ -2203,12 +2210,20 @@ export function classifyDocument(
       confidence: 1.0,
     };
   }
-  
-  // All PDFs need OCR since we can't extract text in edge functions
+
+  if (metrics?.selectableTextDetected === true && metrics?.charsPerPage >= 100) {
+    return {
+      type: 'text',
+      textDensity: metrics.charsPerPage,
+      needsOCR: false,
+      confidence: 1.0,
+    };
+  }
+
   return {
     type: 'scanned',
-    textDensity: 0,
+    textDensity: metrics?.charsPerPage || 0,
     needsOCR: true,
-    confidence: 1.0,
+    confidence: 0.5,
   };
 }
