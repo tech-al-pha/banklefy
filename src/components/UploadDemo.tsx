@@ -724,9 +724,31 @@ export const UploadDemo = () => {
   }, [selectedFile]);
 
   useEffect(() => {
-    // Progress panel intentionally disabled for cleaner UX.
-    setShowProgress(false);
+    if (!converting) return;
+
+    setShowProgress(true);
     setProgressStep(0);
+
+    const timeouts: number[] = [];
+    const delays = [900, 1100, 1300, 1500];
+
+    const schedule = (nextStep: number) => {
+      const delay = delays[nextStep - 1] ?? 1200;
+      timeouts.push(
+        window.setTimeout(() => {
+          setProgressStep(nextStep);
+          if (nextStep < 3) {
+            schedule(nextStep + 1);
+          }
+        }, delay)
+      );
+    };
+
+    schedule(1);
+
+    return () => {
+      timeouts.forEach((t) => window.clearTimeout(t));
+    };
   }, [converting]);
 
   useEffect(() => {
@@ -739,10 +761,15 @@ export const UploadDemo = () => {
   }, [hasEditPdfDetectorAccess, editedPdfWarning, editedPdfCheckResult]);
 
   useEffect(() => {
-    if (showProgress) {
+    if (converting || !showProgress) return;
+
+    setProgressStep(4);
+    const timeout = window.setTimeout(() => {
       setShowProgress(false);
-    }
-  }, [showProgress]);
+    }, 900);
+
+    return () => window.clearTimeout(timeout);
+  }, [converting, showProgress]);
 
   const MAX_PDF_RENDER_PAGES = 120;
   const FREE_MAX_PDF_PAGES_PER_FILE = 15;
@@ -750,7 +777,7 @@ export const UploadDemo = () => {
   const EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES = 18 * 1024 * 1024;
   const EDGE_FUNCTION_SAFE_BATCH_PDF_PAYLOAD_BYTES = 20 * 1024 * 1024;
   const EDGE_FUNCTION_SAFE_BATCH_PDF_PAGES = 45;
-  const showConversionProgressPanel = false;
+  const showConversionProgressPanel = true;
 
 
 
