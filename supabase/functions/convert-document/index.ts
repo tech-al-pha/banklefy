@@ -439,10 +439,15 @@ const loadPdfDocumentFromBytes = async (
   password?: string,
 ): Promise<PdfDocumentProxy> => {
   const pdfjsLib = (await import('https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs')) as PdfJsModule;
+  if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    // Edge runtime: force explicit workerSrc to avoid runtime workerSrc resolution errors.
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
+  }
   const loadingTask = pdfjsLib.getDocument({
     data: bytes,
     password: password || undefined,
     useWorkerFetch: false,
+    disableWorker: true,
     isEvalSupported: false,
     useSystemFonts: true,
   });
@@ -2961,6 +2966,17 @@ Deno.serve(async (req) => {
       // Retry without it so history records are still created.
       if (convError && /pages_processed/i.test(convError.message || '')) {
         delete insertPayload.pages_processed;
+        ({ data: convData, error: convError } = await supabase
+          .from('conversions')
+          .insert(insertPayload)
+          .select()
+          .single());
+      }
+
+      // Some deployed DBs do not have `file_path` column yet.
+      // Retry without it so history records are still created.
+      if (convError && /file_path/i.test(convError.message || '')) {
+        delete insertPayload.file_path;
         ({ data: convData, error: convError } = await supabase
           .from('conversions')
           .insert(insertPayload)
