@@ -112,6 +112,12 @@ const MONTH_INDEX: Record<string, number> = {
   december: 12,
 };
 
+const normalizeTwoDigitYear = (yearRaw: number): number => {
+  if (!Number.isFinite(yearRaw)) return yearRaw;
+  if (yearRaw >= 100) return yearRaw;
+  return yearRaw < 50 ? 2000 + yearRaw : 1900 + yearRaw;
+};
+
 const normalizeDate = (value: string): string => {
   const raw = value.trim().replace(/\s+/g, ' ');
   const slashDate = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
@@ -119,7 +125,7 @@ const normalizeDate = (value: string): string => {
     const day = Number(slashDate[1]);
     const month = Number(slashDate[2]);
     const yearRaw = Number(slashDate[3]);
-    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+    const year = normalizeTwoDigitYear(yearRaw);
     if (
       Number.isFinite(day) &&
       Number.isFinite(month) &&
@@ -139,7 +145,7 @@ const normalizeDate = (value: string): string => {
     const monthName = monthDate[2].toLowerCase();
     const month = MONTH_INDEX[monthName];
     const yearRaw = Number(monthDate[3]);
-    const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+    const year = normalizeTwoDigitYear(yearRaw);
     if (
       Number.isFinite(day) &&
       Number.isFinite(month) &&
@@ -454,13 +460,20 @@ const loadPdfDocumentFromBytes = async (
   return (await loadingTask.promise) as PdfDocumentProxy;
 };
 
-const detectPdfTotalPagesFromBytes = async (bytes: Uint8Array, password?: string): Promise<number> => {
+const detectPdfTotalPagesFromBytes = async (
+  bytes: Uint8Array,
+  password?: string,
+  options?: { pdfDocument?: PdfDocumentProxy },
+): Promise<number> => {
   if (!bytes || bytes.length === 0) return 0;
-  const pdf = await loadPdfDocumentFromBytes(bytes, password);
+  const shouldDestroyPdf = !options?.pdfDocument;
+  const pdf = options?.pdfDocument ?? await loadPdfDocumentFromBytes(bytes, password);
   try {
     return Number(pdf.numPages || 0);
   } finally {
-    await pdf.destroy?.();
+    if (shouldDestroyPdf) {
+      await pdf.destroy?.();
+    }
   }
 };
 
@@ -708,15 +721,17 @@ const extractDeterministicPdfTransactions = async ({
   totalPages,
   useChunkMode,
   allowSingleDate,
+  pdfDocument,
 }: {
   bytes: Uint8Array;
   password?: string;
   totalPages: number;
   useChunkMode: boolean;
   allowSingleDate?: boolean;
+  pdfDocument?: PdfDocumentProxy;
 }): Promise<{ transactions: RawTransaction[]; text: string; chunked: boolean; chunksProcessed: number }> => {
   if (!useChunkMode) {
-    const parsed = await extractPdfTextTransactionsFromBytes(bytes, password, { allowSingleDate });
+    const parsed = await extractPdfTextTransactionsFromBytes(bytes, password, { allowSingleDate, pdfDocument });
     return {
       transactions: parsed.transactions,
       text: parsed.text,
@@ -729,7 +744,8 @@ const extractDeterministicPdfTransactions = async ({
   const textParts: string[] = [];
   let chunksProcessed = 0;
 
-  const pdf = await loadPdfDocumentFromBytes(bytes, password);
+  const shouldDestroyPdf = !pdfDocument;
+  const pdf = pdfDocument ?? await loadPdfDocumentFromBytes(bytes, password);
   try {
     const cappedTotalPages = Math.max(0, Math.min(pdf.numPages, totalPages));
     for (let start = 0; start < cappedTotalPages; start += CHUNK_SIZE) {
@@ -756,7 +772,9 @@ const extractDeterministicPdfTransactions = async ({
       parsedChunk = null;
     }
   } finally {
-    await pdf.destroy?.();
+    if (shouldDestroyPdf) {
+      await pdf.destroy?.();
+    }
   }
 
   return {
@@ -786,11 +804,13 @@ const buildSelectiveOcrPagePlan = async ({
   password,
   totalPages,
   pageImages,
+  pdfDocument,
 }: {
   bytes: Uint8Array;
   password?: string;
   totalPages: number;
   pageImages: string[];
+  pdfDocument?: PdfDocumentProxy;
 }): Promise<SelectiveOcrPagePlan> => {
   const totalProvidedPages = Array.isArray(pageImages) ? pageImages.length : 0;
   const fallbackAll = pageImages.map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }));
@@ -817,39 +837,46 @@ const buildSelectiveOcrPagePlan = async ({
     };
   }
 
-  const diagnostics: SelectiveOcrPagePlan['pageDiagnostics'] = [];
   const selectedIndexes = new Set<number>();
-  const pdf = await loadPdfDocumentFromBytes(bytes, password);
+  const shouldDestroyPdf = !pdfDocument;
+  const pdf = pdfDocument ?? await loadPdfDocumentFromBytes(bytes, password);
+  let diagnostics: SelectiveOcrPagePlan['pageDiagnostics'] = [];
   try {
-    for (let pageNumber = 1; pageNumber <= lastPage; pageNumber += 1) {
-      const singlePage = await extractPdfTextTransactionsFromBytes(bytes, password, {
-        pageStart: pageNumber,
-        pageEnd: pageNumber,
-        pdfDocument: pdf,
-      });
-      const assessment = assessClientPdfParsedTransactions(singlePage.transactions, 1);
-      const sparseRows = singlePage.transactions.length < 2;
-      const needsOcr =
-        sparseRows ||
-        !assessment.useDeterministic ||
-        assessment.mismatchRatio >= 0.22 ||
-        assessment.anomalyRate >= 0.2;
+    diagnostics = (await Promise.all(
+      Array.from({ length: lastPage }, async (_, idx) => {
+        const pageNumber = idx + 1;
+        const singlePage = await extractPdfTextTransactionsFromBytes(bytes, password, {
+          pageStart: pageNumber,
+          pageEnd: pageNumber,
+          pdfDocument: pdf,
+        });
+        const assessment = assessClientPdfParsedTransactions(singlePage.transactions, 1);
+        const sparseRows = singlePage.transactions.length < 2;
+        const needsOcr =
+          sparseRows ||
+          !assessment.useDeterministic ||
+          assessment.mismatchRatio >= 0.22 ||
+          assessment.anomalyRate >= 0.2;
 
-      diagnostics.push({
-        pageNumber,
-        rows: singlePage.transactions.length,
-        useDeterministic: assessment.useDeterministic,
-        mismatchRatio: assessment.mismatchRatio,
-        anomalyRate: assessment.anomalyRate,
-        needsOcr,
-      });
-
-      if (needsOcr) {
-        selectedIndexes.add(pageNumber - 1);
+        return {
+          pageNumber,
+          rows: singlePage.transactions.length,
+          useDeterministic: assessment.useDeterministic,
+          mismatchRatio: assessment.mismatchRatio,
+          anomalyRate: assessment.anomalyRate,
+          needsOcr,
+        };
+      }),
+    )) as SelectiveOcrPagePlan['pageDiagnostics'];
+    for (const diagnostic of diagnostics) {
+      if (diagnostic.needsOcr) {
+        selectedIndexes.add(diagnostic.pageNumber - 1);
       }
     }
   } finally {
-    await pdf.destroy?.();
+    if (shouldDestroyPdf) {
+      await pdf.destroy?.();
+    }
   }
 
   if (selectedIndexes.size === 0) {
@@ -1183,13 +1210,7 @@ const isPdfPasswordError = (error: unknown): boolean => {
 
 const toBase64FromBytes = (bytes: Uint8Array): string => {
   if (!bytes || bytes.length === 0) return '';
-  const chunkSize = 8192;
-  let result = '';
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    result += String.fromCharCode(...chunk);
-  }
-  return btoa(result);
+  return btoa(String.fromCharCode(...new Uint8Array(bytes)));
 };
 
 const decodePdfSegment = (bytes: Uint8Array, maxBytes = 300_000): string => {
@@ -1231,10 +1252,8 @@ const runStructuralScan = ({
   let pdfType: StructuralScanResult['pdfType'] = 'UNKNOWN';
   if (!isPdf) {
     pdfType = 'IMAGE';
-  } else if (hasSelectableText && pageCount <= 1) {
-    pdfType = 'TEXT';
   } else if (hasSelectableText) {
-    pdfType = 'HYBRID';
+    pdfType = 'TEXT';
   } else {
     pdfType = 'IMAGE';
   }
@@ -1587,11 +1606,14 @@ async function verifyRecaptcha(token: string): Promise<boolean> {
     return false;
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
     const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: `secret=${secretKey}&response=${token}`,
+      signal: controller.signal,
     });
     const data = await response.json();
     console.log('reCAPTCHA verification result:', { success: data.success });
@@ -1599,6 +1621,8 @@ async function verifyRecaptcha(token: string): Promise<boolean> {
   } catch (error) {
     console.error('reCAPTCHA verification error:', error);
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -1781,7 +1805,7 @@ const shouldForceOcrForDenseStatement = (
   let codeHits = 0;
   for (const transaction of transactions.slice(0, 200)) {
     const blob = `${String(transaction.refNumber || '')} ${String(transaction.description || '')}`.toLowerCase();
-    if (/\bphub|mob|trf\b/.test(blob)) codeHits += 1;
+    if (/phub|mob|trf/i.test(blob)) codeHits += 1;
   }
   return codeHits >= 4;
 };
@@ -2480,6 +2504,7 @@ Deno.serve(async (req) => {
   let supabaseAdmin: any = null;
   let shouldCleanupUploadedSource = false;
   let uploadedSourcePath: string | null = null;
+  let sharedPdf: PdfDocumentProxy | null = null;
   const totalStart = Date.now();
   const timing: Record<string, number> = {
     text_extract_ms: 0,
@@ -2603,6 +2628,16 @@ Deno.serve(async (req) => {
     const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
     const rawBase64Input = typeof base64FileData === 'string' ? base64FileData.trim() : '';
     const hasBase64FileData = rawBase64Input.length > 0;
+    const rawBase64PayloadLength = hasBase64FileData
+      ? (rawBase64Input.match(/^data:[^;]+;base64,(.+)$/)?.[1] || rawBase64Input).replace(/\s+/g, '').length
+      : 0;
+    const estimatedBase64Bytes = Math.floor(rawBase64PayloadLength * 0.75);
+    if (hasBase64FileData && estimatedBase64Bytes > 10 * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({ error: 'File exceeds 10MB limit' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (!user && !hasBase64FileData) {
       return new Response(
@@ -2750,9 +2785,10 @@ Deno.serve(async (req) => {
     let pageCount = hasPdfPageImages ? (pdfPageImages as string[]).length : 1;
     if (isPdf && bytes.length > 0) {
       try {
-        // pdf.js may take ownership of the provided TypedArray buffer.
-        // Use a copy here so downstream extraction keeps the original bytes intact.
-        const detectedPageCount = await detectPdfTotalPagesFromBytes(bytes.slice(), pdfPassword);
+        sharedPdf = await loadPdfDocumentFromBytes(bytes.slice(), pdfPassword);
+        const detectedPageCount = await detectPdfTotalPagesFromBytes(bytes, pdfPassword, {
+          pdfDocument: sharedPdf,
+        });
         if (Number.isFinite(detectedPageCount) && detectedPageCount > 0) {
           pageCount = detectedPageCount;
         }
@@ -3012,6 +3048,7 @@ Deno.serve(async (req) => {
           password: pdfPassword,
           totalPages: pageCount,
           useChunkMode,
+          pdfDocument: sharedPdf ?? undefined,
         });
         timing.text_extract_ms += Date.now() - textStart;
         if (serverParsed.text) extractedText = serverParsed.text;
@@ -3385,81 +3422,120 @@ Deno.serve(async (req) => {
         OCR_WORKER_MODE !== 'primary' &&
         adaptiveOcrStrategy.strictFirstPass;
 
-      try {
-        const ocrPagePlan = await buildSelectiveOcrPagePlan({
-          bytes,
-          password: pdfPassword,
-          totalPages: pageCount,
-          pageImages: pdfPageImages as string[],
-        });
-        selectedOcrPages = ocrPagePlan.selected;
+      if (!structuralScan.hasSelectableText && hasPdfPageImages) {
         pipelineDiagnostics.ocrStage = {
           ok: true,
           skipped: false,
-          totalProvidedPages: ocrPagePlan.totalProvidedPages,
+          totalProvidedPages: selectedOcrPages.length,
           selectedPages: selectedOcrPages.map((entry) => entry.pageNumber),
-          selectionReasons: ocrPagePlan.reasons,
-          pageDiagnostics: ocrPagePlan.pageDiagnostics,
+          selectionReasons: ['image_only_structural_scan'],
+          pageDiagnostics: [],
         };
-        console.log(
-          `Selective OCR plan: selected ${selectedOcrPages.length}/${ocrPagePlan.totalProvidedPages} page(s)`,
-        );
-      } catch (planError) {
-        console.error('Selective OCR page planning failed, falling back to all provided pages:', planError);
+        console.log(`Skipping selective OCR page plan (image-only document): using all ${selectedOcrPages.length} page(s).`);
+      } else {
+        try {
+          const ocrPagePlan = await buildSelectiveOcrPagePlan({
+            bytes,
+            password: pdfPassword,
+            totalPages: pageCount,
+            pageImages: pdfPageImages as string[],
+            pdfDocument: sharedPdf ?? undefined,
+          });
+          selectedOcrPages = ocrPagePlan.selected;
+          pipelineDiagnostics.ocrStage = {
+            ok: true,
+            skipped: false,
+            totalProvidedPages: ocrPagePlan.totalProvidedPages,
+            selectedPages: selectedOcrPages.map((entry) => entry.pageNumber),
+            selectionReasons: ocrPagePlan.reasons,
+            pageDiagnostics: ocrPagePlan.pageDiagnostics,
+          };
+          console.log(
+            `Selective OCR plan: selected ${selectedOcrPages.length}/${ocrPagePlan.totalProvidedPages} page(s)`,
+          );
+        } catch (planError) {
+          console.error('Selective OCR page planning failed, falling back to all provided pages:', planError);
+        }
       }
 
-      for (const pageEntry of selectedOcrPages) {
-        const img = pageEntry.imageDataUrl;
-        if (typeof img !== 'string') continue;
-        const match = img.match(/^data:([^;]+);base64,(.+)$/);
-        if (!match) continue;
-        const pageMime = match[1];
-        const pageBase64 = match[2];
-        let pageResult: OCRResult | null = null;
-        try {
-          if (OCR_WORKER_MODE === 'primary') {
-            const workerResult = await callTesseractOcrWorker(pageBase64, pageMime, fileName);
-            if (workerResult.success && workerResult.transactions && workerResult.transactions.length > 0) {
-              pageResult = workerResult;
-              console.log('Using Tesseract OCR worker result for this page.');
+      const ocrPageResults = await Promise.all(
+        selectedOcrPages.map(async (pageEntry, index) => {
+          const img = pageEntry.imageDataUrl;
+          if (typeof img !== 'string') {
+            return { pageResult: null, error: 'Invalid OCR page image payload', strictUsed: false, dualUsed: false };
+          }
+
+          const match = img.match(/^data:([^;]+);base64,(.+)$/);
+          if (!match) {
+            return { pageResult: null, error: 'Invalid OCR page image encoding', strictUsed: false, dualUsed: false };
+          }
+
+          const pageMime = match[1];
+          const pageBase64 = match[2];
+          let pageResult: OCRResult | null = null;
+          let strictUsed = false;
+          let dualUsed = false;
+          try {
+            if (OCR_WORKER_MODE === 'primary') {
+              const workerResult = await callTesseractOcrWorker(pageBase64, pageMime, fileName);
+              if (workerResult.success && workerResult.transactions && workerResult.transactions.length > 0) {
+                pageResult = workerResult;
+                console.log('Using Tesseract OCR worker result for this page.');
+              }
             }
-          }
 
-          if (!pageResult) {
-            pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
-          }
-
-          if (
-            pageResult &&
-            !useStrictFirstPass &&
-            OCR_WORKER_MODE !== 'primary' &&
-            strictRetryCount < effectiveStrictMaxPages &&
-            shouldRetryStrictVisionPass(lowerFileName, pageResult, effectiveStrictMode)
-          ) {
-            const strictResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: true });
-            strictRetryCount += 1;
-            const chosenResult = chooseBetterVisionResult(pageResult, strictResult);
-            if (chosenResult !== pageResult) {
-              console.log('Using strict-table OCR pass for a PDF page (better extraction quality).');
-              pageResult = chosenResult;
+            if (!pageResult) {
+              pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
             }
-          }
 
-          if (
-            pageResult &&
-            OCR_WORKER_MODE !== 'primary' &&
-            dualProviderCount < effectiveDualMaxPages &&
-            shouldRunMistralDualPass(lowerFileName, pageResult, effectiveDualMode)
-          ) {
-            const mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
-            dualProviderCount += 1;
-            pageResult = mergeProviderResults(pageResult, mistralResult);
+            if (
+              pageResult &&
+              !useStrictFirstPass &&
+              OCR_WORKER_MODE !== 'primary' &&
+              index < effectiveStrictMaxPages &&
+              shouldRetryStrictVisionPass(lowerFileName, pageResult, effectiveStrictMode)
+            ) {
+              const strictResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: true });
+              strictUsed = true;
+              const chosenResult = chooseBetterVisionResult(pageResult, strictResult);
+              if (chosenResult !== pageResult) {
+                console.log('Using strict-table OCR pass for a PDF page (better extraction quality).');
+                pageResult = chosenResult;
+              }
+            }
+
+            if (
+              pageResult &&
+              OCR_WORKER_MODE !== 'primary' &&
+              index < effectiveDualMaxPages &&
+              shouldRunMistralDualPass(lowerFileName, pageResult, effectiveDualMode)
+            ) {
+              const mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
+              dualUsed = true;
+              pageResult = mergeProviderResults(pageResult, mistralResult);
+            }
+
+            return { pageResult, error: null, strictUsed, dualUsed };
+          } catch (pageError) {
+            return {
+              pageResult: null,
+              error: pageError instanceof Error ? pageError.message : 'OCR page processing failed',
+              strictUsed,
+              dualUsed,
+            };
           }
-        } catch (pageError) {
-          errors.push(pageError instanceof Error ? pageError.message : 'OCR page processing failed');
+        }),
+      );
+
+      for (const pageOutcome of ocrPageResults) {
+        if (pageOutcome.strictUsed) strictRetryCount += 1;
+        if (pageOutcome.dualUsed) dualProviderCount += 1;
+        if (pageOutcome.error) {
+          errors.push(pageOutcome.error);
           continue;
         }
 
+        const pageResult = pageOutcome.pageResult;
         if (pageResult && pageResult.success && pageResult.transactions && pageResult.transactions.length > 0) {
           pagesWithData += 1;
           collected.push(...pageResult.transactions);
@@ -3469,7 +3545,7 @@ Deno.serve(async (req) => {
             console.log('Bank metadata detected:', collectedBankMetadata);
           }
         } else {
-          errors.push(pageResult.error || 'No data extracted');
+          errors.push(pageResult?.error || 'No data extracted');
         }
       }
       if (strictRetryCount > 0) {
@@ -4524,6 +4600,15 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
     );
   } finally {
+    if (sharedPdf) {
+      try {
+        await sharedPdf.destroy?.();
+      } catch (destroyError) {
+        console.error('Failed to destroy shared PDF document:', destroyError);
+      } finally {
+        sharedPdf = null;
+      }
+    }
     if (shouldCleanupUploadedSource && uploadedSourcePath && supabaseAdmin) {
       try {
         const { error } = await supabaseAdmin.storage
