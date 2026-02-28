@@ -832,6 +832,9 @@ export const UploadDemo = () => {
     }
 
     if (newFiles.length > 0) {
+      void supabase.functions
+        .invoke('warm-up', { body: { ts: Date.now() } })
+        .catch(() => undefined);
       setUploadPrepActive(true);
       setUploadPrepProgress(0);
       setUploadPrepFileName(newFiles[0]?.name ?? null);
@@ -2293,6 +2296,17 @@ Analytics Summary:
       const cached = preparedPdfDataRef.current.get(getFileCacheKey(file));
       return !cached?.transactions || cached.transactions.length === 0;
     });
+  const conversionProgressDetail = uploading
+    ? "Uploading file and preparing document..."
+    : progressStep < 45
+      ? "Reading document structure..."
+      : progressStep < 65
+        ? "Detecting amounts and balance columns..."
+        : progressStep < 82
+          ? "Categorizing and validating transactions..."
+          : progressStep < 96
+            ? "Running final checks and reconciliation..."
+            : "Preparing download output...";
 
   return (
     <section className="relative py-16 px-4 sm:px-6 overflow-hidden bg-background">
@@ -2317,16 +2331,6 @@ Analytics Summary:
               limitReached={limitReached}
               planType={planType}
             />
-            {showScanTimeCard && (selectedFile || selectedFiles.length > 0) && !limitReached && !uploadPrepActive && (
-              <div className="p-4 bg-[#141414] border border-primary/25 rounded-xl">
-                <p className="text-sm font-semibold text-white">Scanning Mode Active</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  This looks like an image-based statement. We run deeper OCR checks for cleaner extraction, so processing can take longer.
-                  Strong accuracy takes a little extra time.
-                </p>
-              </div>
-            )}
-
             <div className="space-y-8">
               {/* Hidden File Input - Multiple Files */}
               <input
@@ -2663,32 +2667,6 @@ Analytics Summary:
                 </div>
               )}
 
-              {showProgress && (selectedFile || selectedFiles.length > 0) && (
-                <div className="mx-auto w-full max-w-2xl space-y-2 rounded-xl border border-primary/20 bg-[#141414] px-4 py-4">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>
-                      {uploading
-                        ? "Uploading and preparing document..."
-                        : converting
-                          ? "Converting and validating transactions..."
-                          : "Finalizing..."}
-                    </span>
-                    <span>{Math.round(Math.min(100, Math.max(0, progressStep)))}%</span>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
-                      style={{ width: `${Math.min(100, Math.max(0, progressStep))}%` }}
-                    />
-                  </div>
-                  {converting && showImageProcessingHint && (
-                    <p className="text-xs text-muted-foreground">
-                      Image-based statements can take longer. We prioritize extraction accuracy over raw speed.
-                    </p>
-                  )}
-                </div>
-              )}
-
               <ResultsSection
                 batchResults={batchResults}
                 batchDownloading={batchDownloading}
@@ -2727,7 +2705,7 @@ Analytics Summary:
                       ? "Converting and validating transactions..."
                       : "Finalizing..."
                 }
-                showImageProcessingHint={converting && showImageProcessingHint}
+                conversionProgressSubLabel={conversionProgressDetail}
               />
             </div>
           </div>
