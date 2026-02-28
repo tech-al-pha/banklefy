@@ -1180,6 +1180,13 @@ const MONTH_TO_NUM: Record<string, string> = {
 };
 
 const parseStatementDate = (value: string, defaultYear?: string): string | undefined => {
+  const normalizeTwoDigitYear = (yearToken: string): string => {
+    if (yearToken.length !== 2) return yearToken;
+    const parsed = Number(yearToken);
+    if (!Number.isFinite(parsed)) return `20${yearToken}`;
+    return parsed < 50 ? `20${yearToken}` : `19${yearToken}`;
+  };
+
   const clean = value.trim();
   const iso = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
@@ -1188,7 +1195,7 @@ const parseStatementDate = (value: string, defaultYear?: string): string | undef
   if (slash) {
     const dd = slash[1].padStart(2, '0');
     const mm = slash[2].padStart(2, '0');
-    const yyyy = slash[3].length === 2 ? `20${slash[3]}` : slash[3];
+    const yyyy = normalizeTwoDigitYear(slash[3]);
     return `${yyyy}-${mm}-${dd}`;
   }
 
@@ -1209,7 +1216,7 @@ const parseStatementDate = (value: string, defaultYear?: string): string | undef
     }
   }
   if (!yearToken) return undefined;
-  const yyyy = yearToken.length === 2 ? `20${yearToken}` : yearToken;
+  const yyyy = normalizeTwoDigitYear(yearToken);
   return `${yyyy}-${mm}-${dd}`;
 };
 
