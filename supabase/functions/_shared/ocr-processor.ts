@@ -1726,7 +1726,7 @@ const findBestSecondaryMatch = (
   }
 
   if (bestIndex < 0) return -1;
-  return bestScore <= 75 ? bestIndex : -1; // <= 0.75 balance difference
+  return bestScore <= 200 ? bestIndex : -1;
 };
 
 export const mergeOcrTransactionsDeterministic = (
@@ -2229,7 +2229,7 @@ export function classifyDocument(
     };
   }
 
-  if (metrics?.selectableTextDetected === true) {
+  if (metrics?.selectableTextDetected === true && (metrics?.charsPerPage ?? 0) > 50) {
     return {
       type: 'text',
       textDensity: metrics.charsPerPage || metrics.rawTextLength || 0,
