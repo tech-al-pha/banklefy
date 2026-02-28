@@ -31,16 +31,14 @@ import {
 } from "lucide-react";
 import { AIStatusPanel } from "@/components/AIStatusPanel";
 import { UnderwritingPanel } from "@/components/UnderwritingPanel";
-import { UnderwritingPanelSkeleton } from "@/components/UnderwritingPanelSkeleton";
 import { FraudAlertPanel } from "@/components/FraudAlertPanel";
-import { categoryColors, conversionSteps, supportedBanks } from "./constants";
+import { categoryColors, supportedBanks } from "./constants";
 import type {
   AiStatus,
   Analytics,
   MergeInfo,
   Transaction,
 } from "./types";
-import { useState } from "react";
 
 type ToneName = "excellent" | "good" | "moderate" | "bad";
 
@@ -92,12 +90,9 @@ type ResultsSectionProps = {
   hasTallyAccess: boolean;
   exportAsCSV: () => Promise<void>;
   handleTallyExport: () => Promise<boolean>;
-  exportAsPDF: () => Promise<void>;
   handlePremiumExport: (format: "json" | "mt940") => void;
   aiStatus: AiStatus | null;
   converting: boolean;
-  showProgress: boolean;
-  progressStep: number;
   analytics: Analytics | null;
   currencyCode: string;
   showDuplicatesOnly: boolean;
@@ -108,12 +103,10 @@ type ResultsSectionProps = {
   resultMode?: "standard" | "tally_only";
   editedPdfCheckResult?: { fileName: string; status: "clean" | "suspected"; reason: string } | null;
   showPipeline?: boolean;
-  showFeedback?: boolean;
-  feedbackSubmitted?: boolean;
-  feedbackLoading?: boolean;
-  feedbackError?: string | null;
-  onSubmitFeedback?: (payload: { isAccurate: boolean; allowTemplate: boolean }) => void;
   showUnderwriting?: boolean;
+  conversionProgressPercent?: number;
+  conversionProgressLabel?: string;
+  showImageProcessingHint?: boolean;
 };
 
 export const ResultsSection = ({
@@ -132,12 +125,9 @@ export const ResultsSection = ({
   hasTallyAccess,
   exportAsCSV,
   handleTallyExport,
-  exportAsPDF,
   handlePremiumExport,
   aiStatus,
   converting,
-  showProgress,
-  progressStep,
   analytics,
   currencyCode,
   showDuplicatesOnly,
@@ -148,12 +138,10 @@ export const ResultsSection = ({
   resultMode = "standard",
   editedPdfCheckResult = null,
   showPipeline = true,
-  showFeedback = false,
-  feedbackSubmitted = false,
-  feedbackLoading = false,
-  feedbackError = null,
-  onSubmitFeedback,
   showUnderwriting = true,
+  conversionProgressPercent = 0,
+  conversionProgressLabel = "Processing conversion...",
+  showImageProcessingHint = false,
 }: ResultsSectionProps) => {
   const isTallyOnlyMode = resultMode === "tally_only";
   const creditTone: ToneName = analytics ? getCreditTone(analytics.totalCredits) : "good";
@@ -162,8 +150,6 @@ export const ResultsSection = ({
   const lockedFormats: string[] = [];
   if (isTallyOnlyMode && !hasTallyAccess) lockedFormats.push("Tally XML");
   if (!isPaidUser) lockedFormats.push("JSON", "MT940");
-  const [allowTemplate, setAllowTemplate] = useState(false);
-
   return (
     <>
       {batchResults.length > 0 && (
@@ -253,10 +239,6 @@ export const ResultsSection = ({
                   <FileText className="mr-2 h-4 w-4" />
                   CSV
                 </Button>
-                <Button size="sm" variant="outline" onClick={exportAsPDF} disabled={transactions.length === 0} className="text-white">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Analyzed PDF
-                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -338,10 +320,6 @@ export const ResultsSection = ({
                   <FileText className="mr-2 h-5 w-5" />
                   CSV
                 </Button>
-                <Button size="lg" variant="outline" onClick={exportAsPDF} disabled={transactions.length === 0} className="text-white">
-                  <FileText className="mr-2 h-5 w-5" />
-                  Analyzed PDF
-                </Button>
                 <Button
                   size="lg"
                   variant="outline"
@@ -376,51 +354,6 @@ export const ResultsSection = ({
         </div>
       )}
 
-      {showFeedback && !isTallyOnlyMode && conversionResult && batchResults.length === 0 && (
-        <Card className="p-4 border-white/10 bg-[#191919]/80">
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-white">
-              Was this Excel correct for your bank statement?
-            </p>
-            <p className="text-xs text-muted-foreground">
-              If yes, we can learn this layout to improve future results.
-            </p>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-primary"
-                checked={allowTemplate}
-                onChange={(event) => setAllowTemplate(event.target.checked)}
-              />
-              You can use this layout as a template
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                onClick={() => onSubmitFeedback?.({ isAccurate: true, allowTemplate })}
-                disabled={feedbackLoading || feedbackSubmitted}
-              >
-                Yes, correct
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onSubmitFeedback?.({ isAccurate: false, allowTemplate: false })}
-                disabled={feedbackLoading || feedbackSubmitted}
-              >
-                Not correct
-              </Button>
-              {feedbackSubmitted && (
-                <span className="text-xs text-emerald-300 self-center">Thanks for your feedback.</span>
-              )}
-            </div>
-            {feedbackError && (
-              <p className="text-xs text-red-300">{feedbackError}</p>
-            )}
-          </div>
-        </Card>
-      )}
-
       {isTallyOnlyMode && showEditDetectorSignals && editedPdfCheckResult && (
         <Card
           className={`p-4 border ${
@@ -447,57 +380,24 @@ export const ResultsSection = ({
 
       {showPipeline && aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
 
-      {(converting || showProgress) && (
-        <div className="rounded-xl border border-white/10 bg-[#191919]/80 p-4 sm:p-5" role="status" aria-live="polite" aria-atomic="true">
+      {showUnderwriting && converting && (
+        <Card className="p-4 bg-[#191919]/80 border border-white/10">
           <div className="space-y-2">
-            {conversionSteps.map((step, index) => {
-              const isDone = index < progressStep;
-              const isActive = index === progressStep;
-              const isUpcoming = index > progressStep;
-
-              return (
-                <div
-                  key={step}
-                  className={`relative flex items-center gap-3 rounded-lg px-3 py-2 transition-all duration-500 ${
-                    isActive ? "text-white" : isDone ? "text-emerald-200" : "text-white/50"
-                  } ${
-                    isActive
-                      ? "before:absolute before:inset-0 before:-z-10 before:rounded-lg before:bg-primary/10 before:blur-xl before:opacity-70 before:content-['']"
-                      : ""
-                  } ${
-                    isDone
-                      ? "bg-emerald-500/10 border border-emerald-500/25"
-                      : isActive
-                        ? "bg-primary/5 border border-primary/20"
-                        : "border border-transparent"
-                  }`}
-                >
-                  <div
-                    className={`relative flex h-6 w-6 items-center justify-center rounded-full border transition-all duration-500 ${
-                      isDone
-                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                        : isActive
-                          ? "border-primary/60 text-primary shadow-[0_0_18px_hsl(var(--primary)/0.35)]"
-                          : "border-white/10 text-white/40"
-                    }`}
-                  >
-                    {isDone ? (
-                      <CheckCircle className="h-4 w-4" />
-                    ) : (
-                      <div className={`h-2 w-2 rounded-full ${isActive ? "bg-primary animate-pulse" : "bg-white/20"}`} />
-                    )}
-                  </div>
-                  <span className={`text-sm font-medium ${isUpcoming ? "text-white/50" : ""}`}>
-                    {step}
-                  </span>
-                </div>
-              );
-            })}
+            <p className="text-sm font-semibold text-white">{conversionProgressLabel}</p>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
+                style={{ width: `${Math.min(100, Math.max(0, conversionProgressPercent))}%` }}
+              />
+            </div>
+            {showImageProcessingHint && (
+              <p className="text-xs text-muted-foreground">
+                Image-based statements can take longer. We prioritize extraction accuracy over raw speed.
+              </p>
+            )}
           </div>
-        </div>
+        </Card>
       )}
-
-      {showUnderwriting && converting && <UnderwritingPanelSkeleton />}
       {showUnderwriting && !converting && !isTallyOnlyMode && analytics?.underwriting && (
         <UnderwritingPanel underwriting={analytics.underwriting} currencyCode={currencyCode} />
       )}
