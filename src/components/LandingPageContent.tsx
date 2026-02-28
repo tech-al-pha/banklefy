@@ -1,5 +1,4 @@
 import { Hero } from "@/components/Hero";
-import { HowItWorks } from "@/components/HowItWorks";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 
@@ -56,7 +55,6 @@ export const LandingPageContent = () => {
     <>
       <div className="bg-background">
         <Hero />
-        <HowItWorks />
       </div>
 
       <div id="demo" ref={demoRef}>
