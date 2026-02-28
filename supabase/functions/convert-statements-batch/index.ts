@@ -30,6 +30,7 @@ import {
   detectDuplicates,
   analyzeLiquidity,
   scoreTransactionConfidence,
+  type ConfidenceSummary,
   type Transaction,
 } from '../_shared/financial-engine.ts';
 import {
@@ -638,6 +639,7 @@ interface AggregatedAnalytics {
   netFlow: number;
   duplicateCount: number;
   categoryBreakdown: Record<string, { count: number; totalDebit: number; totalCredit: number }>;
+  confidenceSummary: ConfidenceSummary;
   riskAnalysis: {
     integrityScore: number;
     balanceMismatches: number;
