@@ -62,6 +62,19 @@ import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts
 import { getTrackingKey } from '../_shared/client-id.ts';
 import { resolveEffectiveLimit } from '../_shared/limit-resolver.ts';
 
+type PdfJsModule = {
+  getDocument: (options: Record<string, unknown>) => { promise: Promise<unknown> };
+  GlobalWorkerOptions?: { workerSrc?: string };
+};
+type PdfPage = {
+  getTextContent?: () => Promise<{ items?: Array<Record<string, unknown>> }>;
+};
+type PdfDocumentProxy = {
+  numPages: number;
+  getPage: (pageNumber: number) => Promise<PdfPage>;
+  destroy?: () => void;
+};
+
 // ============= ADMIN ROLE (Server-Side Only) =============
 const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
 const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
@@ -201,8 +214,7 @@ async function verifyRecaptcha(token: string): Promise<boolean> {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: `secret=${secretKey}&response=${token}`,
       signal: controller.signal,
-    });
-    clearTimeout(timeout);
+    }).finally(() => clearTimeout(timeout));
     const data = await response.json();
     console.log('reCAPTCHA verification result:', { success: data.success });
     return data.success === true;
@@ -222,6 +234,124 @@ const estimateBase64Bytes = (base64: string): number => {
   const cleaned = base64.trim();
   const padding = cleaned.endsWith('==') ? 2 : cleaned.endsWith('=') ? 1 : 0;
   return Math.floor((cleaned.length * 3) / 4) - padding;
+};
+
+const loadPdfDocumentFromBytes = async (
+  bytes: Uint8Array,
+  password?: string,
+): Promise<PdfDocumentProxy> => {
+  const isWorkerSrcFailure = (error: unknown): boolean => {
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    return /globalworkeroptions\.workersrc/i.test(message);
+  };
+
+  const loadViaPdfjsDist = async (): Promise<PdfDocumentProxy> => {
+    const pdfjsLib = (await import('https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs')) as PdfJsModule;
+    if (pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        pdfjsLib.GlobalWorkerOptions.workerSrc ||
+        'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
+    }
+    const loadingTask = pdfjsLib.getDocument({
+      data: bytes,
+      password: password || undefined,
+      useWorkerFetch: false,
+      disableWorker: true,
+      worker: null,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
+    return (await loadingTask.promise) as PdfDocumentProxy;
+  };
+
+  try {
+    return await loadViaPdfjsDist();
+  } catch (error) {
+    if (!isWorkerSrcFailure(error)) throw error;
+    const fallbackModule = await import('https://esm.sh/pdfjs-serverless');
+    const getDocument = (fallbackModule as { getDocument?: (options: Record<string, unknown>) => { promise: Promise<unknown> } }).getDocument;
+    if (!getDocument) throw error;
+    const fallbackLoadingTask = getDocument({
+      data: bytes,
+      password: password || undefined,
+      useSystemFonts: true,
+    });
+    return (await fallbackLoadingTask.promise) as PdfDocumentProxy;
+  }
+};
+
+const extractPdfPageText = async (
+  pdf: PdfDocumentProxy,
+  pageNumber: number,
+): Promise<string> => {
+  const page = await pdf.getPage(pageNumber);
+  const textContent = await page.getTextContent?.();
+  const items = Array.isArray(textContent?.items) ? textContent.items : [];
+  return items
+    .map((item) => String(item?.str ?? '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join(' ');
+};
+
+const extractPdfTextSummary = async (pdf: PdfDocumentProxy, pageCount: number): Promise<{
+  hasSelectableText: boolean;
+  charsPerPage: number;
+}> => {
+  const limitedPages = Math.max(1, Math.min(pageCount, pdf.numPages, 8));
+  const sampleTexts = await Promise.all(
+    Array.from({ length: limitedPages }, async (_, i) => extractPdfPageText(pdf, i + 1)),
+  );
+  const rawLength = sampleTexts.join('\n').replace(/\s+/g, '').length;
+  return {
+    hasSelectableText: rawLength > 0,
+    charsPerPage: Math.floor(rawLength / Math.max(1, limitedPages)),
+  };
+};
+
+type SelectiveOcrPlan = {
+  selected: Array<{ pageNumber: number; imageDataUrl: string }>;
+  reasons: string[];
+};
+
+const buildSelectiveOcrPagePlan = async (params: {
+  pdfDocument: PdfDocumentProxy;
+  totalPages: number;
+  pageImages: string[];
+}): Promise<SelectiveOcrPlan> => {
+  const totalPages = Math.max(0, Math.min(params.totalPages, params.pageImages.length, params.pdfDocument.numPages));
+  const fallbackAll = params.pageImages.map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }));
+  if (totalPages === 0) {
+    return { selected: fallbackAll, reasons: ['no_pages'] };
+  }
+
+  const diagnostics = await Promise.all(
+    Array.from({ length: totalPages }, async (_, idx) => {
+      const pageNumber = idx + 1;
+      const pageText = await extractPdfPageText(params.pdfDocument, pageNumber);
+      const charCount = pageText.replace(/\s+/g, '').length;
+      const dateMatches = (pageText.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g) || []).length;
+      const amountMatches = (pageText.match(/-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g) || []).length;
+      const needsOcr = charCount < 80 || amountMatches < 2 || dateMatches < 1;
+      return { pageNumber, needsOcr };
+    }),
+  );
+
+  const selected = diagnostics
+    .filter((entry) => entry.needsOcr)
+    .map((entry) => ({ pageNumber: entry.pageNumber, imageDataUrl: params.pageImages[entry.pageNumber - 1] }))
+    .filter((entry) => typeof entry.imageDataUrl === 'string' && entry.imageDataUrl.length > 0);
+
+  if (selected.length === 0) {
+    return {
+      selected: [{ pageNumber: 1, imageDataUrl: params.pageImages[0] }],
+      reasons: ['all_pages_text_stable'],
+    };
+  }
+
+  return {
+    selected,
+    reasons: [`selected_${selected.length}_of_${totalPages}`],
+  };
 };
 
 const bufferToBase64 = (buffer: ArrayBuffer): string => {
@@ -790,6 +920,7 @@ const processStatement = async (params: {
   pdfPageImages?: string[];
   pdfParsedTransactions?: StatementPayload['pdfParsedTransactions'];
   pdfParsedBankMetadata?: StatementPayload['pdfParsedBankMetadata'];
+  pdfPassword?: string;
   categoryCorrections?: Map<string, string>;
   forceOcrForPdf?: boolean;
 }): Promise<{ transactions: Transaction[]; bankMetadata?: BankMetadata; excelBuffer: ArrayBuffer; totals: { totalCredits: number; totalDebits: number }; pagesWithData: number }> => {
@@ -827,34 +958,50 @@ const processStatement = async (params: {
     `Adaptive OCR strategy (${params.fileName}): level=${adaptiveOcrStrategy.level}, strict=${adaptiveOcrStrategy.strictMode}:${adaptiveOcrStrategy.strictMaxPages}, ` +
     `dual=${adaptiveOcrStrategy.dualMode}:${adaptiveOcrStrategy.dualMaxPages}, reasons=${adaptiveOcrStrategy.reasons.join('|') || 'none'}`,
   );
-  const canUseDeterministicClientPdf =
-    !params.forceOcrForPdf &&
-    !forceOcrForDenseStatement &&
-    isPdf &&
-    clientParsedTransactions.length > 0 &&
-    (clientPdfParseAssessment.useDeterministic || mustUseDeterministicClientPdf);
 
-  if (mustUseDeterministicClientPdf && !clientPdfParseAssessment.useDeterministic) {
-    console.log(
-      `No PDF page images provided; forcing deterministic PDF rows (${clientParsedTransactions.length}) despite assessment: ${clientPdfParseAssessment.reason}`,
-    );
-  }
+  let sharedPdf: PdfDocumentProxy | null = null;
+  let structuralScan = {
+    hasSelectableText: false,
+    charsPerPage: 0,
+  };
+  try {
+    if (isPdf && params.bytes.length > 0) {
+      try {
+        sharedPdf = await loadPdfDocumentFromBytes(params.bytes.slice(), params.pdfPassword);
+        structuralScan = await extractPdfTextSummary(sharedPdf, pageCount);
+      } catch (pdfLoadError) {
+        console.warn(`Batch PDF text summary unavailable for ${params.fileName}:`, pdfLoadError);
+      }
+    }
 
-  if (isPdf && clientParsedTransactions.length > 0 && !canUseDeterministicClientPdf) {
-    console.log(
-      `Ignoring deterministic client PDF rows (${clientParsedTransactions.length}) and falling back to OCR: ${clientPdfParseAssessment.reason} ` +
-        `(mismatch=${clientPdfParseAssessment.mismatchRatio.toFixed(3)}, anomaly=${clientPdfParseAssessment.anomalyRate.toFixed(3)}, dense=${forceOcrForDenseStatement})`,
-    );
-  }
+    const canUseDeterministicClientPdf =
+      !params.forceOcrForPdf &&
+      !forceOcrForDenseStatement &&
+      isPdf &&
+      clientParsedTransactions.length > 0 &&
+      (clientPdfParseAssessment.useDeterministic || mustUseDeterministicClientPdf);
 
-  let extractionResult: Awaited<ReturnType<typeof performExtraction>>;
-  let collectedBankMetadata: BankMetadata | undefined = clientParsedBankMetadata;
-  let pagesWithData = 1;
+    if (mustUseDeterministicClientPdf && !clientPdfParseAssessment.useDeterministic) {
+      console.log(
+        `No PDF page images provided; forcing deterministic PDF rows (${clientParsedTransactions.length}) despite assessment: ${clientPdfParseAssessment.reason}`,
+      );
+    }
 
-  if (canUseDeterministicClientPdf) {
-    console.log(`Using deterministic client PDF text extraction: ${clientParsedTransactions.length} transactions`);
-    extractionResult = {
-      transactions: clientParsedTransactions,
+    if (isPdf && clientParsedTransactions.length > 0 && !canUseDeterministicClientPdf) {
+      console.log(
+        `Ignoring deterministic client PDF rows (${clientParsedTransactions.length}) and falling back to OCR: ${clientPdfParseAssessment.reason} ` +
+          `(mismatch=${clientPdfParseAssessment.mismatchRatio.toFixed(3)}, anomaly=${clientPdfParseAssessment.anomalyRate.toFixed(3)}, dense=${forceOcrForDenseStatement})`,
+      );
+    }
+
+    let extractionResult: Awaited<ReturnType<typeof performExtraction>>;
+    let collectedBankMetadata: BankMetadata | undefined = clientParsedBankMetadata;
+    let pagesWithData = 1;
+
+    if (canUseDeterministicClientPdf) {
+      console.log(`Using deterministic client PDF text extraction: ${clientParsedTransactions.length} transactions`);
+      extractionResult = {
+        transactions: clientParsedTransactions,
       status: {
         groqVision: { used: false, success: false },
         mistral: { used: false, success: false },
@@ -864,119 +1011,148 @@ const processStatement = async (params: {
       extractedText: '',
     };
     pagesWithData = Math.max(1, pageCount);
-  } else if (isPdf && hasPdfPageImages) {
-    const status: AIProcessingStatus = {
-      groqVision: { used: true, success: false },
-      mistral: { used: false, success: false },
-      groqText: { used: false, success: false },
-      patternFallback: { used: false, success: false },
-    };
+    } else if (isPdf && hasPdfPageImages) {
+      const status: AIProcessingStatus = {
+        groqVision: { used: true, success: false },
+        mistral: { used: false, success: false },
+        groqText: { used: false, success: false },
+        patternFallback: { used: false, success: false },
+      };
 
-    const errors: string[] = [];
-    const start = Date.now();
-    const collected: RawTransaction[] = [];
-    pagesWithData = 0;
-    let combinedText = '';
-    let strictRetryCount = 0;
-    let dualProviderCount = 0;
-    const effectiveStrictMode = adaptiveOcrStrategy.strictMode;
-    const effectiveStrictMaxPages = adaptiveOcrStrategy.strictMaxPages;
-    const effectiveDualMode = adaptiveOcrStrategy.dualMode;
-    const effectiveDualMaxPages = adaptiveOcrStrategy.dualMaxPages;
-    const useStrictFirstPass = OCR_WORKER_MODE !== 'primary' && adaptiveOcrStrategy.strictFirstPass;
+      const errors: string[] = [];
+      const start = Date.now();
+      const collected: RawTransaction[] = [];
+      pagesWithData = 0;
+      let combinedText = '';
+      const effectiveStrictMode = adaptiveOcrStrategy.strictMode;
+      const effectiveStrictMaxPages = adaptiveOcrStrategy.strictMaxPages;
+      const effectiveDualMode = adaptiveOcrStrategy.dualMode;
+      const effectiveDualMaxPages = adaptiveOcrStrategy.dualMaxPages;
+      const useStrictFirstPass = OCR_WORKER_MODE !== 'primary' && adaptiveOcrStrategy.strictFirstPass;
 
-    for (const img of params.pdfPageImages as string[]) {
-      if (typeof img !== 'string') continue;
-      const match = img.match(/^data:([^;]+);base64,(.+)$/);
-      if (!match) continue;
-      const pageMime = match[1];
-      const pageBase64 = match[2];
-      let pageResult: OCRResult | null = null;
+      let selectedOcrPages: Array<{ pageNumber: number; imageDataUrl: string }> = (params.pdfPageImages as string[])
+        .map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }));
 
-      if (OCR_WORKER_MODE === 'primary') {
-        const workerResult = await callTesseractOcrWorker(pageBase64, pageMime, params.fileName);
-        if (workerResult.success && workerResult.transactions && workerResult.transactions.length > 0) {
-          pageResult = workerResult;
-          console.log('Using Tesseract OCR worker result for this page.');
+      if (!structuralScan.hasSelectableText && hasPdfPageImages) {
+        console.log(`Skipping selective OCR page plan for image-only batch file ${params.fileName}; using all pages.`);
+      } else if (sharedPdf) {
+        try {
+          const plan = await buildSelectiveOcrPagePlan({
+            pdfDocument: sharedPdf,
+            totalPages: pageCount,
+            pageImages: params.pdfPageImages as string[],
+          });
+          selectedOcrPages = plan.selected;
+          console.log(`Selective OCR plan (${params.fileName}): ${plan.reasons.join(', ')}`);
+        } catch (planError) {
+          console.warn(`Selective OCR planning failed for ${params.fileName}; using all pages.`, planError);
         }
       }
 
-      if (!pageResult) {
-        pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
-      }
+      const ocrOutcomes = await Promise.all(
+        selectedOcrPages.map(async (pageEntry, index) => {
+          const img = pageEntry.imageDataUrl;
+          if (typeof img !== 'string') {
+            return { pageResult: null, strictUsed: false, dualUsed: false, error: 'Invalid OCR page payload' };
+          }
+          const match = img.match(/^data:([^;]+);base64,(.+)$/);
+          if (!match) {
+            return { pageResult: null, strictUsed: false, dualUsed: false, error: 'Invalid OCR page encoding' };
+          }
+          const pageMime = match[1];
+          const pageBase64 = match[2];
+          let pageResult: OCRResult | null = null;
+          let strictUsed = false;
+          let dualUsed = false;
 
-      if (
-        pageResult &&
-        !useStrictFirstPass &&
-        OCR_WORKER_MODE !== 'primary' &&
-        strictRetryCount < effectiveStrictMaxPages &&
-        shouldRetryStrictVisionPass(lowerFileName, pageResult, effectiveStrictMode)
-      ) {
-        const strictResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: true });
-        strictRetryCount += 1;
-        const chosenResult = chooseBetterVisionResult(pageResult, strictResult);
-        if (chosenResult !== pageResult) {
-          console.log('Using strict-table OCR pass for a PDF page (better extraction quality).');
-          pageResult = chosenResult;
+          if (OCR_WORKER_MODE === 'primary') {
+            const workerResult = await callTesseractOcrWorker(pageBase64, pageMime, params.fileName);
+            if (workerResult.success && workerResult.transactions && workerResult.transactions.length > 0) {
+              pageResult = workerResult;
+            }
+          }
+
+          if (!pageResult) {
+            pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
+          }
+
+          if (
+            pageResult &&
+            !useStrictFirstPass &&
+            OCR_WORKER_MODE !== 'primary' &&
+            index < effectiveStrictMaxPages &&
+            shouldRetryStrictVisionPass(lowerFileName, pageResult, effectiveStrictMode)
+          ) {
+            const strictResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: true });
+            strictUsed = true;
+            pageResult = chooseBetterVisionResult(pageResult, strictResult);
+          }
+
+          if (
+            pageResult &&
+            OCR_WORKER_MODE !== 'primary' &&
+            index < effectiveDualMaxPages &&
+            shouldRunMistralDualPass(lowerFileName, pageResult, effectiveDualMode)
+          ) {
+            const mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
+            dualUsed = true;
+            pageResult = mergeProviderResults(pageResult, mistralResult);
+          }
+
+          return { pageResult, strictUsed, dualUsed, error: pageResult?.error || null };
+        }),
+      );
+
+      const strictRetryCount = ocrOutcomes.filter((entry) => entry.strictUsed).length;
+      const dualProviderCount = ocrOutcomes.filter((entry) => entry.dualUsed).length;
+      for (const outcome of ocrOutcomes) {
+        const pageResult = outcome.pageResult;
+        if (pageResult && pageResult.success && pageResult.transactions && pageResult.transactions.length > 0) {
+          pagesWithData += 1;
+          collected.push(...pageResult.transactions);
+          if (pageResult.text) combinedText += (combinedText ? '\n' : '') + pageResult.text;
+          if (pageResult.bankMetadata) {
+            collectedBankMetadata = mergeBankMetadata(collectedBankMetadata, pageResult.bankMetadata);
+            console.log('Bank metadata detected:', collectedBankMetadata);
+          }
+        } else {
+          errors.push(outcome.error || 'No data extracted');
         }
       }
 
-      if (
-        pageResult &&
-        OCR_WORKER_MODE !== 'primary' &&
-        dualProviderCount < effectiveDualMaxPages &&
-        shouldRunMistralDualPass(lowerFileName, pageResult, effectiveDualMode)
-      ) {
-        const mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
-        dualProviderCount += 1;
-        pageResult = mergeProviderResults(pageResult, mistralResult);
+      if (strictRetryCount > 0) {
+        console.log(`Strict OCR retries used: ${strictRetryCount}/${effectiveStrictMaxPages} (mode=${effectiveStrictMode})`);
+      }
+      if (dualProviderCount > 0) {
+        console.log(`Dual OCR pages used: ${dualProviderCount}/${effectiveDualMaxPages} (mode=${effectiveDualMode})`);
       }
 
-      if (pageResult && pageResult.success && pageResult.transactions && pageResult.transactions.length > 0) {
-        pagesWithData += 1;
-        collected.push(...pageResult.transactions);
-        if (pageResult.text) combinedText += (combinedText ? '\n' : '') + pageResult.text;
-        if (pageResult.bankMetadata) {
-          collectedBankMetadata = mergeBankMetadata(collectedBankMetadata, pageResult.bankMetadata);
-          console.log('Bank metadata detected:', collectedBankMetadata);
-        }
-      } else {
-        errors.push(pageResult.error || 'No data extracted');
+      status.groqVision.time = Date.now() - start;
+      status.groqVision.success = collected.length > 0;
+      if (!status.groqVision.success) {
+        status.groqVision.error = errors[0] || 'No data extracted from PDF page images';
       }
-    }
-    if (strictRetryCount > 0) {
-      console.log(`Strict OCR retries used: ${strictRetryCount}/${effectiveStrictMaxPages} (mode=${effectiveStrictMode})`);
-    }
-    if (dualProviderCount > 0) {
-      console.log(`Dual OCR pages used: ${dualProviderCount}/${effectiveDualMaxPages} (mode=${effectiveDualMode})`);
-    }
 
-    status.groqVision.time = Date.now() - start;
-    status.groqVision.success = collected.length > 0;
-    if (!status.groqVision.success) {
-      status.groqVision.error = errors[0] || 'No data extracted from PDF page images';
+      extractionResult = {
+        transactions: collected,
+        status,
+        extractedText: combinedText,
+        bankMetadata: collectedBankMetadata,
+      };
+    } else {
+      if (isPdf) {
+        throw new Error('PDF requires page images for processing.');
+      }
+      const chunkSize = 8192;
+      let base64Data = '';
+      for (let i = 0; i < params.bytes.length; i += chunkSize) {
+        const chunk = params.bytes.subarray(i, i + chunkSize);
+        base64Data += String.fromCharCode(...chunk);
+      }
+      base64Data = btoa(base64Data);
+      const mimeType = lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      extractionResult = await performExtraction(base64Data, mimeType, '');
     }
-
-    extractionResult = {
-      transactions: collected,
-      status,
-      extractedText: combinedText,
-      bankMetadata: collectedBankMetadata,
-    };
-  } else {
-    if (isPdf) {
-      throw new Error('PDF requires page images for processing.');
-    }
-    const chunkSize = 8192;
-    let base64Data = '';
-    for (let i = 0; i < params.bytes.length; i += chunkSize) {
-      const chunk = params.bytes.subarray(i, i + chunkSize);
-      base64Data += String.fromCharCode(...chunk);
-    }
-    base64Data = btoa(base64Data);
-    const mimeType = lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
-    extractionResult = await performExtraction(base64Data, mimeType, '');
-  }
 
   // Stage 6b: auto reprocess low-confidence rows (strict OCR) only when needed.
   if (
@@ -1209,23 +1385,26 @@ const processStatement = async (params: {
     ),
   });
 
-  const bankMetadata = mergeBankMetadata(
-    clientParsedBankMetadata,
-    ocrTextBankMetadata,
-    collectedBankMetadata,
-    extractionResult.bankMetadata,
-  );
+    const bankMetadata = mergeBankMetadata(
+      clientParsedBankMetadata,
+      ocrTextBankMetadata,
+      collectedBankMetadata,
+      extractionResult.bankMetadata,
+    );
 
-  return {
-    transactions,
-    bankMetadata,
-    excelBuffer: excelResult.buffer,
-    totals: {
-      totalCredits,
-      totalDebits,
-    },
-    pagesWithData: Math.max(1, pagesWithData),
-  };
+    return {
+      transactions,
+      bankMetadata,
+      excelBuffer: excelResult.buffer,
+      totals: {
+        totalCredits,
+        totalDebits,
+      },
+      pagesWithData: Math.max(1, pagesWithData),
+    };
+  } finally {
+    await sharedPdf?.destroy?.();
+  }
 };
 
 // ============= MAIN HANDLER =============
@@ -1369,8 +1548,14 @@ Deno.serve(async (req) => {
       userPlanType = effectiveLimit.planType || 'free';
     } catch (limitError) {
       console.error('Error checking limit:', limitError);
+      const reason = limitError instanceof Error ? limitError.message : String(limitError ?? 'unknown');
       return new Response(
-        JSON.stringify({ error: 'Failed to check usage limit', status: 'error' }),
+        JSON.stringify({
+          error: 'Failed to check usage limit',
+          code: 'BATCH_LIMIT_RPC_FAILED',
+          reason,
+          status: 'error',
+        }),
         { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -1545,6 +1730,14 @@ Deno.serve(async (req) => {
           const buffer = await fileData.arrayBuffer();
           bytes = new Uint8Array(buffer);
         } else {
+          const rawBase64Input = typeof file.fileData === 'string' ? file.fileData.trim() : '';
+          const rawBase64PayloadLength = rawBase64Input
+            ? (rawBase64Input.match(/^data:[^;]+;base64,(.+)$/)?.[1] || rawBase64Input).replace(/\s+/g, '').length
+            : 0;
+          const estimatedBase64Bytes = Math.floor(rawBase64PayloadLength * 0.75);
+          if (estimatedBase64Bytes > 10 * 1024 * 1024) {
+            throw new Error('File exceeds 10MB limit');
+          }
           bytes = bytesFromBase64(file.fileData) as Uint8Array<ArrayBuffer>;
         }
 
@@ -1612,6 +1805,7 @@ Deno.serve(async (req) => {
           pdfPageImages: file.pdfPageImages,
           pdfParsedTransactions: file.pdfParsedTransactions,
           pdfParsedBankMetadata: file.pdfParsedBankMetadata,
+          pdfPassword: file.pdfPassword,
           categoryCorrections,
           forceOcrForPdf,
         });
@@ -1840,8 +2034,13 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Internal error:', error);
     const errorMessage = sanitizeError(error);
+    const reason = error instanceof Error ? error.message : String(error ?? 'unknown');
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({
+        error: errorMessage,
+        code: 'BATCH_INTERNAL_ERROR',
+        reason,
+      }),
       { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
     );
   } finally {
