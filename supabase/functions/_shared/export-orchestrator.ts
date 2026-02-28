@@ -19,7 +19,9 @@ const CRITICAL_FRAUD_FLAGS = new Set([
   'high_conflict_reconciliation',
 ]);
 
-const DEFAULT_MIN_CONFIDENCE = Number(Deno.env.get('EXPORT_MIN_CONFIDENCE') ?? '0.6');
+const DEFAULT_MIN_CONFIDENCE = Number(Deno.env.get('EXPORT_MIN_CONFIDENCE') ?? '0.35');
+const BLOCK_LOW_CONFIDENCE_EXPORTS =
+  String(Deno.env.get('EXPORT_BLOCK_LOW_CONFIDENCE') ?? 'false').trim().toLowerCase() === 'true';
 const MAX_EXPORT_FILE_SIZE_BYTES = Number(Deno.env.get('EXPORT_MAX_SIZE_BYTES') ?? String(25 * 1024 * 1024));
 const BALANCE_TOLERANCE = Number(Deno.env.get('EXPORT_BALANCE_TOLERANCE') ?? '0.01');
 const MAX_BALANCE_MISMATCH_RATIO = Number(Deno.env.get('EXPORT_MAX_MISMATCH_RATIO') ?? '0.2');
@@ -538,7 +540,7 @@ export const runStandardizedExportPipeline = async (
   const configuredThreshold = Number.isFinite(input.minimumConfidenceScore ?? NaN)
     ? Number(input.minimumConfidenceScore)
     : DEFAULT_MIN_CONFIDENCE;
-  const minConfidence = Math.max(0.6, configuredThreshold);
+  const minConfidence = Math.max(0, Math.min(1, configuredThreshold));
   if (!Array.isArray(input.structuredTransactions) || input.structuredTransactions.length === 0) {
     return {
       ok: false,
@@ -641,29 +643,33 @@ export const runStandardizedExportPipeline = async (
   if (fraudRisk === 'high') exportConfidence -= 0.1;
   exportConfidence = Math.max(0, Math.min(1, round2(exportConfidence)));
 
-  if (exportConfidence <= minConfidence) {
-    return {
-      ok: false,
-      error: {
-        code: 'EXPORT_LOW_CONFIDENCE',
-        message: `Export confidence below threshold (${minConfidence}).`,
-        details: {
-          confidenceScore: input.confidenceScore,
-          exportConfidence,
-          threshold: minConfidence,
-          flaggedTransactions: flaggedIndices.map((index) => ({
-            index,
-            transaction: normalized[index] ?? null,
-            issues: validationIssues
-              .filter((issue) => issue.index === index)
-              .map((issue) => issue.code),
-          })),
-        },
-      },
-    };
-  }
-
   const warnings: string[] = [];
+  if (exportConfidence <= minConfidence) {
+    if (BLOCK_LOW_CONFIDENCE_EXPORTS) {
+      return {
+        ok: false,
+        error: {
+          code: 'EXPORT_LOW_CONFIDENCE',
+          message: `Export confidence below threshold (${minConfidence}).`,
+          details: {
+            confidenceScore: input.confidenceScore,
+            exportConfidence,
+            threshold: minConfidence,
+            flaggedTransactions: flaggedIndices.map((index) => ({
+              index,
+              transaction: normalized[index] ?? null,
+              issues: validationIssues
+                .filter((issue) => issue.index === index)
+                .map((issue) => issue.code),
+            })),
+          },
+        },
+      };
+    }
+    warnings.push(
+      `Low confidence (${exportConfidence}) is below threshold (${minConfidence}); exported with validation flags.`,
+    );
+  }
   if (formatFallbackApplied) {
     warnings.push(`Requested format '${input.requestedFormat}' downgraded to '${effectiveFormat}' by plan gate.`);
   }
