@@ -292,6 +292,11 @@ export const UploadDemo = () => {
     }
     return `Selected batch is too heavy for one run (${payload}). Please split files into smaller batches.`;
   };
+  const formatFileSize = (bytes: number): string => {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    return `${(bytes / 1024).toFixed(0)} KB`;
+  };
   const AUTO_CHUNK_MAX_PDF_PAGES = 25;
   const AUTO_CHUNK_MAX_PDF_BYTES = 8 * 1024 * 1024;
   const AUTO_CHUNK_EAGER_MIN_PDF_PAGES = 16;
@@ -2271,6 +2276,16 @@ Analytics Summary:
     void handleConvert(undefined, mode);
   };
 
+  const handleUnlockPassword = () => {
+    if (!pdfPassword.trim()) {
+      setPasswordError(true);
+      return;
+    }
+    setPasswordError(false);
+    setLastError(null);
+    runSelectedConversion(conversionMode);
+  };
+
   const showImageProcessingHint =
     showScanTimeCard ||
     selectedFiles.some((file) => {
@@ -2450,27 +2465,38 @@ Analytics Summary:
 
               {/* PDF Password Input - Only show when password is required */}
               {(selectedFile || selectedFiles.length > 0) && showPasswordInput && !limitReached && (
-                <div className="space-y-4 p-6 bg-[#191919]/80 rounded-xl border border-red-500/30">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-red-500/15 rounded-lg">
-                      <Lock className="h-5 w-5 text-red-400" />
+                <div className="space-y-3 rounded-xl border border-white/15 bg-[#141414] p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center">
+                      <Lock className="h-4 w-4 text-primary" />
                     </div>
-                      <div>
-                        <p className="font-semibold text-red-300">Password Required</p>
-                        <p id={pdfPasswordHelpId} className="text-xs text-white/60">This PDF is password protected. Enter the password to continue.</p>
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-white">
+                        {(selectedFile || selectedFiles[0])?.name || "Password protected PDF"}
+                      </p>
+                      <p id={pdfPasswordHelpId} className="text-xs text-muted-foreground">
+                        {formatFileSize((selectedFile || selectedFiles[0])?.size || 0)} • Password required
+                      </p>
                     </div>
+                  </div>
 
-                    <div className="relative">
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <div className="relative flex-1">
                       <label htmlFor="pdf-password" className="sr-only">PDF password</label>
                       <Input
                         id="pdf-password"
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Enter PDF password..."
+                        placeholder="Enter password"
                         value={pdfPassword}
                         onChange={(e) => {
                           setPdfPassword(e.target.value);
                           setPasswordError(false);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            handleUnlockPassword();
+                          }
                         }}
                         aria-invalid={passwordError}
                         aria-describedby={`${pdfPasswordHelpId}${passwordError ? ` ${pdfPasswordErrorId}` : ''}`}
@@ -2486,13 +2512,29 @@ Analytics Summary:
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
+                    <Button
+                      type="button"
+                      onClick={handleUnlockPassword}
+                      disabled={uploading || converting || !pdfPassword.trim()}
+                      className="sm:w-auto min-w-[120px]"
+                    >
+                      {uploading || converting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Unlocking...
+                        </>
+                      ) : (
+                        "Unlock"
+                      )}
+                    </Button>
+                  </div>
 
-                    {passwordError && (
-                      <p id={pdfPasswordErrorId} role="alert" className="text-sm text-red-300 flex items-center gap-1">
-                        <AlertTriangle className="h-4 w-4" />
-                        Incorrect password. Please try again.
-                      </p>
-                    )}
+                  {passwordError && (
+                    <p id={pdfPasswordErrorId} role="alert" className="text-xs text-red-300 flex items-center gap-1">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Incorrect password. Please try again.
+                    </p>
+                  )}
                 </div>
               )}
 
