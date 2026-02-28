@@ -113,9 +113,6 @@ export const UploadDemo = () => {
     progressStep,
     showProgress,
   } = state;
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
-  const [feedbackLoading, setFeedbackLoading] = useState(false);
-  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const setSelectedFiles = (value: File[] | ((prev: File[]) => File[])) =>
     dispatch({
       type: "set",
@@ -185,13 +182,17 @@ export const UploadDemo = () => {
   const [editedPdfCheckResult, setEditedPdfCheckResult] = useState<EditedPdfCheckResult | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showScanTimeCard, setShowScanTimeCard] = useState(false);
+  const [uploadPrepActive, setUploadPrepActive] = useState(false);
+  const [uploadPrepProgress, setUploadPrepProgress] = useState(0);
+  const [uploadPrepLabel, setUploadPrepLabel] = useState("Reading document...");
+  const [uploadPrepFileName, setUploadPrepFileName] = useState<string | null>(null);
+  const preparedPdfDataRef = useRef<
+    Map<string, { transactions?: BatchFilePayload["pdfParsedTransactions"]; bankMetadata?: BatchFilePayload["pdfParsedBankMetadata"] }>
+  >(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { hasChatAuraAccess } = useSubscriptionTier();
   const navigate = useNavigate();
-  useEffect(() => {
-    if (!conversionResult) resetFeedbackState();
-  }, [conversionResult]);
   useEffect(() => {
     const checkAdmin = async () => {
       if (!user) {
@@ -249,31 +250,6 @@ export const UploadDemo = () => {
     if (normalized.includes("deadline exceeded")) return true;
     return false;
   };
-  const resetFeedbackState = () => {
-    setFeedbackSubmitted(false);
-    setFeedbackLoading(false);
-    setFeedbackError(null);
-  };
-
-  const submitConversionFeedback = async (payload: { isAccurate: boolean; allowTemplate: boolean }) => {
-    if (!user || !conversionResult?.id) return;
-    setFeedbackLoading(true);
-    setFeedbackError(null);
-    const { error } = await supabase.from("conversion_feedback").insert({
-      conversion_id: conversionResult.id,
-      user_id: user.id,
-      is_accurate: payload.isAccurate,
-      allow_template: payload.allowTemplate,
-    });
-    if (error) {
-      console.error("Failed to save conversion feedback:", error);
-      setFeedbackError("We could not save your feedback. Please try again.");
-      setFeedbackLoading(false);
-      return;
-    }
-    setFeedbackLoading(false);
-    setFeedbackSubmitted(true);
-  };
   const parseStructuredErrorCode = (payload: unknown): string | null => {
     if (!payload || typeof payload !== "object") return null;
     const maybePayload = payload as Record<string, unknown>;
@@ -298,6 +274,7 @@ export const UploadDemo = () => {
       return null;
     }
   };
+  const getFileCacheKey = (file: File): string => `${file.name}__${file.size}__${file.lastModified}`;
   const estimateDataUrlBytes = (dataUrl: string): number => {
     const commaIndex = dataUrl.indexOf(",");
     const base64 = commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
@@ -535,19 +512,6 @@ export const UploadDemo = () => {
       truncateDecimals,
     });
   };
-  const exportAsPDF = async () => {
-    const { exportAsPDF: exportPdf } = await loadExporters();
-    return exportPdf({
-      transactions,
-      analytics,
-      currencyCode,
-      exportBaseName: getExportBaseName(),
-      toast,
-      getErrorMessage,
-      sumMoney,
-      truncateDecimals,
-    });
-  };
   const exportAsJSON = async () => {
     const { exportAsJSON: exportJson } = await loadExporters();
     return exportJson({
@@ -724,32 +688,36 @@ export const UploadDemo = () => {
   }, [selectedFile]);
 
   useEffect(() => {
-    if (!converting) return;
+    let intervalId: number | undefined;
 
-    setShowProgress(true);
-    setProgressStep(0);
+    if (uploading) {
+      setShowProgress(true);
+      setProgressStep(0);
+      let value = 0;
+      intervalId = window.setInterval(() => {
+        value = Math.min(value + 5, 35);
+        setProgressStep(value);
+      }, 140);
+      return () => {
+        if (intervalId) window.clearInterval(intervalId);
+      };
+    }
 
-    const timeouts: number[] = [];
-    const delays = [900, 1100, 1300, 1500];
+    if (converting) {
+      setShowProgress(true);
+      let value = 35;
+      setProgressStep(value);
+      intervalId = window.setInterval(() => {
+        value = Math.min(value + 3, 95);
+        setProgressStep(value);
+      }, 220);
+      return () => {
+        if (intervalId) window.clearInterval(intervalId);
+      };
+    }
 
-    const schedule = (nextStep: number) => {
-      const delay = delays[nextStep - 1] ?? 1200;
-      timeouts.push(
-        window.setTimeout(() => {
-          setProgressStep(nextStep);
-          if (nextStep < 3) {
-            schedule(nextStep + 1);
-          }
-        }, delay)
-      );
-    };
-
-    schedule(1);
-
-    return () => {
-      timeouts.forEach((t) => window.clearTimeout(t));
-    };
-  }, [converting]);
+    return undefined;
+  }, [uploading, converting]);
 
   useEffect(() => {
     if (!hasEditPdfDetectorAccess && editedPdfWarning) {
@@ -761,15 +729,16 @@ export const UploadDemo = () => {
   }, [hasEditPdfDetectorAccess, editedPdfWarning, editedPdfCheckResult]);
 
   useEffect(() => {
-    if (converting || !showProgress) return;
+    if (uploading || converting || !showProgress) return;
 
-    setProgressStep(4);
+    setProgressStep(100);
     const timeout = window.setTimeout(() => {
       setShowProgress(false);
-    }, 900);
+      setProgressStep(0);
+    }, 700);
 
     return () => window.clearTimeout(timeout);
-  }, [converting, showProgress]);
+  }, [uploading, converting, showProgress]);
 
   const MAX_PDF_RENDER_PAGES = 120;
   const FREE_MAX_PDF_PAGES_PER_FILE = 15;
@@ -777,7 +746,6 @@ export const UploadDemo = () => {
   const EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES = 18 * 1024 * 1024;
   const EDGE_FUNCTION_SAFE_BATCH_PDF_PAYLOAD_BYTES = 20 * 1024 * 1024;
   const EDGE_FUNCTION_SAFE_BATCH_PDF_PAGES = 45;
-  const showConversionProgressPanel = true;
 
 
 
@@ -859,69 +827,110 @@ export const UploadDemo = () => {
     }
 
     if (newFiles.length > 0) {
-      if (limitReached) {
-        showLimitReachedDialog();
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
+      setUploadPrepActive(true);
+      setUploadPrepProgress(0);
+      setUploadPrepFileName(newFiles[0]?.name ?? null);
+      setUploadPrepLabel("Reading document...");
+      try {
+        setUploadPrepProgress(12);
+        if (limitReached) {
+          showLimitReachedDialog();
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
         }
-        return;
+
+        if (!usageLimitLoading) {
+          const candidateFiles = [...selectedFiles, ...newFiles];
+          const { getTotalPages } = await loadPdfUtils();
+          const { unknown, overCap, maxSingle } = await getTotalPages(
+            candidateFiles,
+            pdfPassword.trim() || undefined,
+            maxPdfRenderPages
+          );
+          if (overCap) {
+            toast({
+              variant: "destructive",
+              title: "PDF too large",
+              description: `This PDF has ${maxSingle} pages. The current maximum supported per file is ${MAX_PDF_RENDER_PAGES} pages. Please split the PDF and try again.`,
+            });
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            return;
+          }
+
+          if (!unknown && isFreeUsageMode && maxSingle > FREE_MAX_PDF_PAGES_PER_FILE) {
+            toast({
+              variant: "destructive",
+              title: "Free tier file limit",
+              description: `Free tier allows up to ${FREE_MAX_PDF_PAGES_PER_FILE} pages per PDF. One selected file has ${maxSingle} pages.`,
+            });
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            return;
+          }
+
+          const remainingCount = Math.max(0, remaining ?? 0);
+          const limit = Math.max(0, conversionsLimit ?? 0);
+          if (isFreeUsageMode && candidateFiles.length > remainingCount) {
+            showSelectionLimitDialog(candidateFiles.length, remainingCount, limit);
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            return;
+          }
+        }
+
+        setUploadPrepProgress(40);
+        setUploadPrepLabel("Detecting amounts...");
+        try {
+          const { extractPdfDataFromText } = await loadPdfUtils();
+          for (const file of newFiles) {
+            if (!file.name.toLowerCase().endsWith(".pdf")) continue;
+            try {
+              const parsedPdf = await extractPdfDataFromText(file, {
+                password: pdfPassword.trim() || undefined,
+                maxPdfRenderPages,
+              });
+              preparedPdfDataRef.current.set(getFileCacheKey(file), {
+                transactions: parsedPdf.transactions,
+                bankMetadata: parsedPdf.bankMetadata,
+              });
+            } catch {
+              preparedPdfDataRef.current.delete(getFileCacheKey(file));
+            }
+          }
+        } catch {
+          // Preparation failures should not block file selection.
+        }
+
+        setUploadPrepProgress(75);
+        setUploadPrepLabel("Categorizing data...");
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        setUploadPrepProgress(100);
+        await new Promise((resolve) => setTimeout(resolve, 120));
+
+        setSelectedFiles((prev) => [...prev, ...newFiles]);
+        setPasswordError(false);
+        setPdfPassword('');
+        setShowPasswordInput(false);
+        setShowPassword(false);
+        setEditedPdfWarning(null);
+        setEditedPdfCheckResult(null);
+
+        toast({
+          title: "Files Selected",
+          description: `${newFiles.length} ${pluralize(newFiles.length, "file")} added - Ready to convert`,
+        });
+      } finally {
+        setUploadPrepActive(false);
+        setUploadPrepProgress(0);
+        setUploadPrepFileName(null);
+        setUploadPrepLabel("Reading document...");
       }
-
-      if (!usageLimitLoading) {
-        const candidateFiles = [...selectedFiles, ...newFiles];
-        const { getTotalPages } = await loadPdfUtils();
-        const { unknown, overCap, maxSingle } = await getTotalPages(
-          candidateFiles,
-          pdfPassword.trim() || undefined,
-          maxPdfRenderPages
-        );
-        if (overCap) {
-          toast({
-            variant: "destructive",
-            title: "PDF too large",
-            description: `This PDF has ${maxSingle} pages. The current maximum supported per file is ${MAX_PDF_RENDER_PAGES} pages. Please split the PDF and try again.`,
-          });
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-          return;
-        }
-
-        if (!unknown && isFreeUsageMode && maxSingle > FREE_MAX_PDF_PAGES_PER_FILE) {
-          toast({
-            variant: "destructive",
-            title: "Free tier file limit",
-            description: `Free tier allows up to ${FREE_MAX_PDF_PAGES_PER_FILE} pages per PDF. One selected file has ${maxSingle} pages.`,
-          });
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-          return;
-        }
-
-        const remainingCount = Math.max(0, remaining ?? 0);
-        const limit = Math.max(0, conversionsLimit ?? 0);
-        if (isFreeUsageMode && candidateFiles.length > remainingCount) {
-          showSelectionLimitDialog(candidateFiles.length, remainingCount, limit);
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
-          return;
-        }
-      }
-
-      setSelectedFiles((prev) => [...prev, ...newFiles]);
-      setPasswordError(false);
-      setPdfPassword('');
-      setShowPasswordInput(false);
-      setShowPassword(false);
-      setEditedPdfWarning(null);
-      setEditedPdfCheckResult(null);
-
-      toast({
-        title: "Files Selected",
-        description: `${newFiles.length} ${pluralize(newFiles.length, "file")} added - Ready to convert`,
-      });
     }
   };
 
@@ -1052,20 +1061,31 @@ export const UploadDemo = () => {
           const { extractPdfDataFromText, pdfToPageImages } = await loadPdfUtils();
           let parsedPdfTransactionsCount = 0;
 
-          try {
-            const parsedPdf = await extractPdfDataFromText(fileToConvert, {
-              password: pdfPassword.trim() || undefined,
-              maxPdfRenderPages,
-            });
-            parsedPdfTransactionsCount = parsedPdf.transactions.length;
+          const cachedParsedPdf = preparedPdfDataRef.current.get(getFileCacheKey(fileToConvert));
+          if (cachedParsedPdf) {
+            parsedPdfTransactionsCount = cachedParsedPdf.transactions?.length ?? 0;
             if (parsedPdfTransactionsCount > 0) {
-              requestBody.pdfParsedTransactions = parsedPdf.transactions;
+              requestBody.pdfParsedTransactions = cachedParsedPdf.transactions;
             }
-            if (parsedPdf.bankMetadata) {
-              requestBody.pdfParsedBankMetadata = parsedPdf.bankMetadata;
+            if (cachedParsedPdf.bankMetadata) {
+              requestBody.pdfParsedBankMetadata = cachedParsedPdf.bankMetadata;
             }
-          } catch {
-            // Parser failure should not block conversion; backend OCR fallback will handle it.
+          } else {
+            try {
+              const parsedPdf = await extractPdfDataFromText(fileToConvert, {
+                password: pdfPassword.trim() || undefined,
+                maxPdfRenderPages,
+              });
+              parsedPdfTransactionsCount = parsedPdf.transactions.length;
+              if (parsedPdfTransactionsCount > 0) {
+                requestBody.pdfParsedTransactions = parsedPdf.transactions;
+              }
+              if (parsedPdf.bankMetadata) {
+                requestBody.pdfParsedBankMetadata = parsedPdf.bankMetadata;
+              }
+            } catch {
+              // Parser failure should not block conversion; backend OCR fallback will handle it.
+            }
           }
 
           // If text parse returned no rows, let the server attempt text extraction first.
@@ -2215,6 +2235,8 @@ Analytics Summary:
       return;
     }
     setConversionMode(mode);
+    setShowProgress(true);
+    setProgressStep(0);
 
     if (selectedFiles.length === 1) {
       const firstFile = selectedFiles[0];
@@ -2228,6 +2250,14 @@ Analytics Summary:
     }
     void handleConvert(undefined, mode);
   };
+
+  const showImageProcessingHint =
+    showScanTimeCard ||
+    selectedFiles.some((file) => {
+      if (!file.name.toLowerCase().endsWith(".pdf")) return false;
+      const cached = preparedPdfDataRef.current.get(getFileCacheKey(file));
+      return !cached?.transactions || cached.transactions.length === 0;
+    });
 
   return (
     <section className="relative py-16 px-4 sm:px-6 overflow-hidden bg-background">
@@ -2252,7 +2282,7 @@ Analytics Summary:
               limitReached={limitReached}
               planType={planType}
             />
-            {showScanTimeCard && (selectedFile || selectedFiles.length > 0) && !limitReached && (
+            {showScanTimeCard && (selectedFile || selectedFiles.length > 0) && !limitReached && !uploadPrepActive && (
               <div className="p-4 bg-[#141414] border border-primary/25 rounded-xl">
                 <p className="text-sm font-semibold text-white">Scanning Mode Active</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -2335,6 +2365,10 @@ Analytics Summary:
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                const removed = selectedFiles[idx];
+                                if (removed) {
+                                  preparedPdfDataRef.current.delete(getFileCacheKey(removed));
+                                }
                                 setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
                               }}
                               className="text-white/85 hover:text-white"
@@ -2345,6 +2379,21 @@ Analytics Summary:
                             </button>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {uploadPrepActive && (selectedFiles.length > 0 || uploadPrepFileName) && (
+                    <div className="mx-auto mt-4 w-full max-w-xl space-y-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+                      <p className="text-sm text-white truncate">
+                        {uploadPrepFileName ?? selectedFiles[0]?.name}
+                      </p>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
+                          style={{ width: `${Math.min(100, Math.max(0, uploadPrepProgress))}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">{uploadPrepLabel}</p>
                     </div>
                   )}
 
@@ -2365,6 +2414,7 @@ Analytics Summary:
                         className="bg-accent text-accent-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto"
                         onClick={(e) => {
                           e.stopPropagation();
+                          preparedPdfDataRef.current.clear();
                           setSelectedFiles([]);
                           setSelectedFile(null);
                           setEditedPdfWarning(null);
@@ -2504,7 +2554,7 @@ Analytics Summary:
               )}
 
               {/* Convert Buttons */}
-              {(selectedFile || selectedFiles.length > 0) && !limitReached && !lastError && (
+              {(selectedFile || selectedFiles.length > 0) && !limitReached && !lastError && !uploadPrepActive && (
                 <div className="text-center space-y-3">
                   {selectedFiles.length > 0 && (
                     <div className="space-y-3">
@@ -2513,7 +2563,7 @@ Analytics Summary:
                           size="lg"
                           className="convert-button w-full md:w-auto"
                           onClick={() => runSelectedConversion("standard")}
-                          disabled={uploading || converting}
+                          disabled={uploading || converting || uploadPrepActive}
                         >
                           {uploading || converting ? (
                             <>
@@ -2523,7 +2573,7 @@ Analytics Summary:
                           ) : (
                             <>
                               <Sparkles className="mr-2 h-5 w-5" />
-                              Convert All Statements
+                              {selectedFiles.length === 1 ? "Convert" : "Convert All Statements"}
                             </>
                           )}
                         </Button>
@@ -2536,10 +2586,10 @@ Analytics Summary:
                               : "border-primary/30 text-primary"
                           }`}
                           onClick={() => runSelectedConversion("tally_only")}
-                          disabled={uploading || converting}
+                          disabled={uploading || converting || uploadPrepActive}
                         >
                           <FileText className="mr-2 h-5 w-5" />
-                          Convert to Tally XML
+                          Tally XML
                           {!hasTallyAccess && <Lock className="ml-2 h-4 w-4" />}
                         </Button>
                       </div>
@@ -2547,6 +2597,32 @@ Analytics Summary:
                         {selectedFiles.length} {pluralize(selectedFiles.length, "file")} ready to convert
                       </p>
                     </div>
+                  )}
+                </div>
+              )}
+
+              {showProgress && (selectedFile || selectedFiles.length > 0) && (
+                <div className="mx-auto w-full max-w-2xl space-y-2 rounded-xl border border-primary/20 bg-[#141414] px-4 py-4">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>
+                      {uploading
+                        ? "Uploading and preparing document..."
+                        : converting
+                          ? "Converting and validating transactions..."
+                          : "Finalizing..."}
+                    </span>
+                    <span>{Math.round(Math.min(100, Math.max(0, progressStep)))}%</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
+                      style={{ width: `${Math.min(100, Math.max(0, progressStep))}%` }}
+                    />
+                  </div>
+                  {converting && showImageProcessingHint && (
+                    <p className="text-xs text-muted-foreground">
+                      Image-based statements can take longer. We prioritize extraction accuracy over raw speed.
+                    </p>
                   )}
                 </div>
               )}
@@ -2567,12 +2643,9 @@ Analytics Summary:
                 hasTallyAccess={hasTallyAccess}
                 exportAsCSV={exportAsCSV}
                 handleTallyExport={handleTallyExport}
-                exportAsPDF={exportAsPDF}
                 handlePremiumExport={handlePremiumExport}
                 aiStatus={aiStatus}
-                converting={showConversionProgressPanel ? converting : false}
-                showProgress={showConversionProgressPanel ? showProgress : false}
-                progressStep={progressStep}
+                converting={converting}
                 analytics={analytics}
                 currencyCode={currencyCode}
                 showDuplicatesOnly={showDuplicatesOnly}
@@ -2583,12 +2656,16 @@ Analytics Summary:
                 resultMode={conversionMode}
                 editedPdfCheckResult={editedPdfCheckResult}
                 showPipeline={isAdmin}
-                showFeedback={!!user}
-                feedbackSubmitted={feedbackSubmitted}
-                feedbackLoading={feedbackLoading}
-                feedbackError={feedbackError}
-                onSubmitFeedback={submitConversionFeedback}
                 showUnderwriting={isPaidUser || isAdmin}
+                conversionProgressPercent={progressStep}
+                conversionProgressLabel={
+                  uploading
+                    ? "Uploading and preparing document..."
+                    : converting
+                      ? "Converting and validating transactions..."
+                      : "Finalizing..."
+                }
+                showImageProcessingHint={converting && showImageProcessingHint}
               />
             </div>
           </div>
