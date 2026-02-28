@@ -59,14 +59,6 @@ import type { ExportFormat } from '../_shared/export-builders.ts';
 import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
-import {
-  detectBankTemplate,
-  getHeaderAliasesForHint,
-  getBankTemplateById,
-  isComplexBankLayoutHint,
-  isDenseTableBankHint,
-  isDualPassBankHint,
-} from '../_shared/bank-templates.ts';
 import { resolveEffectiveLimit } from '../_shared/limit-resolver.ts';
 
 type PdfJsModule = {
@@ -347,6 +339,68 @@ const extractAmountsWithDashPlaceholders = (
   return null;
 };
 
+const isStrictAmountToken = (value: string): boolean =>
+  /^-?\d{1,3}(?:,\d{3})*\.\d{2}$/.test(value) || /^-?\d+\.\d{2}$/.test(value);
+
+const findLeadingDateToken = (tokens: LineToken[]): { value: string; index: number } | null => {
+  const maxIndex = Math.min(2, tokens.length - 1);
+  for (let i = 0; i <= maxIndex; i += 1) {
+    const cleaned = tokens[i].text.replace(/[.,;:]+$/g, '').trim();
+    if (DATE_TOKEN.test(cleaned)) {
+      return { value: cleaned, index: i };
+    }
+  }
+  return null;
+};
+
+const buildTokenFallbackRows = (
+  lineEntries: LineEntry[],
+  amountCenters: number[],
+): RawTransaction[] => {
+  const fallbackRows: RawTransaction[] = [];
+  for (const entry of lineEntries) {
+    const line = entry.text.trim().replace(/\s+/g, ' ');
+    if (!line || isNoiseLine(line)) continue;
+
+    const leadingDate = findLeadingDateToken(entry.tokens);
+    if (!leadingDate) continue;
+
+    const anchored = extractAnchoredAmounts(entry, amountCenters);
+    const trailingTokens = entry.tokens
+      .slice(leadingDate.index + 1)
+      .map((token) => token.text)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const parsedAmounts = anchored
+      ? {
+          textWithoutAmounts: trailingTokens,
+          debit: anchored.debit,
+          credit: anchored.credit,
+          balance: anchored.balance,
+        }
+      : (extractAmounts(trailingTokens) || extractAmountsWithDashPlaceholders(trailingTokens));
+    if (!parsedAmounts) continue;
+
+    const numericTokenCount = entry.tokens.filter((token) => isStrictAmountToken(token.text)).length;
+    if (numericTokenCount < 2 && parsedAmounts.balance === 0) continue;
+
+    const description = (parsedAmounts.textWithoutAmounts || trailingTokens).trim();
+    if (!description || description.length < 2) continue;
+
+    fallbackRows.push({
+      date: normalizeDate(leadingDate.value),
+      description,
+      debit: parsedAmounts.debit,
+      credit: parsedAmounts.credit,
+      balance: parsedAmounts.balance,
+      refNumber: '',
+    });
+  }
+  return fallbackRows;
+};
+
 const hasLikelyAmountTail = (text: string): boolean => {
   const normalizedText = normalizeDashToken(text);
   const matches = normalizedText.match(/-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g) || [];
@@ -594,7 +648,7 @@ const extractPdfTextTransactionsFromBytes = async (
 
     // Fallback parser for text-based PDFs where line-anchored parsing under-extracts.
     if (transactions.length < 2 && allLines.length > 0) {
-      const fallbackRows: RawTransaction[] = [];
+      const regexFallbackRows: RawTransaction[] = [];
       for (const rawLine of allLines) {
         const line = rawLine.trim().replace(/\s+/g, ' ');
         if (!line || isNoiseLine(line)) continue;
@@ -610,7 +664,7 @@ const extractPdfTextTransactionsFromBytes = async (
         const description = (amounts.textWithoutAmounts || remainder).trim();
         if (!description || description.length < 2) continue;
 
-        fallbackRows.push({
+        regexFallbackRows.push({
           date: normalizeDate(dateToken),
           description,
           debit: amounts.debit,
@@ -619,6 +673,10 @@ const extractPdfTextTransactionsFromBytes = async (
           refNumber: '',
         });
       }
+
+      const tokenFallbackRows = buildTokenFallbackRows(allLineEntries, amountCenters);
+      const fallbackRows =
+        tokenFallbackRows.length > regexFallbackRows.length ? tokenFallbackRows : regexFallbackRows;
 
       if (fallbackRows.length > transactions.length) {
         transactions = fallbackRows;
@@ -806,88 +864,6 @@ const buildSelectiveOcrPagePlan = async ({
     reasons,
     pageDiagnostics: diagnostics,
   };
-};
-
-const extractHeaderHints = (text: string): string => {
-  if (!text) return '';
-  const headerKeywords = /(transaction date|value date|posting date|narration|description|details|reference|ref no|debit|credit|balance|running balance)/i;
-  const lines = text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => headerKeywords.test(line));
-  return lines.slice(0, 8).join(' | ');
-};
-
-const toHex = (buffer: ArrayBuffer): string =>
-  Array.from(new Uint8Array(buffer))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-
-const buildTemplateFingerprint = async (text: string): Promise<{ fingerprint: string; headerHint: string }> => {
-  const compact = text.replace(/\s+/g, ' ').trim();
-  const headerHint = extractHeaderHints(text);
-  const seed = `${compact.slice(0, 2000)}|${headerHint}`;
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seed));
-  return { fingerprint: toHex(digest), headerHint };
-};
-
-const fetchTemplateFingerprint = async (
-  supabaseAdmin: any,
-  fingerprint: string,
-): Promise<{ template_id?: string; allow_single_date?: boolean } | null> => {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('bank_template_fingerprints')
-      .select('template_id, allow_single_date')
-      .eq('fingerprint', fingerprint)
-      .maybeSingle();
-    if (error) return null;
-    return data ?? null;
-  } catch {
-    return null;
-  }
-};
-
-const storeTemplateFingerprint = async (
-  supabaseAdmin: any,
-  payload: { fingerprint: string; templateId?: string | null; headerHint?: string; allowSingleDate?: boolean },
-): Promise<void> => {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from('bank_template_fingerprints')
-      .select('id, match_count')
-      .eq('fingerprint', payload.fingerprint)
-      .maybeSingle();
-    if (error && !/bank_template_fingerprints/i.test(error.message || '')) return;
-
-    if (!data) {
-      await supabaseAdmin
-        .from('bank_template_fingerprints')
-        .insert({
-          fingerprint: payload.fingerprint,
-          template_id: payload.templateId ?? null,
-          header_hint: payload.headerHint ?? null,
-          allow_single_date: payload.allowSingleDate ?? false,
-          match_count: 1,
-          last_seen_at: new Date().toISOString(),
-        });
-      return;
-    }
-
-    const nextCount = Number(data.match_count ?? 1) + 1;
-    await supabaseAdmin
-      .from('bank_template_fingerprints')
-      .update({
-        template_id: payload.templateId ?? null,
-        header_hint: payload.headerHint ?? null,
-        allow_single_date: payload.allowSingleDate ?? false,
-        match_count: nextCount,
-        last_seen_at: new Date().toISOString(),
-      })
-      .eq('id', data.id);
-  } catch {
-    // Best-effort only
-  }
 };
 
 const attemptGroqTextRescue = async (
@@ -1177,13 +1153,6 @@ type BankDetectionLayerResult = {
   signals: string[];
 };
 
-type TemplateMappingLayerResult = {
-  templateId: string;
-  templateFound: boolean;
-  templateSource: 'fingerprint' | 'bank_detection' | 'generic';
-  allowSingleDate: boolean;
-};
-
 type ConfidenceBreakdown = {
   score: number;
   parseSuccessRatio: number;
@@ -1294,6 +1263,18 @@ const runStructuralScan = ({
   };
 };
 
+const computePrintableRatio = (text: string): number => {
+  if (!text) return 0;
+  const compact = text.replace(/\s+/g, '');
+  if (!compact) return 0;
+  let printable = 0;
+  for (let i = 0; i < compact.length; i += 1) {
+    const code = compact.charCodeAt(i);
+    if (code >= 32 && code !== 127) printable += 1;
+  }
+  return clamp01(printable / compact.length);
+};
+
 const countDateLikeRows = (text: string): number => {
   if (!text) return 0;
   const lines = text
@@ -1350,7 +1331,13 @@ const computeDateContinuityScore = (rows: RawTransaction[]): number => {
 
 const computeHeaderMatchScore = (text: string, bankId: string): number => {
   if (!text) return 0;
-  const aliases = getHeaderAliasesForHint(bankId);
+  const aliases = {
+    date: ['transaction date', 'txn date', 'date', 'value date', 'posting date'],
+    description: ['narration', 'description', 'details', 'particulars', 'transaction details'],
+    debit: ['debit', 'withdrawal', 'dr amount', 'debit amount'],
+    credit: ['credit', 'deposit', 'cr amount', 'credit amount'],
+    balance: ['balance', 'running balance', 'available balance', 'ledger balance'],
+  };
   const headerBlob = text.slice(0, 5000).toLowerCase();
   const expectedGroups = [aliases.date, aliases.description, aliases.debit, aliases.credit, aliases.balance];
   const matchedGroups = expectedGroups.filter((group) =>
@@ -1424,36 +1411,48 @@ const computeConfidenceBreakdown = ({
 const pickBankBySignals = ({
   fileName,
   extractedText,
-  cachedTemplateId,
 }: {
   fileName: string;
   extractedText: string;
-  cachedTemplateId: string | null;
 }): BankDetectionLayerResult => {
+  const signalText = `${fileName}\n${extractedText}`.toLowerCase();
   const signals: string[] = [];
-  if (cachedTemplateId) {
-    return {
-      bankId: cachedTemplateId,
-      detectionConfidence: 0.98,
-      signals: ['fingerprint_template_match'],
-    };
-  }
-
-  const signalText = `${fileName}\n${extractedText}`;
-  const template = detectBankTemplate(signalText);
-  if (template) {
+  const bankDetectors: Array<{ id: string; pattern: RegExp }> = [
+    { id: 'enbd', pattern: /\bemirates\s+nbd\b|\benbd\b/ },
+    { id: 'adcb', pattern: /\badcb\b|abu dhabi commercial bank/ },
+    { id: 'emirates_islamic', pattern: /\bemirates\s+islamic\b/ },
+    { id: 'mashreq', pattern: /\bmashreq\b/ },
+    { id: 'wio', pattern: /\bwio\b/ },
+    { id: 'hdfc', pattern: /\bhdfc\b/ },
+    { id: 'icici', pattern: /\bicici\b/ },
+    { id: 'axis', pattern: /\baxis\b/ },
+    { id: 'sbi', pattern: /\bsbi\b|state bank of india/ },
+    { id: 'kotak', pattern: /\bkotak\b/ },
+    { id: 'hsbc', pattern: /\bhsbc\b/ },
+    { id: 'citi', pattern: /\bciti\b|citibank/ },
+    { id: 'chase', pattern: /\bjp\s*morgan\b|\bchase\b/ },
+    { id: 'bank_of_america', pattern: /bank of america|\bbofa\b/ },
+    { id: 'wells_fargo', pattern: /wells fargo/ },
+    { id: 'barclays', pattern: /\bbarclays\b/ },
+    { id: 'dbs', pattern: /\bdbs\b/ },
+    { id: 'ocbc', pattern: /\bocbc\b/ },
+    { id: 'uob', pattern: /\buob\b/ },
+    { id: 'deutsche', pattern: /deutsche bank/ },
+  ];
+  const matchedBank = bankDetectors.find((entry) => entry.pattern.test(signalText));
+  if (matchedBank) {
     signals.push('header_keyword_match');
   }
-  if (/\b[A-Z]{4}0[A-Z0-9]{6}\b/.test(signalText)) {
+  if (/\b[a-z]{4}0[a-z0-9]{6}\b/i.test(signalText)) {
     signals.push('ifsc_pattern');
   }
-  if (/statement of account|account statement|bank statement/i.test(signalText)) {
+  if (/statement of account|account statement|bank statement/.test(signalText)) {
     signals.push('statement_title_pattern');
   }
 
-  if (template) {
+  if (matchedBank) {
     return {
-      bankId: template.id,
+      bankId: matchedBank.id,
       detectionConfidence: clamp01(0.65 + (signals.length * 0.1)),
       signals,
     };
@@ -1463,32 +1462,6 @@ const pickBankBySignals = ({
     bankId: 'generic',
     detectionConfidence: 0.25,
     signals: signals.length > 0 ? signals : ['generic_fallback'],
-  };
-};
-
-const mapTemplateForBank = ({
-  bankId,
-  extractedText,
-  cachedAllowSingleDate,
-}: {
-  bankId: string;
-  extractedText: string;
-  cachedAllowSingleDate: boolean;
-}): TemplateMappingLayerResult => {
-  const template = getBankTemplateById(bankId) ?? detectBankTemplate(extractedText);
-  if (template) {
-    return {
-      templateId: template.id,
-      templateFound: true,
-      templateSource: template.id === bankId ? 'fingerprint' : 'bank_detection',
-      allowSingleDate: cachedAllowSingleDate,
-    };
-  }
-  return {
-    templateId: 'generic',
-    templateFound: false,
-    templateSource: 'generic',
-    allowSingleDate: cachedAllowSingleDate,
   };
 };
 
@@ -1798,8 +1771,6 @@ const shouldForceOcrForDenseStatement = (
   bankMetadata: BankMetadata | undefined,
   transactions: RawTransaction[],
 ): boolean => {
-  const bankHint = `${fileNameLower} ${String(bankMetadata?.bankName || '')}`.toLowerCase();
-  if (isDenseTableBankHint(bankHint)) return true;
   if (transactions.length < 8) return false;
 
   let codeHits = 0;
@@ -1870,10 +1841,6 @@ const deriveAdaptiveOcrStrategy = (
     hardnessScore += 1;
     reasons.push('moderate_amount_anomaly_rate');
   }
-  if (isComplexBankLayoutHint(fileNameLower)) {
-    hardnessScore += 2;
-    reasons.push('complex_table_layout_hint');
-  }
 
   let level: OcrHardnessLevel = 'easy';
   if (hardnessScore >= 8) level = 'extreme';
@@ -1933,8 +1900,6 @@ const shouldRetryStrictVisionPass = (
   if (mode === 'always') return true;
 
   const tx = primaryResult.transactions || [];
-  const likelyDenseTableBank = isDenseTableBankHint(fileNameLower);
-  if (likelyDenseTableBank && tx.length <= 40) return true;
   if (!primaryResult.success || tx.length === 0) return true;
 
   const mismatchRatio = balanceMismatchRatio(tx);
@@ -1976,14 +1941,7 @@ const shouldRunMistralDualPass = (
   if (mode === 'always') return true;
 
   const tx = groqResult.transactions || [];
-  const bankHints = [
-    fileNameLower,
-    String(groqResult.bankMetadata?.bankName || ''),
-    String(groqResult.text || ''),
-  ].join(' ');
-  const likelyDenseTableBank = isDualPassBankHint(bankHints);
   if (!groqResult.success || tx.length === 0) return true;
-  if (likelyDenseTableBank && tx.length <= 60) return true;
 
   const mismatchRatio = balanceMismatchRatio(tx);
   if (tx.length >= 8 && mismatchRatio > 0.08) return true;
@@ -2522,7 +2480,6 @@ Deno.serve(async (req) => {
     text_extract_ms: 0,
     deterministic_parse_ms: 0,
     confidence_ms: 0,
-    template_recheck_ms: 0,
     ocr_ms: 0,
     ai_ms: 0,
     validation_ms: 0,
@@ -2639,17 +2596,19 @@ Deno.serve(async (req) => {
       );
     }
     const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
+    const rawBase64Input = typeof base64FileData === 'string' ? base64FileData.trim() : '';
+    const hasBase64FileData = rawBase64Input.length > 0;
 
-    if (!user && !base64FileData && !hasPdfPageImages) {
+    if (!user && !hasBase64FileData) {
       return new Response(
         JSON.stringify({ error: 'File data required for anonymous users' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (user && !fileId && !hasPdfPageImages) {
+    if (user && !fileId && !hasBase64FileData) {
       return new Response(
-        JSON.stringify({ error: 'File ID or PDF page images required for authenticated users' }),
+        JSON.stringify({ error: 'File ID or fileData required for authenticated users' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -2701,40 +2660,59 @@ Deno.serve(async (req) => {
 
     // Get file bytes
     let bytes: Uint8Array;
+    let fileSource: 'storage' | 'base64' | 'none' = 'none';
 
-    if (user && storageFilePath && !hasPdfPageImages) {
+    if (user && storageFilePath) {
       const { data: fileData, error: downloadError } = await supabaseAdmin.storage
         .from('bank-statements')
         .download(storageFilePath);
 
-      if (downloadError || !fileData) {
+      if (!downloadError && fileData) {
+        const buffer = await fileData.arrayBuffer();
+        bytes = new Uint8Array(buffer);
+        fileSource = 'storage';
+      } else if (hasBase64FileData) {
+        try {
+          const dataUrlMatch = rawBase64Input.match(/^data:[^;]+;base64,(.+)$/);
+          const base64Content = (dataUrlMatch?.[1] || rawBase64Input || '').replace(/\s+/g, '');
+          const binaryString = atob(base64Content);
+          bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          fileSource = 'base64';
+        } catch {
+          return new Response(
+            JSON.stringify({ error: 'Invalid file data' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } else {
         return new Response(
           JSON.stringify({ error: 'File not found' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
-      const buffer = await fileData.arrayBuffer();
-      bytes = new Uint8Array(buffer);
     } else {
       try {
-        // If PDF pages are provided as images, we may not have a PDF base64.
-        const rawBase64 = typeof base64FileData === 'string' ? base64FileData.trim() : '';
-        const dataUrlMatch = rawBase64.match(/^data:[^;]+;base64,(.+)$/);
-        const base64Content = (dataUrlMatch?.[1] || rawBase64 || '').replace(/\s+/g, '');
+        const dataUrlMatch = rawBase64Input.match(/^data:[^;]+;base64,(.+)$/);
+        const base64Content = (dataUrlMatch?.[1] || rawBase64Input || '').replace(/\s+/g, '');
         if (!base64Content) {
           bytes = new Uint8Array();
+          fileSource = 'none';
         } else {
           const binaryString = atob(base64Content);
           bytes = new Uint8Array(binaryString.length);
           for (let i = 0; i < binaryString.length; i++) {
             bytes[i] = binaryString.charCodeAt(i);
           }
+          fileSource = 'base64';
         }
         traceLog('file_decode_metrics', {
-          hasFileData: typeof base64FileData === 'string',
-          rawLength: rawBase64.length,
+          hasFileData: hasBase64FileData,
+          rawLength: rawBase64Input.length,
           decodedBytes: bytes.length,
+          fileSource,
         });
       } catch {
         return new Response(
@@ -2755,6 +2733,15 @@ Deno.serve(async (req) => {
     // Validate magic bytes
     const lowerFileName = fileName.toLowerCase();
     const isPdf = lowerFileName.endsWith('.pdf');
+    if (isPdf && bytes.length === 0) {
+      return new Response(
+        JSON.stringify({
+          code: 'PDF_BYTES_MISSING',
+          error: 'PDF bytes missing. Please upload with original file data (fileId or fileData).',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
     let pageCount = hasPdfPageImages ? (pdfPageImages as string[]).length : 1;
     if (isPdf && bytes.length > 0) {
       try {
@@ -2827,6 +2814,7 @@ Deno.serve(async (req) => {
     pipelineDiagnostics.uploadReceive = {
       ok: true,
       fileName,
+      fileSource,
       fileSizeBytes: bytes.length,
       pageCount,
       isPdf,
@@ -3051,6 +3039,7 @@ Deno.serve(async (req) => {
 
     const rawTextLength = extractedText.length;
     const charsPerPage = pageCount > 0 ? Number((rawTextLength / pageCount).toFixed(2)) : rawTextLength;
+    const printableRatio = computePrintableRatio(extractedText);
     const structuralScan = runStructuralScan({
       isPdf,
       fileName,
@@ -3067,10 +3056,12 @@ Deno.serve(async (req) => {
       rawTextLength,
       charsPerPage,
       selectableTextDetected: structuralScan.hasSelectableText,
+      printableRatio,
     });
     pipelineDiagnostics.structuralScan = {
       ok: true,
       classification,
+      printableRatio,
       ...structuralScan,
     };
     console.log('Document classification:', classification);
@@ -3135,10 +3126,6 @@ Deno.serve(async (req) => {
       clientPdfParseAssessment,
       forceOcrForDenseStatement,
     );
-    let fingerprintData: { fingerprint: string; headerHint: string } | null = null;
-    let cachedTemplate: { template_id?: string; allow_single_date?: boolean } | null = null;
-    let cachedTemplateId: string | null = null;
-    let cachedAllowSingleDate = false;
     const computeConfidenceBreakdownTimed = (payload: {
       rows: RawTransaction[];
       sourceText: string;
@@ -3150,23 +3137,9 @@ Deno.serve(async (req) => {
       timing.confidence_ms += Date.now() - startedAt;
       return result;
     };
-    if (extractedText) {
-      try {
-        fingerprintData = await buildTemplateFingerprint(extractedText);
-        cachedTemplate = await fetchTemplateFingerprint(supabaseAdmin, fingerprintData.fingerprint);
-        cachedTemplateId = cachedTemplate?.template_id ?? null;
-        cachedAllowSingleDate = cachedTemplate?.allow_single_date === true;
-      } catch {
-        fingerprintData = null;
-        cachedTemplate = null;
-        cachedTemplateId = null;
-        cachedAllowSingleDate = false;
-      }
-    }
     const bankDetection = pickBankBySignals({
       fileName,
       extractedText,
-      cachedTemplateId,
     });
     pipelineDiagnostics.bankDetection = {
       ok: true,
@@ -3174,77 +3147,11 @@ Deno.serve(async (req) => {
       detectionConfidence: bankDetection.detectionConfidence,
       signals: bankDetection.signals,
     };
-
-    const templateMapping = mapTemplateForBank({
-      bankId: bankDetection.bankId,
-      extractedText,
-      cachedAllowSingleDate,
-    });
-    pipelineDiagnostics.templateMapping = {
-      ok: true,
-      ...templateMapping,
-    };
-
-    let templateSelectedId: string | null = templateMapping.templateId === 'generic'
-      ? null
-      : templateMapping.templateId;
-    let templateSingleDateUsed = false;
-    if (
-      extractedText &&
-      (
-        clientParsedTransactions.length > 0 ||
-        structuralScan.hasSelectableText
-      )
-    ) {
-      const template = getBankTemplateById(templateSelectedId) ?? detectBankTemplate(extractedText);
-      const needsTemplateRecheck = clientPdfParseAssessment.useDeterministic === false &&
-        clientPdfParseAssessment.mismatchRatio < 0.9;
-      const shouldRecheck =
-        needsTemplateRecheck ||
-        templateMapping.allowSingleDate ||
-        (clientParsedTransactions.length === 0 && structuralScan.hasSelectableText);
-      if (template && shouldRecheck) {
-        templateSelectedId = template.id;
-        try {
-          const templateStart = Date.now();
-          const templateReparse = await extractDeterministicPdfTransactions({
-            bytes,
-            password: pdfPassword,
-            totalPages: pageCount,
-            useChunkMode,
-            allowSingleDate: true,
-          });
-          timing.template_recheck_ms += Date.now() - templateStart;
-          if (templateReparse.transactions.length > 0) {
-            const reparseAssessment = assessClientPdfParsedTransactions(templateReparse.transactions, pageCount);
-            const originalMismatch = clientPdfParseAssessment.mismatchRatio;
-            const reparseMismatch = reparseAssessment.mismatchRatio;
-            const originalCount = clientParsedTransactions.length;
-            const reparseCount = templateReparse.transactions.length;
-            const preferReparse =
-              reparseMismatch + 0.02 < originalMismatch ||
-              reparseCount >= originalCount + 3;
-            if (preferReparse) {
-              console.log(
-                `Template recheck selected (${template.id}) rows=${reparseCount}, mismatch=${reparseMismatch.toFixed(3)} vs original ${originalMismatch.toFixed(3)}`,
-              );
-              clientParsedTransactions = templateReparse.transactions;
-              clientPdfParseAssessment = reparseAssessment;
-              templateSingleDateUsed = true;
-              if (!extractedText && templateReparse.text) {
-                extractedText = templateReparse.text;
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Template recheck failed:', error);
-        }
-      }
-    }
+    const selectedBankId = bankDetection.bankId;
     const deterministicConfidenceBreakdown = computeConfidenceBreakdownTimed({
       rows: clientParsedTransactions,
       sourceText: extractedText,
-      bankId: templateSelectedId ?? bankDetection.bankId,
+      bankId: selectedBankId,
       headerConfidenceHint: bankDetection.detectionConfidence,
     });
     traceLog('confidence_breakdown', {
@@ -3276,7 +3183,7 @@ Deno.serve(async (req) => {
       structuralScan.hasSelectableText === true;
     let skipOCR = false;
     if (hardTextGateActive) {
-      console.log('HARD TEXT GATE ACTIVATED — SKIPPING OCR');
+      console.log('HARD TEXT GATE ACTIVATED - SKIPPING OCR');
       skipOCR = true;
     }
     console.log(
@@ -3713,13 +3620,13 @@ Deno.serve(async (req) => {
     const deterministicReconcileConfidence = computeConfidenceBreakdownTimed({
       rows: deterministicDataset,
       sourceText: extractedText,
-      bankId: templateSelectedId ?? bankDetection.bankId,
+      bankId: selectedBankId,
       headerConfidenceHint: bankDetection.detectionConfidence,
     });
     const ocrReconcileConfidence = computeConfidenceBreakdownTimed({
       rows: ocrDataset.length > 0 ? ocrDataset : extractionResult.transactions,
       sourceText: extractionResult.extractedText || extractedText,
-      bankId: templateSelectedId ?? bankDetection.bankId,
+      bankId: selectedBankId,
       headerConfidenceHint: bankDetection.detectionConfidence,
     });
 
@@ -3731,7 +3638,7 @@ Deno.serve(async (req) => {
       const mergedConfidence = computeConfidenceBreakdownTimed({
         rows: mergedDataset,
         sourceText: extractionResult.extractedText || extractedText,
-        bankId: templateSelectedId ?? bankDetection.bankId,
+        bankId: selectedBankId,
         headerConfidenceHint: bankDetection.detectionConfidence,
       });
 
@@ -3879,7 +3786,7 @@ Deno.serve(async (req) => {
           const rescueConfidence = computeConfidenceBreakdownTimed({
             rows: rescueRows,
             sourceText: minimalStructuredLines,
-            bankId: templateSelectedId ?? bankDetection.bankId,
+            bankId: selectedBankId,
             headerConfidenceHint: bankDetection.detectionConfidence,
           });
           const rescueMismatch = 1 - rescueConfidence.balanceValidationScore;
@@ -3940,15 +3847,6 @@ Deno.serve(async (req) => {
     rawTransactions = hardRuleResult.rows;
     if (rawTransactions.length > 1) {
       console.log(`Debit/Credit hard rule applied (order=${hardRuleResult.order}).`);
-    }
-
-    if (fingerprintData && rawTransactions.length > 0) {
-      await storeTemplateFingerprint(supabaseAdmin, {
-        fingerprint: fingerprintData.fingerprint,
-        templateId: templateSelectedId,
-        headerHint: fingerprintData.headerHint,
-        allowSingleDate: templateSingleDateUsed || cachedAllowSingleDate,
-      });
     }
 
     const ocrTextBankMetadata = extractBankMetadataFromOcrText(extractedText);
@@ -4225,7 +4123,7 @@ Deno.serve(async (req) => {
     const exportResult = await runStandardizedExportPipeline({
       sessionId: conversion?.id ?? crypto.randomUUID(),
       structuredTransactions: transactions,
-      bankId: templateSelectedId ?? bankDetection.bankId,
+      bankId: selectedBankId,
       confidenceScore: finalConfidenceScore,
       parseMode: processedVia,
       fraudAnalysis: riskAnalysis,
@@ -4561,7 +4459,7 @@ Deno.serve(async (req) => {
         rowCount: exportResult.rowCount,
         fileSize: exportResult.fileSize,
         transactions: transactions,
-        bankId: templateSelectedId ?? bankDetection.bankId,
+        bankId: selectedBankId,
         confidenceScore: finalConfidenceScore,
         fraudFlags,
         aiUsed: aiUsed || processedVia === 'ai_rescue',
