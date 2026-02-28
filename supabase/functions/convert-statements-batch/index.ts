@@ -59,11 +59,6 @@ import {
 } from '../_shared/multi-statement.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
-import {
-  isComplexBankLayoutHint,
-  isDenseTableBankHint,
-  isDualPassBankHint,
-} from '../_shared/bank-templates.ts';
 
 // ============= ADMIN ROLE (Server-Side Only) =============
 const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
@@ -339,8 +334,6 @@ const shouldForceOcrForDenseStatement = (
   bankMetadata: BankMetadata | undefined,
   transactions: RawTransaction[],
 ): boolean => {
-  const bankHint = `${fileNameLower} ${String(bankMetadata?.bankName || '')}`.toLowerCase();
-  if (isDenseTableBankHint(bankHint)) return true;
   if (transactions.length < 8) return false;
 
   let codeHits = 0;
@@ -411,10 +404,6 @@ const deriveAdaptiveOcrStrategy = (
     hardnessScore += 1;
     reasons.push('moderate_amount_anomaly_rate');
   }
-  if (isComplexBankLayoutHint(fileNameLower)) {
-    hardnessScore += 2;
-    reasons.push('complex_table_layout_hint');
-  }
 
   let level: OcrHardnessLevel = 'easy';
   if (hardnessScore >= 8) level = 'extreme';
@@ -474,8 +463,6 @@ const shouldRetryStrictVisionPass = (
   if (mode === 'always') return true;
 
   const tx = primaryResult.transactions || [];
-  const likelyDenseTableBank = isDenseTableBankHint(fileNameLower);
-  if (likelyDenseTableBank && tx.length <= 40) return true;
   if (!primaryResult.success || tx.length === 0) return true;
 
   const mismatchRatio = balanceMismatchRatio(tx);
@@ -517,14 +504,7 @@ const shouldRunMistralDualPass = (
   if (mode === 'always') return true;
 
   const tx = groqResult.transactions || [];
-  const bankHints = [
-    fileNameLower,
-    String(groqResult.bankMetadata?.bankName || ''),
-    String(groqResult.text || ''),
-  ].join(' ');
-  const likelyDenseTableBank = isDualPassBankHint(bankHints);
   if (!groqResult.success || tx.length === 0) return true;
-  if (likelyDenseTableBank && tx.length <= 60) return true;
 
   const mismatchRatio = balanceMismatchRatio(tx);
   if (tx.length >= 8 && mismatchRatio > 0.08) return true;
