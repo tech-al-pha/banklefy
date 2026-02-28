@@ -1366,6 +1366,25 @@ export const UploadDemo = () => {
       } catch (invokeError: unknown) {
         const error = invokeError as InvokeConversionError;
         const errorMessage = (error?.message || '').toLowerCase();
+        const isStorageSourceError =
+          isPdf &&
+          !!user &&
+          !("fileData" in requestBody) &&
+          (
+            errorMessage.includes('pdf bytes missing') ||
+            errorMessage.includes('file not found') ||
+            errorMessage.includes('file id or filedata required')
+          );
+
+        if (isStorageSourceError) {
+          // Storage download can occasionally fail despite successful upload.
+          // Retry once with direct fileData to keep frontend-backend flow resilient.
+          requestBody.fileData = await fileToBase64(fileToConvert);
+          const retryWithFileData = await invokeConvertDocument(requestBody);
+          data = retryWithFileData;
+          // Continue with normal success path below.
+          // eslint-disable-next-line no-lonely-if
+        } else {
         const hasDeterministicPdfRows =
           Array.isArray(requestBody.pdfParsedTransactions) &&
           requestBody.pdfParsedTransactions.length > 0;
@@ -1435,6 +1454,7 @@ export const UploadDemo = () => {
         } else {
           // Lean mode: no nested retries (only OCR fallback path above).
           throw invokeError;
+        }
         }
       }
 
