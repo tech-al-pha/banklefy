@@ -444,20 +444,45 @@ const loadPdfDocumentFromBytes = async (
   bytes: Uint8Array,
   password?: string,
 ): Promise<PdfDocumentProxy> => {
-  const pdfjsLib = (await import('https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs')) as PdfJsModule;
-  if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    // Edge runtime: force explicit workerSrc to avoid runtime workerSrc resolution errors.
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
+  const isWorkerSrcFailure = (error: unknown): boolean => {
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    return /globalworkeroptions\.workersrc/i.test(message);
+  };
+
+  const loadViaPdfjsDist = async (): Promise<PdfDocumentProxy> => {
+    const pdfjsLib = (await import('https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs')) as PdfJsModule;
+    if (pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        pdfjsLib.GlobalWorkerOptions.workerSrc ||
+        'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
+    }
+    const loadingTask = pdfjsLib.getDocument({
+      data: bytes,
+      password: password || undefined,
+      useWorkerFetch: false,
+      disableWorker: true,
+      worker: null,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    });
+    return (await loadingTask.promise) as PdfDocumentProxy;
+  };
+
+  try {
+    return await loadViaPdfjsDist();
+  } catch (error) {
+    if (!isWorkerSrcFailure(error)) throw error;
+    console.warn('pdfjs-dist workerSrc resolution failed; retrying with pdfjs-serverless fallback');
+    const fallbackModule = await import('https://esm.sh/pdfjs-serverless');
+    const getDocument = (fallbackModule as { getDocument?: (options: Record<string, unknown>) => { promise: Promise<unknown> } }).getDocument;
+    if (!getDocument) throw error;
+    const fallbackLoadingTask = getDocument({
+      data: bytes,
+      password: password || undefined,
+      useSystemFonts: true,
+    });
+    return (await fallbackLoadingTask.promise) as PdfDocumentProxy;
   }
-  const loadingTask = pdfjsLib.getDocument({
-    data: bytes,
-    password: password || undefined,
-    useWorkerFetch: false,
-    disableWorker: true,
-    isEvalSupported: false,
-    useSystemFonts: true,
-  });
-  return (await loadingTask.promise) as PdfDocumentProxy;
 };
 
 const detectPdfTotalPagesFromBytes = async (
@@ -2703,9 +2728,19 @@ Deno.serve(async (req) => {
     let fileSource: 'storage' | 'base64' | 'none' = 'none';
 
     if (user && storageFilePath) {
-      const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-        .from('bank-statements')
-        .download(storageFilePath);
+      let fileData: Blob | null = null;
+      let downloadError: { message?: string } | null = null;
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        const response = await supabaseAdmin.storage
+          .from('bank-statements')
+          .download(storageFilePath);
+        fileData = response.data ?? null;
+        downloadError = response.error ?? null;
+        if (fileData) break;
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
+        }
+      }
 
       if (!downloadError && fileData) {
         const buffer = await fileData.arrayBuffer();
@@ -2728,6 +2763,10 @@ Deno.serve(async (req) => {
           );
         }
       } else {
+        console.error('Storage file lookup failed:', {
+          storageFilePath,
+          error: downloadError?.message || 'unknown',
+        });
         return new Response(
           JSON.stringify({ error: 'File not found' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
