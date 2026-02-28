@@ -60,6 +60,7 @@ import {
 } from '../_shared/multi-statement.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
+import { resolveEffectiveLimit } from '../_shared/limit-resolver.ts';
 
 // ============= ADMIN ROLE (Server-Side Only) =============
 const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
@@ -193,11 +194,15 @@ async function verifyRecaptcha(token: string): Promise<boolean> {
   }
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: `secret=${secretKey}&response=${token}`,
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     const data = await response.json();
     console.log('reCAPTCHA verification result:', { success: data.success });
     return data.success === true;
@@ -340,7 +345,7 @@ const shouldForceOcrForDenseStatement = (
   let codeHits = 0;
   for (const transaction of transactions.slice(0, 200)) {
     const blob = `${String(transaction.refNumber || '')} ${String(transaction.description || '')}`.toLowerCase();
-    if (/\bphub|mob|trf\b/.test(blob)) codeHits += 1;
+    if (/phub|mob|trf/i.test(blob)) codeHits += 1;
   }
   return codeHits >= 4;
 };
@@ -1346,39 +1351,29 @@ Deno.serve(async (req) => {
       pageCounts.push(pageCount);
     }
 
-    // Usage limit checks (count each statement as a conversion)
-    const { data: limitResult, error: limitError } = await supabaseAdmin.rpc('check_and_reset_daily_limit', {
-      p_ip_address: user ? null : trackingKey,
-      p_user_id: user ? user.id : null,
-      p_timezone: userTimezone,
-    });
+    let conversionsUsed = 0;
+    let conversionsLimit = user ? 5 : 2;
+    let isAdmin = false;
+    let userPlanType = 'free';
 
-    if (limitError) {
+    try {
+      const effectiveLimit = await resolveEffectiveLimit({
+        supabaseAdmin,
+        user,
+        trackingKey,
+        timezone: userTimezone,
+      });
+      conversionsUsed = effectiveLimit.conversionsUsed;
+      conversionsLimit = effectiveLimit.conversionsLimit;
+      isAdmin = effectiveLimit.isAdmin || effectiveLimit.isOwner || effectiveLimit.isUnlimited;
+      userPlanType = effectiveLimit.planType || 'free';
+    } catch (limitError) {
       console.error('Error checking limit:', limitError);
       return new Response(
         JSON.stringify({ error: 'Failed to check usage limit', status: 'error' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const usageInfo = limitResult && limitResult.length > 0 ? limitResult[0] : null;
-    const conversionsUsed = usageInfo?.conversions_used ?? 0;
-    const conversionsLimit = usageInfo?.conversions_limit ?? (user ? 5 : 2);
-    let isAdmin = false;
-    if (user) {
-      const { data: roleData, error: roleError } = await supabaseAdmin.rpc('has_role', {
-        _user_id: user.id,
-        _role: 'admin',
-      });
-      if (roleError) {
-        console.error('Failed to verify admin role:', roleError);
-      } else {
-        isAdmin = !!roleData;
-      }
-    }
-    let userPlanType = 'free';
-    let pagesUsedThisMonth = 0;
-    const userPlanLimit = conversionsLimit;
 
     if (user && !isAdmin) {
       const { data: subData, error: subError } = await supabase
@@ -1391,7 +1386,6 @@ Deno.serve(async (req) => {
         console.error('Failed to load subscription plan type:', subError);
       } else if (subData) {
         userPlanType = subData.plan_type || userPlanType;
-        pagesUsedThisMonth = subData.pages_used_this_month || 0;
       }
     }
 
