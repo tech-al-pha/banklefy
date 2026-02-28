@@ -1,7 +1,25 @@
 // ============= GROQ VISION OCR PROCESSOR =============
 // Using Groq's Llama Vision model for OCR
 
-import { getHeaderAliasesForHint, type HeaderAliasMap } from './bank-templates.ts';
+type HeaderAliasMap = {
+  date: string[];
+  valueDate: string[];
+  description: string[];
+  reference: string[];
+  debit: string[];
+  credit: string[];
+  balance: string[];
+};
+
+const GENERIC_HEADER_ALIASES: HeaderAliasMap = {
+  date: ['transaction date', 'txn date', 'date'],
+  valueDate: ['value date', 'posting date', 'value dt'],
+  description: ['narration', 'description', 'particular', 'transaction details', 'details'],
+  reference: ['reference', 'txn id', 'transaction id', 'ref no', 'chq ref no', 'chq no', 'utr'],
+  debit: ['debit amount', 'withdrawal amount', 'withdrawal amt', 'dr amount', 'debit'],
+  credit: ['credit amount', 'deposit amount', 'deposit amt', 'cr amount', 'credit'],
+  balance: ['running balance', 'closing balance', 'ledger balance', 'available balance', 'balance'],
+};
 
 export interface BankMetadata {
   bankName: string;
@@ -1547,7 +1565,7 @@ const buildMarkdownHeaderMap = (headers: string[], aliases: HeaderAliasMap): Mar
 
 const parseTransactionsFromMarkdownTables = (markdown: string): RawTransaction[] => {
   const lines = normalizeMarkdownText(markdown).split('\n').map((line) => line.trim()).filter(Boolean);
-  const headerAliases = getHeaderAliasesForHint(markdown);
+  const headerAliases = GENERIC_HEADER_ALIASES;
   const rows: RawTransaction[] = [];
   let index = 0;
 
@@ -2211,10 +2229,10 @@ export function classifyDocument(
     };
   }
 
-  if (metrics?.selectableTextDetected === true && metrics?.charsPerPage >= 100) {
+  if (metrics?.selectableTextDetected === true) {
     return {
       type: 'text',
-      textDensity: metrics.charsPerPage,
+      textDensity: metrics.charsPerPage || metrics.rawTextLength || 0,
       needsOCR: false,
       confidence: 1.0,
     };
