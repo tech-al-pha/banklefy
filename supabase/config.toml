@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.convert-document]
 verify_jwt = false
 
+[functions.warm-up]
+verify_jwt = false
+
 [functions.chat-aura]
 verify_jwt = true
 
