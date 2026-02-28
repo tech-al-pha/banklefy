@@ -9,8 +9,6 @@ import {
   assessClientPdfParsedTransactions,
   classifyDocument,
   callGroqVisionOCR,
-  callMistralVisionOCR,
-  callTesseractOcrWorker,
   correctMinorBalanceDrift,
   extractBankMetadataFromOcrText,
   mergeOcrTransactionsDeterministic,
@@ -1130,9 +1128,6 @@ const CHUNK_SIZE = 5;
 const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
 const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${30 * 1024 * 1024}`); // 30MB
-type OcrWorkerMode = 'off' | 'primary';
-const OCR_WORKER_MODE: OcrWorkerMode =
-  (Deno.env.get('OCR_WORKER_MODE') || '').trim().toLowerCase() === 'primary' ? 'primary' : 'off';
 type DualOcrMode = 'off' | 'smart' | 'always';
 const normalizeDualOcrMode = (value: string | undefined): DualOcrMode => {
   const mode = (value || '').trim().toLowerCase();
@@ -3458,7 +3453,6 @@ Deno.serve(async (req) => {
       const effectiveDualMode: DualOcrMode = 'off';
       const effectiveDualMaxPages = 0;
       const useStrictFirstPass = !OCR_SINGLE_PASS_ONLY &&
-        OCR_WORKER_MODE !== 'primary' &&
         adaptiveOcrStrategy.strictFirstPass;
 
       if (!structuralScan.hasSelectableText && hasPdfPageImages) {
@@ -3515,22 +3509,11 @@ Deno.serve(async (req) => {
           let strictUsed = false;
           let dualUsed = false;
           try {
-            if (OCR_WORKER_MODE === 'primary') {
-              const workerResult = await callTesseractOcrWorker(pageBase64, pageMime, fileName);
-              if (workerResult.success && workerResult.transactions && workerResult.transactions.length > 0) {
-                pageResult = workerResult;
-                console.log('Using Tesseract OCR worker result for this page.');
-              }
-            }
-
-            if (!pageResult) {
-              pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
-            }
+            pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
 
             if (
               pageResult &&
               !useStrictFirstPass &&
-              OCR_WORKER_MODE !== 'primary' &&
               index < effectiveStrictMaxPages &&
               shouldRetryStrictVisionPass(lowerFileName, pageResult, effectiveStrictMode)
             ) {
@@ -3541,17 +3524,6 @@ Deno.serve(async (req) => {
                 console.log('Using strict-table OCR pass for a PDF page (better extraction quality).');
                 pageResult = chosenResult;
               }
-            }
-
-            if (
-              pageResult &&
-              OCR_WORKER_MODE !== 'primary' &&
-              index < effectiveDualMaxPages &&
-              shouldRunMistralDualPass(lowerFileName, pageResult, effectiveDualMode)
-            ) {
-              const mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
-              dualUsed = true;
-              pageResult = mergeProviderResults(pageResult, mistralResult);
             }
 
             return { pageResult, error: null, strictUsed, dualUsed };
@@ -3682,7 +3654,6 @@ Deno.serve(async (req) => {
       isPdf &&
       hasPdfPageImages &&
       !OCR_SINGLE_PASS_ONLY &&
-      OCR_WORKER_MODE !== 'primary' &&
       extractionResult.transactions.length > 0
     ) {
       const prelim = scoreTransactionConfidence(extractionResult.transactions as unknown as Transaction[]);
