@@ -18,6 +18,7 @@ import {
 import {
   AlertTriangle,
   CheckCircle,
+  Clock3,
   Crown,
   Download,
   FileSpreadsheet,
@@ -390,11 +391,6 @@ export const ResultsSection = ({
                 style={{ width: `${Math.min(100, Math.max(0, conversionProgressPercent))}%` }}
               />
             </div>
-            {showImageProcessingHint && (
-              <p className="text-xs text-muted-foreground">
-                Image-based statements can take longer. We prioritize extraction accuracy over raw speed.
-              </p>
-            )}
           </div>
         </Card>
       )}
@@ -617,6 +613,23 @@ export const ResultsSection = ({
             </div>
           </Card>
         </div>
+      )}
+
+      {showImageProcessingHint && (
+        <Card className="p-4 bg-[#141414] border border-primary/20">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+              <Clock3 className="h-4.5 w-4.5 text-primary" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-white">Scanned or image-based PDF detected</p>
+              <p className="text-xs text-muted-foreground">
+                We run deeper OCR checks on scanned files for cleaner extraction. This can take a bit longer,
+                while text-based PDFs are processed faster through deterministic parsing.
+              </p>
+            </div>
+          </div>
+        </Card>
       )}
 
       <div className="grid md:grid-cols-3 gap-6">
