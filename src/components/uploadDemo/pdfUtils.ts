@@ -165,7 +165,7 @@ const summarizeFlags = (flags: DetectorFlag[]) => {
 };
 
 export const getPdfPageCount = async (file: File, password?: string): Promise<number | null> => {
-  const pdfjsLib = (await import("pdfjs-dist")) as PdfJsModule;
+  const pdfjsLib = (await import("pdfjs-dist")) as unknown as PdfJsModule;
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
   try {
@@ -279,7 +279,7 @@ export const detectEditedPdf = async (
     pushFlag(flags, entry.code, entry.label, Math.round(entry.score * scoreFactor), entry.severity);
   });
 
-  const pdfjsLib = (await import("pdfjs-dist")) as PdfJsModule;
+  const pdfjsLib = (await import("pdfjs-dist")) as unknown as PdfJsModule;
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
   let totalTextChars = 0;
@@ -529,7 +529,7 @@ export const detectEditedPdf = async (
 };
 
 export const detectPasswordProtectedPdf = async (file: File): Promise<boolean> => {
-  const pdfjsLib = (await import("pdfjs-dist")) as PdfJsModule;
+  const pdfjsLib = (await import("pdfjs-dist")) as unknown as PdfJsModule;
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
   const arrayBuffer = await file.arrayBuffer();
@@ -856,7 +856,7 @@ export const extractPdfDataFromText = async (
   file: File,
   options?: { password?: string; maxPdfRenderPages?: number },
 ): Promise<ParsedPdfData> => {
-  const pdfjsLib = (await import("pdfjs-dist")) as PdfJsModule;
+  const pdfjsLib = (await import("pdfjs-dist")) as unknown as PdfJsModule;
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
   const arrayBuffer = await file.arrayBuffer();
@@ -974,7 +974,7 @@ export const pdfToPageImages = async (
   },
 ): Promise<string[]> => {
   const { password, maxPdfRenderPages, isFreeUsageMode, freeMaxPdfPagesPerFile } = options;
-  const pdfjsLib = (await import("pdfjs-dist")) as PdfJsModule;
+  const pdfjsLib = (await import("pdfjs-dist")) as unknown as PdfJsModule;
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
 
   const arrayBuffer = await file.arrayBuffer();

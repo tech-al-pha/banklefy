@@ -48,6 +48,7 @@ interface SettingItem {
   category: string;
   icon: React.ReactNode;
   component?: React.ReactNode;
+  tone?: "danger" | "default";
 }
 
 const Settings = () => {

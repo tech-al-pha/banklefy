@@ -437,11 +437,11 @@ export const UploadDemo = () => {
     const merged: BankInfo = {};
     for (const info of infos) {
       if (!info) continue;
-      for (const [key, value] of Object.entries(info) as Array<[keyof BankInfo, BankInfo[keyof BankInfo]]>) {
+      for (const [key, value] of Object.entries(info)) {
         if (value === undefined || value === null || value === "") continue;
-        const existing = merged[key];
+        const existing = (merged as Record<string, unknown>)[key];
         if (existing === undefined || existing === null || existing === "") {
-          merged[key] = value;
+          (merged as Record<string, unknown>)[key] = value;
         }
       }
     }
@@ -493,7 +493,7 @@ export const UploadDemo = () => {
       const debitValue = Number(transaction.debit || 0);
       const creditValue = Number(transaction.credit || 0);
       const balanceValue =
-        transaction.balance === null || transaction.balance === undefined || transaction.balance === ""
+        transaction.balance === null || transaction.balance === undefined || (transaction.balance as unknown) === ""
           ? ""
           : Number(transaction.balance);
       rows.push([
