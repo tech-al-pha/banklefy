@@ -9,6 +9,7 @@ import {
   assessClientPdfParsedTransactions,
   classifyDocument,
   callGroqVisionOCR,
+  callMistralVisionOCR,
   correctMinorBalanceDrift,
   extractBankMetadataFromOcrText,
   mergeOcrTransactionsDeterministic,
@@ -1125,9 +1126,11 @@ const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
 const GLOBAL_PDF_PAGE_CAP = 50;
 const CHUNK_THRESHOLD = 10;
 const CHUNK_SIZE = 5;
+const MAX_TEXT_PDF_BYTES = 50 * 1024 * 1024;
+const MAX_IMAGE_UPLOAD_BYTES = 20 * 1024 * 1024;
 const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
-const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${30 * 1024 * 1024}`); // 30MB
+const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${20 * 1024 * 1024}`); // 20MB
 type DualOcrMode = 'off' | 'smart' | 'always';
 const normalizeDualOcrMode = (value: string | undefined): DualOcrMode => {
   const mode = (value || '').trim().toLowerCase();
@@ -2648,13 +2651,15 @@ Deno.serve(async (req) => {
     const hasPdfPageImages = Array.isArray(pdfPageImages) && pdfPageImages.length > 0;
     const rawBase64Input = typeof base64FileData === 'string' ? base64FileData.trim() : '';
     const hasBase64FileData = rawBase64Input.length > 0;
+    const isPdfByName = fileName.toLowerCase().endsWith('.pdf');
+    const maxIncomingBytes = isPdfByName ? MAX_TEXT_PDF_BYTES : MAX_IMAGE_UPLOAD_BYTES;
     const rawBase64PayloadLength = hasBase64FileData
       ? (rawBase64Input.match(/^data:[^;]+;base64,(.+)$/)?.[1] || rawBase64Input).replace(/\s+/g, '').length
       : 0;
     const estimatedBase64Bytes = Math.floor(rawBase64PayloadLength * 0.75);
-    if (hasBase64FileData && estimatedBase64Bytes > 10 * 1024 * 1024) {
+    if (hasBase64FileData && estimatedBase64Bytes > maxIncomingBytes) {
       return new Response(
-        JSON.stringify({ error: 'File exceeds 10MB limit' }),
+        JSON.stringify({ error: `File exceeds ${Math.round(maxIncomingBytes / (1024 * 1024))}MB limit` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -2733,15 +2738,15 @@ Deno.serve(async (req) => {
         downloadError = response.error ?? null;
         if (fileData) break;
         if (attempt < 3) {
-          await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
 
-      if (!downloadError && fileData) {
-        const buffer = await fileData.arrayBuffer();
-        bytes = new Uint8Array(buffer);
-        fileSource = 'storage';
-      } else if (hasBase64FileData) {
+        if (!downloadError && fileData) {
+          const buffer = await fileData.arrayBuffer();
+          bytes = new Uint8Array(buffer);
+          fileSource = 'storage';
+        } else if (hasBase64FileData) {
         try {
           const dataUrlMatch = rawBase64Input.match(/^data:[^;]+;base64,(.+)$/);
           const base64Content = (dataUrlMatch?.[1] || rawBase64Input || '').replace(/\s+/g, '');
@@ -2757,17 +2762,20 @@ Deno.serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
+        } else {
+          console.error('Storage file lookup failed:', {
+            storageFilePath,
+            error: downloadError?.message || 'unknown',
+          });
+          return new Response(
+          JSON.stringify({
+            error: 'Source file is not ready yet. Please retry in a moment.',
+            code: 'SOURCE_FILE_NOT_READY',
+          }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       } else {
-        console.error('Storage file lookup failed:', {
-          storageFilePath,
-          error: downloadError?.message || 'unknown',
-        });
-        return new Response(
-          JSON.stringify({ error: 'File not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    } else {
       try {
         const dataUrlMatch = rawBase64Input.match(/^data:[^;]+;base64,(.+)$/);
         const base64Content = (dataUrlMatch?.[1] || rawBase64Input || '').replace(/\s+/g, '');
@@ -2797,9 +2805,9 @@ Deno.serve(async (req) => {
     }
 
     // Validate file size (10MB limit) when we actually have original bytes
-    if (bytes.length > 0 && bytes.length > 10 * 1024 * 1024) {
+    if (bytes.length > 0 && bytes.length > maxIncomingBytes) {
       return new Response(
-        JSON.stringify({ error: 'File exceeds 10MB limit' }),
+        JSON.stringify({ error: `File exceeds ${Math.round(maxIncomingBytes / (1024 * 1024))}MB limit` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -3441,6 +3449,7 @@ Deno.serve(async (req) => {
       };
 
       const errors: string[] = [];
+      const ocrProvidersFailedDetails: string[] = [];
       const start = Date.now();
       const collected: RawTransaction[] = [];
       pagesWithData = 0;
@@ -3508,8 +3517,57 @@ Deno.serve(async (req) => {
           let pageResult: OCRResult | null = null;
           let strictUsed = false;
           let dualUsed = false;
+          let providersFailed = false;
+          let groqFailureReason: string | null = null;
           try {
-            pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
+            let groqResult: OCRResult | null = null;
+            try {
+              groqResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
+            } catch (groqError) {
+              groqFailureReason = groqError instanceof Error ? groqError.message : 'Groq OCR failed';
+            }
+
+            const groqHasRows = !!(
+              groqResult &&
+              groqResult.success &&
+              groqResult.transactions &&
+              groqResult.transactions.length > 0
+            );
+            if (groqHasRows) {
+              pageResult = groqResult;
+            } else {
+              let mistralResult: OCRResult | null = null;
+              let mistralFailureReason: string | null = null;
+              try {
+                mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
+              } catch (mistralError) {
+                mistralFailureReason = mistralError instanceof Error ? mistralError.message : 'Mistral OCR failed';
+              }
+
+              const mistralHasRows = !!(
+                mistralResult &&
+                mistralResult.success &&
+                mistralResult.transactions &&
+                mistralResult.transactions.length > 0
+              );
+              if (mistralHasRows) {
+                pageResult = mistralResult;
+                dualUsed = true;
+              } else {
+                providersFailed = true;
+                const failureParts = [
+                  groqFailureReason || 'Groq returned empty OCR result',
+                  mistralFailureReason || 'Mistral returned empty OCR result',
+                ];
+                return {
+                  pageResult: null,
+                  error: `OCR_PROVIDERS_FAILED: page ${pageEntry.pageNumber} (${failureParts.join(' | ')})`,
+                  strictUsed,
+                  dualUsed: true,
+                  providersFailed,
+                };
+              }
+            }
 
             if (
               pageResult &&
@@ -3526,13 +3584,14 @@ Deno.serve(async (req) => {
               }
             }
 
-            return { pageResult, error: null, strictUsed, dualUsed };
+            return { pageResult, error: null, strictUsed, dualUsed, providersFailed };
           } catch (pageError) {
             return {
               pageResult: null,
               error: pageError instanceof Error ? pageError.message : 'OCR page processing failed',
               strictUsed,
               dualUsed,
+              providersFailed,
             };
           }
         }),
@@ -3543,6 +3602,9 @@ Deno.serve(async (req) => {
         if (pageOutcome.dualUsed) dualProviderCount += 1;
         if (pageOutcome.error) {
           errors.push(pageOutcome.error);
+          if (pageOutcome.providersFailed) {
+            ocrProvidersFailedDetails.push(pageOutcome.error);
+          }
           continue;
         }
 
@@ -3571,6 +3633,22 @@ Deno.serve(async (req) => {
       status.groqVision.success = collected.length > 0;
       if (!status.groqVision.success) {
         status.groqVision.error = errors[0] || 'No data extracted from PDF page images';
+      }
+
+      if (
+        collected.length === 0 &&
+        ocrProvidersFailedDetails.length > 0 &&
+        deterministicDataset.length === 0
+      ) {
+        return new Response(
+          JSON.stringify({
+            error: 'OCR_PROVIDERS_FAILED',
+            code: 'OCR_PROVIDERS_FAILED',
+            message: 'Both OCR providers failed to extract data from this document.',
+            details: ocrProvidersFailedDetails,
+          }),
+          { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
       }
 
       extractionResult = {
