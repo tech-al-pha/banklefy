@@ -100,109 +100,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { data: cronEnsure, error: cronEnsureError } = await supabase.rpc("ensure_purge_expired_conversions_cron");
-
-    if (cronEnsureError) {
-      return new Response(
-        JSON.stringify({ error: `Failed to ensure purge cron job: ${cronEnsureError.message}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const cronEnsureResult = (cronEnsure && typeof cronEnsure === "object")
-      ? (cronEnsure as Record<string, unknown>)
-      : null;
-
-    if (cronEnsureResult && cronEnsureResult.ok === false) {
-      return new Response(
-        JSON.stringify({ error: "Retention cron health check failed", details: cronEnsureResult }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Storage objects cannot be deleted directly from SQL tables in modern Supabase.
-    // Delete via Storage API first (age-based fallback), then purge DB rows.
-    const cutoffIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    let storageDeleted = 0;
-    let storageDeleteErrors = 0;
-    const chunkSize = 100;
-
-    for (let cycle = 0; cycle < 40; cycle += 1) {
-      const { data: oldObjects, error: listError } = await supabase
-        .schema("storage")
-        .from("objects")
-        .select("name")
-        .eq("bucket_id", "bank-statements")
-        .lte("created_at", cutoffIso)
-        .order("created_at", { ascending: true })
-        .limit(500);
-
-      if (listError) {
-        return new Response(
-          JSON.stringify({ error: `Failed to list old storage objects: ${listError.message}` }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      if (!oldObjects || oldObjects.length === 0) {
-        break;
-      }
-
-      const names = oldObjects
-        .map((row) => (row && typeof row.name === "string" ? row.name : ""))
-        .filter((name) => name.length > 0);
-
-      if (names.length === 0) {
-        break;
-      }
-
-      for (let i = 0; i < names.length; i += chunkSize) {
-        const slice = names.slice(i, i + chunkSize);
-        const { error: removeError } = await supabase.storage
-          .from("bank-statements")
-          .remove(slice);
-
-        if (removeError) {
-          storageDeleteErrors += slice.length;
-        } else {
-          storageDeleted += slice.length;
-        }
-      }
-
-      if (oldObjects.length < 500) {
-        break;
-      }
-    }
-
-    const { error } = await supabase.rpc("purge_expired_conversions");
-
-    if (error) {
-      return new Response(
-        JSON.stringify({ error: error.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { data: healthData, error: healthError } = await supabase.rpc("retention_health_check");
-
-    if (healthError) {
-      return new Response(
-        JSON.stringify({
-          status: "ok",
-          warning: `Cleanup done, but health probe failed: ${healthError.message}`,
-          cron: cronEnsureResult,
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     return new Response(
       JSON.stringify({
         status: "ok",
-        cron: cronEnsureResult,
-        health: healthData ?? null,
-        storageDeleted,
-        storageDeleteErrors,
+        retention: "disabled",
+        message: "Automatic 24-hour retention cleanup is disabled.",
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
