@@ -1786,21 +1786,78 @@ const normalizeCurrencyCode = (value: string | undefined): string => {
   return cleaned.slice(0, 3);
 };
 
+const normalizeDedupeText = (value: string | undefined): string =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const normalizeDedupeReference = (value: string | undefined): string =>
+  String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .trim();
+
+const chooseBetterDedupeRow = (current: Transaction, incoming: Transaction): Transaction => {
+  const currentRef = normalizeDedupeReference(current.refNumber);
+  const incomingRef = normalizeDedupeReference(incoming.refNumber);
+  if (!currentRef && incomingRef) return incoming;
+  if (currentRef && !incomingRef) return current;
+
+  const currentDesc = normalizeDedupeText(current.description);
+  const incomingDesc = normalizeDedupeText(incoming.description);
+  if (incomingDesc.length > currentDesc.length + 4) return incoming;
+  return current;
+};
+
+const areLikelyDuplicateRows = (left: Transaction, right: Transaction): boolean => {
+  const leftRef = normalizeDedupeReference(left.refNumber);
+  const rightRef = normalizeDedupeReference(right.refNumber);
+  if (leftRef && rightRef) {
+    return leftRef === rightRef;
+  }
+
+  const leftDesc = normalizeDedupeText(left.description);
+  const rightDesc = normalizeDedupeText(right.description);
+  if (leftDesc && rightDesc) {
+    return leftDesc === rightDesc;
+  }
+
+  return !leftRef && !rightRef && !leftDesc && !rightDesc;
+};
+
 const dedupeAndSortTransactions = (rows: Transaction[]): Transaction[] => {
-  const seen = new Set<string>();
+  const buckets = new Map<string, Transaction[]>();
   const deduped: Transaction[] = [];
+
   for (const row of rows) {
-    const key = [
+    const numericKey = [
       String(row.date || '').trim(),
-      String(row.description || '').trim().toLowerCase(),
       Number(row.debit || 0).toFixed(2),
       Number(row.credit || 0).toFixed(2),
       Number(row.balance || 0).toFixed(2),
     ].join('|');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(row);
+
+    const bucket = buckets.get(numericKey) ?? [];
+    let merged = false;
+    for (let i = 0; i < bucket.length; i += 1) {
+      if (!areLikelyDuplicateRows(bucket[i], row)) continue;
+      bucket[i] = chooseBetterDedupeRow(bucket[i], row);
+      merged = true;
+      break;
+    }
+
+    if (!merged) {
+      bucket.push(row);
+    }
+    buckets.set(numericKey, bucket);
   }
+
+  for (const bucketRows of buckets.values()) {
+    deduped.push(...bucketRows);
+  }
+
   deduped.sort((a, b) => {
     const aTime = new Date(a.date || '').getTime();
     const bTime = new Date(b.date || '').getTime();
