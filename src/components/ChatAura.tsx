@@ -278,7 +278,7 @@ export const ChatAura = ({ pdfContext, pdfFileName, onClose }: ChatAuraProps) =>
               {user && (
                 <p className="text-[11px] text-muted-foreground">
                   {recentLoading
-                    ? "Syncing your last 24 hours..."
+                    ? "Syncing your recent activity..."
                     : `${recentConversions.length} recent file${recentConversions.length === 1 ? "" : "s"} indexed.`}
                 </p>
               )}

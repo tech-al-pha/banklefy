@@ -120,7 +120,7 @@ const Help = () => {
       title: "Exports and Downloads",
       items: [
         "Export to Excel (.xlsx), CSV, JSON, MT940, and PDF reports.",
-        "Download files immediately after conversion to avoid expiration.",
+        "Download files during your active session.",
         "If a download fails, refresh the page and retry the export.",
         "For accounting tools, Excel or CSV is recommended.",
         "PDF reports are best for sharing, Excel/CSV are best for analysis.",
@@ -220,7 +220,7 @@ const Help = () => {
       title: "Security and Privacy",
       items: [
         "Data is encrypted in transit.",
-        "Files and results are kept for up to 24 hours for download.",
+        "Files and results are available while your session is active.",
         "reCAPTCHA is used to prevent abuse.",
         "Do not upload credentials or passwords, only statements.",
         "Sensitive data should be reviewed before sharing outputs.",

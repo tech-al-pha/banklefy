@@ -20,7 +20,7 @@ const Terms = () => {
     {
       icon: Heart,
       title: "Your Content & License",
-      content: "You retain ownership of your files. You grant us a limited license to process, store, and transmit your files and results solely to provide and support the service. Files and results are kept for up to 24 hours so you can download them; after that they are deleted and cannot be recovered.",
+      content: "You retain ownership of your files. You grant us a limited license to process, store, and transmit your files and results solely to provide and support the service. Download access is provided during your active session.",
     },
     {
       icon: AlertCircle,

@@ -34,9 +34,6 @@ interface RecentConversion {
   error_message?: string | null;
 }
 
-const ONE_HOUR_MS = 60 * 60 * 1000;
-const ONE_DAY_MS = 24 * ONE_HOUR_MS;
-
 const Profile = () => {
   const { user, session, signOut } = useAuth();
   const navigate = useNavigate();
@@ -49,7 +46,6 @@ const Profile = () => {
   const [nameChanged, setNameChanged] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const workbookCache = useState(() => new Map<string, ArrayBuffer>())[0];
   const authFlags = user as { email_confirmed_at?: string | null; confirmed_at?: string | null } | null;
   const isVerified = Boolean(authFlags?.email_confirmed_at || authFlags?.confirmed_at);
@@ -107,48 +103,7 @@ const Profile = () => {
     setNameChanged(false);
   }, [profileData, user]);
 
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, ONE_HOUR_MS);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (recent.length === 0) return;
-
-    let nearestExpiryMs = Number.POSITIVE_INFINITY;
-    for (const item of recent) {
-      const createdMs = new Date(item.created_at).getTime();
-      if (Number.isNaN(createdMs)) continue;
-      const expiryMs = createdMs + ONE_DAY_MS;
-      if (expiryMs > nowMs && expiryMs < nearestExpiryMs) {
-        nearestExpiryMs = expiryMs;
-      }
-    }
-
-    if (!Number.isFinite(nearestExpiryMs)) return;
-
-    const timeoutMs = Math.max(0, nearestExpiryMs - nowMs);
-    const timeoutId = window.setTimeout(() => {
-      setNowMs(Date.now());
-    }, timeoutMs);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [recent, nowMs]);
-
-  const visibleRecent = useMemo(() => {
-    return recent.filter((item) => {
-      const createdMs = new Date(item.created_at).getTime();
-      if (Number.isNaN(createdMs)) return false;
-      return createdMs + ONE_DAY_MS > nowMs;
-    });
-  }, [recent, nowMs]);
+  const visibleRecent = useMemo(() => recent, [recent]);
 
   const handleSaveName = async () => {
     await updateProfile(displayName);
@@ -277,14 +232,6 @@ const Profile = () => {
     }
 
     return { transactions, bankMeta };
-  };
-
-  const getExpiryLabel = (createdAt: string, referenceNowMs: number) => {
-    const expiresAt = new Date(new Date(createdAt).getTime() + ONE_DAY_MS);
-    const msLeft = expiresAt.getTime() - referenceNowMs;
-    if (msLeft <= 0) return "Expired";
-    const hours = Math.ceil(msLeft / ONE_HOUR_MS);
-    return `${hours}h left`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -555,7 +502,7 @@ const Profile = () => {
           <Card className="p-6 glass-card">
             <h2 className="text-xl font-semibold mb-2">Processing History</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              View and manage all converted files. Expiry updates hourly.
+              View and manage all converted files.
             </p>
             {visibleRecent.length === 0 ? (
               <div className="py-8 text-center">
@@ -570,7 +517,6 @@ const Profile = () => {
                       <TableHead>File Name</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
-                      <TableHead>Auto Remove</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -582,7 +528,6 @@ const Profile = () => {
                         </TableCell>
                         <TableCell>{getStatusBadge(item.status)}</TableCell>
                         <TableCell>{format(new Date(item.created_at), "MMM d, yyyy HH:mm")}</TableCell>
-                        <TableCell>{getExpiryLabel(item.created_at, nowMs)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex flex-wrap justify-end gap-2">
                             {item.status === "completed" && item.result_path ? (

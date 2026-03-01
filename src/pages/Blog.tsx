@@ -22,7 +22,7 @@ const posts = [
   },
   {
     id: "privacy",
-    title: "Privacy by Default: 24-Hour Retention and Secure Handling",
+    title: "Privacy by Default: Session-Based Access and Secure Handling",
     date: "Feb 7, 2026",
     excerpt:
       "A short overview of how Banklefy stores files temporarily for download and protects sensitive financial data.",

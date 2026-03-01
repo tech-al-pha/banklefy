@@ -67,7 +67,7 @@ const Privacy = () => {
     {
       icon: LockOpen,
       title: "Your Rights",
-      content: "You can access and update your account information. Files and results are deleted automatically after 24 hours and cannot be recovered after that.",
+      content: "You can access and update your account information. Download access is session-based.",
     },
     {
       icon: CheckCircle,
