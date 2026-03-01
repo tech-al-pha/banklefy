@@ -190,6 +190,7 @@ export interface ConversionResponse {
   remaining?: number;
   limitReached?: boolean;
   requiresPassword?: boolean;
+  requiresPageImages?: boolean;
   error?: string;
   message?: string;
 }

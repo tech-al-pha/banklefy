@@ -217,15 +217,7 @@ const Profile = () => {
           category: "Uncategorized",
         };
       })
-      .filter((item): item is {
-        date: string;
-        description: string;
-        refNumber?: string;
-        debit: number;
-        credit: number;
-        balance: number;
-        category: string;
-      } => Boolean(item));
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
     if (transactions.length === 0) {
       throw new Error("No transactions found in workbook.");
