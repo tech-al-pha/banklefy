@@ -23,6 +23,7 @@ import {
 } from '../_shared/ocr-processor.ts';
 import {
   CATEGORY_LIST,
+  fallbackCategorize,
   type ProcessedTransaction,
 } from '../_shared/categorizer.ts';
 import {
@@ -3989,7 +3990,12 @@ Deno.serve(async (req) => {
       rawTransactions = balanceDriftCorrection.transactions;
     }
 
+    const textPdfZeroAiMode =
+      isPdf &&
+      structuralScan.hasSelectableText === true;
+
     const shouldAttemptAiRescue =
+      !textPdfZeroAiMode &&
       AI_RESCUE_ENABLED &&
       processedVia !== 'deterministic' &&
       extractedText &&
@@ -4153,11 +4159,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ============= LAYER 3: SPECIALIZED CATEGORIZATION =============
-    // Mistral is BEST for categorization, Groq as backup, Pattern as fallback
-    console.log('=== Starting Specialized Categorization ===');
-
-    const categorizationResult = await performCategorization(rawTransactions, extractionResult.status);
+    // ============= LAYER 3: CATEGORIZATION =============
+    // For text-based PDFs, keep categorization pure code (pattern fallback) with zero AI.
+    console.log('=== Starting Categorization ===');
+    const categorizationResult = textPdfZeroAiMode
+      ? {
+          transactions: fallbackCategorize(rawTransactions),
+          status: {
+            ...extractionResult.status,
+            mistral: { used: false, success: false },
+            groqText: { used: false, success: false },
+            patternFallback: { used: true, success: true },
+          },
+        }
+      : await performCategorization(rawTransactions, extractionResult.status);
     const categorizedTransactions = categorizationResult.transactions;
 
     // Log final status
