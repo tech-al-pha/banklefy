@@ -80,6 +80,23 @@ const cleanText = (value: string): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const DESCRIPTION_OCR_REPAIRS: Array<[RegExp, string]> = [
+  [/\bOWW\b/gi, 'O/W'],
+  [/\bMARRIOITT\b/gi, 'MARRIOTT'],
+  [/\bHIJTON\b/gi, 'HILTON'],
+  [/\bTHEBANC\b/gi, 'THEBANQ'],
+];
+
+const normalizeDescriptionNoise = (value: string | undefined): string => {
+  const original = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!original) return '';
+  let cleaned = original;
+  for (const [pattern, replacement] of DESCRIPTION_OCR_REPAIRS) {
+    cleaned = cleaned.replace(pattern, replacement);
+  }
+  return cleaned.replace(/\s+/g, ' ').trim();
+};
+
 type BalanceDirection = 'forward' | 'reverse';
 
 type SanitizerOptions = {
@@ -517,7 +534,12 @@ const maybeApplyBalanceOffset = (transactions: Transaction[], options?: Sanitize
 };
 
 export const sanitizeTransactions = (transactions: Transaction[], options?: SanitizerOptions): Transaction[] => {
-  const filtered = transactions.filter((t) => {
+  const normalizedDescriptions = transactions.map((transaction) => ({
+    ...transaction,
+    description: normalizeDescriptionNoise(transaction.description),
+  }));
+
+  const filtered = normalizedDescriptions.filter((t) => {
     if (!isDateLike(t.date)) return false;
     if (isNonTransactionRow(t)) return false;
     const debit = Number(t.debit || 0);

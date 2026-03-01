@@ -4396,33 +4396,7 @@ Deno.serve(async (req) => {
       includeCompatibilityBundle: false,
       prepareDownload: async (artifact) => {
         const fileSize = artifact.fileBuffer.byteLength;
-        if (!user || !conversion || artifact.format !== 'xlsx') {
-          return { downloadUrl: null, storagePath: null, fileSize };
-        }
-
-        const storagePath = `${user.id}/results/${conversion.id}.xlsx`;
-        const { error: uploadResultError } = await supabase.storage
-          .from('bank-statements')
-          .upload(storagePath, artifact.fileBuffer, {
-            contentType: artifact.mimeType,
-            upsert: true,
-          });
-        if (uploadResultError) {
-          throw new Error(`EXPORT_UPLOAD_FAILED:${uploadResultError.message}`);
-        }
-
-        const { data: signedData, error: signedUrlError } = await supabaseAdmin.storage
-          .from('bank-statements')
-          .createSignedUrl(storagePath, 600);
-        if (signedUrlError) {
-          console.error('Signed URL generation failed:', signedUrlError);
-          return { downloadUrl: null, storagePath, fileSize };
-        }
-        return {
-          downloadUrl: signedData?.signedUrl ?? null,
-          storagePath,
-          fileSize,
-        };
+        return { downloadUrl: null, storagePath: null, fileSize };
       },
       commitExportTransaction: async (payload) => {
         const currentRemaining = Math.max(0, conversionsLimit - conversionsUsed);
@@ -4584,7 +4558,7 @@ Deno.serve(async (req) => {
       excelBase64 = encodeArtifactToBase64(excelArtifact);
     }
 
-    if (user && conversion && resultPath) {
+    if (user && conversion) {
       await supabase
         .from('conversions')
         .update({

@@ -1833,37 +1833,21 @@ Deno.serve(async (req) => {
           paidPagesConsumed += pagesToCharge;
         }
 
-        // Upload result for authenticated users
-        let resultPath: string | null = null;
-        let uploadResultError: unknown = null;
+        // Keep export ephemeral: no persistent result upload.
+        const resultPath: string | null = null;
         if (user && conversionRecord) {
-          resultPath = `${user.id}/results/${conversionRecord.id}.xlsx`;
-          const { error } = await supabase.storage
-            .from('bank-statements')
-            .upload(resultPath, excelBuffer, {
-              contentType: 'application/octet-stream',
-              upsert: false,
-            });
-
-          if (error) {
-            console.error('Failed to upload result:', error);
-            uploadResultError = error;
-            resultPath = null;
-          }
-
           await supabase
             .from('conversions')
             .update({
               status: 'completed',
               completed_at: new Date().toISOString(),
-              result_path: resultPath,
-              error_message: uploadResultError ? 'Result upload failed' : null,
+              result_path: null,
+              error_message: null,
             })
             .eq('id', conversionRecord.id);
         }
 
-        const shouldIncludeBase64 = !user || !resultPath;
-        const excelBase64 = shouldIncludeBase64 ? bufferToBase64(excelBuffer) : undefined;
+        const excelBase64 = bufferToBase64(excelBuffer);
 
         successes.push({
           fileName: sanitizedName,
@@ -1931,26 +1915,8 @@ Deno.serve(async (req) => {
         transactions: merged.mergedTransactions,
         totals: merged.totals,
       });
-      let mergeResultPath: string | null = null;
-
-      if (user) {
-        mergeResultPath = `${user.id}/results/merged_${Date.now()}.xlsx`;
-        const { error } = await supabase.storage
-          .from('bank-statements')
-          .upload(mergeResultPath, mergedExcel.buffer, {
-            contentType: 'application/octet-stream',
-            upsert: false,
-          });
-
-        if (error) {
-          console.error('Failed to upload merged result:', error);
-          mergeResultPath = null;
-        }
-      }
-
-      const mergeExcelBase64 = (!user || !mergeResultPath)
-        ? bufferToBase64(mergedExcel.buffer)
-        : undefined;
+      const mergeResultPath: string | null = null;
+      const mergeExcelBase64 = bufferToBase64(mergedExcel.buffer);
 
       mergePayload = {
         available: true,
