@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { isPaidPlan, resolveEffectivePlanType } from "@/lib/entitlements";
+import { hasChatAuraAccess as resolveChatAuraAccess, resolveEffectivePlanType } from "@/lib/entitlements";
 
 type SubscriptionTier = "free" | "daily" | "business";
 
@@ -71,7 +71,7 @@ export const useSubscriptionTier = () => {
   }, [user, refreshKey]);
 
   const hasChatAuraAccess =
-    !!user && isPaidPlan({ planType, tier, isAuthenticated: true });
+    !!user && resolveChatAuraAccess({ planType, tier, isAuthenticated: true });
 
   return { tier, planType, loading, hasChatAuraAccess };
 };

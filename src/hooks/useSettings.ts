@@ -10,6 +10,7 @@ export interface UserSettings {
   soundEnabled: boolean;
   autoDownload: boolean;
   premiumExcelExport: boolean; // Toggle for Premium vs Simple Excel
+  editedPdfWarningTiming: "upload" | "convert";
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -19,6 +20,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   soundEnabled: true,
   autoDownload: false,
   premiumExcelExport: true, // Default to premium
+  editedPdfWarningTiming: "convert",
 };
 
 const STORAGE_KEY = 'banklefy_user_settings';

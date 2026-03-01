@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 const PURCHASE_TOAST_STORAGE_KEY = "banklefy:last-plan-purchase";
+const RAZORPAY_CHECKOUT_URL = "https://checkout.razorpay.com/v1/checkout.js";
 
 type Plan = {
   planId: string;
@@ -177,6 +178,52 @@ const PricingPage = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const loadRazorpayCheckout = async () => {
+    if (window.Razorpay) return true;
+
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src^="${RAZORPAY_CHECKOUT_URL}"]`
+    );
+
+    if (existingScript) {
+      await new Promise<void>((resolve, reject) => {
+        const timeoutId = window.setTimeout(() => {
+          reject(new Error("Razorpay checkout timed out while loading."));
+        }, 7000);
+
+        existingScript.addEventListener("load", () => {
+          window.clearTimeout(timeoutId);
+          resolve();
+        }, { once: true });
+
+        existingScript.addEventListener("error", () => {
+          window.clearTimeout(timeoutId);
+          reject(new Error("Razorpay checkout script failed to load."));
+        }, { once: true });
+      }).catch(() => null);
+      return !!window.Razorpay;
+    }
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = `${RAZORPAY_CHECKOUT_URL}?v=${Date.now()}`;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("Razorpay checkout script failed to load."));
+        document.head.appendChild(script);
+      });
+    } catch {
+      return false;
+    }
+
+    return !!window.Razorpay;
+  };
+
+  useEffect(() => {
+    void loadRazorpayCheckout();
+  }, []);
+
   const ensureActiveSession = async () => {
     const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
     if (!refreshError && refreshed.session?.access_token) {
@@ -309,7 +356,12 @@ const PricingPage = () => {
       }
 
       if (!window.Razorpay) {
-        throw new Error("Razorpay checkout is not loaded yet.");
+        const loaded = await loadRazorpayCheckout();
+        if (!loaded || !window.Razorpay) {
+          throw new Error(
+            "Razorpay checkout script could not load. Disable proxy/VPN/ad-blocker and try again."
+          );
+        }
       }
 
       const { data: { user } } = await supabase.auth.getUser();

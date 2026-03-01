@@ -1532,7 +1532,7 @@ Deno.serve(async (req) => {
 
     let conversionsUsed = 0;
     let conversionsLimit = user ? 5 : 2;
-    let isAdmin = false;
+    let hasUnlimitedAccess = false;
     let userPlanType = 'free';
 
     try {
@@ -1544,7 +1544,7 @@ Deno.serve(async (req) => {
       });
       conversionsUsed = effectiveLimit.conversionsUsed;
       conversionsLimit = effectiveLimit.conversionsLimit;
-      isAdmin = effectiveLimit.isAdmin || effectiveLimit.isOwner || effectiveLimit.isUnlimited;
+      hasUnlimitedAccess = effectiveLimit.isUnlimited;
       userPlanType = effectiveLimit.planType || 'free';
     } catch (limitError) {
       console.error('Error checking limit:', limitError);
@@ -1560,7 +1560,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (user && !isAdmin) {
+    if (user && !hasUnlimitedAccess) {
       const { data: subData, error: subError } = await supabase
         .from('subscriptions')
         .select('plan_type, pages_used_this_month')
@@ -1580,11 +1580,11 @@ Deno.serve(async (req) => {
     const isPerPagePlan = normalizedPlanType.startsWith('per_page');
     const isPaidPlan = !!user && (isMonthlyPlan || isYearlyPlan || isPerPagePlan || conversionsLimit > 5);
     const isFreeMode = !isPaidPlan;
-    const underwritingTier = resolveUnderwritingTier(userPlanType, isAdmin);
+    const underwritingTier = resolveUnderwritingTier(userPlanType, false);
     const remainingQuota = Math.max(0, conversionsLimit - conversionsUsed);
 
     // Free mode: enforce a 15-page max per PDF before processing.
-    if (!isAdmin && isFreeMode) {
+    if (!hasUnlimitedAccess && isFreeMode) {
       const maxDetectedPages = pageCounts.reduce((max, count) => Math.max(max, count), 0);
       if (maxDetectedPages > FREE_MAX_PDF_PAGES_PER_FILE) {
         return new Response(
@@ -1606,7 +1606,7 @@ Deno.serve(async (req) => {
     // Quota pre-check:
     // - Free mode uses conversion count (1 file = 1 conversion).
     // - Paid mode uses pages, but page charge is known only after OCR, so here we only reject if no quota remains.
-    if (!isAdmin) {
+    if (!hasUnlimitedAccess) {
       if (isFreeMode) {
         const usageEstimate = Math.max(1, files.length);
         if ((conversionsUsed + usageEstimate) > conversionsLimit) {
@@ -1691,7 +1691,7 @@ Deno.serve(async (req) => {
       );
 
       try {
-        if (!isAdmin && !isFreeMode) {
+        if (!hasUnlimitedAccess && !isFreeMode) {
           const remainingPagesBeforeFile = paidRemainingQuota - paidPagesConsumed;
           if (remainingPagesBeforeFile <= 0) {
             failures.push({
@@ -1703,7 +1703,7 @@ Deno.serve(async (req) => {
         }
 
         if (
-          !isAdmin &&
+          !hasUnlimitedAccess &&
           isFreeMode &&
           isPdf &&
           hasPdfPageImages &&
@@ -1810,7 +1810,7 @@ Deno.serve(async (req) => {
           forceOcrForPdf,
         });
 
-        if (!isAdmin && !isFreeMode) {
+        if (!hasUnlimitedAccess && !isFreeMode) {
           const remainingPagesBeforeFile = paidRemainingQuota - paidPagesConsumed;
           const pagesToCharge = Math.max(1, pagesWithData);
           if (pagesToCharge > remainingPagesBeforeFile) {

@@ -329,51 +329,26 @@ export const resolveEffectiveLimit = async ({
     return resolveAnonymousLimit(supabaseAdmin, trackingKey, timezone, dateParts.isoDate);
   }
 
-  // 1) Admin role
   const isAdmin = await resolveAdminRole(supabaseAdmin, user.id);
-  if (isAdmin) {
-    return buildResult({
-      conversionsUsed: 0,
-      conversionsLimit: UNLIMITED_LIMIT,
-      planType: 'unlimited',
-      isAuthenticated: true,
-      isAdmin: true,
-      isOwner: false,
-      isUnlimited: true,
-    });
-  }
-
-  // 2) Owner email
   const userEmail = (user.email ?? '').trim().toLowerCase();
   const isOwner = !!userEmail && getOwnerEmailSet().has(userEmail);
-  if (isOwner) {
-    return buildResult({
-      conversionsUsed: 0,
-      conversionsLimit: UNLIMITED_LIMIT,
-      planType: 'unlimited',
-      isAuthenticated: true,
-      isAdmin: false,
-      isOwner: true,
-      isUnlimited: true,
-    });
-  }
 
   const row = await ensureSubscriptionRow(supabaseAdmin, user.id, timezone, dateParts.isoDate);
 
-  // 3) Explicit unlimited flag
+  // 1) Explicit unlimited flag
   if (hasExplicitUnlimitedFlag(row)) {
     return buildResult({
       conversionsUsed: 0,
       conversionsLimit: UNLIMITED_LIMIT,
       planType: 'unlimited',
       isAuthenticated: true,
-      isAdmin: false,
+      isAdmin,
       isOwner,
       isUnlimited: true,
     });
   }
 
-  // 4) Explicit conversions_limit
+  // 2) Explicit conversions_limit
   const explicitLimit = toNumber(row.conversions_limit, 0);
   if (explicitLimit > 0) {
     const planType = resolvePlanType(row, explicitLimit);
@@ -400,13 +375,13 @@ export const resolveEffectiveLimit = async ({
       conversionsLimit: explicitLimit,
       planType,
       isAuthenticated: true,
-      isAdmin: false,
+      isAdmin,
       isOwner,
       isUnlimited: false,
     });
   }
 
-  // 5) Stacked buckets
+  // 3) Stacked buckets
   const hasBuckets =
     Object.prototype.hasOwnProperty.call(row, 'free_daily_limit') ||
     Object.prototype.hasOwnProperty.call(row, 'monthly_limit') ||
@@ -466,21 +441,21 @@ export const resolveEffectiveLimit = async ({
         conversionsLimit: stackedLimit,
         planType,
         isAuthenticated: true,
-        isAdmin: false,
+        isAdmin,
         isOwner,
         isUnlimited: false,
       });
     }
   }
 
-  // 6) Free fallback
+  // 4) Free fallback
   const fallbackUsed = toNumber(row.conversions_used, 0);
   return buildResult({
     conversionsUsed: fallbackUsed,
     conversionsLimit: DEFAULT_AUTH_LIMIT,
     planType: 'free',
     isAuthenticated: true,
-    isAdmin: false,
+    isAdmin,
     isOwner,
     isUnlimited: false,
   });

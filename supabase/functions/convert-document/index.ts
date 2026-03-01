@@ -3011,14 +3011,14 @@ Deno.serve(async (req) => {
     const conversionsUsed = limitState.conversionsUsed;
     const conversionsLimit = limitState.conversionsLimit;
     const userPlanType = limitState.planType;
-    const isAdmin = limitState.isUnlimited || limitState.isAdmin || limitState.isOwner;
+    const hasUnlimitedAccess = limitState.isUnlimited;
 
     console.log('Usage info:', {
       conversionsUsed,
       conversionsLimit,
       user: !!user,
       planType: userPlanType,
-      isAdmin,
+      isUnlimited: hasUnlimitedAccess,
     });
 
     const normalizedPlanType = userPlanType.toLowerCase();
@@ -3027,11 +3027,11 @@ Deno.serve(async (req) => {
     const isPerPagePlan = normalizedPlanType.startsWith('per_page');
     const isPaidPlan = !!user && (isMonthlyPlan || isYearlyPlan || isPerPagePlan || conversionsLimit > 5);
     const isFreeMode = !isPaidPlan;
-    const underwritingTier = resolveUnderwritingTier(userPlanType, isAdmin);
+    const underwritingTier = resolveUnderwritingTier(userPlanType, false);
     const remainingQuota = Math.max(0, conversionsLimit - conversionsUsed);
 
     // Free mode: one file = one conversion, plus a 15-page per-file PDF cap.
-    if (!isAdmin && isFreeMode && isPdf && pageCount > FREE_MAX_PDF_PAGES_PER_FILE) {
+    if (!hasUnlimitedAccess && isFreeMode && isPdf && pageCount > FREE_MAX_PDF_PAGES_PER_FILE) {
       return new Response(
         JSON.stringify({
           error: `Free tier allows up to ${FREE_MAX_PDF_PAGES_PER_FILE} PDF pages per file. This file has ${pageCount} pages.`,
@@ -3048,7 +3048,7 @@ Deno.serve(async (req) => {
     }
 
     // Enforce quota before processing.
-    if (!isAdmin) {
+    if (!hasUnlimitedAccess) {
       if (isFreeMode && remainingQuota < 1) {
         const errorMessage = user
           ? `You have reached your daily limit of ${conversionsLimit} conversions.`
@@ -3443,7 +3443,7 @@ Deno.serve(async (req) => {
       isPdf &&
       hasPdfPageImages &&
       !canUseDeterministicClientPdf &&
-      !isAdmin &&
+      !hasUnlimitedAccess &&
       isFreeMode &&
       (clientPdfParseAssessment.requiresHeavyOcr || adaptiveOcrStrategy.hardForFreeTier)
     ) {
@@ -4126,7 +4126,7 @@ Deno.serve(async (req) => {
     }
 
     // Paid mode is page-based and charges only pages that actually contain data.
-    if (!isAdmin && isPaidPlan) {
+    if (!hasUnlimitedAccess && isPaidPlan) {
       const pagesToCharge = Math.max(1, pagesWithData);
       if ((conversionsUsed + pagesToCharge) > conversionsLimit) {
         const remainingPages = Math.max(0, conversionsLimit - conversionsUsed);
@@ -4384,9 +4384,9 @@ Deno.serve(async (req) => {
       requestedFormat: normalizedRequestedFormat,
       fraudFlags,
       creditsRemainingBefore: creditsBeforeExport,
-      planAllowsFraudOverride: isAdmin,
-      allowFraudReport: isAdmin || underwritingTier !== 'none',
-      allowFoirReport: isAdmin || underwritingTier !== 'none',
+      planAllowsFraudOverride: false,
+      allowFraudReport: underwritingTier !== 'none',
+      allowFoirReport: underwritingTier !== 'none',
       statementReference: conversion?.id ?? undefined,
       bankInfo,
       xlsxContext: {

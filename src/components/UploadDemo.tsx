@@ -11,8 +11,14 @@ import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { UsageLimitBanner } from "./UsageLimitBanner";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
-import { isPaidPlan } from "@/lib/entitlements";
-import { hasAdminAccess } from "@/lib/adminAccess";
+import { useSettings } from "@/hooks/useSettings";
+import {
+  getEditPdfDetectorTier,
+  hasFoirDashboardAccess,
+  hasFraudDetectorAccess,
+  hasMt940Access,
+  hasTallyXmlAccess,
+} from "@/lib/entitlements";
 import banklefyLogo from "@/assets/banklefy-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -40,6 +46,7 @@ import type {
 } from "./uploadDemo/types";
 
 const PURCHASE_TOAST_STORAGE_KEY = "banklefy:last-plan-purchase";
+const EDITED_WARNING_BYPASS_KEY = "banklefy:edited-warning-bypass-all";
 
 export const UploadDemo = () => {
   const { toast } = useToast();
@@ -172,6 +179,13 @@ export const UploadDemo = () => {
   const pdfPasswordHelpId = "pdf-password-help";
   const pdfPasswordErrorId = "pdf-password-error";
   const dismissedEditedWarningsRef = useRef<Set<string>>(new Set());
+  const [editedWarningBypassAll, setEditedWarningBypassAll] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(EDITED_WARNING_BYPASS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   type ConversionMode = "standard" | "tally_only";
   type EditedPdfCheckResult = {
     fileName: string;
@@ -180,7 +194,6 @@ export const UploadDemo = () => {
   };
   const [conversionMode, setConversionMode] = useState<ConversionMode>("standard");
   const [editedPdfCheckResult, setEditedPdfCheckResult] = useState<EditedPdfCheckResult | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [showScanTimeCard, setShowScanTimeCard] = useState(false);
   const [uploadPrepActive, setUploadPrepActive] = useState(false);
   const [uploadPrepProgress, setUploadPrepProgress] = useState(0);
@@ -193,19 +206,9 @@ export const UploadDemo = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { hasChatAuraAccess } = useSubscriptionTier();
+  const { settings } = useSettings();
   const navigate = useNavigate();
-  useEffect(() => {
-    const checkAdmin = async () => {
-      if (!user) {
-        setIsAdmin(false);
-        return;
-      }
-      const nextIsAdmin = await hasAdminAccess(user);
-      setIsAdmin(nextIsAdmin);
-    };
-
-    void checkAdmin();
-  }, [user]);
+  const editedPdfWarningTiming = settings.editedPdfWarningTiming ?? "convert";
   useEffect(() => {
     if (selectedFiles.length === 0) {
       setShowScanTimeCard(false);
@@ -297,6 +300,57 @@ export const UploadDemo = () => {
     if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
     if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     return `${(bytes / 1024).toFixed(0)} KB`;
+  };
+  const isTransientStorageUploadError = (error: unknown): boolean => {
+    const message =
+      typeof error === "string"
+        ? error
+        : error instanceof Error
+          ? error.message
+          : typeof error === "object" && error && "message" in error
+            ? String((error as { message?: unknown }).message ?? "")
+            : "";
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes("failed to fetch") ||
+      normalized.includes("networkerror") ||
+      normalized.includes("network request failed") ||
+      normalized.includes("err_timed_out") ||
+      normalized.includes("timeout")
+    );
+  };
+  const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+  const uploadSourceFileWithRetry = async (storagePath: string, file: File) => {
+    const maxAttempts = 3;
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const { error: uploadError } = await supabase.storage
+        .from("bank-statements")
+        .upload(storagePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (!uploadError) {
+        return;
+      }
+
+      // If previous attempt succeeded but response was interrupted, retry can hit "already exists".
+      if (String(uploadError.message || "").toLowerCase().includes("already exists")) {
+        return;
+      }
+
+      lastError = uploadError;
+      if (!isTransientStorageUploadError(uploadError) || attempt === maxAttempts) {
+        throw uploadError;
+      }
+
+      await sleep(attempt * 1000);
+    }
+
+    if (lastError) {
+      throw lastError;
+    }
   };
   const AUTO_CHUNK_MAX_PDF_PAGES = 25;
   const AUTO_CHUNK_MAX_PDF_BYTES = 8 * 1024 * 1024;
@@ -639,16 +693,12 @@ export const UploadDemo = () => {
   const isYearlyUsagePlan = normalizedPlanType.startsWith("yearly") || normalizedPlanType === "business";
   const isKnownPaidUsagePlan = isPerPageUsagePlan || isMonthlyUsagePlan || isYearlyUsagePlan || isUnlimitedUsagePlan;
   const isFreeUsageMode = !isKnownPaidUsagePlan && (!isAuthenticated || normalizedPlanType === "free" || conversionsLimit <= 5);
-  const getPdfDetectorTier = (): "none" | "basic" | "advanced" => {
-    if (normalizedPlanType === "monthly_enterprise" || normalizedPlanType === "yearly_pro") {
-      return "advanced";
-    }
-    if (normalizedPlanType === "monthly_pro" || normalizedPlanType === "yearly_full") {
-      return "basic";
-    }
-    return "none";
+  const entitlementInput = {
+    planType,
+    conversionsLimit,
+    isAuthenticated,
   };
-  const pdfDetectorTier = getPdfDetectorTier();
+  const pdfDetectorTier = getEditPdfDetectorTier(entitlementInput);
   const hasEditPdfDetectorAccess = pdfDetectorTier !== "none";
 
   // reCAPTCHA v3 for anonymous users - runs invisibly in background
@@ -956,6 +1006,15 @@ export const UploadDemo = () => {
         setEditedPdfWarning(null);
         setEditedPdfCheckResult(null);
 
+        if (hasEditPdfDetectorAccess && editedPdfWarningTiming === "upload") {
+          for (const file of newFiles) {
+            const shouldBlockForEditedPdf = await runEditedPdfDetection(file);
+            if (shouldBlockForEditedPdf) {
+              break;
+            }
+          }
+        }
+
         toast({
           title: "Files Selected",
           description: `${newFiles.length} ${pluralize(newFiles.length, "file")} added - Ready to convert`,
@@ -988,7 +1047,12 @@ export const UploadDemo = () => {
 
   const runEditedPdfDetection = async (file: File): Promise<boolean> => {
     const isPdf = file.name.toLowerCase().endsWith(".pdf");
-    if (!isPdf || !hasEditPdfDetectorAccess || dismissedEditedWarningsRef.current.has(file.name)) {
+    if (
+      !isPdf ||
+      !hasEditPdfDetectorAccess ||
+      editedWarningBypassAll ||
+      dismissedEditedWarningsRef.current.has(file.name)
+    ) {
       return false;
     }
 
@@ -1055,8 +1119,10 @@ export const UploadDemo = () => {
     // For anonymous users, reCAPTCHA v3 runs in background - token generated at conversion time
 
     const isPdf = fileToConvert.name.toLowerCase().endsWith('.pdf');
-    const shouldBlockForEditedPdf = await runEditedPdfDetection(fileToConvert);
-    if (shouldBlockForEditedPdf) return;
+    if (editedPdfWarningTiming === "convert") {
+      const shouldBlockForEditedPdf = await runEditedPdfDetection(fileToConvert);
+      if (shouldBlockForEditedPdf) return;
+    }
 
     setCurrencyCode('');
     setBankInfo(null);
@@ -1115,16 +1181,7 @@ export const UploadDemo = () => {
         const sanitized = sanitizeFilename(fileToConvert.name);
         const filePath = `${Date.now()}_${sanitized}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('bank-statements')
-          .upload(`${user.id}/${filePath}`, fileToConvert, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-
-        if (uploadError) {
-          throw uploadError;
-        }
+          await uploadSourceFileWithRetry(`${user.id}/${filePath}`, fileToConvert);
 
         requestBody.fileId = filePath;
       } else {
@@ -1615,6 +1672,15 @@ Analytics Summary:
           title: "Verification Failed",
           description: "Please try again.",
         });
+      } else if (isTransientStorageUploadError(errorMessage)) {
+        const networkMessage =
+          "Network timeout while uploading PDF. Please retry. If this keeps happening, disable VPN/proxy and check internet stability.";
+        setLastError({ message: networkMessage, canRetry: true });
+        toast({
+          variant: "destructive",
+          title: "Network Timeout",
+          description: networkMessage,
+        });
       } else {
         // General error - can retry
         setLastError({ message: errorMessage, canRetry: true });
@@ -1694,9 +1760,11 @@ Analytics Summary:
       }
 
       for (const [index, file] of selectedFiles.entries()) {
-        const shouldBlockForEditedPdf = await runEditedPdfDetection(file);
-        if (shouldBlockForEditedPdf) {
-          return;
+        if (editedPdfWarningTiming === "convert") {
+          const shouldBlockForEditedPdf = await runEditedPdfDetection(file);
+          if (shouldBlockForEditedPdf) {
+            return;
+          }
         }
 
         const isPdf = file.name.toLowerCase().endsWith('.pdf');
@@ -1744,16 +1812,7 @@ Analytics Summary:
           const sanitized = sanitizeFilename(file.name);
           const filePath = `${Date.now()}_${index}_${sanitized}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('bank-statements')
-            .upload(`${user.id}/${filePath}`, file, {
-              cacheControl: '3600',
-              upsert: false,
-            });
-
-          if (uploadError) {
-            throw uploadError;
-          }
+          await uploadSourceFileWithRetry(`${user.id}/${filePath}`, file);
 
           payload.fileId = filePath;
         } else if (!isPdf) {
@@ -1956,6 +2015,15 @@ Analytics Summary:
           title: "Verification Failed",
           description: "Please try again.",
         });
+      } else if (isTransientStorageUploadError(errorMessage)) {
+        const networkMessage =
+          "Batch upload timed out while sending files. Please retry. If it repeats, reduce batch size or disable VPN/proxy.";
+        setLastError({ message: networkMessage, canRetry: true });
+        toast({
+          variant: "destructive",
+          title: "Network Timeout",
+          description: networkMessage,
+        });
       } else {
         setLastError({ message: errorMessage, canRetry: true });
         toast({
@@ -2138,22 +2206,11 @@ Analytics Summary:
 
 
 
-  // Check if user has premium access
-  const isPaidUser = isPaidPlan({
-    planType,
-    conversionsLimit,
-    isAuthenticated: isAuthenticated,
-  });
-  const hasTallyAccess = (() => {
-    if (!isAuthenticated) return false;
-    const normalized = (planType ?? "free").toLowerCase();
-    return (
-      normalized === "monthly_pro" ||
-      normalized === "monthly_enterprise" ||
-      normalized === "yearly_full" ||
-      normalized === "yearly_pro"
-    );
-  })();
+  // Plan-based feature access
+  const hasPremiumExportAccess = hasMt940Access(entitlementInput);
+  const hasTallyAccess = hasTallyXmlAccess(entitlementInput);
+  const hasFoirAccess = hasFoirDashboardAccess(entitlementInput);
+  const hasFraudAccess = hasFraudDetectorAccess(entitlementInput);
 
   const getTallyLimit = (normalizedPlan: string): number | null => {
     if (normalizedPlan === "monthly_pro") return 25;
@@ -2235,7 +2292,7 @@ Analytics Summary:
   };
 
   const handlePremiumExport = (format: 'json' | 'mt940') => {
-    if (!isPaidUser) {
+    if (!hasPremiumExportAccess) {
       setShowUpgradeDialog(true);
       return;
     }
@@ -2560,6 +2617,12 @@ Analytics Summary:
                       variant="outline"
                       className="w-full border border-amber-500/40 text-amber-200 bg-amber-500/10 hover:bg-amber-500/20"
                       onClick={() => {
+                        try {
+                          localStorage.setItem(EDITED_WARNING_BYPASS_KEY, "1");
+                        } catch {
+                          // Ignore localStorage errors and continue.
+                        }
+                        setEditedWarningBypassAll(true);
                         dismissedEditedWarningsRef.current.add(editedPdfWarning.fileName);
                         setEditedPdfWarning(null);
                         if (selectedFiles.length > 1) {
@@ -2630,7 +2693,7 @@ Analytics Summary:
                           size="lg"
                           className="convert-button w-full md:w-auto"
                           onClick={() => runSelectedConversion("standard")}
-                          disabled={uploading || converting || uploadPrepActive}
+                          disabled={uploading || converting || uploadPrepActive || Boolean(editedPdfWarning)}
                         >
                           {uploading || converting ? (
                             <>
@@ -2653,7 +2716,7 @@ Analytics Summary:
                               : "border-primary/30 text-primary"
                           }`}
                           onClick={() => runSelectedConversion("tally_only")}
-                          disabled={uploading || converting || uploadPrepActive}
+                          disabled={uploading || converting || uploadPrepActive || Boolean(editedPdfWarning)}
                         >
                           <FileText className="mr-2 h-5 w-5" />
                           Tally XML
@@ -2680,7 +2743,7 @@ Analytics Summary:
                 downloading={downloading}
                 handleDownload={handleDownload}
                 transactions={transactions}
-                isPaidUser={isPaidUser}
+                isPaidUser={hasPremiumExportAccess}
                 hasTallyAccess={hasTallyAccess}
                 exportAsCSV={exportAsCSV}
                 handleTallyExport={handleTallyExport}
@@ -2696,8 +2759,9 @@ Analytics Summary:
                 showEditDetectorSignals={hasEditPdfDetectorAccess}
                 resultMode={conversionMode}
                 editedPdfCheckResult={editedPdfCheckResult}
-                showPipeline={isAdmin}
-                showUnderwriting={isPaidUser || isAdmin}
+                showPipeline={false}
+                showUnderwriting={hasFoirAccess}
+                showFraudSignals={hasFraudAccess}
                 conversionProgressPercent={progressStep}
                 conversionProgressLabel={
                   uploading

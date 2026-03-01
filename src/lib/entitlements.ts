@@ -86,3 +86,49 @@ export const isPaidPlan = ({ planType, tier, conversionsLimit, isAuthenticated }
 
   return false;
 };
+
+const resolvePlanForFeatures = (input: EntitlementInput): string =>
+  resolveEffectivePlanType(input.planType, input.conversionsLimit);
+
+export const hasChatAuraAccess = (input: EntitlementInput): boolean =>
+  isPaidPlan(input);
+
+export const hasMt940Access = (input: EntitlementInput): boolean =>
+  isPaidPlan(input);
+
+export const hasTallyXmlAccess = (input: EntitlementInput): boolean => {
+  const normalizedPlan = resolvePlanForFeatures(input);
+  return (
+    normalizedPlan === "monthly_pro" ||
+    normalizedPlan === "monthly_enterprise" ||
+    normalizedPlan === "yearly_full" ||
+    normalizedPlan === "yearly_pro"
+  );
+};
+
+export const hasFoirDashboardAccess = (input: EntitlementInput): boolean => {
+  const normalizedPlan = resolvePlanForFeatures(input);
+  if (normalizedPlan === "unlimited" || normalizedPlan === "business") return true;
+  if (normalizedPlan.startsWith("monthly") || normalizedPlan.startsWith("yearly")) return true;
+  return false;
+};
+
+export const hasFraudDetectorAccess = (input: EntitlementInput): boolean => {
+  const normalizedPlan = resolvePlanForFeatures(input);
+  return (
+    normalizedPlan === "unlimited" ||
+    normalizedPlan === "business" ||
+    normalizedPlan === "monthly_pro" ||
+    normalizedPlan === "monthly_enterprise" ||
+    normalizedPlan === "yearly_full" ||
+    normalizedPlan === "yearly_pro"
+  );
+};
+
+export const getEditPdfDetectorTier = (input: EntitlementInput): "none" | "basic" | "advanced" => {
+  const normalizedPlan = resolvePlanForFeatures(input);
+  if (normalizedPlan === "unlimited" || normalizedPlan === "business") return "advanced";
+  if (normalizedPlan === "monthly_enterprise" || normalizedPlan === "yearly_pro") return "advanced";
+  if (normalizedPlan === "monthly_pro" || normalizedPlan === "yearly_full") return "basic";
+  return "none";
+};

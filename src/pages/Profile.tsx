@@ -39,7 +39,7 @@ const Profile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { conversionsUsed, conversionsLimit, remaining, planType, loading: usageLoading } = useUsageLimit();
-  const { profileData, updateProfile, sendPasswordReset, saving } = useSettings();
+  const { settings, profileData, updateProfile, sendPasswordReset, saving, updateSetting } = useSettings();
   const [recent, setRecent] = useState<RecentConversion[]>([]);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState("");
@@ -464,6 +464,28 @@ const Profile = () => {
                   {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   Reset Password
                 </Button>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Edited PDF Warning Timing</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Choose when the edited-PDF warning should appear.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant={settings.editedPdfWarningTiming === "upload" ? "default" : "outline"}
+                    onClick={() => updateSetting("editedPdfWarningTiming", "upload")}
+                  >
+                    After Upload
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={settings.editedPdfWarningTiming === "convert" ? "default" : "outline"}
+                    onClick={() => updateSetting("editedPdfWarningTiming", "convert")}
+                  >
+                    On Convert
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="mt-6">

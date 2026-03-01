@@ -35,7 +35,6 @@ import {
   Trash2,
   LogOut,
   Loader2,
-  Bell,
   Palette,
   MonitorSmartphone,
   SlidersHorizontal,
@@ -120,46 +119,6 @@ const Settings = () => {
             {t('settings.usage.upgrade')}
           </Button>
         </div>
-      )
-    },
-    // Notifications
-    {
-      id: "notifications-email",
-      title: t('settings.notifications.email'),
-      description: t('settings.notifications.emailDesc'),
-      category: "notifications",
-      icon: <Bell className="h-5 w-5" />,
-      component: (
-        <Switch
-          checked={settings.emailNotifications}
-          onCheckedChange={(value) => updateSetting('emailNotifications', value)}
-        />
-      )
-    },
-    {
-      id: "notifications-push",
-      title: t('settings.notifications.push'),
-      description: t('settings.notifications.pushDesc'),
-      category: "notifications",
-      icon: <Bell className="h-5 w-5" />,
-      component: (
-        <Switch
-          checked={settings.pushNotifications}
-          onCheckedChange={(value) => updateSetting('pushNotifications', value)}
-        />
-      )
-    },
-    {
-      id: "notifications-sound",
-      title: t('settings.notifications.sound'),
-      description: t('settings.notifications.soundDesc'),
-      category: "notifications",
-      icon: <Bell className="h-5 w-5" />,
-      component: (
-        <Switch
-          checked={settings.soundEnabled}
-          onCheckedChange={(value) => updateSetting('soundEnabled', value)}
-        />
       )
     },
     // Appearance
@@ -287,7 +246,6 @@ const Settings = () => {
   const categories = [
     { id: "all", label: t('settings.categories.all'), icon: <SettingsIcon className="h-4 w-4" /> },
     { id: "usage", label: t('settings.categories.usage'), icon: <BarChart3 className="h-4 w-4" /> },
-    { id: "notifications", label: t('settings.categories.notifications'), icon: <Bell className="h-4 w-4" /> },
     { id: "appearance", label: t('settings.categories.appearance'), icon: <Palette className="h-4 w-4" /> },
     { id: "privacy", label: t('settings.categories.privacy'), icon: <Shield className="h-4 w-4" /> },
     { id: "advanced", label: t('settings.categories.advanced'), icon: <SlidersHorizontal className="h-4 w-4" /> },

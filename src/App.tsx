@@ -18,7 +18,6 @@ const Index = lazyWithRetry(() => import("./pages/Index"));
 const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
 const Terms = lazyWithRetry(() => import("./pages/Terms"));
 const ChatPage = lazyWithRetry(() => import("./pages/ChatPage"));
-const Admin = lazyWithRetry(() => import("./pages/Admin"));
 const About = lazyWithRetry(() => import("./pages/About"));
 const FeaturesPage = lazyWithRetry(() => import("./pages/FeaturesPage"));
 const BenefitsPage = lazyWithRetry(() => import("./pages/BenefitsPage"));
@@ -101,13 +100,9 @@ const META_BY_PATH: Record<string, RouteMeta> = {
     title: "Blog | Banklefy",
     description: "Product updates, tutorials, and announcements from Banklefy.",
   },
-  "/admin": {
-    title: "Admin Console | Banklefy",
-    description: "Administrative dashboard for system status and operations.",
-  },
 };
 
-const NO_INDEX_PREFIXES = ["/admin", "/dashboard", "/settings", "/profile", "/auth", "/chat"];
+const NO_INDEX_PREFIXES = ["/dashboard", "/settings", "/profile", "/auth", "/chat"];
 
 const normalizePathname = (pathname: string) =>
   pathname !== "/" && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
@@ -181,7 +176,6 @@ const AppRoutes = () => {
           <Route path="/chat" element={<RequirePaid><ChatPage /></RequirePaid>} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
-          <Route path="/admin" element={<Admin />} />
           <Route path="/about" element={<About />} />
           <Route path="/features" element={<FeaturesPage />} />
           <Route path="/benefits" element={<BenefitsPage />} />

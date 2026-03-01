@@ -105,6 +105,7 @@ type ResultsSectionProps = {
   editedPdfCheckResult?: { fileName: string; status: "clean" | "suspected"; reason: string } | null;
   showPipeline?: boolean;
   showUnderwriting?: boolean;
+  showFraudSignals?: boolean;
   conversionProgressPercent?: number;
   conversionProgressLabel?: string;
   conversionProgressSubLabel?: string;
@@ -141,6 +142,7 @@ export const ResultsSection = ({
   editedPdfCheckResult = null,
   showPipeline = true,
   showUnderwriting = true,
+  showFraudSignals = true,
   conversionProgressPercent = 0,
   conversionProgressLabel = "Processing conversion...",
   conversionProgressSubLabel = "Preparing document...",
@@ -383,7 +385,7 @@ export const ResultsSection = ({
 
       {showPipeline && aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
 
-      {showUnderwriting && converting && (
+      {converting && (
         <Card className="p-4 bg-[#191919]/80 border border-white/10">
           <div className="space-y-2">
             <p className="text-sm font-semibold text-white">{conversionProgressLabel}</p>
@@ -401,7 +403,7 @@ export const ResultsSection = ({
         <UnderwritingPanel underwriting={analytics.underwriting} currencyCode={currencyCode} />
       )}
 
-      {!isTallyOnlyMode && analytics?.riskAnalysis && (
+      {!isTallyOnlyMode && showFraudSignals && analytics?.riskAnalysis && (
         <FraudAlertPanel
           riskAnalysis={analytics.riskAnalysis}
           currencyCode={currencyCode}
@@ -531,7 +533,7 @@ export const ResultsSection = ({
                           className={`${
                             transaction.balanceMismatch
                               ? "bg-red-500/10 border-l-2 border-l-red-500"
-                              : transaction.riskFlag
+                              : showFraudSignals && transaction.riskFlag
                                 ? "bg-orange-500/5 border-l-2 border-l-orange-500"
                                 : transaction.isDuplicate
                                   ? "bg-yellow-500/5 border-l-2 border-l-yellow-500"
@@ -551,7 +553,7 @@ export const ResultsSection = ({
                                   </TooltipContent>
                                 </Tooltip>
                               )}
-                              {transaction.riskFlag && !transaction.balanceMismatch && (
+                              {showFraudSignals && transaction.riskFlag && !transaction.balanceMismatch && (
                                 <Tooltip>
                                   <TooltipTrigger aria-label="Risk flag warning">
                                     <AlertTriangle className="w-4 h-4 text-orange-500" />

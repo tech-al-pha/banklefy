@@ -1,8 +1,9 @@
 ﻿import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Shield, Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift } from "lucide-react";
+import { Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift, Lock } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import Logo from "@/components/Logo";
 import { LanguageSelector } from "@/components/LanguageSelector";
@@ -10,15 +11,17 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { hasAdminAccess } from "@/lib/adminAccess";
+import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 
 const LandingPageContent = lazyWithRetry(() =>
   import("@/components/LandingPageContent").then((module) => ({ default: module.LandingPageContent })),
 );
 
-const CHAT_AURA_TEMP_UNAVAILABLE = true;
+const CHAT_AURA_TEMP_UNAVAILABLE = false;
 
 const Index = () => {
   const { user } = useAuth();
+  const { hasChatAuraAccess, loading: subscriptionLoading } = useSubscriptionTier();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const nextParam = searchParams.get("next");
@@ -75,6 +78,19 @@ const Index = () => {
     }
   };
 
+  const handleChatAuraClick = () => {
+    if (subscriptionLoading) return;
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    if (!hasChatAuraAccess) {
+      navigate('/pricing');
+      return;
+    }
+    navigate('/chat');
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <a
@@ -122,14 +138,17 @@ const Index = () => {
                 <span>{t('nav.features')}</span>
               </Link>
 
-              {user && !CHAT_AURA_TEMP_UNAVAILABLE && (
-                <Link
-                  to="/chat"
-                  className="text-glow-link text-xs font-medium"
+              {!CHAT_AURA_TEMP_UNAVAILABLE && (
+                <button
+                  type="button"
+                  onClick={handleChatAuraClick}
+                  disabled={subscriptionLoading}
+                  className="text-glow-link text-xs font-medium disabled:opacity-70"
                 >
                   <MessageCircle className="h-3 w-3" />
                   <span>{t('nav.chatAura')}</span>
-                </Link>
+                  {(!user || !hasChatAuraAccess) && <Lock className="h-3 w-3" />}
+                </button>
               )}
 
               {user && (
@@ -143,13 +162,9 @@ const Index = () => {
               )}
 
               {isAdmin && (
-                <Link
-                  to="/admin"
-                  className="text-glow-link text-xs font-medium"
-                >
-                  <Shield className="h-3 w-3" />
-                  <span>{t('nav.admin')}</span>
-                </Link>
+                <Badge variant="secondary" className="border-primary/30 bg-primary/10 text-primary">
+                  Admin
+                </Badge>
               )}
 
               {/* Language Selector */}
@@ -240,17 +255,17 @@ const Index = () => {
                       </Button>
                     </SheetClose>
 
-                    {user && !CHAT_AURA_TEMP_UNAVAILABLE && (
+                    {!CHAT_AURA_TEMP_UNAVAILABLE && (
                       <SheetClose asChild>
                         <Button
-                          asChild
                           variant="ghost"
                           className="justify-start gap-2 text-muted-foreground"
+                          onClick={handleChatAuraClick}
+                          disabled={subscriptionLoading}
                         >
-                          <Link to="/chat">
-                            <MessageCircle className="h-4 w-4" />
-                            {t('nav.chatAura')}
-                          </Link>
+                          <MessageCircle className="h-4 w-4" />
+                          {t('nav.chatAura')}
+                          {(!user || !hasChatAuraAccess) && <Lock className="h-4 w-4" />}
                         </Button>
                       </SheetClose>
                     )}
@@ -271,18 +286,11 @@ const Index = () => {
                     )}
 
                     {isAdmin && (
-                      <SheetClose asChild>
-                        <Button
-                          asChild
-                          variant="ghost"
-                          className="justify-start gap-2 text-muted-foreground"
-                        >
-                          <Link to="/admin">
-                            <Shield className="h-4 w-4" />
-                            {t('nav.admin')}
-                          </Link>
-                        </Button>
-                      </SheetClose>
+                      <div className="px-3 py-2">
+                        <Badge variant="secondary" className="border-primary/30 bg-primary/10 text-primary">
+                          Admin
+                        </Badge>
+                      </div>
                     )}
 
                     <div className="border-t border-primary/10 pt-3 flex flex-col gap-3">
