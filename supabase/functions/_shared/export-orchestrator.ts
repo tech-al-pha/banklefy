@@ -96,7 +96,7 @@ const prepareTransactions = (transactions: ReadonlyArray<Transaction>): Prepared
 
     let debit = Number.isFinite(debitRaw) ? debitRaw : 0;
     let credit = Number.isFinite(creditRaw) ? creditRaw : 0;
-    let balance = Number.isFinite(balanceRaw) ? balanceRaw : 0;
+    const balance = Number.isFinite(balanceRaw) ? balanceRaw : 0;
 
     if (!isoDate) {
       invalidFieldCount += 1;

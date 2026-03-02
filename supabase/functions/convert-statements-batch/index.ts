@@ -7,7 +7,6 @@ import {
   assessClientPdfParsedTransactions,
   callGroqVisionOCR,
   callMistralVisionOCR,
-  callTesseractOcrWorker,
   correctMinorBalanceDrift,
   extractBankMetadataFromOcrText,
   mergeOcrTransactionsDeterministic,
@@ -73,6 +72,184 @@ type PdfDocumentProxy = {
   numPages: number;
   getPage: (pageNumber: number) => Promise<PdfPage>;
   destroy?: () => void;
+};
+
+const BATCH_DATE_TOKEN_SOURCE =
+  '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}[/-]\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{2,4})';
+const BATCH_ROW_START_PATTERN = new RegExp(
+  `^(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]+\\s+)?(${BATCH_DATE_TOKEN_SOURCE})\\s+(.+)$`,
+  'i',
+);
+const BATCH_AMOUNT_PATTERN = /([+-]?\(?\d{1,3}(?:,\d{3})*\.\d{2}\)?|[+-]?\(?\d+\.\d{2}\)?)(?:\s*(CR|DR))?/gi;
+const BATCH_MONTH_INDEX: Record<string, number> = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5,
+  jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+};
+
+type BatchLineToken = { x: number; y: number; text: string };
+
+const normalizeBatchDate = (value: string): string => {
+  const raw = value.trim().replace(/\s+/g, ' ');
+  const dmy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    const yearRaw = Number(dmy[3]);
+    const year = yearRaw < 100 ? (yearRaw < 50 ? 2000 + yearRaw : 1900 + yearRaw) : yearRaw;
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+      return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
+  const dayMonthYear = raw.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{2,4})$/);
+  if (dayMonthYear) {
+    const day = Number(dayMonthYear[1]);
+    const month = BATCH_MONTH_INDEX[dayMonthYear[2].toLowerCase()];
+    const yearRaw = Number(dayMonthYear[3]);
+    const year = yearRaw < 100 ? (yearRaw < 50 ? 2000 + yearRaw : 1900 + yearRaw) : yearRaw;
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+      return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
+  const monthDayYear = raw.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{2,4})$/);
+  if (monthDayYear) {
+    const month = BATCH_MONTH_INDEX[monthDayYear[1].toLowerCase()];
+    const day = Number(monthDayYear[2]);
+    const yearRaw = Number(monthDayYear[3]);
+    const year = yearRaw < 100 ? (yearRaw < 50 ? 2000 + yearRaw : 1900 + yearRaw) : yearRaw;
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+      return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
+  return raw;
+};
+
+const parseBatchAmount = (value: string): number => {
+  const raw = String(value || '').trim();
+  if (!raw) return 0;
+  const hasParens = raw.startsWith('(') && raw.endsWith(')');
+  const marker = raw.match(/\b(CR|DR)\b/i)?.[1]?.toUpperCase();
+  const cleaned = raw.replace(/\b(CR|DR)\b/gi, '').replace(/[(),]/g, '').trim();
+  const amount = Number(cleaned.replace(/,/g, ''));
+  if (!Number.isFinite(amount)) return 0;
+  if (hasParens || marker === 'DR') return -Math.abs(amount);
+  if (marker === 'CR') return Math.abs(amount);
+  return amount;
+};
+
+const inferBatchDebitCredit = (line: string, amount: number): { debit: number; credit: number } => {
+  const lower = line.toLowerCase();
+  const absAmount = Math.abs(amount);
+  if (
+    amount < 0 ||
+    /\bdr\b|\bdebit\b|withdraw|purchase|payment|charge|fee|atm|pos\b|sent\b|outward|transfer to/i.test(lower)
+  ) {
+    return { debit: absAmount, credit: 0 };
+  }
+  if (/\bcr\b|\bcredit\b|deposit|salary|refund|interest|received|inward|transfer from/i.test(lower)) {
+    return { debit: 0, credit: absAmount };
+  }
+  return { debit: absAmount, credit: 0 };
+};
+
+const extractPdfPageLines = async (pdf: PdfDocumentProxy, pageNumber: number): Promise<string[]> => {
+  const page = await pdf.getPage(pageNumber);
+  const textContent = await page.getTextContent?.();
+  const items = Array.isArray(textContent?.items) ? textContent.items : [];
+  const tokens: BatchLineToken[] = items
+    .map((item) => {
+      const text = String(item?.str ?? '').replace(/\s+/g, ' ').trim();
+      const transform = Array.isArray(item?.transform) ? item.transform : [];
+      return {
+        x: Number(transform[4] ?? 0),
+        y: Number(transform[5] ?? 0),
+        text,
+      };
+    })
+    .filter((token) => token.text.length > 0);
+
+  if (tokens.length === 0) return [];
+
+  tokens.sort((a, b) => {
+    const yDiff = Math.abs(a.y - b.y);
+    if (yDiff <= 1.5) return a.x - b.x;
+    return b.y - a.y;
+  });
+
+  const buckets: Array<{ y: number; tokens: BatchLineToken[] }> = [];
+  for (const token of tokens) {
+    const bucket = buckets.find((entry) => Math.abs(entry.y - token.y) <= 1.5);
+    if (bucket) bucket.tokens.push(token);
+    else buckets.push({ y: token.y, tokens: [token] });
+  }
+
+  return buckets
+    .sort((a, b) => b.y - a.y)
+    .map((bucket) =>
+      bucket.tokens
+        .sort((a, b) => a.x - b.x)
+        .map((token) => token.text)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .filter(Boolean);
+};
+
+const parseDeterministicRowsFromLines = (lines: string[]): RawTransaction[] => {
+  const rows: RawTransaction[] = [];
+  for (const rawLine of lines) {
+    const line = rawLine.trim().replace(/\s+/g, ' ');
+    if (!line) continue;
+    if (/^page\s*\d+/i.test(line)) continue;
+    if (/statement of accounts|transaction date|value date|running balance|account statement|opening balance|closing balance/i.test(line)) continue;
+
+    const rowMatch = line.match(BATCH_ROW_START_PATTERN);
+    if (!rowMatch) continue;
+
+    const dateToken = rowMatch[1];
+    const remainder = rowMatch[2] || '';
+    const matches: Array<{ raw: string; marker: string | null }> = [];
+    let m: RegExpExecArray | null;
+    while ((m = BATCH_AMOUNT_PATTERN.exec(remainder)) !== null) {
+      matches.push({ raw: m[0], marker: m[2] ? m[2].toUpperCase() : null });
+    }
+    BATCH_AMOUNT_PATTERN.lastIndex = 0;
+    if (matches.length < 2) continue;
+
+    const amountToken = matches[matches.length - 2];
+    const balanceToken = matches[matches.length - 1];
+    const amount = parseBatchAmount(amountToken.raw);
+    const balance = Math.abs(parseBatchAmount(balanceToken.raw));
+    if (!Number.isFinite(balance) || balance <= 0) continue;
+
+    const explicit = amountToken.marker;
+    const inferred = explicit === 'CR'
+      ? { debit: 0, credit: Math.abs(amount) }
+      : explicit === 'DR'
+        ? { debit: Math.abs(amount), credit: 0 }
+        : inferBatchDebitCredit(remainder, amount);
+    if (inferred.debit <= 0 && inferred.credit <= 0) continue;
+
+    const description = remainder
+      .replace(BATCH_AMOUNT_PATTERN, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!description || description.length < 2) continue;
+
+    rows.push({
+      date: normalizeBatchDate(dateToken),
+      description,
+      debit: inferred.debit,
+      credit: inferred.credit,
+      balance,
+      refNumber: '',
+    });
+  }
+  return rows;
 };
 
 // ============= ADMIN ROLE (Server-Side Only) =============
@@ -602,8 +779,16 @@ const shouldRetryStrictVisionPass = (
   if (!primaryResult.success || tx.length === 0) return true;
 
   const mismatchRatio = balanceMismatchRatio(tx);
-  if (tx.length >= 8 && mismatchRatio > 0.1) return true;
-  if (tx.length >= 4 && mismatchRatio > 0.2) return true;
+  const avgConfidence = Number(primaryResult.metadata?.avg_confidence ?? 0.85);
+  const lowConfidenceRows = tx.filter((row) =>
+    String((row as RawTransaction).type || '').toLowerCase().includes('low_confidence'),
+  ).length;
+  const lowConfidenceRatio = tx.length > 0 ? lowConfidenceRows / tx.length : 1;
+
+  if (avgConfidence < 0.75) return true;
+  if (lowConfidenceRatio >= 0.18) return true;
+  if (tx.length >= 8 && mismatchRatio > 0.08) return true;
+  if (tx.length >= 4 && mismatchRatio > 0.16) return true;
   return false;
 };
 
@@ -646,6 +831,27 @@ const shouldRunMistralDualPass = (
   if (tx.length >= 8 && mismatchRatio > 0.08) return true;
   if (tx.length >= 4 && mismatchRatio > 0.18) return true;
   return false;
+};
+
+const shouldFallbackToMistralAfterGroq = (groqResult: OCRResult): boolean => {
+  if (!groqResult.success) return true;
+  const tx = groqResult.transactions || [];
+  if (tx.length === 0) return true;
+
+  const mismatchRatio = balanceMismatchRatio(tx);
+  const avgConfidence = Number(groqResult.metadata?.avg_confidence ?? 0.85);
+  const lowConfidenceRows = tx.filter((row) => {
+    const rowConfidence = Number((row as RawTransaction).confidence ?? NaN);
+    if (Number.isFinite(rowConfidence) && rowConfidence < 0.72) return true;
+    return String((row as RawTransaction).type || '').toLowerCase().includes('low_confidence');
+  }).length;
+  const lowConfidenceRatio = tx.length > 0 ? lowConfidenceRows / tx.length : 1;
+
+  return (
+    avgConfidence < 0.72 ||
+    mismatchRatio > 0.16 ||
+    (tx.length >= 5 && lowConfidenceRatio >= 0.2)
+  );
 };
 
 const mergeProviderResults = (primary: OCRResult, secondary: OCRResult): OCRResult => {
@@ -927,7 +1133,7 @@ const processStatement = async (params: {
   const lowerFileName = params.fileName.toLowerCase();
   const isPdf = lowerFileName.endsWith('.pdf');
   const hasPdfPageImages = Array.isArray(params.pdfPageImages) && params.pdfPageImages.length > 0;
-  const clientParsedTransactions: RawTransaction[] = Array.isArray(params.pdfParsedTransactions)
+  const initialClientParsedTransactions: RawTransaction[] = Array.isArray(params.pdfParsedTransactions)
     ? normalizeRawTransactions(params.pdfParsedTransactions).filter((transaction) => {
         const hasDate = typeof transaction.date === 'string' && transaction.date.trim() && transaction.date !== 'Unknown';
         const hasDescription = typeof transaction.description === 'string' && transaction.description.trim().length > 0;
@@ -940,24 +1146,6 @@ const processStatement = async (params: {
     : [];
   const clientParsedBankMetadata = normalizeClientBankMetadata(params.pdfParsedBankMetadata);
   const pageCount = hasPdfPageImages ? params.pdfPageImages!.length : 1;
-  const clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
-  const mustUseDeterministicClientPdf =
-    isPdf && !hasPdfPageImages && clientParsedTransactions.length > 0;
-  const forceOcrForDenseStatement = shouldForceOcrForDenseStatement(
-    lowerFileName,
-    clientParsedBankMetadata,
-    clientParsedTransactions,
-  );
-  const adaptiveOcrStrategy = deriveAdaptiveOcrStrategy(
-    lowerFileName,
-    pageCount,
-    clientPdfParseAssessment,
-    forceOcrForDenseStatement,
-  );
-  console.log(
-    `Adaptive OCR strategy (${params.fileName}): level=${adaptiveOcrStrategy.level}, strict=${adaptiveOcrStrategy.strictMode}:${adaptiveOcrStrategy.strictMaxPages}, ` +
-    `dual=${adaptiveOcrStrategy.dualMode}:${adaptiveOcrStrategy.dualMaxPages}, reasons=${adaptiveOcrStrategy.reasons.join('|') || 'none'}`,
-  );
 
   let sharedPdf: PdfDocumentProxy | null = null;
   let structuralScan = {
@@ -973,6 +1161,52 @@ const processStatement = async (params: {
         console.warn(`Batch PDF text summary unavailable for ${params.fileName}:`, pdfLoadError);
       }
     }
+
+    let clientParsedTransactions = initialClientParsedTransactions;
+    if (
+      isPdf &&
+      sharedPdf &&
+      structuralScan.hasSelectableText &&
+      clientParsedTransactions.length === 0
+    ) {
+      try {
+        const lines = (
+          await Promise.all(
+            Array.from({ length: Math.max(1, Math.min(pageCount, sharedPdf.numPages)) }, async (_, idx) =>
+              extractPdfPageLines(sharedPdf as PdfDocumentProxy, idx + 1),
+            ),
+          )
+        ).flat();
+        const serverDeterministicRows = parseDeterministicRowsFromLines(lines);
+        if (serverDeterministicRows.length > 0) {
+          clientParsedTransactions = serverDeterministicRows;
+          console.log(
+            `Batch server deterministic fallback extracted ${serverDeterministicRows.length} rows for ${params.fileName}`,
+          );
+        }
+      } catch (serverDeterministicError) {
+        console.warn(`Batch deterministic fallback failed for ${params.fileName}:`, serverDeterministicError);
+      }
+    }
+
+    const clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
+    const mustUseDeterministicClientPdf =
+      isPdf && !hasPdfPageImages && clientParsedTransactions.length > 0;
+    const forceOcrForDenseStatement = shouldForceOcrForDenseStatement(
+      lowerFileName,
+      clientParsedBankMetadata,
+      clientParsedTransactions,
+    );
+    const adaptiveOcrStrategy = deriveAdaptiveOcrStrategy(
+      lowerFileName,
+      pageCount,
+      clientPdfParseAssessment,
+      forceOcrForDenseStatement,
+    );
+    console.log(
+      `Adaptive OCR strategy (${params.fileName}): level=${adaptiveOcrStrategy.level}, strict=${adaptiveOcrStrategy.strictMode}:${adaptiveOcrStrategy.strictMaxPages}, ` +
+      `dual=${adaptiveOcrStrategy.dualMode}:${adaptiveOcrStrategy.dualMaxPages}, reasons=${adaptiveOcrStrategy.reasons.join('|') || 'none'}`,
+    );
 
     const canUseDeterministicClientPdf =
       !params.forceOcrForPdf &&
@@ -1028,7 +1262,7 @@ const processStatement = async (params: {
       const effectiveStrictMaxPages = adaptiveOcrStrategy.strictMaxPages;
       const effectiveDualMode = adaptiveOcrStrategy.dualMode;
       const effectiveDualMaxPages = adaptiveOcrStrategy.dualMaxPages;
-      const useStrictFirstPass = OCR_WORKER_MODE !== 'primary' && adaptiveOcrStrategy.strictFirstPass;
+      const useStrictFirstPass = adaptiveOcrStrategy.strictFirstPass || !structuralScan.hasSelectableText;
 
       let selectedOcrPages: Array<{ pageNumber: number; imageDataUrl: string }> = (params.pdfPageImages as string[])
         .map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }));
@@ -1064,22 +1298,63 @@ const processStatement = async (params: {
           let pageResult: OCRResult | null = null;
           let strictUsed = false;
           let dualUsed = false;
-
-          if (OCR_WORKER_MODE === 'primary') {
-            const workerResult = await callTesseractOcrWorker(pageBase64, pageMime, params.fileName);
-            if (workerResult.success && workerResult.transactions && workerResult.transactions.length > 0) {
-              pageResult = workerResult;
-            }
+          let groqResult: OCRResult | null = null;
+          let groqFailureReason: string | null = null;
+          try {
+            groqResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
+          } catch (groqError) {
+            groqFailureReason = groqError instanceof Error ? groqError.message : 'Groq OCR failed';
           }
 
-          if (!pageResult) {
-            pageResult = await callGroqVisionOCR(pageBase64, pageMime, { strictTableMode: useStrictFirstPass });
+          const groqHasRows = !!(
+            groqResult &&
+            groqResult.success &&
+            groqResult.transactions &&
+            groqResult.transactions.length > 0
+          );
+          const groqNeedsMistralPass = !!(groqResult && groqHasRows && shouldFallbackToMistralAfterGroq(groqResult));
+
+          if (groqHasRows && !groqNeedsMistralPass) {
+            pageResult = groqResult;
+          } else {
+            let mistralResult: OCRResult | null = null;
+            let mistralFailureReason: string | null = null;
+            try {
+              mistralResult = await callMistralVisionOCR(pageBase64, pageMime);
+            } catch (mistralError) {
+              mistralFailureReason = mistralError instanceof Error ? mistralError.message : 'Mistral OCR failed';
+            }
+
+            const mistralHasRows = !!(
+              mistralResult &&
+              mistralResult.success &&
+              mistralResult.transactions &&
+              mistralResult.transactions.length > 0
+            );
+            if (mistralHasRows) {
+              pageResult = groqHasRows && groqResult
+                ? mergeProviderResults(groqResult, mistralResult as OCRResult)
+                : (mistralResult as OCRResult);
+              dualUsed = true;
+            } else if (groqHasRows && groqResult) {
+              pageResult = groqResult;
+            } else {
+              const failureParts = [
+                groqFailureReason || 'Groq returned empty OCR result',
+                mistralFailureReason || 'Mistral returned empty OCR result',
+              ];
+              return {
+                pageResult: null,
+                strictUsed,
+                dualUsed: true,
+                error: `OCR_PROVIDERS_FAILED: page ${pageEntry.pageNumber} (${failureParts.join(' | ')})`,
+              };
+            }
           }
 
           if (
             pageResult &&
             !useStrictFirstPass &&
-            OCR_WORKER_MODE !== 'primary' &&
             index < effectiveStrictMaxPages &&
             shouldRetryStrictVisionPass(lowerFileName, pageResult, effectiveStrictMode)
           ) {
@@ -1090,7 +1365,6 @@ const processStatement = async (params: {
 
           if (
             pageResult &&
-            OCR_WORKER_MODE !== 'primary' &&
             index < effectiveDualMaxPages &&
             shouldRunMistralDualPass(lowerFileName, pageResult, effectiveDualMode)
           ) {

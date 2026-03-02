@@ -75,14 +75,14 @@ type PdfDocumentProxy = {
 };
 
 const DATE_TOKEN_SOURCE =
-  '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}[/-]\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4})';
+  '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}[/-]\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{2,4})';
 const DATE_TOKEN = new RegExp(DATE_TOKEN_SOURCE);
 const FLEXIBLE_PREFIX_SOURCE = '(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]+\\s+)?';
 const ROW_START_PATTERN = new RegExp(`^${FLEXIBLE_PREFIX_SOURCE}(${DATE_TOKEN_SOURCE})\\s+(${DATE_TOKEN_SOURCE})\\s+(.+)$`);
 const AMOUNT_PATTERN = /-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g;
 const AMOUNT_TOKEN_PATTERN = /-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/;
 const DATE_TOKEN_FLEX_PATTERN = new RegExp(`(${DATE_TOKEN_SOURCE})`);
-const DASH_PLACEHOLDER = /^[\-\u2013\u2014]+$/;
+const DASH_PLACEHOLDER = /^[-\u2013\u2014]+$/;
 const normalizeDashToken = (token: string): string => token.replace(/[–—]/g, '-');
 
 const MONTH_INDEX: Record<string, number> = {
@@ -157,13 +157,57 @@ const normalizeDate = (value: string): string => {
     }
   }
 
+  const monthFirstDate = raw.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{2,4})$/);
+  if (monthFirstDate) {
+    const monthName = monthFirstDate[1].toLowerCase();
+    const month = MONTH_INDEX[monthName];
+    const day = Number(monthFirstDate[2]);
+    const yearRaw = Number(monthFirstDate[3]);
+    const year = normalizeTwoDigitYear(yearRaw);
+    if (
+      Number.isFinite(day) &&
+      Number.isFinite(month) &&
+      Number.isFinite(year) &&
+      day >= 1 &&
+      day <= 31
+    ) {
+      return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
   return raw;
 };
 
 const parseAmount = (value: string): number => {
-  const normalized = value.replace(/,/g, "").trim();
+  const raw = String(value || '').trim();
+  if (!raw) return 0;
+  const hasParens = raw.startsWith('(') && raw.endsWith(')');
+  const marker = raw.match(/\b(CR|DR)\b/i)?.[1]?.toUpperCase();
+  const normalized = raw
+    .replace(/\b(CR|DR)\b/gi, '')
+    .replace(/[(),]/g, '')
+    .trim();
   const amount = Number(normalized);
-  return Number.isFinite(amount) ? amount : 0;
+  if (!Number.isFinite(amount)) return 0;
+  if (hasParens) return -Math.abs(amount);
+  if (marker === 'DR') return -Math.abs(amount);
+  if (marker === 'CR') return Math.abs(amount);
+  return amount;
+};
+
+const inferDebitCreditFromContext = (
+  text: string,
+  amount: number,
+): { debit: number; credit: number } => {
+  const lower = text.toLowerCase();
+  const absAmount = Math.abs(amount);
+  if (amount < 0 || /\bdr\b|\bdebit\b|withdraw|purchase|payment|charge|fee|atm|pos\b|sent\b|outward|transfer to/i.test(lower)) {
+    return { debit: absAmount, credit: 0 };
+  }
+  if (amount > 0 && (/\bcr\b|\bcredit\b|deposit|salary|refund|interest|received|inward|transfer from/i.test(lower))) {
+    return { debit: 0, credit: absAmount };
+  }
+  return { debit: absAmount, credit: 0 };
 };
 
 const isNoiseLine = (line: string): boolean => {
@@ -345,6 +389,39 @@ const extractAmountsWithDashPlaceholders = (
   return null;
 };
 
+const extractFlexibleAmounts = (
+  text: string,
+): { textWithoutAmounts: string; debit: number; credit: number; balance: number } | null => {
+  const strict = extractAmounts(text) || extractAmountsWithDashPlaceholders(text);
+  if (strict) return strict;
+
+  const normalizedText = normalizeDashToken(text);
+  const amountRegex = /([+-]?\(?\d{1,3}(?:,\d{3})*\.\d{2}\)?|[+-]?\(?\d+\.\d{2}\)?)(?:\s*(CR|DR))?/gi;
+  const matches: Array<{ raw: string; marker: string | null }> = [];
+  let match: RegExpExecArray | null;
+  while ((match = amountRegex.exec(normalizedText)) !== null) {
+    matches.push({ raw: match[0], marker: match[2] ? match[2].toUpperCase() : null });
+  }
+  if (matches.length < 2) return null;
+
+  const amount = parseAmount(matches[matches.length - 2].raw);
+  const balance = parseAmount(matches[matches.length - 1].raw);
+  const explicitMarker = matches[matches.length - 2].marker;
+  const markerText = explicitMarker ? `${normalizedText} ${explicitMarker}` : normalizedText;
+  const inferred = explicitMarker === 'CR'
+    ? { debit: 0, credit: Math.abs(amount) }
+    : explicitMarker === 'DR'
+      ? { debit: Math.abs(amount), credit: 0 }
+      : inferDebitCreditFromContext(markerText, amount);
+
+  return {
+    textWithoutAmounts: normalizedText.replace(amountRegex, ' ').replace(/\s+/g, ' ').trim(),
+    debit: inferred.debit,
+    credit: inferred.credit,
+    balance: Math.abs(balance),
+  };
+};
+
 const isStrictAmountToken = (value: string): boolean =>
   /^-?\d{1,3}(?:,\d{3})*\.\d{2}$/.test(value) || /^-?\d+\.\d{2}$/.test(value);
 
@@ -386,7 +463,7 @@ const buildTokenFallbackRows = (
           credit: anchored.credit,
           balance: anchored.balance,
         }
-      : (extractAmounts(trailingTokens) || extractAmountsWithDashPlaceholders(trailingTokens));
+      : extractFlexibleAmounts(trailingTokens);
     if (!parsedAmounts) continue;
 
     const numericTokenCount = entry.tokens.filter((token) => isStrictAmountToken(token.text)).length;
@@ -408,6 +485,7 @@ const buildTokenFallbackRows = (
 };
 
 const hasLikelyAmountTail = (text: string): boolean => {
+  if (extractFlexibleAmounts(text)) return true;
   const normalizedText = normalizeDashToken(text);
   const matches = normalizedText.match(/-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g) || [];
   if (matches.length >= 2) return true;
@@ -567,7 +645,7 @@ const extractPdfTextTransactionsFromBytes = async (
         continue;
       }
 
-      let rowStart = line.match(ROW_START_PATTERN);
+      const rowStart = line.match(ROW_START_PATTERN);
       let monthPairMatch = null;
       if (!rowStart) {
         monthPairMatch = line.match(ROW_START_PATTERN_MONTH_PAIR);
@@ -600,7 +678,7 @@ const extractPdfTextTransactionsFromBytes = async (
           : monthPairMatch
             ? monthPairMatch[3]
             : singleDateMatch?.[2] ?? '';
-        const amounts = extractAmounts(trailing) || extractAmountsWithDashPlaceholders(trailing);
+        const amounts = extractFlexibleAmounts(trailing);
         const anchored = extractAnchoredAmounts(entry, amountCenters);
         const debit = anchored ? anchored.debit : (amounts?.debit ?? 0);
         const credit = anchored ? anchored.credit : (amounts?.credit ?? 0);
@@ -621,7 +699,7 @@ const extractPdfTextTransactionsFromBytes = async (
       }
 
       if (!current) continue;
-      const maybeAmounts = extractAmounts(line) || extractAmountsWithDashPlaceholders(line);
+      const maybeAmounts = extractFlexibleAmounts(line);
       const anchored = extractAnchoredAmounts(entry, amountCenters);
       if ((maybeAmounts || anchored) && current.balance === 0 && current.debit === 0 && current.credit === 0) {
         current.debit = anchored ? anchored.debit : (maybeAmounts?.debit ?? 0);
@@ -633,7 +711,7 @@ const extractPdfTextTransactionsFromBytes = async (
         continue;
       }
 
-      const singleAmountPattern = /^-?\d{1,3}(,\d{3})*(\.\d{2})?$/;
+      const singleAmountPattern = /^-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{2})?(?:\s*(?:CR|DR))?$/i;
       const singleAmountToken = line.trim();
       if (
         current &&
@@ -701,7 +779,7 @@ const extractPdfTextTransactionsFromBytes = async (
 
         const dateToken = dateMatch[1];
         const remainder = dateMatch[2] || '';
-        const amounts = extractAmounts(remainder) || extractAmountsWithDashPlaceholders(remainder);
+        const amounts = extractFlexibleAmounts(remainder);
         if (!amounts) continue;
 
         const description = (amounts.textWithoutAmounts || remainder).trim();
@@ -948,9 +1026,9 @@ const attemptGroqTextRescue = async (
               `Return JSON array with: date (YYYY-MM-DD), refNumber (as shown in the document), description, debit (number), credit (number), balance (number).\n` +
               `If both Transaction Date and Value Date/Posting Date exist, use Transaction Date as date.\n` +
               `If refNumber is not present for a row, return an empty string.\n` +
-              `Populate refNumber only when a dedicated reference column exists. If ID appears only inside description text, keep it in description and set refNumber to \"\".\n` +
+              `Populate refNumber only when a dedicated reference column exists. If ID appears only inside description text, keep it in description and set refNumber to "".\n` +
               `Ignore headers, footers, summaries, opening/closing balance lines, and page-break artifacts.\n` +
-              `Map debit/credit strictly by their table columns. If a column has \"-\" or blank, set that side to 0.\n` +
+              `Map debit/credit strictly by their table columns. If a column has "-" or blank, set that side to 0.\n` +
               `Use running balance progression to resolve ambiguous debit vs credit rows.\n` +
               `Never output negative debit or credit.\n` +
               `Return ONLY the JSON array, no markdown.`,
@@ -2013,8 +2091,16 @@ const shouldRetryStrictVisionPass = (
   if (!primaryResult.success || tx.length === 0) return true;
 
   const mismatchRatio = balanceMismatchRatio(tx);
-  if (tx.length >= 8 && mismatchRatio > 0.1) return true;
-  if (tx.length >= 4 && mismatchRatio > 0.2) return true;
+  const avgConfidence = Number(primaryResult.metadata?.avg_confidence ?? 0.85);
+  const lowConfidenceRows = tx.filter((row) =>
+    String((row as RawTransaction).type || '').toLowerCase().includes('low_confidence'),
+  ).length;
+  const lowConfidenceRatio = tx.length > 0 ? lowConfidenceRows / tx.length : 1;
+
+  if (avgConfidence < 0.75) return true;
+  if (lowConfidenceRatio >= 0.18) return true;
+  if (tx.length >= 8 && mismatchRatio > 0.08) return true;
+  if (tx.length >= 4 && mismatchRatio > 0.16) return true;
   return false;
 };
 
@@ -2057,6 +2143,27 @@ const shouldRunMistralDualPass = (
   if (tx.length >= 8 && mismatchRatio > 0.08) return true;
   if (tx.length >= 4 && mismatchRatio > 0.18) return true;
   return false;
+};
+
+const shouldFallbackToMistralAfterGroq = (groqResult: OCRResult): boolean => {
+  if (!groqResult.success) return true;
+  const tx = groqResult.transactions || [];
+  if (tx.length === 0) return true;
+
+  const mismatchRatio = balanceMismatchRatio(tx);
+  const avgConfidence = Number(groqResult.metadata?.avg_confidence ?? 0.85);
+  const lowConfidenceRows = tx.filter((row) => {
+    const rowConfidence = Number((row as RawTransaction).confidence ?? NaN);
+    if (Number.isFinite(rowConfidence) && rowConfidence < 0.72) return true;
+    return String((row as RawTransaction).type || '').toLowerCase().includes('low_confidence');
+  }).length;
+  const lowConfidenceRatio = tx.length > 0 ? lowConfidenceRows / tx.length : 1;
+
+  return (
+    avgConfidence < 0.72 ||
+    mismatchRatio > 0.16 ||
+    (tx.length >= 5 && lowConfidenceRatio >= 0.2)
+  );
 };
 
 const mergeProviderResults = (primary: OCRResult, secondary: OCRResult): OCRResult => {
@@ -3235,7 +3342,7 @@ Deno.serve(async (req) => {
       ? normalizeRawTransactions(parsedTransactionsInput)
       : [];
     const totalBeforeNormalization = normalizedParsedTransactions.length;
-    let clientParsedTransactions: RawTransaction[] = normalizedParsedTransactions.filter((transaction, index) => {
+    const clientParsedTransactions: RawTransaction[] = normalizedParsedTransactions.filter((transaction, index) => {
       const hasDate = typeof transaction.date === 'string' && transaction.date.trim() && transaction.date !== 'Unknown';
       const hasDescription = typeof transaction.description === 'string' && transaction.description.trim().length > 0;
       const hasAmount =
@@ -3264,7 +3371,7 @@ Deno.serve(async (req) => {
       count: clientParsedTransactions.length,
     });
     const clientParsedBankMetadata = normalizeClientBankMetadata(pdfParsedBankMetadata);
-    let clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
+    const clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
     timing.deterministic_parse_ms = Date.now() - deterministicStart;
     const mustUseDeterministicClientPdf =
       isPdf && !hasPdfPageImages && clientParsedTransactions.length > 0;
@@ -3402,7 +3509,7 @@ Deno.serve(async (req) => {
     let processedVia: 'deterministic' | 'ocr' | 'ai_rescue' = 'ocr';
     // UI-facing confidence can differ from internal gate confidence.
     let finalConfidenceScore = internalGateConfidence;
-    let finalErrorFlags = [...deterministicConfidenceBreakdown.errorFlags];
+    const finalErrorFlags = [...deterministicConfidenceBreakdown.errorFlags];
     let aiUsed = false;
     pipelineDiagnostics.decisionGate = {
       ok: true,
@@ -3520,7 +3627,7 @@ Deno.serve(async (req) => {
       const effectiveDualMode: DualOcrMode = 'off';
       const effectiveDualMaxPages = 0;
       const useStrictFirstPass = !OCR_SINGLE_PASS_ONLY &&
-        adaptiveOcrStrategy.strictFirstPass;
+        (adaptiveOcrStrategy.strictFirstPass || !structuralScan.hasSelectableText);
 
       if (!structuralScan.hasSelectableText && hasPdfPageImages) {
         pipelineDiagnostics.ocrStage = {
@@ -3591,7 +3698,8 @@ Deno.serve(async (req) => {
               groqResult.transactions &&
               groqResult.transactions.length > 0
             );
-            if (groqHasRows) {
+            const groqNeedsMistralPass = !!(groqResult && groqHasRows && shouldFallbackToMistralAfterGroq(groqResult));
+            if (groqHasRows && !groqNeedsMistralPass) {
               pageResult = groqResult;
             } else {
               let mistralResult: OCRResult | null = null;
@@ -3609,9 +3717,20 @@ Deno.serve(async (req) => {
                 mistralResult.transactions.length > 0
               );
               if (mistralHasRows) {
-                pageResult = mistralResult;
+                pageResult = groqHasRows && groqResult
+                  ? mergeProviderResults(groqResult, mistralResult as OCRResult)
+                  : (mistralResult as OCRResult);
                 dualUsed = true;
+                if (groqNeedsMistralPass) {
+                  console.log(
+                    `Mistral OCR fallback used for low-quality Groq page result (page ${pageEntry.pageNumber}).`,
+                  );
+                }
               } else {
+                if (groqHasRows && groqResult) {
+                  pageResult = groqResult;
+                  return { pageResult, error: null, strictUsed, dualUsed, providersFailed };
+                }
                 providersFailed = true;
                 const failureParts = [
                   groqFailureReason || 'Groq returned empty OCR result',

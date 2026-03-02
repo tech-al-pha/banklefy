@@ -1,5 +1,4 @@
 ﻿import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -161,12 +160,6 @@ const Index = () => {
                 </Link>
               )}
 
-              {isAdmin && (
-                <Badge variant="secondary" className="border-primary/30 bg-primary/10 text-primary">
-                  Admin
-                </Badge>
-              )}
-
               {/* Language Selector */}
               <LanguageSelector />
 
@@ -176,7 +169,7 @@ const Index = () => {
                 className="border-primary/50 bg-[#141414] text-foreground transition-colors btn-target-glow"
                 onClick={handleAuthClick}
               >
-                {user ? "Profile" : t('nav.signIn')}
+                {user ? (isAdmin ? "Admin" : "Profile") : t('nav.signIn')}
               </Button>
 
               <Button
@@ -285,14 +278,6 @@ const Index = () => {
                       </SheetClose>
                     )}
 
-                    {isAdmin && (
-                      <div className="px-3 py-2">
-                        <Badge variant="secondary" className="border-primary/30 bg-primary/10 text-primary">
-                          Admin
-                        </Badge>
-                      </div>
-                    )}
-
                     <div className="border-t border-primary/10 pt-3 flex flex-col gap-3">
                       <SheetClose asChild>
                         <Button
@@ -300,7 +285,7 @@ const Index = () => {
                           className="border-primary/40 text-foreground"
                           onClick={handleAuthClick}
                         >
-                          {user ? "Profile" : t('nav.signIn')}
+                          {user ? (isAdmin ? "Admin" : "Profile") : t('nav.signIn')}
                         </Button>
                       </SheetClose>
 

@@ -339,7 +339,7 @@ const callGroqTextExtraction = async (extractedText: string): Promise<GroqTextEx
 
   const start = Date.now();
   try {
-    const prompt = `Extract transaction rows from bank statement text.\n\nReturn ONLY valid JSON with key \"transactions\".\nEach item must include: date, description, debit, credit, balance, refNumber.\nRules:\n- No invented rows\n- If a field is missing, set it to \"UNKNOWN\" for text or 0 for numbers\n- Keep debit/credit positive\n- Do not output headers or summary lines.`;
+    const prompt = `Extract transaction rows from bank statement text.\n\nReturn ONLY valid JSON with key "transactions".\nEach item must include: date, description, debit, credit, balance, refNumber.\nRules:\n- No invented rows\n- If a field is missing, set it to "UNKNOWN" for text or 0 for numbers\n- Keep debit/credit positive\n- Do not output headers or summary lines.`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',

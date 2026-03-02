@@ -466,9 +466,18 @@ const sanitizeStrictNumericToken = (value: unknown): string | null => {
 
   const raw = String(value).trim();
   if (!raw) return null;
+  let normalizedRaw = raw;
+  // OCR drift repair for numeric fields only (e.g., 1O0.00, 5l2.90).
+  if (/[A-Za-z]/.test(normalizedRaw) && /\d/.test(normalizedRaw)) {
+    normalizedRaw = normalizedRaw
+      .replace(/[oO]/g, '0')
+      .replace(/[lI]/g, '1')
+      .replace(/[sS]/g, '5')
+      .replace(/[bB]/g, '8');
+  }
 
   // Keep only numeric-safe characters for OCR.
-  const cleaned = raw.replace(/[^\d,.\-]/g, '');
+  const cleaned = normalizedRaw.replace(/[^\d,.-]/g, '');
   if (!cleaned || cleaned === '-') return null;
 
   const minusMatches = cleaned.match(/-/g) || [];
@@ -979,7 +988,7 @@ export async function callGroqVisionOCR(
         // Check if it's the new format with bankMetadata
         if (parsed.bankMetadata && parsed.transactions) {
           console.log(`Groq Vision OCR extracted ${parsed.transactions.length} transactions with bank metadata`);
-          let normalizedTransactions = normalizeOcrRawTransactions(parsed.transactions, { strictColumnLock: strictTableMode });
+          const normalizedTransactions = normalizeOcrRawTransactions(parsed.transactions, { strictColumnLock: strictTableMode });
           const issues: string[] = [];
 
           if (!strictTableMode && normalizedTransactions.length > 0 && hasLowConfidenceRows(normalizedTransactions)) {
@@ -1093,7 +1102,7 @@ export async function callMistralVisionOCR(
     if (transactions.length === 0) {
       transactions = recoverAdcbTransactionsFromOcrText(markdownText);
     }
-    const normalizedTransactions = normalizeOcrRawTransactions(transactions);
+    const normalizedTransactions = normalizeOcrRawTransactions(transactions, { strictColumnLock: true });
 
     return {
       success: true,
