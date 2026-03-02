@@ -32,6 +32,7 @@ const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const queryClient = new QueryClient();
 
 type RouteMeta = { title: string; description: string; image?: string };
+type JsonLd = Record<string, unknown>;
 
 const DEFAULT_META: RouteMeta = {
   title: "Bank Statement Converter to Excel & CSV | Fast AI OCR | Banklefy",
@@ -124,6 +125,142 @@ const toAbsoluteUrl = (value: string, baseUrl: string) => {
   return `${baseUrl}${normalizedPath}`;
 };
 
+const getStructuredDataByRoute = (
+  pathname: string,
+  canonical: string,
+  siteUrl: string,
+  meta: RouteMeta,
+): JsonLd[] => {
+  const schemas: JsonLd[] = [];
+
+  const organizationSchema: JsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "@id": `${siteUrl}/#organization`,
+    name: "Banklefy",
+    url: siteUrl,
+    logo: `${siteUrl}/favicon.svg`,
+    sameAs: [
+      "https://www.instagram.com/banklefy",
+    ],
+  };
+
+  const websiteSchema: JsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${siteUrl}/#website`,
+    url: siteUrl,
+    name: "Banklefy",
+    publisher: { "@id": `${siteUrl}/#organization` },
+    inLanguage: "en",
+  };
+
+  const softwareApplicationSchema: JsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Banklefy Bank Statement Converter",
+    applicationCategory: "FinanceApplication",
+    operatingSystem: "Web Browser",
+    description: meta.description,
+    url: canonical,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "INR",
+      description: "Free trial available",
+    },
+  };
+
+  const webPageSchema: JsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: meta.title,
+    description: meta.description,
+    url: canonical,
+    inLanguage: "en",
+    isPartOf: { "@id": `${siteUrl}/#website` },
+  };
+
+  if (pathname === "/") {
+    schemas.push(organizationSchema, websiteSchema, softwareApplicationSchema);
+    return schemas;
+  }
+
+  if (pathname === "/help") {
+    const faqSchema: JsonLd = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: "Which file formats are supported?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Banklefy supports PDF, JPG, and PNG statements including scans and photos.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Do you support password-protected PDFs?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Yes. Enter the password in the unlock field before conversion.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "How long does conversion take?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Most statements convert quickly; large or scanned files can take longer.",
+          },
+        },
+      ],
+    };
+    schemas.push(webPageSchema, faqSchema);
+    return schemas;
+  }
+
+  if (pathname === "/about") {
+    schemas.push({
+      "@context": "https://schema.org",
+      "@type": "AboutPage",
+      name: meta.title,
+      description: meta.description,
+      url: canonical,
+      isPartOf: { "@id": `${siteUrl}/#website` },
+    });
+    return schemas;
+  }
+
+  if (pathname === "/blog") {
+    schemas.push({
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      name: meta.title,
+      description: meta.description,
+      url: canonical,
+      isPartOf: { "@id": `${siteUrl}/#website` },
+    });
+    return schemas;
+  }
+
+  if (pathname.startsWith("/blog/")) {
+    schemas.push({
+      "@context": "https://schema.org",
+      "@type": "Article",
+      headline: meta.title,
+      description: meta.description,
+      mainEntityOfPage: canonical,
+      publisher: { "@id": `${siteUrl}/#organization` },
+    });
+    return schemas;
+  }
+
+  schemas.push(webPageSchema);
+  return schemas;
+};
+
 const AppRoutes = () => {
   const location = useLocation();
   const normalizedPathname = normalizePathname(location.pathname);
@@ -132,6 +269,7 @@ const AppRoutes = () => {
   const canonical = `${siteUrl}${normalizedPathname === "/" ? "/" : normalizedPathname}`;
   const imageUrl = toAbsoluteUrl(meta.image || DEFAULT_META.image || "/og-banklefy.jpg", siteUrl);
   const shouldNoIndex = NO_INDEX_PREFIXES.some((path) => normalizedPathname.startsWith(path));
+  const structuredData = getStructuredDataByRoute(normalizedPathname, canonical, siteUrl, meta);
 
   return (
     <ErrorBoundary resetKey={location.pathname}>
@@ -159,6 +297,12 @@ const AppRoutes = () => {
         <meta name="twitter:url" content={canonical} />
         <meta name="twitter:image" content={imageUrl} />
         <meta name="twitter:image:alt" content="Banklefy bank statement converter preview" />
+
+        {structuredData.map((schema, index) => (
+          <script key={`jsonld-${index}`} type="application/ld+json">
+            {JSON.stringify(schema)}
+          </script>
+        ))}
       </Helmet>
 
       <Suspense

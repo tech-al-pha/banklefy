@@ -5,6 +5,8 @@ export const LuxuryCursor = () => {
   const [isHovering, setIsHovering] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
+  const isVisibleRef = useRef(false);
+  const isHoveringRef = useRef(false);
   const positionRef = useRef({ x: -100, y: -100 });
   const rafRef = useRef<number | undefined>(undefined);
 
@@ -41,7 +43,10 @@ export const LuxuryCursor = () => {
 
     const handleMouseMove = (e: MouseEvent) => {
       positionRef.current = { x: e.clientX, y: e.clientY };
-      setIsVisible(true);
+      if (!isVisibleRef.current) {
+        isVisibleRef.current = true;
+        setIsVisible(true);
+      }
       
       // Use requestAnimationFrame for smooth updates
       if (rafRef.current) {
@@ -50,8 +55,19 @@ export const LuxuryCursor = () => {
       rafRef.current = requestAnimationFrame(updateCursor);
     };
 
-    const handleMouseLeave = () => setIsVisible(false);
-    const handleMouseEnter = () => setIsVisible(true);
+    const handleMouseLeave = () => {
+      if (isVisibleRef.current) {
+        isVisibleRef.current = false;
+        setIsVisible(false);
+      }
+    };
+
+    const handleMouseEnter = () => {
+      if (!isVisibleRef.current) {
+        isVisibleRef.current = true;
+        setIsVisible(true);
+      }
+    };
 
     const handleHoverStart = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -62,11 +78,19 @@ export const LuxuryCursor = () => {
         target.closest("a") ||
         target.closest("[data-hover]")
       ) {
-        setIsHovering(true);
+        if (!isHoveringRef.current) {
+          isHoveringRef.current = true;
+          setIsHovering(true);
+        }
       }
     };
 
-    const handleHoverEnd = () => setIsHovering(false);
+    const handleHoverEnd = () => {
+      if (isHoveringRef.current) {
+        isHoveringRef.current = false;
+        setIsHovering(false);
+      }
+    };
 
     document.addEventListener("mousemove", handleMouseMove, { passive: true });
     document.addEventListener("mouseenter", handleMouseEnter);
@@ -83,6 +107,8 @@ export const LuxuryCursor = () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
+      isVisibleRef.current = false;
+      isHoveringRef.current = false;
       root.classList.remove("luxury-cursor-active");
       if (styleEl && styleEl.parentNode) {
         styleEl.parentNode.removeChild(styleEl);
