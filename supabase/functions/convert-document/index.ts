@@ -1907,13 +1907,69 @@ const mergeBankMetadata = (...candidates: Array<BankMetadata | undefined>): Bank
   let hasValue = false;
   const writable = merged as unknown as Record<string, unknown>;
 
+  const hasArabicScript = (value: string): boolean => /[\u0600-\u06FF]/.test(value);
+  const hasLikelyDate = (value: string): boolean =>
+    /\d{1,2}[/-]\d{1,2}[/-]\d{2,4}/.test(value) || /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i.test(value);
+  const sanitizeMetadataString = (key: keyof BankMetadata, value: string): string | null => {
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (!normalized) return null;
+    if (normalized.length > 140) return null;
+
+    // Drop legal footer/header noise that sometimes leaks from PDF text.
+    if (/correct\s*\(subject to the bank/i.test(normalized)) return null;
+    if (/for assistance|customer service|raise a complaint/i.test(normalized)) return null;
+
+    if (key === 'bankName') {
+      if (hasArabicScript(normalized)) return null;
+      if (normalized.length > 80) return null;
+      const bankLike = /(bank|adcb|emirates|nbd|wio|hdfc|icici|sbi|fab|mashreq|islamic)/i.test(normalized);
+      if (!bankLike) return null;
+      return normalized;
+    }
+
+    if (key === 'accountHolder') {
+      if (/currency|interest rate|account opened|closing balance|account number|account holder name/i.test(normalized)) {
+        return null;
+      }
+      if ((normalized.match(/\d/g) || []).length >= 5) return null;
+      if (normalized.length < 3) return null;
+      return normalized;
+    }
+
+    if (key === 'accountNumber') {
+      const compact = normalized.replace(/[^A-Za-z0-9]/g, '');
+      const digitCount = (compact.match(/\d/g) || []).length;
+      if (compact.length < 6 || digitCount < 6) return null;
+      return compact;
+    }
+
+    if (key === 'iban') {
+      const compact = normalized.replace(/\s+/g, '').toUpperCase();
+      if (!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(compact)) return null;
+      return compact;
+    }
+
+    if (key === 'statementPeriod') {
+      if (!hasLikelyDate(normalized)) return null;
+      return normalized;
+    }
+
+    if (key === 'currency') {
+      const code = normalizeCurrencyCode(normalized);
+      if (!code || code.length !== 3) return null;
+      return code;
+    }
+
+    return normalized;
+  };
+
   const assignString = (key: keyof BankMetadata, value: unknown) => {
     if (typeof value !== 'string') return;
-    const trimmed = value.trim();
-    if (!trimmed) return;
+    const cleaned = sanitizeMetadataString(key, value);
+    if (!cleaned) return;
     const current = merged[key];
     if (typeof current === 'string' && current.trim()) return;
-    writable[key] = trimmed;
+    writable[key] = cleaned;
     hasValue = true;
   };
 
