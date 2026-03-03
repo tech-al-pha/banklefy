@@ -886,9 +886,6 @@ export const UploadDemo = () => {
     }
 
     if (newFiles.length > 0) {
-      void supabase.functions
-        .invoke('warm-up', { body: { ts: Date.now() } })
-        .catch(() => undefined);
       setUploadPrepActive(true);
       setUploadPrepProgress(0);
       setUploadPrepFileName(newFiles[0]?.name ?? null);
@@ -1472,9 +1469,21 @@ export const UploadDemo = () => {
 
         if (isRequiresImageFallbackError) {
           setShowScanTimeCard(true);
-          const renderedPdfPageImages = preparedPdfImagesRef.current.get(getFileCacheKey(fileToConvert));
+          let renderedPdfPageImages = preparedPdfImagesRef.current.get(getFileCacheKey(fileToConvert));
           if (!renderedPdfPageImages || renderedPdfPageImages.length === 0) {
-            throw new Error("PDF preparation is not ready yet. Please re-add the file and try again.");
+            const { pdfToPageImages } = await loadPdfUtils();
+            renderedPdfPageImages = await pdfToPageImages(fileToConvert, {
+              password: pdfPassword.trim() || undefined,
+              maxPdfRenderPages,
+              isFreeUsageMode,
+              freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+            });
+            if (Array.isArray(renderedPdfPageImages) && renderedPdfPageImages.length > 0) {
+              preparedPdfImagesRef.current.set(getFileCacheKey(fileToConvert), renderedPdfPageImages);
+            }
+          }
+          if (!renderedPdfPageImages || renderedPdfPageImages.length === 0) {
+            throw new Error("PDF preparation failed. Please try again.");
           }
           requestBody.pdfPageImages = renderedPdfPageImages;
           delete requestBody.pdfParsedTransactions;
@@ -1788,11 +1797,24 @@ Analytics Summary:
             payload.pdfParsedBankMetadata = cachedParsedPdf.bankMetadata;
           }
           if (parsedPdfTransactionsCount === 0) {
-            payload.pdfPageImages = preparedPdfImagesRef.current.get(cacheKey);
+            let cachedPageImages = preparedPdfImagesRef.current.get(cacheKey);
+            if (!cachedPageImages || cachedPageImages.length === 0) {
+              const { pdfToPageImages } = await loadPdfUtils();
+              cachedPageImages = await pdfToPageImages(file, {
+                password: pdfPassword.trim() || undefined,
+                maxPdfRenderPages,
+                isFreeUsageMode,
+                freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+              });
+              if (Array.isArray(cachedPageImages) && cachedPageImages.length > 0) {
+                preparedPdfImagesRef.current.set(cacheKey, cachedPageImages);
+              }
+            }
+            payload.pdfPageImages = cachedPageImages;
             const filePdfPayloadBytes = estimatePdfPageImagesBytes(payload.pdfPageImages);
             const filePdfPages = payload.pdfPageImages?.length ?? 0;
             if (!payload.pdfPageImages || filePdfPages === 0) {
-              throw new Error(`Preparation pending for ${file.name}. Please re-add the file and try again.`);
+              throw new Error(`PDF preparation failed for ${file.name}. Please try again.`);
             }
             if (filePdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES) {
               throw new Error(buildPdfPayloadTooLargeMessage("single", filePdfPages, filePdfPayloadBytes));
