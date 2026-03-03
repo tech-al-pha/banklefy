@@ -79,8 +79,9 @@ const DATE_TOKEN_SOURCE =
 const DATE_TOKEN = new RegExp(DATE_TOKEN_SOURCE);
 const FLEXIBLE_PREFIX_SOURCE = '(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]+\\s+)?';
 const ROW_START_PATTERN = new RegExp(`^${FLEXIBLE_PREFIX_SOURCE}(${DATE_TOKEN_SOURCE})\\s+(${DATE_TOKEN_SOURCE})\\s+(.+)$`);
-const AMOUNT_PATTERN = /-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g;
-const AMOUNT_TOKEN_PATTERN = /-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/;
+const AMOUNT_TOKEN_SOURCE = '[+-]?(?:\\(?\\d{1,3}(?:,\\d{3})+\\)?|\\(?\\d{1,7}\\)?)(?:\\.\\d{1,4})?(?:\\s*(?:CR|DR))?';
+const AMOUNT_PATTERN = new RegExp(AMOUNT_TOKEN_SOURCE, 'g');
+const AMOUNT_TOKEN_PATTERN = new RegExp(`^${AMOUNT_TOKEN_SOURCE}$`, 'i');
 const DATE_TOKEN_FLEX_PATTERN = new RegExp(`(${DATE_TOKEN_SOURCE})`);
 const DASH_PLACEHOLDER = /^[-\u2013\u2014]+$/;
 const normalizeDashToken = (token: string): string => token.replace(/[–—]/g, '-');
@@ -207,6 +208,10 @@ const inferDebitCreditFromContext = (
   if (amount > 0 && (/\bcr\b|\bcredit\b|deposit|salary|refund|interest|received|inward|transfer from/i.test(lower))) {
     return { debit: 0, credit: absAmount };
   }
+  if (amount > 0) {
+    // In single-amount statements (e.g. Wio), positive values are typically credits.
+    return { debit: 0, credit: absAmount };
+  }
   return { debit: absAmount, credit: 0 };
 };
 
@@ -281,7 +286,7 @@ const detectAmountColumns = (lineEntries: LineEntry[]): number[] => {
   const numericXs: number[] = [];
   for (const entry of lineEntries) {
     for (const token of entry.tokens) {
-      if (AMOUNT_TOKEN_PATTERN.test(token.text)) {
+      if (AMOUNT_TOKEN_PATTERN.test(token.text.replace(/[,:;]+$/g, '').trim())) {
         numericXs.push(token.x);
       }
     }
@@ -311,7 +316,7 @@ const extractAnchoredAmounts = (
   centers: number[],
 ): { debit: number; credit: number; balance: number } | null => {
   if (centers.length < 3) return null;
-  const numericTokens = entry.tokens.filter((token) => AMOUNT_TOKEN_PATTERN.test(token.text));
+  const numericTokens = entry.tokens.filter((token) => AMOUNT_TOKEN_PATTERN.test(token.text.replace(/[,:;]+$/g, '').trim()));
   if (numericTokens.length === 0) return null;
 
   const nearest = centers.map((center) => {
@@ -360,8 +365,9 @@ const extractAmountsWithDashPlaceholders = (
   const cleaned = normalizeDashToken(text).trim();
   if (!cleaned) return null;
 
+  const amountPart = '(-?(?:\\d{1,3}(?:,\\d{3})+|\\d{1,7})(?:\\.\\d{1,4})?)';
   const debitBlankPattern =
-    /^(.*?)(?:\s|^)([-\u2013\u2014]+)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/;
+    new RegExp(`^(.*?)(?:\\s|^)([-\\u2013\\u2014]+)\\s+${amountPart}\\s+${amountPart}\\s*$`);
   const debitBlankMatch = cleaned.match(debitBlankPattern);
   if (debitBlankMatch && DASH_PLACEHOLDER.test(debitBlankMatch[2])) {
     const [, prefix, , creditToken, balanceToken] = debitBlankMatch;
@@ -374,7 +380,7 @@ const extractAmountsWithDashPlaceholders = (
   }
 
   const creditBlankPattern =
-    /^(.*?)(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+([-\u2013\u2014]+)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/;
+    new RegExp(`^(.*?)${amountPart}\\s+([-\\u2013\\u2014]+)\\s+${amountPart}\\s*$`);
   const creditBlankMatch = cleaned.match(creditBlankPattern);
   if (creditBlankMatch && DASH_PLACEHOLDER.test(creditBlankMatch[3])) {
     const [, prefix, debitToken, , balanceToken] = creditBlankMatch;
@@ -389,14 +395,101 @@ const extractAmountsWithDashPlaceholders = (
   return null;
 };
 
+const extractTrailingAmounts = (
+  text: string,
+): { textWithoutAmounts: string; debit: number; credit: number; balance: number } | null => {
+  const sanitized = normalizeDashToken(text)
+    .replace(/\(\s*rate:\s*[^)]*\)/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!sanitized) return null;
+
+  const rawTokens = sanitized.split(/\s+/);
+  const cleanedTokens = rawTokens.map((token) => token.replace(/[,:;]+$/g, '').trim());
+  const amountLikePattern = /^[+-]?(?:\(?\d{1,3}(?:,\d{3})*(?:\.\d{1,4})?\)?|\(?\d{1,7}(?:\.\d{1,4})?\)?)(?:\s*(?:CR|DR))?$/i;
+  const monthTokenPattern = /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)$/i;
+
+  let tailStart = cleanedTokens.length;
+  for (let i = cleanedTokens.length - 1; i >= 0; i -= 1) {
+    const token = cleanedTokens[i];
+    if (!token) {
+      if (tailStart < cleanedTokens.length) break;
+      continue;
+    }
+    if (amountLikePattern.test(token) || DASH_PLACEHOLDER.test(token)) {
+      const prevToken = i > 0 ? cleanedTokens[i - 1] : '';
+      const looksLikeMonthYear = /^(?:19|20)\d{2}$/.test(token) && monthTokenPattern.test(prevToken);
+      if (looksLikeMonthYear) {
+        if (tailStart < cleanedTokens.length) break;
+        continue;
+      }
+      tailStart = i;
+      continue;
+    }
+    if (tailStart < cleanedTokens.length) break;
+  }
+
+  if (tailStart >= cleanedTokens.length) return null;
+  const tailTokens = cleanedTokens.slice(tailStart);
+  const numericTail = tailTokens.filter((token) => !DASH_PLACEHOLDER.test(token));
+  if (numericTail.length < 2) return null;
+
+  const balanceToken = numericTail[numericTail.length - 1];
+  const balance = Math.abs(parseAmount(balanceToken));
+  if (!Number.isFinite(balance)) return null;
+
+  const leadingTokens = tailTokens.slice(0, Math.max(0, tailTokens.length - 1));
+  const parsedLeading = leadingTokens.map((token) => {
+    if (DASH_PLACEHOLDER.test(token)) return 0;
+    return parseAmount(token);
+  });
+
+  let debit = 0;
+  let credit = 0;
+
+  if (parsedLeading.length >= 2) {
+    const first = parsedLeading[parsedLeading.length - 2] ?? 0;
+    const second = parsedLeading[parsedLeading.length - 1] ?? 0;
+    const firstAbs = Math.abs(first);
+    const secondAbs = Math.abs(second);
+
+    if (firstAbs > 0 && secondAbs > 0) {
+      debit = firstAbs;
+      credit = secondAbs;
+    } else if (firstAbs > 0) {
+      debit = firstAbs;
+    } else if (secondAbs > 0) {
+      credit = secondAbs;
+    }
+  } else if (parsedLeading.length === 1) {
+    const inferred = inferDebitCreditFromContext(sanitized, parsedLeading[0]);
+    debit = inferred.debit;
+    credit = inferred.credit;
+  }
+
+  const descriptionTokens = rawTokens.slice(0, tailStart);
+  const textWithoutAmounts = descriptionTokens.join(' ').replace(/\s+/g, ' ').trim();
+  if (!textWithoutAmounts) return null;
+
+  return {
+    textWithoutAmounts,
+    debit,
+    credit,
+    balance,
+  };
+};
+
 const extractFlexibleAmounts = (
   text: string,
 ): { textWithoutAmounts: string; debit: number; credit: number; balance: number } | null => {
+  const trailing = extractTrailingAmounts(text);
+  if (trailing) return trailing;
+
   const strict = extractAmounts(text) || extractAmountsWithDashPlaceholders(text);
   if (strict) return strict;
 
   const normalizedText = normalizeDashToken(text);
-  const amountRegex = /([+-]?\(?\d{1,3}(?:,\d{3})*\.\d{2}\)?|[+-]?\(?\d+\.\d{2}\)?)(?:\s*(CR|DR))?/gi;
+  const amountRegex = /([+-]?\(?\d{1,3}(?:,\d{3})+\)?(?:\.\d{1,4})?|\(?[+-]?\d{1,7}(?:\.\d{1,4})?\)?)(?:\s*(CR|DR))?/gi;
   const matches: Array<{ raw: string; marker: string | null }> = [];
   let match: RegExpExecArray | null;
   while ((match = amountRegex.exec(normalizedText)) !== null) {
@@ -423,7 +516,7 @@ const extractFlexibleAmounts = (
 };
 
 const isStrictAmountToken = (value: string): boolean =>
-  /^-?\d{1,3}(?:,\d{3})*\.\d{2}$/.test(value) || /^-?\d+\.\d{2}$/.test(value);
+  /^-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?(?:\s*(?:CR|DR))?$/i.test(value);
 
 const findLeadingDateToken = (tokens: LineToken[]): { value: string; index: number } | null => {
   const maxIndex = Math.min(2, tokens.length - 1);
@@ -487,17 +580,17 @@ const buildTokenFallbackRows = (
 const hasLikelyAmountTail = (text: string): boolean => {
   if (extractFlexibleAmounts(text)) return true;
   const normalizedText = normalizeDashToken(text);
-  const matches = normalizedText.match(/-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g) || [];
+  const matches = normalizedText.match(/-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?/g) || [];
   if (matches.length >= 2) return true;
   // Placeholder variants: amount + '-' + balance OR '-' + amount + balance
   const debitBlankTail = normalizedText.match(
-    /(?:^|\s)([-\u2013\u2014]+)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/,
+    /(?:^|\s)([-\u2013\u2014]+)\s+(-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?)\s+(-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?)\s*$/,
   );
   if (debitBlankTail && DASH_PLACEHOLDER.test(debitBlankTail[1])) {
     return true;
   }
   const creditBlankTail = normalizedText.match(
-    /(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+([-\u2013\u2014]+)\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/,
+    /(-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?)\s+([-\u2013\u2014]+)\s+(-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?)\s*$/,
   );
   if (creditBlankTail && DASH_PLACEHOLDER.test(creditBlankTail[2])) {
     return true;
@@ -711,7 +804,7 @@ const extractPdfTextTransactionsFromBytes = async (
         continue;
       }
 
-      const singleAmountPattern = /^-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{2})?(?:\s*(?:CR|DR))?$/i;
+      const singleAmountPattern = /^-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?(?:\s*(?:CR|DR))?$/i;
       const singleAmountToken = line.trim();
       if (
         current &&
@@ -3245,8 +3338,7 @@ Deno.serve(async (req) => {
     let serverParsedTransactions: RawTransaction[] = [];
     if (
       isPdf &&
-      bytes.length > 0 &&
-      (!Array.isArray(pdfParsedTransactions) || pdfParsedTransactions.length === 0)
+      bytes.length > 0
     ) {
       try {
         const textStart = Date.now();
@@ -3334,9 +3426,15 @@ Deno.serve(async (req) => {
     console.log('=== Starting Specialized AI Pipeline ===');
 
     let extractionResult: Awaited<ReturnType<typeof performExtraction>>;
-    const parsedTransactionsInput = Array.isArray(pdfParsedTransactions) && pdfParsedTransactions.length > 0
-      ? pdfParsedTransactions
-      : serverParsedTransactions;
+    const parsedTransactionsInput = Array.isArray(serverParsedTransactions) && serverParsedTransactions.length > 0
+      ? serverParsedTransactions
+      : (Array.isArray(pdfParsedTransactions) ? pdfParsedTransactions : []);
+    if (Array.isArray(serverParsedTransactions) && serverParsedTransactions.length > 0) {
+      console.log(
+        `Using server deterministic rows as primary source (${serverParsedTransactions.length})` +
+          `${Array.isArray(pdfParsedTransactions) ? ` over client rows (${pdfParsedTransactions.length})` : ''}.`,
+      );
+    }
     const deterministicStart = Date.now();
     const normalizedParsedTransactions: RawTransaction[] = Array.isArray(parsedTransactionsInput)
       ? normalizeRawTransactions(parsedTransactionsInput)
@@ -4313,10 +4411,10 @@ Deno.serve(async (req) => {
       riskFlag: t.riskFlag,
     }));
     const provisionalBankInfo = mergeBankMetadata(
-      clientParsedBankMetadata,
       ocrTextBankMetadata,
       collectedBankMetadata,
       extractionResult.bankMetadata,
+      clientParsedBankMetadata,
     );
     let transactions = sanitizeTransactions(extractedTransactions, {
       openingBalance: provisionalBankInfo?.openingBalance,
