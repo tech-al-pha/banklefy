@@ -211,6 +211,15 @@ const hasExplicitUnlimitedFlag = (row: Record<string, unknown>): boolean => {
   return planType === 'unlimited' || tier === 'unlimited';
 };
 
+const hasFiniteConfiguredLimit = (row: Record<string, unknown>): boolean => {
+  const explicitLimit = toNumber(row.conversions_limit, 0);
+  const freeLimit = toNumber(row.free_daily_limit, 0);
+  const monthlyLimit = toNumber(row.monthly_limit, 0);
+  const yearlyLimit = toNumber(row.yearly_limit, 0);
+  const packLimit = toNumber(row.pack_limit, 0);
+  return explicitLimit > 0 || freeLimit > 0 || monthlyLimit > 0 || yearlyLimit > 0 || packLimit > 0;
+};
+
 const resolveAdminRole = async (supabaseAdmin: SupabaseLike, userId: string): Promise<boolean> => {
   const { data: roleRow, error: roleRowError } = await supabaseAdmin
     .from('user_roles')
@@ -335,8 +344,8 @@ export const resolveEffectiveLimit = async ({
 
   const row = await ensureSubscriptionRow(supabaseAdmin, user.id, timezone, dateParts.isoDate);
 
-  // 1) Explicit unlimited flag
-  if (hasExplicitUnlimitedFlag(row)) {
+  // 1) Explicit unlimited flag (only when no finite limits are configured)
+  if (hasExplicitUnlimitedFlag(row) && !hasFiniteConfiguredLimit(row)) {
     return buildResult({
       conversionsUsed: 0,
       conversionsLimit: UNLIMITED_LIMIT,

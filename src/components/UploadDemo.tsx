@@ -56,7 +56,7 @@ export const UploadDemo = () => {
   const formatRemaining = (remaining?: number) => {
     if (remaining === null || remaining === undefined) return "";
     const normalizedPlan = (planType ?? "free").toLowerCase();
-    const isUnlimitedPlan = normalizedPlan === "unlimited";
+    const isUnlimitedPlan = normalizedPlan === "unlimited" && Number.isFinite(conversionsLimit) && conversionsLimit >= 900000;
     const isPerPagePlan = normalizedPlan.startsWith("per_page");
     const isMonthlyPlan = normalizedPlan.startsWith("monthly") || normalizedPlan === "daily";
     const isYearlyPlan = normalizedPlan.startsWith("yearly") || normalizedPlan === "business";
@@ -687,7 +687,10 @@ export const UploadDemo = () => {
   }, [refreshUsageLimit, toast]);
 
   const normalizedPlanType = (planType ?? "free").toLowerCase();
-  const isUnlimitedUsagePlan = normalizedPlanType === "unlimited";
+  const isUnlimitedUsagePlan =
+    normalizedPlanType === "unlimited" &&
+    Number.isFinite(conversionsLimit) &&
+    conversionsLimit >= 900000;
   const isPerPageUsagePlan = normalizedPlanType.startsWith("per_page");
   const isMonthlyUsagePlan = normalizedPlanType.startsWith("monthly") || normalizedPlanType === "daily";
   const isYearlyUsagePlan = normalizedPlanType.startsWith("yearly") || normalizedPlanType === "business";

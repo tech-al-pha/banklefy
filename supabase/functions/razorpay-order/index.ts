@@ -95,6 +95,15 @@ const extractBearerToken = (authHeader: string | null): string | null => {
   return null;
 };
 
+const toFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -141,7 +150,12 @@ Deno.serve(async (req) => {
   }
 
   if (!pricing) {
-    return respond(req, 400, { error: 'Unknown plan selected.' });
+    return respond(req, 400, {
+      error: 'Unknown plan selected.',
+      code: 'INVALID_PLAN_ID',
+      planId,
+      supportedPlans: Object.keys(PLAN_PRICING),
+    });
   }
 
   if (!serverRazorpayKeyId) {
@@ -184,8 +198,38 @@ Deno.serve(async (req) => {
       ? body.receipt.trim()
       : `akro-${planId.slice(0, 12)}-${shortId}`;
 
+  const clientAmountInRupee =
+    toFiniteNumber(body.amountInRupee) ??
+    toFiniteNumber(body.amount);
+
+  if (clientAmountInRupee !== null && clientAmountInRupee > 0) {
+    const drift = Math.abs(clientAmountInRupee - pricing.amount);
+    if (drift > 0.01) {
+      console.warn('Client amount differs from server pricing; server pricing will be enforced.', {
+        planId,
+        clientAmountInRupee,
+        serverAmountInRupee: pricing.amount,
+      });
+    }
+  }
+
   const amountInPaise = Math.round(pricing.amount * 100);
   const currency = pricing.currency;
+
+  if (!Number.isFinite(amountInPaise) || amountInPaise <= 0) {
+    console.error('Invalid computed amount for Razorpay order.', {
+      planId,
+      amountInPaise,
+      pricingAmount: pricing.amount,
+    });
+    return respond(req, 400, {
+      error: 'Amount must be a positive number.',
+      code: 'INVALID_ORDER_AMOUNT',
+      planId,
+      amountInPaise,
+      pricingAmount: pricing.amount,
+    });
+  }
 
   const orderPayload = {
     amount: amountInPaise,

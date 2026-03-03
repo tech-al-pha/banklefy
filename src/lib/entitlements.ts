@@ -16,10 +16,10 @@ export const resolveEffectivePlanType = (
   const limit = typeof conversionsLimit === "number" && Number.isFinite(conversionsLimit)
     ? conversionsLimit
     : null;
+  const isTrueUnlimitedLimit = limit !== null && limit >= 900000;
 
   if (
     normalizedPlan === "free" ||
-    normalizedPlan === "unlimited" ||
     normalizedPlan.startsWith("per_page") ||
     normalizedPlan.startsWith("monthly") ||
     normalizedPlan.startsWith("yearly")
@@ -36,6 +36,23 @@ export const resolveEffectivePlanType = (
       if (limit === 65000) return "yearly_pro";
     }
     return normalizedPlan;
+  }
+
+  if (normalizedPlan === "unlimited") {
+    if (isTrueUnlimitedLimit) return "unlimited";
+    if (limit !== null) {
+      if (limit >= 65000) return "yearly_pro";
+      if (limit >= 15000) return "yearly_full";
+      if (limit >= 5000) return "yearly_lite";
+      if (limit >= 4500) return "monthly_enterprise";
+      if (limit >= 1000) return "monthly_pro";
+      if (limit >= 300) return "monthly_basic";
+      if (limit >= 50) return "per_page_power";
+      if (limit >= 25) return "per_page_standard";
+      if (limit >= 10) return "per_page_lite";
+      return "free";
+    }
+    return "free";
   }
 
   if (normalizedPlan === "daily") {

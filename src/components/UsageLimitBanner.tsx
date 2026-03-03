@@ -32,7 +32,7 @@ export const UsageLimitBanner = ({
   const { t } = useLanguage();
   const planLabel = formatPlanLabel(planType);
   const normalizedPlan = (planType || "free").toLowerCase();
-  const isUnlimitedPlan = normalizedPlan === "unlimited";
+  const isUnlimitedPlan = normalizedPlan === "unlimited" && Number.isFinite(limit) && limit >= 900000;
   const isPerPagePlan = normalizedPlan.startsWith("per_page");
   const isMonthlyPlan = normalizedPlan.startsWith("monthly") || normalizedPlan === "daily";
   const isYearlyPlan = normalizedPlan.startsWith("yearly") || normalizedPlan === "business";

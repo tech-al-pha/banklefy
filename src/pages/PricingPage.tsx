@@ -342,6 +342,10 @@ const PricingPage = () => {
     try {
       const payload = await invokeFunctionWithSession("razorpay-order", {
         planId: plan.planId,
+        amount: plan.amountInRupee,
+        amountInRupee: plan.amountInRupee,
+        amountInPaise: Math.round(plan.amountInRupee * 100),
+        currency: "INR",
         notes: {
           planName: plan.name,
           planCategory: plan.category,
