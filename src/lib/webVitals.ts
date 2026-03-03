@@ -84,7 +84,7 @@ export const startWebVitalsObserver = () => {
         }
       }
     });
-    inpObserver.observe({ type: "event", buffered: true, durationThreshold: 40 });
+    inpObserver.observe({ type: "event", buffered: true } as PerformanceObserverInit & { durationThreshold?: number });
 
     const flush = () => {
       if (lcpValue > 0) emitMetric("LCP", lcpValue);
