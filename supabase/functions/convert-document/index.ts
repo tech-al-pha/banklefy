@@ -1200,6 +1200,12 @@ const attemptGroqTextRescue = async (
 };
 
 const countDebitCreditMismatches = (rows: RawTransaction[], reverseOrder: boolean): number => {
+  const resolveBalance = (value: unknown): number => {
+    const direct = Number(value ?? NaN);
+    if (Number.isFinite(direct)) return direct;
+    const parsed = parseAmount(String(value ?? ''));
+    return Number.isFinite(parsed) ? parsed : NaN;
+  };
   let mismatches = 0;
   const startIndex = reverseOrder ? 0 : 1;
   const endIndex = reverseOrder ? rows.length - 1 : rows.length;
@@ -1207,8 +1213,8 @@ const countDebitCreditMismatches = (rows: RawTransaction[], reverseOrder: boolea
     const current = rows[i];
     const prev = reverseOrder ? rows[i + 1] : rows[i - 1];
     if (!prev) continue;
-    const currentBalance = Number(current.balance);
-    const prevBalance = Number(prev.balance);
+    const currentBalance = resolveBalance(current.balance);
+    const prevBalance = resolveBalance(prev.balance);
     if (!Number.isFinite(currentBalance) || !Number.isFinite(prevBalance)) continue;
     const delta = currentBalance - prevBalance;
     if (Math.abs(delta) < 0.005) continue;
@@ -1220,19 +1226,53 @@ const countDebitCreditMismatches = (rows: RawTransaction[], reverseOrder: boolea
   return mismatches;
 };
 
+const detectDebitCreditOrderFromDates = (rows: RawTransaction[]): 'chron' | 'reverse' | null => {
+  if (rows.length < 3) return null;
+  const timestamps = rows
+    .map((row) => {
+      const parsed = Date.parse(normalizeDate(String(row.date || '')));
+      return Number.isFinite(parsed) ? parsed : NaN;
+    })
+    .filter((value) => Number.isFinite(value));
+
+  if (timestamps.length < 3) return null;
+
+  let asc = 0;
+  let desc = 0;
+  for (let i = 1; i < timestamps.length; i += 1) {
+    const delta = timestamps[i] - timestamps[i - 1];
+    if (delta > 0) asc += 1;
+    if (delta < 0) desc += 1;
+  }
+
+  const directionalMoves = asc + desc;
+  if (directionalMoves < 2) return null;
+  if (asc >= Math.ceil(directionalMoves * 0.6)) return 'chron';
+  if (desc >= Math.ceil(directionalMoves * 0.6)) return 'reverse';
+  return null;
+};
+
 const applyDebitCreditHardRule = (rows: RawTransaction[]): { rows: RawTransaction[]; order: 'chron' | 'reverse' } => {
+  const resolveBalance = (value: unknown): number => {
+    const direct = Number(value ?? NaN);
+    if (Number.isFinite(direct)) return direct;
+    const parsed = parseAmount(String(value ?? ''));
+    return Number.isFinite(parsed) ? parsed : NaN;
+  };
   if (rows.length < 2) return { rows, order: 'chron' };
   const mismatchesChron = countDebitCreditMismatches(rows, false);
   const mismatchesReverse = countDebitCreditMismatches(rows, true);
-  const order: 'chron' | 'reverse' = mismatchesReverse + 1 < mismatchesChron ? 'reverse' : 'chron';
+  const dateOrder = detectDebitCreditOrderFromDates(rows);
+  const order: 'chron' | 'reverse' =
+    dateOrder ?? (mismatchesReverse + 1 < mismatchesChron ? 'reverse' : 'chron');
   const updated = rows.map((row) => ({ ...row }));
 
   for (let i = 0; i < updated.length; i += 1) {
     const current = updated[i];
     const prev = order === 'reverse' ? updated[i + 1] : updated[i - 1];
     if (!prev) continue;
-    const currentBalance = Number(current.balance);
-    const prevBalance = Number(prev.balance);
+    const currentBalance = resolveBalance(current.balance);
+    const prevBalance = resolveBalance(prev.balance);
     if (!Number.isFinite(currentBalance) || !Number.isFinite(prevBalance)) continue;
     const delta = currentBalance - prevBalance;
     if (Math.abs(delta) < 0.005) continue;
@@ -1243,9 +1283,11 @@ const applyDebitCreditHardRule = (rows: RawTransaction[]): { rows: RawTransactio
     if (delta > 0 && credit === 0 && debit > 0) {
       current.credit = amount;
       current.debit = 0;
+      current.type = 'credit';
     } else if (delta < 0 && debit === 0 && credit > 0) {
       current.debit = amount;
       current.credit = 0;
+      current.type = 'debit';
     }
   }
 
@@ -1253,6 +1295,12 @@ const applyDebitCreditHardRule = (rows: RawTransaction[]): { rows: RawTransactio
 };
 
 const applyOcrPostParseAdjustments = (rows: RawTransaction[]): { rows: RawTransaction[]; order: 'chron' | 'reverse' } => {
+  const resolveBalance = (value: unknown): number => {
+    const direct = Number(value ?? NaN);
+    if (Number.isFinite(direct)) return direct;
+    const parsed = parseAmount(String(value ?? ''));
+    return Number.isFinite(parsed) ? parsed : NaN;
+  };
   const { rows: anchored, order } = applyDebitCreditHardRule(rows);
   const updated = anchored.map((row) => ({ ...row }));
   const startIndex = order === 'reverse' ? 0 : 1;
@@ -1262,8 +1310,8 @@ const applyOcrPostParseAdjustments = (rows: RawTransaction[]): { rows: RawTransa
     const current = updated[i];
     const prev = order === 'reverse' ? updated[i + 1] : updated[i - 1];
     if (!prev) continue;
-    const currentBalance = Number(current.balance);
-    const prevBalance = Number(prev.balance);
+    const currentBalance = resolveBalance(current.balance);
+    const prevBalance = resolveBalance(prev.balance);
     if (!Number.isFinite(currentBalance) || !Number.isFinite(prevBalance)) continue;
     const delta = currentBalance - prevBalance;
     if (Math.abs(delta) < 0.005) continue;
@@ -1274,8 +1322,10 @@ const applyOcrPostParseAdjustments = (rows: RawTransaction[]): { rows: RawTransa
     if (debit === 0 && credit === 0) {
       if (delta > 0) {
         current.credit = Math.abs(delta);
+        current.type = 'credit';
       } else {
         current.debit = Math.abs(delta);
+        current.type = 'debit';
       }
       continue;
     }
@@ -1284,9 +1334,11 @@ const applyOcrPostParseAdjustments = (rows: RawTransaction[]): { rows: RawTransa
       if (delta > 0) {
         current.credit = Math.max(debit, credit);
         current.debit = 0;
+        current.type = 'credit';
       } else {
         current.debit = Math.max(debit, credit);
         current.credit = 0;
+        current.type = 'debit';
       }
     }
   }

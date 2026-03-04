@@ -203,6 +203,7 @@ export const UploadDemo = () => {
     Map<string, { transactions?: BatchFilePayload["pdfParsedTransactions"]; bankMetadata?: BatchFilePayload["pdfParsedBankMetadata"] }>
   >(new Map());
   const preparedPdfImagesRef = useRef<Map<string, string[]>>(new Map());
+  const preparedUploadedFileIdRef = useRef<Map<string, string>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { hasChatAuraAccess } = useSubscriptionTier();
@@ -947,45 +948,60 @@ export const UploadDemo = () => {
         setUploadPrepLabel("Detecting amounts...");
         try {
           const { extractPdfDataFromText, pdfToPageImages } = await loadPdfUtils();
-          for (const file of newFiles) {
-            if (!file.name.toLowerCase().endsWith(".pdf")) continue;
+          for (const [fileIndex, file] of newFiles.entries()) {
             const cacheKey = getFileCacheKey(file);
-            let parsedPdfTransactionsCount = 0;
-            try {
-              const parsedPdf = await extractPdfDataFromText(file, {
-                password: pdfPassword.trim() || undefined,
-                maxPdfRenderPages,
-              });
-              parsedPdfTransactionsCount = parsedPdf.transactions.length;
-              preparedPdfDataRef.current.set(getFileCacheKey(file), {
-                transactions: parsedPdf.transactions,
-                bankMetadata: parsedPdf.bankMetadata,
-              });
-            } catch {
-              preparedPdfDataRef.current.delete(cacheKey);
-            }
-
-            if (parsedPdfTransactionsCount === 0) {
-              setUploadPrepProgress(65);
-              setUploadPrepLabel("Preparing OCR pages...");
+            if (file.name.toLowerCase().endsWith(".pdf")) {
+              let parsedPdfTransactionsCount = 0;
               try {
-                const renderedPdfPageImages = await pdfToPageImages(file, {
+                const parsedPdf = await extractPdfDataFromText(file, {
                   password: pdfPassword.trim() || undefined,
                   maxPdfRenderPages,
-                  isFreeUsageMode,
-                  freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
                 });
-                if (Array.isArray(renderedPdfPageImages) && renderedPdfPageImages.length > 0) {
-                  preparedPdfImagesRef.current.set(cacheKey, renderedPdfPageImages);
-                  setShowScanTimeCard(true);
-                } else {
+                parsedPdfTransactionsCount = parsedPdf.transactions.length;
+                preparedPdfDataRef.current.set(cacheKey, {
+                  transactions: parsedPdf.transactions,
+                  bankMetadata: parsedPdf.bankMetadata,
+                });
+              } catch {
+                preparedPdfDataRef.current.delete(cacheKey);
+              }
+
+              if (parsedPdfTransactionsCount === 0) {
+                setUploadPrepProgress(65);
+                setUploadPrepLabel("Preparing OCR pages...");
+                try {
+                  const renderedPdfPageImages = await pdfToPageImages(file, {
+                    password: pdfPassword.trim() || undefined,
+                    maxPdfRenderPages,
+                    isFreeUsageMode,
+                    freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+                  });
+                  if (Array.isArray(renderedPdfPageImages) && renderedPdfPageImages.length > 0) {
+                    preparedPdfImagesRef.current.set(cacheKey, renderedPdfPageImages);
+                    setShowScanTimeCard(true);
+                  } else {
+                    preparedPdfImagesRef.current.delete(cacheKey);
+                  }
+                } catch {
                   preparedPdfImagesRef.current.delete(cacheKey);
                 }
-              } catch {
+              } else {
                 preparedPdfImagesRef.current.delete(cacheKey);
               }
-            } else {
-              preparedPdfImagesRef.current.delete(cacheKey);
+            }
+
+            if (user) {
+              setUploadPrepProgress(82);
+              setUploadPrepLabel(`Uploading ${file.name}...`);
+              try {
+                const sanitized = sanitizeFilename(file.name);
+                const stagedFilePath = `${Date.now()}_${fileIndex}_${sanitized}`;
+                await uploadSourceFileWithRetry(`${user.id}/${stagedFilePath}`, file);
+                preparedUploadedFileIdRef.current.set(cacheKey, stagedFilePath);
+              } catch (uploadError) {
+                console.error("Pre-upload failed for selected file, will retry at convert time:", uploadError);
+                preparedUploadedFileIdRef.current.delete(cacheKey);
+              }
             }
           }
         } catch {
@@ -1177,13 +1193,18 @@ export const UploadDemo = () => {
       }
 
       if (user) {
-        // Authenticated user - upload file to storage first
-        const sanitized = sanitizeFilename(fileToConvert.name);
-        const filePath = `${Date.now()}_${sanitized}`;
-
+        // Authenticated user - prefer pre-uploaded file from selection phase.
+        const cacheKey = getFileCacheKey(fileToConvert);
+        const stagedFileId = preparedUploadedFileIdRef.current.get(cacheKey);
+        if (stagedFileId) {
+          requestBody.fileId = stagedFileId;
+        } else {
+          const sanitized = sanitizeFilename(fileToConvert.name);
+          const filePath = `${Date.now()}_${sanitized}`;
           await uploadSourceFileWithRetry(`${user.id}/${filePath}`, fileToConvert);
-
-        requestBody.fileId = filePath;
+          requestBody.fileId = filePath;
+          preparedUploadedFileIdRef.current.set(cacheKey, filePath);
+        }
       } else {
         if (!isPdf || !("pdfPageImages" in requestBody)) {
           // Anonymous user - send file as base64 (images or text-based PDF)
@@ -1412,6 +1433,7 @@ export const UploadDemo = () => {
         setSelectedFiles([]);
         preparedPdfDataRef.current.clear();
         preparedPdfImagesRef.current.clear();
+        preparedUploadedFileIdRef.current.clear();
         setShowPasswordInput(false);
         setPdfPassword('');
         setPasswordError(false);
@@ -1453,13 +1475,9 @@ export const UploadDemo = () => {
           // Continue with normal success path below.
           // eslint-disable-next-line no-lonely-if
         } else {
-        const hasDeterministicPdfRows =
-          Array.isArray(requestBody.pdfParsedTransactions) &&
-          requestBody.pdfParsedTransactions.length > 0;
         const isRequiresImageFallbackError =
           isPdf &&
           !("pdfPageImages" in requestBody) &&
-          !hasDeterministicPdfRows &&
           (
             (error as { requiresPageImages?: boolean })?.requiresPageImages ||
             errorMessage.includes('requires page images') ||
@@ -1636,6 +1654,7 @@ Analytics Summary:
       setSelectedFiles([]);
       preparedPdfDataRef.current.clear();
       preparedPdfImagesRef.current.clear();
+      preparedUploadedFileIdRef.current.clear();
       setShowPasswordInput(false);
       setPdfPassword('');
       setPasswordError(false);
@@ -1834,12 +1853,17 @@ Analytics Summary:
         }
 
         if (user) {
-          const sanitized = sanitizeFilename(file.name);
-          const filePath = `${Date.now()}_${index}_${sanitized}`;
-
-          await uploadSourceFileWithRetry(`${user.id}/${filePath}`, file);
-
-          payload.fileId = filePath;
+          const cacheKey = getFileCacheKey(file);
+          const stagedFileId = preparedUploadedFileIdRef.current.get(cacheKey);
+          if (stagedFileId) {
+            payload.fileId = stagedFileId;
+          } else {
+            const sanitized = sanitizeFilename(file.name);
+            const filePath = `${Date.now()}_${index}_${sanitized}`;
+            await uploadSourceFileWithRetry(`${user.id}/${filePath}`, file);
+            payload.fileId = filePath;
+            preparedUploadedFileIdRef.current.set(cacheKey, filePath);
+          }
         } else if (!isPdf) {
           payload.fileData = await fileToBase64(file);
         }
@@ -1995,6 +2019,7 @@ Analytics Summary:
       setSelectedFile(null);
       preparedPdfDataRef.current.clear();
       preparedPdfImagesRef.current.clear();
+      preparedUploadedFileIdRef.current.clear();
       setShowPasswordInput(false);
       setPdfPassword('');
       setPasswordError(false);
@@ -2478,6 +2503,7 @@ Analytics Summary:
                                 if (removed) {
                                   preparedPdfDataRef.current.delete(getFileCacheKey(removed));
                                   preparedPdfImagesRef.current.delete(getFileCacheKey(removed));
+                                  preparedUploadedFileIdRef.current.delete(getFileCacheKey(removed));
                                 }
                                 setSelectedFiles(selectedFiles.filter((_, i) => i !== idx));
                               }}
@@ -2537,6 +2563,7 @@ Analytics Summary:
                           e.stopPropagation();
                           preparedPdfDataRef.current.clear();
                           preparedPdfImagesRef.current.clear();
+                          preparedUploadedFileIdRef.current.clear();
                           setSelectedFiles([]);
                           setSelectedFile(null);
                           setEditedPdfWarning(null);
