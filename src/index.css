@@ -129,13 +129,6 @@
     background: var(--background);
   }
 
-  .container {
-    width: 100%;
-    max-width: none !important;
-    padding-left: clamp(12px, 2.4vw, 28px);
-    padding-right: clamp(12px, 2.4vw, 28px);
-  }
-
   h1,
   h2,
   h3,
