@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Mail, Instagram, MapPin, ArrowLeft, ShieldCheck, Zap, Award, MessageCircle, X } from "lucide-react";
+import { Mail, MapPin, ArrowLeft, ShieldCheck, Zap, Award, MessageCircle, X } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -96,19 +96,11 @@ const AboutPage = () => {
               </div>
             </a>
 
-            <a href="mailto:inspirexali@gmail.com" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
+            <a href="mailto:banklefy@gmail.com" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
               <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><Mail size={24} /></div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.mail')}</p>
-                <p className="text-xl font-bold">inspirexali@gmail.com</p>
-              </div>
-            </a>
-
-            <a href="https://instagram.com/inspirexali" target="_blank" rel="noopener noreferrer" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
-              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><Instagram size={24} /></div>
-              <div>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.social')}</p>
-                <p className="text-xl font-bold">@inspirexali</p>
+                <p className="text-xl font-bold">banklefy@gmail.com</p>
               </div>
             </a>
 
