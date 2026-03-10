@@ -518,6 +518,9 @@ const PricingPage = () => {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Choose your perfect plan. One-time page packs, monthly subscriptions, or yearly savings.
           </p>
+          <p className="text-sm font-medium text-yellow-300/90">
+            Analyzed PDF is a paid-only feature and is not available on free usage.
+          </p>
         </section>
 
         {/* One-time plans */}

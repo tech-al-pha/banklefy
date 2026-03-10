@@ -138,6 +138,9 @@ const BenefitsPage = () => {
             Discover the benefits that make our platform a strong choice for document analysis
             and processing.
           </p>
+          <p className="mt-3 text-sm font-medium text-yellow-300/90">
+            Analyzed PDF is available on paid plans only.
+          </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             {categories.map((cat) => (
               <span
