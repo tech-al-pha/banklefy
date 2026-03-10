@@ -11,11 +11,13 @@ import {
   TrendingDown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
+import { hasFoirDashboardAccess, hasFraudDetectorAccess } from "@/lib/entitlements";
 
-const highlights = [
+const baseHighlights = [
   "Transaction summary and cashflow",
   "Category breakdown and trends",
-  "Risk flags and balance checks",
   "Clean, audit-ready formatting",
 ];
 
@@ -75,6 +77,23 @@ const upcomingFormats = [
 
 export default function SampleReport() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { planType, tier } = useSubscriptionTier();
+  const entitlementInput = {
+    planType,
+    tier,
+    isAuthenticated: !!user,
+  };
+  const hasFoirAccess = !!user && hasFoirDashboardAccess(entitlementInput);
+  const hasFraudAccess = !!user && hasFraudDetectorAccess(entitlementInput);
+  const showPremiumLock = !hasFoirAccess && !hasFraudAccess;
+  const highlights = [...baseHighlights];
+
+  if (hasFraudAccess) {
+    highlights.splice(2, 0, "Risk flags and balance checks");
+  } else if (hasFoirAccess) {
+    highlights.splice(2, 0, "Loan readiness snapshot");
+  }
 
   return (
     <section className="relative min-h-screen overflow-hidden bg-background px-4 py-16 sm:px-6">
@@ -113,6 +132,25 @@ export default function SampleReport() {
                 A preview of the structured Excel-style report users receive after conversion.
               </p>
             </div>
+
+            <Card className="border-primary/30 bg-gradient-to-br from-primary/10 via-[#111111] to-[#111111] p-5 backdrop-blur-xl shadow-[0_0_45px_rgba(60,130,255,0.18)]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#9AFB3F]">Downloads</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-white">Grab the sample files</h2>
+                  <p className="mt-2 text-sm text-white/70">
+                    Click any tile below to download the sample outputs and see the format quality.
+                  </p>
+                </div>
+                <Badge className="border border-primary/40 bg-primary/15 text-primary">
+                  Ready to download
+                </Badge>
+              </div>
+              <div className="mt-4 flex items-center gap-2 text-xs text-[#9AFB3F]">
+                <FileText className="h-4 w-4 text-[#9AFB3F]" />
+                <span>Samples are real exports — not mockups.</span>
+              </div>
+            </Card>
 
             <div className="grid gap-3 sm:grid-cols-2">
               {downloads.map((file) => (
@@ -157,6 +195,56 @@ export default function SampleReport() {
           </div>
 
           <div className="space-y-4">
+            <Card className="border-white/20 bg-[#101010] p-5 backdrop-blur-xl">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <Badge className="border border-primary/40 bg-primary/10 text-primary">
+                    Premium PDF Report
+                  </Badge>
+                  <h2 className="text-2xl font-semibold text-white">Client-ready PDF output</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Polished, shareable reports that match your plan entitlements — no extra noise.
+                  </p>
+                </div>
+                {showPremiumLock && (
+                  <Badge className="border border-white/20 bg-white/10 text-white/80">
+                    Locked
+                  </Badge>
+                )}
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-white/50">Baseline</p>
+                  <p className="mt-2 text-sm font-semibold text-white">Branded cover + audit summary</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-white/50">Appendix</p>
+                  <p className="mt-2 text-sm font-semibold text-white">Transaction tables with clean formatting</p>
+                </div>
+                {hasFoirAccess && (
+                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-white/50">Loan Ready</p>
+                    <p className="mt-2 text-sm font-semibold text-white">FOIR snapshot + monthly cashflow</p>
+                  </div>
+                )}
+                {hasFraudAccess && (
+                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-white/50">Risk Signals</p>
+                    <p className="mt-2 text-sm font-semibold text-white">Edited PDF flags + anomaly summary</p>
+                  </div>
+                )}
+                {showPremiumLock && (
+                  <div className="rounded-xl border border-primary/30 bg-primary/10 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-primary/80">Upgrade</p>
+                    <p className="mt-2 text-sm font-semibold text-white">
+                      Unlock advanced PDF insights with a paid plan.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </Card>
+
             <div className="grid gap-3 md:grid-cols-2">
               {highlights.map((item) => (
                 <Card key={item} className="border-white/15 bg-[#171717] p-4 backdrop-blur-xl">
@@ -168,57 +256,99 @@ export default function SampleReport() {
               ))}
             </div>
 
-            <Card className="border-white/15 bg-[#111111] p-5 backdrop-blur-xl">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2 text-xl font-semibold text-white">
-                  <ShieldCheck className="h-5 w-5 text-[#9AFB3F]" />
-                  <span>Document Integrity & Risk Analysis</span>
+            {hasFraudAccess && (
+              <Card className="border-white/15 bg-[#111111] p-5 backdrop-blur-xl">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xl font-semibold text-white">
+                    <ShieldCheck className="h-5 w-5 text-[#9AFB3F]" />
+                    <span>Document Integrity & Risk Analysis</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-4xl font-bold text-[#9AFB3F]">65%</p>
+                    <p className="text-sm text-[#9AFB3F]">Minor Issues</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-4xl font-bold text-[#9AFB3F]">65%</p>
-                  <p className="text-sm text-[#9AFB3F]">Minor Issues</p>
-                </div>
-              </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
-                  <p className="text-sm text-muted-foreground">Balance Check</p>
-                  <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">16 Errors</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
-                  <p className="text-sm text-muted-foreground">Avg Daily Balance</p>
-                  <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">10,532</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
-                  <p className="text-sm text-muted-foreground">Lowest Balance</p>
-                  <p className="mt-1 text-3xl font-semibold text-[#9AFB3F]">1,129</p>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
-                  <p className="text-sm text-muted-foreground">Risk Flags</p>
-                  <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">None</p>
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/10 p-4">
-                <div className="flex items-center gap-2 text-amber-400">
-                  <AlertTriangle className="h-4 w-4" />
-                  <p className="text-sm font-semibold">1 Alert Detected</p>
-                </div>
-                <p className="mt-2 text-base font-semibold text-amber-300">
-                  16 transaction(s) have balance discrepancies. Mathematical reconciliation failed.
-                </p>
-              </div>
-
-              <div className="mt-5">
-                <h3 className="text-2xl font-semibold text-white">Financial Analytics</h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
-                    <p className="text-sm text-muted-foreground">Total Credits</p>
-                    <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">1,14,150.39</p>
+                    <p className="text-sm text-muted-foreground">Balance Check</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">16 Errors</p>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
-                    <p className="text-sm text-muted-foreground">Total Debits</p>
-                    <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">2,56,969.40</p>
+                    <p className="text-sm text-muted-foreground">Avg Daily Balance</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">10,532</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <p className="text-sm text-muted-foreground">Lowest Balance</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#9AFB3F]">1,129</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <p className="text-sm text-muted-foreground">Risk Flags</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">None</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/10 p-4">
+                  <div className="flex items-center gap-2 text-amber-400">
+                    <AlertTriangle className="h-4 w-4" />
+                    <p className="text-sm font-semibold">1 Alert Detected</p>
+                  </div>
+                  <p className="mt-2 text-base font-semibold text-amber-300">
+                    16 transaction(s) have balance discrepancies. Mathematical reconciliation failed.
+                  </p>
+                </div>
+
+                <div className="mt-5">
+                  <h3 className="text-2xl font-semibold text-white">Financial Analytics</h3>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                      <p className="text-sm text-muted-foreground">Total Credits</p>
+                      <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">1,14,150.39</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                      <p className="text-sm text-muted-foreground">Total Debits</p>
+                      <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">2,56,969.40</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <TrendingDown className="h-4 w-4" />
+                        <p className="text-sm">Net Flow</p>
+                      </div>
+                      <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">-1,42,819.01</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <AlertTriangle className="h-4 w-4" />
+                        <p className="text-sm">Duplicates Found</p>
+                      </div>
+                      <p className="mt-1 text-3xl font-semibold text-amber-400">1</p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {!hasFraudAccess && hasFoirAccess && (
+              <Card className="border-white/15 bg-[#111111] p-5 backdrop-blur-xl">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xl font-semibold text-white">
+                    <ShieldCheck className="h-5 w-5 text-[#53EFA3]" />
+                    <span>Loan Readiness Snapshot</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-4xl font-bold text-[#53EFA3]">A+</p>
+                    <p className="text-sm text-[#53EFA3]">Healthy</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <p className="text-sm text-muted-foreground">Avg Daily Balance</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">10,532</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <p className="text-sm text-muted-foreground">Monthly Inflow</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">1,14,150.39</p>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
                     <div className="flex items-center gap-2 text-muted-foreground">
@@ -228,15 +358,12 @@ export default function SampleReport() {
                     <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">-1,42,819.01</p>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <AlertTriangle className="h-4 w-4" />
-                      <p className="text-sm">Duplicates Found</p>
-                    </div>
-                    <p className="mt-1 text-3xl font-semibold text-amber-400">1</p>
+                    <p className="text-sm text-muted-foreground">Lowest Balance</p>
+                    <p className="mt-1 text-3xl font-semibold text-[#9AFB3F]">1,129</p>
                   </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            )}
 
             <Card className="border-white/15 bg-[#111111] p-5 backdrop-blur-xl">
               <div className="flex flex-wrap gap-2">
