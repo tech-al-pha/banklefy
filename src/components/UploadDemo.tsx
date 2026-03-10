@@ -2823,6 +2823,7 @@ Analytics Summary:
                       : "Finalizing..."
                 }
                 conversionProgressSubLabel={conversionProgressDetail}
+                showImageProcessingHint={showImageProcessingHint}
               />
             </div>
           </div>
