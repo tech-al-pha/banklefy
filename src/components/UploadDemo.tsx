@@ -629,7 +629,7 @@ export const UploadDemo = () => {
     return safe || fallback;
   };
   const buildExcelDownloadName = (bankName?: string | null, fallbackName?: string | null) => {
-    const baseName = sanitizeFileBaseName(bankName || fallbackName);
+    const baseName = sanitizeFileBaseName(fallbackName || bankName);
     return `${baseName}.xlsx`;
   };
   const {
