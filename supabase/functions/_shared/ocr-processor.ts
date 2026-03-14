@@ -467,6 +467,10 @@ const sanitizeStrictNumericToken = (value: unknown): string | null => {
   const raw = String(value).trim();
   if (!raw) return null;
   let normalizedRaw = raw;
+  // Handle trailing minus commonly produced by OCR (e.g., 1,234.56-)
+  if (!normalizedRaw.startsWith('-') && normalizedRaw.endsWith('-')) {
+    normalizedRaw = `-${normalizedRaw.slice(0, -1)}`;
+  }
   // OCR drift repair for numeric fields only (e.g., 1O0.00, 5l2.90).
   if (/[A-Za-z]/.test(normalizedRaw) && /\d/.test(normalizedRaw)) {
     normalizedRaw = normalizedRaw
@@ -490,8 +494,9 @@ const sanitizeStrictNumericToken = (value: unknown): string | null => {
   // Strict numeric format validation.
   const usStyle = /^\d{1,3}(?:,\d{3})*(?:\.\d{1,3})?$/.test(unsigned);
   const euStyle = /^\d{1,3}(?:\.\d{3})*(?:,\d{1,3})?$/.test(unsigned);
+  const indianStyle = /^\d{1,3}(?:,\d{2})+(?:,\d{3})?(?:\.\d{1,3})?$/.test(unsigned);
   const plainStyle = /^\d+(?:[.,]\d{1,3})?$/.test(unsigned);
-  if (!usStyle && !euStyle && !plainStyle) return null;
+  if (!usStyle && !euStyle && !indianStyle && !plainStyle) return null;
 
   const lastDot = unsigned.lastIndexOf('.');
   const lastComma = unsigned.lastIndexOf(',');
@@ -588,8 +593,6 @@ const normalizeOcrTransaction = (raw: Record<string, unknown>): RawTransaction |
     true,
   ) ?? 0;
   const balance = parseStrictOcrNumber(raw.balance ?? raw.bal ?? raw.runningBalance, false);
-
-  if (!Number.isFinite(balance as number)) return null;
   if (debit <= 0 && credit <= 0) {
     const amount = parseStrictOcrNumber(raw.amount, true) ?? 0;
     const typeLower = (normalizedType || '').toLowerCase();
@@ -612,13 +615,16 @@ const normalizeOcrTransaction = (raw: Record<string, unknown>): RawTransaction |
     }
   }
 
+  const hasBalance = Number.isFinite(balance as number);
+  if (!hasBalance) typeTags.push('low_confidence');
+
   return {
     date: normalizedDate,
     description,
     category: pickString(raw.category)?.trim(),
     debit: roundMoney2(debit),
     credit: roundMoney2(credit),
-    balance: roundMoney2(Number(balance)),
+    balance: hasBalance ? roundMoney2(Number(balance)) : undefined,
     amount: parseStrictOcrNumber(raw.amount, true),
     type: typeTags.join('|') || undefined,
     refNumber: cleanedRef,
@@ -774,7 +780,8 @@ const applyRowLevelBalanceValidation = (rows: RawTransaction[]): RawTransaction[
 
 const scoreOcrRowConfidence = (
   row: RawTransaction,
-  previousRow?: RawTransaction,
+  previousRow: RawTransaction | undefined,
+  hasBalanceColumn: boolean,
 ): number => {
   let score = 1.0;
   const description = String(row.description || '').trim();
@@ -784,7 +791,7 @@ const scoreOcrRowConfidence = (
   const lowConfidenceTag = String(row.type || '').toLowerCase().includes('low_confidence');
 
   if (!description || description === OCR_UNREADABLE_DESCRIPTION) score -= 0.45;
-  if (!Number.isFinite(balance)) score -= 0.45;
+  if (hasBalanceColumn && !Number.isFinite(balance)) score -= 0.45;
   if ((debit <= 0 && credit <= 0) || (debit > 0 && credit > 0)) score -= 0.3;
   if (lowConfidenceTag) score -= 0.3;
 
@@ -800,9 +807,10 @@ const scoreOcrRowConfidence = (
 };
 
 const addOcrConfidence = (rows: RawTransaction[]): RawTransaction[] => {
+  const hasBalanceColumn = rows.some((row) => Number.isFinite(Number(row.balance ?? NaN)));
   return rows.map((row, index) => ({
     ...row,
-    confidence: scoreOcrRowConfidence(row, index > 0 ? rows[index - 1] : undefined),
+    confidence: scoreOcrRowConfidence(row, index > 0 ? rows[index - 1] : undefined, hasBalanceColumn),
   }));
 };
 
@@ -876,7 +884,7 @@ export const normalizeOcrRawTransactions = (
     normalizedRows.push(parsed);
   }
 
-  const locked = lockColumnsByBalanceDirection(normalizedRows, options?.strictColumnLock === true);
+  const locked = lockColumnsByBalanceDirection(normalizedRows, options?.strictColumnLock ?? true);
   const validated = applyRowLevelBalanceValidation(locked);
   return addOcrConfidence(validated);
 };
