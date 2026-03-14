@@ -25,6 +25,28 @@ const isCorruptedTranslation = (value: string | undefined): boolean => {
   return false;
 };
 
+const PROTECTED_TERMS: Array<{ term: string; pattern: RegExp }> = [
+  { term: "Banklefy", pattern: /\bbanklefy\b/gi },
+  { term: "Tally", pattern: /\btally\b/gi },
+  { term: "MT940", pattern: /\bmt\s*940\b/gi },
+  { term: "FOIR", pattern: /\bfoir\b/gi },
+  { term: "OCR", pattern: /\bocr\b/gi },
+  { term: "PDF", pattern: /\bpdf\b/gi },
+  { term: "CSV", pattern: /\bcsv\b/gi },
+  { term: "JSON", pattern: /\bjson\b/gi },
+  { term: "Excel", pattern: /\bexcel\b/gi },
+  { term: "AI", pattern: /\bai\b/gi },
+  { term: "UPI", pattern: /\bupi\b/gi },
+  { term: "NEFT", pattern: /\bneft\b/gi },
+  { term: "RTGS", pattern: /\brtgs\b/gi },
+  { term: "IMPS", pattern: /\bimps\b/gi },
+  { term: "API", pattern: /\bapi\b/gi },
+  { term: "XML", pattern: /\bxml\b/gi },
+];
+
+const protectTerms = (value: string): string =>
+  PROTECTED_TERMS.reduce((result, { term, pattern }) => result.replace(pattern, term), value);
+
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<Language>(() => {
     try {
@@ -53,10 +75,10 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const t = (key: string): string => {
     const localized = translations[language][key];
-    if (!isCorruptedTranslation(localized)) return localized;
+    if (!isCorruptedTranslation(localized)) return protectTerms(localized);
 
     const english = translations['en'][key];
-    if (!isCorruptedTranslation(english)) return english;
+    if (!isCorruptedTranslation(english)) return protectTerms(english);
 
     return key;
   };
@@ -77,7 +99,6 @@ export const useLanguage = () => {
 };
 
 export { languageNames };
-
 
 
 
