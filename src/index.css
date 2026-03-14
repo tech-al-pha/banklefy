@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Cantebriggia';
+  src: url('/fonts/cantebriggia.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Deep monochrome SaaS system */
 @layer base {
   :root {

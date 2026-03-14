@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Mail, MapPin, ArrowLeft, ShieldCheck, Zap, Award, MessageCircle, X } from "lucide-react";
+import { Mail, MapPin, ArrowLeft, ShieldCheck, Zap, Award, MessageCircle, X, Linkedin } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -9,7 +9,10 @@ const AboutPage = () => {
   const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-background text-white font-sans selection:bg-primary/30">
+    <div
+      className="min-h-screen bg-background text-white font-sans selection:bg-primary/30"
+      style={{ fontFamily: "'Cantebriggia', serif" }}
+    >
       {/* Header Area */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -24,7 +27,7 @@ const AboutPage = () => {
         </div>
       </nav>
 
-      <main className="container mx-auto px-4 sm:px-6 pt-24 pb-12 sm:pt-28 sm:pb-16 max-w-4xl">
+      <main className="container mx-auto px-4 sm:px-6 pt-24 pb-12 sm:pt-28 sm:pb-16 max-w-5xl">
         {/* About Section - Upgraded with Harvard/Cybersecurity details */}
         <section className="space-y-8 mb-20 animate-in fade-in slide-in-from-bottom-5 duration-700">
           <div className="space-y-2">
@@ -42,7 +45,7 @@ const AboutPage = () => {
             <div className="p-8 bg-gradient-to-r from-primary/10 to-transparent border-l-4 border-primary rounded-r-[2rem] space-y-4">
               <p className="text-white font-medium text-xl not-italic">
                 {t('aboutPage.brainchildPrefix')}{" "}
-                <span className="text-primary underline decoration-2 underline-offset-4">Mr. Faizan Rizvi</span>
+                <span className="text-primary underline decoration-2 underline-offset-4">Faizan Rizvi</span>
               </p>
               <p className="text-muted-foreground">
                 {t('aboutPage.brainchildP1')}
@@ -88,6 +91,21 @@ const AboutPage = () => {
               </div>
             </a>
 
+            <a
+              href="https://www.linkedin.com/in/faizan-rizvi-8589a93a8"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon"
+            >
+              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform">
+                <Linkedin size={24} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">LinkedIn</p>
+                <p className="text-xl font-bold">Faizan Rizvi</p>
+              </div>
+            </a>
+
             <a href="https://x.com/inspirexali" target="_blank" rel="noopener noreferrer" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
               <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><X size={24} /></div>
               <div>
@@ -104,13 +122,18 @@ const AboutPage = () => {
               </div>
             </a>
 
-            <div className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 md:col-span-2">
+            <a
+              href="https://maps.google.com/?q=Prem%20Nagar%2C%20Delhi%2C%20India"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 md:col-span-2 transition-all hover:border-primary hover:shadow-neon"
+            >
               <div className="bg-primary/10 p-4 rounded-full text-primary"><MapPin size={24} /></div>
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.hq')}</p>
                 <p className="text-xl font-bold italic text-white/80 uppercase">{t('aboutPage.contact.hqValue')}</p>
               </div>
-            </div>
+            </a>
           </div>
         </section>
 
