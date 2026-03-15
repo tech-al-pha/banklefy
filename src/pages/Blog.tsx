@@ -5,12 +5,30 @@ import Logo from "@/components/Logo";
 
 const posts = [
   {
-    id: "launch",
-    slug: "/blog/launch",
-    title: "Introducing Banklefy: Bank Statement to Excel in Minutes",
-    date: "Feb 12, 2026",
+    id: "multi-format-export",
+    slug: "/blog/multi-format-export",
+    title: "Multi-Format Export: Excel, CSV, JSON, XML & MT940",
+    date: "Jan 20, 2026",
     excerpt:
-      "Banklefy converts bank statements into clean spreadsheets with AI OCR, built for speed, accuracy, and secure processing.",
+      "Export bank statements to five formats from a single upload — Excel, CSV, JSON, XML, and MT940 for ERP and treasury systems.",
+    cta: "Read more",
+  },
+  {
+    id: "bulk-conversion",
+    slug: "/blog/bulk-conversion",
+    title: "Bulk Bank Statement Conversion: Process Multiple Files at Once",
+    date: "Jan 28, 2026",
+    excerpt:
+      "Upload and convert multiple bank statements in one session. Text PDFs parse instantly, scanned files use selective AI OCR.",
+    cta: "Read more",
+  },
+  {
+    id: "privacy",
+    slug: "/blog/privacy",
+    title: "Privacy by Default: Session-Based Access and Secure Handling",
+    date: "Feb 7, 2026",
+    excerpt:
+      "A short overview of how Banklefy stores files temporarily for download and protects sensitive financial data.",
     cta: "Read more",
   },
   {
@@ -23,12 +41,30 @@ const posts = [
     cta: "Read more",
   },
   {
-    id: "privacy",
-    slug: "/blog/privacy",
-    title: "Privacy by Default: Session-Based Access and Secure Handling",
-    date: "Feb 7, 2026",
+    id: "launch",
+    slug: "/blog/launch",
+    title: "Introducing Banklefy: Bank Statement to Excel in Minutes",
+    date: "Feb 12, 2026",
     excerpt:
-      "A short overview of how Banklefy stores files temporarily for download and protects sensitive financial data.",
+      "Banklefy converts bank statements into clean spreadsheets with AI OCR, built for speed, accuracy, and secure processing.",
+    cta: "Read more",
+  },
+  {
+    id: "underwriting",
+    slug: "/blog/underwriting",
+    title: "AI-Powered Underwriting & Risk Analysis from Bank Statements",
+    date: "Feb 20, 2026",
+    excerpt:
+      "Get ADB, FOIR score, net cashflow, and balance dip analysis automatically from any converted bank statement.",
+    cta: "Read more",
+  },
+  {
+    id: "fraud-detection",
+    slug: "/blog/fraud-detection",
+    title: "Detecting Tampered Bank Statements with AI-Driven Fraud Alerts",
+    date: "Mar 1, 2026",
+    excerpt:
+      "Automated checks for balance continuity, duplicate entries, and formatting inconsistencies flag tampered statements early.",
     cta: "Read more",
   },
 ];
@@ -73,7 +109,7 @@ const Blog = () => {
           </div>
         </section>
 
-        <section className="grid gap-6 md:grid-cols-3">
+        <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {posts.map((post) => (
             <article
               key={post.id}
@@ -86,7 +122,7 @@ const Blog = () => {
               <p className="text-sm text-muted-foreground">{post.excerpt}</p>
               <Button
                 variant="outline"
-                className="border-primary/40 text-foreground w-fit"
+                className="border-primary/40 text-foreground w-fit mt-auto"
                 onClick={() => navigate(post.slug)}
               >
                 {post.cta}
