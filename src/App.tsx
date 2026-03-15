@@ -367,6 +367,10 @@ const AppRoutes = () => {
           <Route path="/blog/launch" element={<BlogLaunch />} />
           <Route path="/blog/accuracy" element={<BlogAccuracy />} />
           <Route path="/blog/privacy" element={<BlogPrivacy />} />
+          <Route path="/blog/multi-format-export" element={<BlogMultiFormat />} />
+          <Route path="/blog/bulk-conversion" element={<BlogBulk />} />
+          <Route path="/blog/underwriting" element={<BlogUnderwriting />} />
+          <Route path="/blog/fraud-detection" element={<BlogFraudDetection />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
