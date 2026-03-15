@@ -25,15 +25,15 @@ export const resolveEffectivePlanType = (
     normalizedPlan.startsWith("yearly")
   ) {
     if (normalizedPlan === "free" && limit !== null) {
-      if (limit === 10) return "per_page_lite";
-      if (limit === 25) return "per_page_standard";
-      if (limit === 50) return "per_page_power";
-      if (limit === 300) return "monthly_basic";
-      if (limit === 1000) return "monthly_pro";
-      if (limit === 4500) return "monthly_enterprise";
-      if (limit === 5000) return "yearly_lite";
-      if (limit === 15000) return "yearly_full";
-      if (limit === 65000) return "yearly_pro";
+      if (limit >= 65000) return "yearly_pro";
+      if (limit >= 15000) return "yearly_full";
+      if (limit >= 5000) return "yearly_lite";
+      if (limit >= 4500) return "monthly_enterprise";
+      if (limit >= 1000) return "monthly_pro";
+      if (limit >= 300) return "monthly_basic";
+      if (limit >= 50) return "per_page_power";
+      if (limit >= 25) return "per_page_standard";
+      if (limit >= 10) return "per_page_lite";
     }
     return normalizedPlan;
   }
