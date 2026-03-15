@@ -187,13 +187,6 @@ export const featureItems: FeatureItem[] = [
     descriptionKey: "featuresPage.items.batchProcessing.desc",
     categoryId: "performance",
   },
-  {
-    id: "chat_aura",
-    icon: MessageCircle,
-    titleKey: "featuresPage.items.chatAura.title",
-    descriptionKey: "featuresPage.items.chatAura.desc",
-    categoryId: "assistant",
-  },
 
   // Security & Privacy
   {
