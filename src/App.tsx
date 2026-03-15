@@ -138,6 +138,14 @@ const META_BY_PATH: Record<string, RouteMeta> = {
     title: "Detecting Tampered Bank Statements with AI Fraud Alerts | Banklefy",
     description: "Automated fraud detection flags balance discontinuity, duplicate entries, and formatting inconsistencies in bank statements.",
   },
+  "/blog/multi-language": {
+    title: "Multi-Language Support: Use Banklefy in Your Preferred Language",
+    description: "Banklefy supports Hindi, Marathi, Tamil, Telugu, and more for accessible bank statement conversion across India.",
+  },
+  "/blog/password-pdf": {
+    title: "Convert Password-Protected Bank Statement PDFs | Banklefy",
+    description: "Upload locked bank statement PDFs, enter the password, and convert to Excel or CSV in one step.",
+  },
 };
 
 const NO_INDEX_PREFIXES = ["/dashboard", "/settings", "/profile", "/auth", "/chat"];
