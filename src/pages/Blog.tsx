@@ -5,6 +5,24 @@ import Logo from "@/components/Logo";
 
 const posts = [
   {
+    id: "multi-language",
+    slug: "/blog/multi-language",
+    title: "Multi-Language Support: Use Banklefy in Your Preferred Language",
+    date: "Nov 15, 2025",
+    excerpt:
+      "Banklefy now supports Hindi, Marathi, Tamil, Telugu, and more — making bank statement conversion accessible across India.",
+    cta: "Read more",
+  },
+  {
+    id: "password-pdf",
+    slug: "/blog/password-pdf",
+    title: "Convert Password-Protected Bank Statement PDFs with Ease",
+    date: "Dec 5, 2025",
+    excerpt:
+      "Upload locked PDFs directly, enter the password, and convert in one step — no manual unlocking needed.",
+    cta: "Read more",
+  },
+  {
     id: "multi-format-export",
     slug: "/blog/multi-format-export",
     title: "Multi-Format Export: Excel, CSV, JSON, XML & MT940",

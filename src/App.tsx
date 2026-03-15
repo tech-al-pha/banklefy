@@ -34,6 +34,8 @@ const BlogMultiFormat = lazyWithRetry(() => import("./pages/blog/MultiFormatExpo
 const BlogBulk = lazyWithRetry(() => import("./pages/blog/BulkConversionPost"));
 const BlogUnderwriting = lazyWithRetry(() => import("./pages/blog/UnderwritingPost"));
 const BlogFraudDetection = lazyWithRetry(() => import("./pages/blog/FraudDetectionPost"));
+const BlogMultiLanguage = lazyWithRetry(() => import("./pages/blog/MultiLanguagePost"));
+const BlogPasswordPdf = lazyWithRetry(() => import("./pages/blog/PasswordPdfPost"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -135,6 +137,14 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   "/blog/fraud-detection": {
     title: "Detecting Tampered Bank Statements with AI Fraud Alerts | Banklefy",
     description: "Automated fraud detection flags balance discontinuity, duplicate entries, and formatting inconsistencies in bank statements.",
+  },
+  "/blog/multi-language": {
+    title: "Multi-Language Support: Use Banklefy in Your Preferred Language",
+    description: "Banklefy supports Hindi, Marathi, Tamil, Telugu, and more for accessible bank statement conversion across India.",
+  },
+  "/blog/password-pdf": {
+    title: "Convert Password-Protected Bank Statement PDFs | Banklefy",
+    description: "Upload locked bank statement PDFs, enter the password, and convert to Excel or CSV in one step.",
   },
 };
 
@@ -371,6 +381,8 @@ const AppRoutes = () => {
           <Route path="/blog/bulk-conversion" element={<BlogBulk />} />
           <Route path="/blog/underwriting" element={<BlogUnderwriting />} />
           <Route path="/blog/fraud-detection" element={<BlogFraudDetection />} />
+          <Route path="/blog/multi-language" element={<BlogMultiLanguage />} />
+          <Route path="/blog/password-pdf" element={<BlogPasswordPdf />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
