@@ -46,7 +46,7 @@ const benefits: Benefit[] = [
   {
     icon: Lock,
     title: "Privacy First",
-    description: "Your data stays yours. Files are stored temporarily for processing and download.",
+    description: "Your data stays yours. Files are processed securely and not kept after conversion.",
     category: "Security",
   },
   {
@@ -76,7 +76,7 @@ const benefits: Benefit[] = [
   {
     icon: FileText,
     title: "Multiple Format Support",
-    description: "Download results in JSON, MT940, Excel, or CSV format for seamless integration.",
+    description: "Excel-first exports with CSV, JSON, and MT940 available based on your plan.",
     category: "Flexibility",
   },
   {
