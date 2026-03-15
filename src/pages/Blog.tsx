@@ -6,6 +6,7 @@ import Logo from "@/components/Logo";
 const posts = [
   {
     id: "launch",
+    slug: "/blog/launch",
     title: "Introducing Banklefy: Bank Statement to Excel in Minutes",
     date: "Feb 12, 2026",
     excerpt:
@@ -14,6 +15,7 @@ const posts = [
   },
   {
     id: "accuracy",
+    slug: "/blog/accuracy",
     title: "How We Improve OCR Accuracy on Low-Quality Scans",
     date: "Feb 10, 2026",
     excerpt:
@@ -22,6 +24,7 @@ const posts = [
   },
   {
     id: "privacy",
+    slug: "/blog/privacy",
     title: "Privacy by Default: Session-Based Access and Secure Handling",
     date: "Feb 7, 2026",
     excerpt:
@@ -84,7 +87,7 @@ const Blog = () => {
               <Button
                 variant="outline"
                 className="border-primary/40 text-foreground w-fit"
-                onClick={() => navigate("/features")}
+                onClick={() => navigate(post.slug)}
               >
                 {post.cta}
               </Button>

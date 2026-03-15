@@ -27,6 +27,9 @@ const SampleReport = lazyWithRetry(() => import("./pages/SampleReport"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const Help = lazyWithRetry(() => import("./pages/Help"));
 const Blog = lazyWithRetry(() => import("./pages/Blog"));
+const BlogLaunch = lazyWithRetry(() => import("./pages/blog/LaunchPost"));
+const BlogAccuracy = lazyWithRetry(() => import("./pages/blog/AccuracyPost"));
+const BlogPrivacy = lazyWithRetry(() => import("./pages/blog/PrivacyPost"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -100,6 +103,18 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   "/blog": {
     title: "Blog | Banklefy",
     description: "Product updates, tutorials, and announcements from Banklefy.",
+  },
+  "/blog/launch": {
+    title: "Introducing Banklefy: Bank Statement to Excel in Minutes",
+    description: "Meet Banklefy and see how it speeds up statement conversion with secure processing.",
+  },
+  "/blog/accuracy": {
+    title: "How We Improve OCR Accuracy on Low-Quality Scans",
+    description: "Learn the OCR safeguards and scanning tips that improve bank statement accuracy.",
+  },
+  "/blog/privacy": {
+    title: "Privacy by Default: Session-Based Access and Secure Handling",
+    description: "How Banklefy handles statement access, downloads, and privacy.",
   },
 };
 
@@ -329,6 +344,9 @@ const AppRoutes = () => {
           <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/help" element={<Help />} />
           <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/launch" element={<BlogLaunch />} />
+          <Route path="/blog/accuracy" element={<BlogAccuracy />} />
+          <Route path="/blog/privacy" element={<BlogPrivacy />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
