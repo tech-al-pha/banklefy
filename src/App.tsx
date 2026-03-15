@@ -120,6 +120,22 @@ const META_BY_PATH: Record<string, RouteMeta> = {
     title: "Privacy by Default: Session-Based Access and Secure Handling",
     description: "How Banklefy handles statement access, downloads, and privacy.",
   },
+  "/blog/multi-format-export": {
+    title: "Multi-Format Export: Excel, CSV, JSON, XML & MT940 | Banklefy",
+    description: "Export bank statements to Excel, CSV, JSON, XML, and MT940 from a single upload for ERP and treasury systems.",
+  },
+  "/blog/bulk-conversion": {
+    title: "Bulk Bank Statement Conversion: Multiple Files at Once | Banklefy",
+    description: "Upload and convert multiple bank statements in one session with parallel processing and selective AI OCR.",
+  },
+  "/blog/underwriting": {
+    title: "AI-Powered Underwriting & Risk Analysis from Bank Statements | Banklefy",
+    description: "Get ADB, FOIR score, net cashflow, and balance dip analysis automatically from converted bank statements.",
+  },
+  "/blog/fraud-detection": {
+    title: "Detecting Tampered Bank Statements with AI Fraud Alerts | Banklefy",
+    description: "Automated fraud detection flags balance discontinuity, duplicate entries, and formatting inconsistencies in bank statements.",
+  },
 };
 
 const NO_INDEX_PREFIXES = ["/dashboard", "/settings", "/profile", "/auth", "/chat"];
