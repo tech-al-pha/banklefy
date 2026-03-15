@@ -41,7 +41,7 @@ const SupportContactDialog = ({ trigger, defaultSubject, source }: SupportContac
         source: source ?? window.location.pathname,
       };
 
-      const { error } = await supabase.from("support_requests").insert(payload);
+      const { error } = await supabase.from("support_requests" as never).insert(payload as never);
       if (error) throw error;
 
       toast({
