@@ -4,6 +4,7 @@ import { useRequireAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { useSettings } from "@/hooks/useSettings";
+import { formatPlanLabel } from "@/lib/planLabels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -56,7 +57,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { toast } = useToast();
-  const { conversionsUsed, conversionsLimit, remaining, isAuthenticated } = useUsageLimit();
+  const { conversionsUsed, conversionsLimit, remaining, isAuthenticated, planType } = useUsageLimit();
   const {
     settings,
     loading: settingsLoading,
@@ -94,7 +95,7 @@ const Settings = () => {
           </div>
           <div className="h-12 w-px bg-border" />
           <div className="text-right">
-            <p className="text-2xl font-bold text-green-500">{remaining}</p>
+            <p className="text-2xl font-bold text-emerald-400">{remaining}</p>
             <p className="text-xs text-muted-foreground">{t('settings.usage.remaining')}</p>
           </div>
         </div>
@@ -109,7 +110,7 @@ const Settings = () => {
       component: (
         <div className="flex items-center gap-3">
           <Badge className="bg-primary/20 text-primary border-primary/30">
-            {isAuthenticated ? t('settings.usage.freeTier') : t('settings.usage.anonymous')}
+            {isAuthenticated ? formatPlanLabel(planType ?? "free") : t('settings.usage.anonymous')}
           </Badge>
           <Button 
             variant="outline" 
@@ -123,19 +124,6 @@ const Settings = () => {
       )
     },
     // Appearance
-    {
-      id: "appearance-theme",
-      title: t('settings.appearance.theme'),
-      description: t('settings.appearance.themeDesc'),
-      category: "appearance",
-      icon: <Palette className="h-5 w-5" />,
-      component: (
-        <Switch
-          checked={settings.darkMode}
-          onCheckedChange={(value) => updateSetting('darkMode', value)}
-        />
-      )
-    },
     {
       id: "appearance-language",
       title: t('settings.appearance.language'),
@@ -234,6 +222,7 @@ const Settings = () => {
     conversionsLimit,
     remaining,
     isAuthenticated,
+    planType,
     saving,
     settings,
     t,
