@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/contexts/LanguageContext";
+import SupportContactDialog from "@/components/SupportContactDialog";
 
 const Privacy = () => {
   const navigate = useNavigate();
@@ -153,20 +154,26 @@ const Privacy = () => {
           <p className="text-muted-foreground max-w-2xl mx-auto">
             {t('privacyPage.contactDescPrefix')}
           </p>
-          <Button
-            size="lg"
-            className="bg-primary text-primary-foreground shadow-neon"
-            asChild
-          >
-            <a href="mailto:inspirexali@gmail.com">Contact Support</a>
-          </Button>
-          <Button
-            size="lg"
-            className="back-pill"
-            onClick={() => navigate('/')}
-          >
-            {t('common.backToHome')}
-          </Button>
+          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <SupportContactDialog
+              source="privacy_page"
+              trigger={
+                <Button
+                  size="lg"
+                  className="bg-primary text-primary-foreground shadow-neon"
+                >
+                  Contact Support
+                </Button>
+              }
+            />
+            <Button
+              size="lg"
+              className="back-pill"
+              onClick={() => navigate('/')}
+            >
+              {t('common.backToHome')}
+            </Button>
+          </div>
         </div>
       </section>
 

@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/contexts/LanguageContext";
+import SupportContactDialog from "@/components/SupportContactDialog";
 
 const Help = () => {
   const navigate = useNavigate();
@@ -345,12 +346,14 @@ const Help = () => {
               </p>
             </div>
           </div>
-          <Button
-            className="bg-primary text-primary-foreground shadow-neon"
-            asChild
-          >
-            <a href="mailto:inspirexali@gmail.com">{t("helpPage.cta.contact")}</a>
-          </Button>
+          <SupportContactDialog
+            source="help_page"
+            trigger={
+              <Button className="bg-primary text-primary-foreground shadow-neon">
+                {t("helpPage.cta.contact")}
+              </Button>
+            }
+          />
         </section>
       </main>
     </div>

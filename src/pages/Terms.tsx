@@ -2,6 +2,7 @@
 import { Shield, ArrowLeft, FileText, CheckCircle, AlertCircle, Scale, Zap, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Logo from "@/components/Logo";
+import SupportContactDialog from "@/components/SupportContactDialog";
 
 const Terms = () => {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ const Terms = () => {
     {
       icon: Heart,
       title: "Your Content & License",
-      content: "You retain ownership of your files. You grant us a limited license to process, store, and transmit your files and results solely to provide and support the service. Download access is provided during your active session.",
+      content: "You retain ownership of your files. You grant us a limited license to process, store, and transmit your files and results solely to provide and support the service. Download access remains available while your session is active and while your files remain in your account.",
     },
     {
       icon: AlertCircle,
@@ -40,7 +41,7 @@ const Terms = () => {
     {
       icon: AlertCircle,
       title: "Refunds & Abuse Prevention",
-      content: "Approved refunds are processed within 14 days. Refunds are not available if 35% or more of the plan usage has been consumed. Repeated refund requests may result in IP blocking to prevent abuse.",
+      content: "Eligible refunds are processed within 14 days, subject to usage-based eligibility and review. Excessive or abusive refund requests may lead to account restrictions to protect the platform.",
     },
     {
       icon: Shield,
@@ -102,7 +103,10 @@ const Terms = () => {
             Please read these terms and conditions carefully before using Banklefy.
           </p>
           <p className="text-sm text-muted-foreground">
-            Last updated: February 7, 2026
+            Please review our <Button variant="link" className="px-1 text-primary" onClick={() => navigate('/privacy')}>Privacy Policy</Button>.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Last updated: March 15, 2026
           </p>
         </div>
       </section>
@@ -141,13 +145,17 @@ const Terms = () => {
           <p className="text-muted-foreground max-w-2xl mx-auto">
             If you have any questions about our Terms of Service, please contact support.
           </p>
-          <Button
-            size="lg"
-            className="bg-primary text-primary-foreground shadow-neon"
-            asChild
-          >
-            <a href="mailto:inspirexali@gmail.com">Contact Support</a>
-          </Button>
+          <SupportContactDialog
+            source="terms_page"
+            trigger={
+              <Button
+                size="lg"
+                className="bg-primary text-primary-foreground shadow-neon"
+              >
+                Contact Support
+              </Button>
+            }
+          />
           <Button
             size="lg"
             className="back-pill"

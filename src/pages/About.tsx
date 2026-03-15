@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Mail, MapPin, ArrowLeft, ShieldCheck, Zap, Award, MessageCircle, X, Linkedin } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/contexts/LanguageContext";
+import SupportContactDialog from "@/components/SupportContactDialog";
 
 const AboutPage = () => {
   const navigate = useNavigate();
@@ -114,13 +115,20 @@ const AboutPage = () => {
               </div>
             </a>
 
-            <a href="mailto:banklefy@gmail.com" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
-              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><Mail size={24} /></div>
-              <div>
-                <p className="text-xs font-normal text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.mail')}</p>
-                <p className="text-xl font-normal">banklefy@gmail.com</p>
-              </div>
-            </a>
+            <SupportContactDialog
+              source="about_page"
+              trigger={
+                <div className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon cursor-pointer">
+                  <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform">
+                    <Mail size={24} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-normal text-muted-foreground uppercase tracking-widest">{t('aboutPage.contact.mail')}</p>
+                    <p className="text-xl font-normal">Contact Support</p>
+                  </div>
+                </div>
+              }
+            />
 
             <a
               href="https://maps.google.com/?q=Prem%20Nagar%2C%20Delhi%2C%20India"

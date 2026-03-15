@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { BadgeDollarSign, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import SupportContactDialog from "@/components/SupportContactDialog";
 
 const PURCHASE_TOAST_STORAGE_KEY = "banklefy:last-plan-purchase";
 const RAZORPAY_CHECKOUT_URL = "https://checkout.razorpay.com/v1/checkout.js";
@@ -447,10 +448,7 @@ const PricingPage = () => {
                 <span className="text-muted-foreground font-medium">{plan.unit}</span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              ~₹{plan.amountInRupee.toLocaleString("en-IN")} INR
-            </p>
-          </div>
+            </div>
 
           {plan.statements && (
             <div className="py-3 px-4 bg-primary/10 border border-primary/20 rounded-lg">
@@ -571,16 +569,15 @@ const PricingPage = () => {
                 of the plan usage has been consumed. Repeated refund requests may result in
                 IP blocking to prevent abuse. Email support with your order ID to start the refund.
               </p>
-              <Button
-                className="mt-4 bg-primary text-primary-foreground shadow-neon"
-                asChild
-              >
-                <a
-                  href="mailto:inspirexali@gmail.com?subject=Banklefy%20Refund%20Request&body=Please%20include%3A%0A1)%20Order%20ID%0A2)%20Email%20used%20for%20payment%0A3)%20Plan%20name%20and%20date%0A4)%20Reason%20(optional)"
-                >
-                  Request Refund by Email
-                </a>
-              </Button>
+              <SupportContactDialog
+                source="pricing_refund"
+                defaultSubject="Refund Request"
+                trigger={
+                  <Button className="mt-4 bg-primary text-primary-foreground shadow-neon">
+                    Request Refund
+                  </Button>
+                }
+              />
             </div>
           </div>
         </section>
@@ -595,20 +592,19 @@ const PricingPage = () => {
             </div>
           </div>
           <br />
-          <Button
-            asChild
-            variant="outline"
-            size="lg"
-            className="border-primary/40 text-white backdrop-blur-lg px-10 h-14 font-black uppercase tracking-widest"
-          >
-            <a
-              href="https://mail.google.com/mail/?view=cm&fs=1&to=inspirexali@gmail.com&su=Banklefy%20Enterprise%20Pricing"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Contact Sales
-            </a>
-          </Button>
+          <SupportContactDialog
+            source="pricing_enterprise"
+            defaultSubject="Enterprise Pricing"
+            trigger={
+              <Button
+                variant="outline"
+                size="lg"
+                className="border-primary/40 text-white backdrop-blur-lg px-10 h-14 font-black uppercase tracking-widest"
+              >
+                Contact Sales
+              </Button>
+            }
+          />
         </section>
       </main>
     </div>
@@ -616,3 +612,4 @@ const PricingPage = () => {
 };
 
 export default PricingPage;
+
