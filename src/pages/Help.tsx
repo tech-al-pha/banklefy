@@ -184,10 +184,10 @@ const Help = () => {
       icon: Clock,
       title: "Daily Limits and Usage",
       items: [
-        "Anonymous users get 2 pages per day.",
-        "Signed-in users get 5 pages per day.",
+        "Daily limits depend on your plan and are shown in your dashboard.",
+        "Guest sessions have lower limits than signed-in accounts.",
         "Paid plans increase your limits based on the plan.",
-        "Free and anonymous limits reset at midnight in your local time zone. Paid plans reset with their billing cycle.",
+        "Limits reset based on your plan cycle and local time zone.",
         "If you need more, upgrade on the Pricing page.",
       ],
     },
@@ -233,7 +233,7 @@ const Help = () => {
       title: "Chat Aura",
       items: [
         "Ask questions about your statement and get quick insights.",
-        "Guests get 1 chat interaction per session. Sign in for more.",
+        "Chat Aura access depends on your plan. Locked items can be unlocked by upgrading.",
         "Best results when a statement is uploaded first.",
         "If responses look off, re-check the statement quality.",
         "Use specific questions like totals, categories, or unusual debits.",
@@ -266,7 +266,7 @@ const Help = () => {
       icon: LifeBuoy,
       title: "Contact Support",
       items: [
-        "Email support for account, billing, or conversion issues.",
+        "Use the Contact Support button to reach us for account, billing, or conversion issues.",
         "Include your order ID and file name when possible.",
         "Describe the issue and attach a screenshot if relevant.",
         "We reply as quickly as possible during business hours.",

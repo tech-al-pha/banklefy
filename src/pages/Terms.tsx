@@ -21,7 +21,7 @@ const Terms = () => {
     {
       icon: Heart,
       title: "Your Content & License",
-      content: "You retain ownership of your files. You grant us a limited license to process, store, and transmit your files and results solely to provide and support the service. Download access remains available while your session is active and while your files remain in your account.",
+      content: "You retain ownership of your files. You grant us a limited license to process, store, and transmit your files and results solely to provide and support the service. Download access is available during your active session and while download links are displayed; files may be removed after processing or when the session ends.",
     },
     {
       icon: AlertCircle,
