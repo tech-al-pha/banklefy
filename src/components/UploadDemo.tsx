@@ -1563,6 +1563,24 @@ export const UploadDemo = () => {
       });
       setSingleDownloadFileName(buildExcelDownloadName(data?.bankInfo?.bankName, fileToConvert.name));
 
+      if (settings.autoDownload && data?.outputMode !== "tally_only") {
+        try {
+          const autoDownloadName = buildExcelDownloadName(data?.bankInfo?.bankName, fileToConvert.name);
+          await downloadExcelFromPayload(
+            { excelData: data.excelData, resultPath: data.resultPath ?? null },
+            autoDownloadName,
+            { silent: true },
+          );
+        } catch (autoDownloadError: unknown) {
+          console.error('Auto-download failed:', autoDownloadError);
+          toast({
+            variant: "destructive",
+            title: "Auto-download failed",
+            description: getErrorMessage(autoDownloadError, "Could not auto-download the Excel file."),
+          });
+        }
+      }
+
       if (data?.transactions && Array.isArray(data.transactions)) {
         setTransactions(data.transactions);
       }
@@ -2088,47 +2106,58 @@ Analytics Summary:
     }
   };
 
+  const downloadExcelFromPayload = async (
+    payload: { excelData?: string | null; resultPath?: string | null },
+    fileName: string,
+    options?: { silent?: boolean },
+  ) => {
+    const silent = options?.silent ?? false;
+    let blob: Blob;
+
+    if (payload.excelData) {
+      // Anonymous user - convert base64 to blob
+      const binaryString = atob(payload.excelData);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    } else if (payload.resultPath && user) {
+      // Authenticated user - download from storage
+      const { data, error } = await supabase.storage
+        .from('bank-statements')
+        .download(payload.resultPath);
+
+      if (error) throw error;
+      blob = data;
+    } else {
+      throw new Error('No download available');
+    }
+
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    if (!silent) {
+      toast({
+        title: "Downloaded!",
+        description: "Your Excel file has been downloaded.",
+      });
+    }
+  };
+
   const handleDownload = async () => {
     if (!conversionResult) return;
 
     setDownloading(true);
     try {
-      let blob: Blob;
-
-      if (conversionResult.excelData) {
-        // Anonymous user - convert base64 to blob
-        const binaryString = atob(conversionResult.excelData);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      } else if (conversionResult.resultPath && user) {
-        // Authenticated user - download from storage
-        const { data, error } = await supabase.storage
-          .from('bank-statements')
-          .download(conversionResult.resultPath);
-
-        if (error) throw error;
-        blob = data;
-      } else {
-        throw new Error('No download available');
-      }
-
-      // Create download link
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = singleDownloadFileName;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Downloaded!",
-        description: "Your Excel file has been downloaded.",
-      });
+      await downloadExcelFromPayload(conversionResult, singleDownloadFileName);
     } catch (error: unknown) {
       console.error('Download error:', error);
       toast({
