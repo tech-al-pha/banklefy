@@ -381,6 +381,8 @@ const AppRoutes = () => {
           <Route path="/blog/bulk-conversion" element={<BlogBulk />} />
           <Route path="/blog/underwriting" element={<BlogUnderwriting />} />
           <Route path="/blog/fraud-detection" element={<BlogFraudDetection />} />
+          <Route path="/blog/multi-language" element={<BlogMultiLanguage />} />
+          <Route path="/blog/password-pdf" element={<BlogPasswordPdf />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
