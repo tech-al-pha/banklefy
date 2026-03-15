@@ -30,6 +30,10 @@ const Blog = lazyWithRetry(() => import("./pages/Blog"));
 const BlogLaunch = lazyWithRetry(() => import("./pages/blog/LaunchPost"));
 const BlogAccuracy = lazyWithRetry(() => import("./pages/blog/AccuracyPost"));
 const BlogPrivacy = lazyWithRetry(() => import("./pages/blog/PrivacyPost"));
+const BlogMultiFormat = lazyWithRetry(() => import("./pages/blog/MultiFormatExportPost"));
+const BlogBulk = lazyWithRetry(() => import("./pages/blog/BulkConversionPost"));
+const BlogUnderwriting = lazyWithRetry(() => import("./pages/blog/UnderwritingPost"));
+const BlogFraudDetection = lazyWithRetry(() => import("./pages/blog/FraudDetectionPost"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
