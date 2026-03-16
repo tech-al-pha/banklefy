@@ -11,6 +11,8 @@ export interface UserSettings {
   autoDownload: boolean;
   premiumExcelExport: boolean; // Toggle for Premium vs Simple Excel
   editedPdfWarningTiming: "upload" | "convert";
+  defaultExportFormat: "xlsx" | "csv";
+  defaultDateFormat: "DD/MM/YYYY" | "MM/DD/YYYY" | "YYYY-MM-DD";
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -21,6 +23,8 @@ const DEFAULT_SETTINGS: UserSettings = {
   autoDownload: false,
   premiumExcelExport: true, // Default to premium
   editedPdfWarningTiming: "convert",
+  defaultExportFormat: "xlsx",
+  defaultDateFormat: "DD/MM/YYYY",
 };
 
 const STORAGE_KEY = 'banklefy_user_settings';
@@ -37,7 +41,7 @@ export const useSettings = () => {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profileData, setProfileData] = useState<{ full_name: string | null } | null>(null);
+  const [profileData, setProfileData] = useState<{ full_name: string | null; avatar_url?: string | null } | null>(null);
 
   // Load settings from localStorage and profile from Supabase
   useEffect(() => {
@@ -54,7 +58,7 @@ export const useSettings = () => {
         if (user) {
           const { data: profile, error } = await supabase
             .from('profiles')
-            .select('full_name')
+            .select('full_name, avatar_url')
             .eq('id', user.id)
             .maybeSingle();
 
