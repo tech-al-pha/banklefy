@@ -215,7 +215,7 @@ const Profile = () => {
   const memberSince = user?.created_at ? format(new Date(user.created_at), "MMM d, yyyy") : "—";
   const planLabel = formatPlanLabel(planType);
   const displayNameFallback = profileData?.full_name || user?.user_metadata?.full_name || "Member";
-  const userEmailFallback = user?.email ?? "â€”";
+  const userEmailFallback = user?.email ?? "-";
 
   const sanitizeFileBaseName = (value?: string | null, fallback = "bank-statement") => {
     const source = (value ?? "").trim();
