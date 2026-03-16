@@ -2,14 +2,11 @@ import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRequireAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { useSettings } from "@/hooks/useSettings";
-import { formatPlanLabel } from "@/lib/planLabels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import Logo from "@/components/Logo";
 import { LanguageSelector } from "@/components/LanguageSelector";
@@ -28,7 +25,6 @@ import {
   Search,
   Shield,
   HelpCircle,
-  FileText,
   BarChart3,
   Settings as SettingsIcon,
   Eye,
@@ -57,7 +53,6 @@ const Settings = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { toast } = useToast();
-  const { conversionsUsed, conversionsLimit, remaining, isAuthenticated, planType } = useUsageLimit();
   const {
     settings,
     loading: settingsLoading,
@@ -80,49 +75,6 @@ const Settings = () => {
   }, [deleteAccount]);
 
   const settingItems: SettingItem[] = useMemo(() => [
-    // Usage & Billing
-    {
-      id: "usage-stats",
-      title: t('settings.usage.stats'),
-      description: t('settings.usage.statsDesc'),
-      category: "usage",
-      icon: <BarChart3 className="h-5 w-5" />,
-      component: (
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-2xl font-bold text-primary">{conversionsUsed}/{conversionsLimit}</p>
-            <p className="text-xs text-muted-foreground">{t('settings.usage.conversionsToday')}</p>
-          </div>
-          <div className="h-12 w-px bg-border" />
-          <div className="text-right">
-            <p className="text-2xl font-bold text-emerald-400">{remaining}</p>
-            <p className="text-xs text-muted-foreground">{t('settings.usage.remaining')}</p>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: "usage-subscription",
-      title: t('settings.usage.subscription'),
-      description: t('settings.usage.subscriptionDesc'),
-      category: "usage",
-      icon: <FileText className="h-5 w-5" />,
-      component: (
-        <div className="flex items-center gap-3">
-          <Badge className="bg-primary/20 text-primary border-primary/30">
-            {isAuthenticated ? formatPlanLabel(planType ?? "free") : t('settings.usage.anonymous')}
-          </Badge>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="border-primary/50 text-primary"
-            onClick={() => navigate('/pricing')}
-          >
-            {t('settings.usage.upgrade')}
-          </Button>
-        </div>
-      )
-    },
     // Appearance
     {
       id: "appearance-language",
@@ -147,6 +99,31 @@ const Settings = () => {
       )
     },
     // Privacy & Security
+    {
+      id: "privacy-edited-warning",
+      title: "Edited PDF Warning Timing",
+      description: "Choose when the edited-PDF warning should appear.",
+      category: "privacy",
+      icon: <Eye className="h-5 w-5" />,
+      component: (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant={settings.editedPdfWarningTiming === "upload" ? "default" : "outline"}
+            onClick={() => updateSetting("editedPdfWarningTiming", "upload")}
+          >
+            After Upload
+          </Button>
+          <Button
+            size="sm"
+            variant={settings.editedPdfWarningTiming === "convert" ? "default" : "outline"}
+            onClick={() => updateSetting("editedPdfWarningTiming", "convert")}
+          >
+            On Convert
+          </Button>
+        </div>
+      )
+    },
     {
       id: "privacy-visibility",
       title: t('settings.privacy.visibility'),
@@ -218,11 +195,6 @@ const Settings = () => {
       )
     },
   ], [
-    conversionsUsed,
-    conversionsLimit,
-    remaining,
-    isAuthenticated,
-    planType,
     saving,
     settings,
     t,
@@ -235,7 +207,6 @@ const Settings = () => {
 
   const categories = [
     { id: "all", label: t('settings.categories.all'), icon: <SettingsIcon className="h-4 w-4" /> },
-    { id: "usage", label: t('settings.categories.usage'), icon: <BarChart3 className="h-4 w-4" /> },
     { id: "appearance", label: t('settings.categories.appearance'), icon: <Palette className="h-4 w-4" /> },
     { id: "privacy", label: t('settings.categories.privacy'), icon: <Shield className="h-4 w-4" /> },
     { id: "advanced", label: t('settings.categories.advanced'), icon: <SlidersHorizontal className="h-4 w-4" /> },
