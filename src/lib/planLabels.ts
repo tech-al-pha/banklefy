@@ -6,9 +6,9 @@ const normalizePlanType = (planType?: string): string => {
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
   unlimited: 'Unlimited',
-  per_page_lite: 'Lite (One-time)',
-  per_page_standard: 'Standard (One-time)',
-  per_page_power: 'Power (One-time)',
+  per_page_lite: 'Starter Pack',
+  per_page_standard: 'Basic Pack',
+  per_page_power: 'Pro Pack',
   monthly_basic: 'Monthly Basic',
   monthly_pro: 'Monthly Pro',
   monthly_enterprise: 'Monthly Enterprise',

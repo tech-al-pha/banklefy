@@ -13,7 +13,7 @@ const RAZORPAY_CHECKOUT_URL = "https://checkout.razorpay.com/v1/checkout.js";
 
 type Plan = {
   planId: string;
-  category: "perPage" | "monthly" | "yearly";
+  category: "perPage";
   name: string;
   price: string;
   amountInRupee: number;
@@ -26,137 +26,29 @@ type Plan = {
   highlighted?: boolean;
 };
 
-const monthlyPlans: Plan[] = [
-  {
-    planId: "monthly_basic",
-    category: "monthly",
-    name: "Monthly Basic",
-    price: "$9",
-    amountInRupee: 899,
-    unit: "/month",
-    description: "Perfect for regular analysis",
-    statements: "300 Pages/month",
-    features: ["Download in 4 Formats", "FOIR/Loan Analysis (Basic)"],
-  },
-  {
-    planId: "monthly_pro",
-    category: "monthly",
-    name: "Monthly Pro",
-    price: "$19",
-    amountInRupee: 1899,
-    unit: "/month",
-    description: "Most popular for professionals",
-    statements: "1000 Pages/month",
-    features: [
-      "Download in 4 Formats",
-      "FOIR/Loan Analysis (Pro)",
-      "Tally XML (25 exports/month)",
-    ],
-    editPdfDetector: "Basic",
-    highlighted: true,
-  },
-  {
-    planId: "monthly_enterprise",
-    category: "monthly",
-    name: "Monthly Enterprise",
-    price: "$39",
-    amountInRupee: 3899,
-    unit: "/month",
-    description: "For heavy users and teams",
-    statements: "4500 Pages/month",
-    features: [
-      "Download in 4 Formats",
-      "FOIR/Loan Analysis (Advanced - Enterprise)",
-      "Tally XML (150 exports/month)",
-    ],
-    editPdfDetector: "Advanced",
-  },
-];
-
-const yearlyPlans: Plan[] = [
-  {
-    planId: "yearly_lite",
-    category: "yearly",
-    name: "Yearly Lite",
-    price: "$99",
-    amountInRupee: 8999,
-    unit: "/year",
-    description: "Great for regular users",
-    statements: "5000 Pages/year",
-    savings: "Save 8% vs Monthly",
-    features: ["Download in 4 Formats", "FOIR/Loan Analysis (Basic)"],
-  },
-  {
-    planId: "yearly_full",
-    category: "yearly",
-    name: "Yearly Full",
-    price: "$199",
-    amountInRupee: 18999,
-    unit: "/year",
-    description: "Best value for professionals",
-    statements: "15,000 Pages/year",
-    savings: "Save 13% vs Monthly",
-    features: [
-      "Download in 4 Formats",
-      "FOIR/Loan Analysis (Pro)",
-      "Tally XML (300 exports/year)",
-    ],
-    editPdfDetector: "Basic",
-    highlighted: true,
-  },
-  {
-    planId: "yearly_pro",
-    category: "yearly",
-    name: "Yearly Pro",
-    price: "$399",
-    amountInRupee: 37999,
-    unit: "/year",
-    description: "Maximum savings for power users",
-    statements: "65,000 Pages/year",
-    savings: "Save 15% vs Monthly",
-    features: [
-      "Download in 4 Formats",
-      "FOIR/Loan Analysis (Advanced - Enterprise)",
-      "Tally XML (1200 exports/year)",
-    ],
-    editPdfDetector: "Advanced",
-  },
-];
-
 const perPagePlans: Plan[] = [
-  {
-    planId: "per_page_lite",
-    category: "perPage",
-    name: "Lite",
-    price: "$1",
-    amountInRupee: 89,
-    unit: "/conversion",
-    description: "Quick single conversion",
-    statements: "10 Pages",
-    features: ["Download in 4 Formats"],
-  },
   {
     planId: "per_page_standard",
     category: "perPage",
-    name: "Standard",
-    price: "$2",
-    amountInRupee: 179,
-    unit: "/conversion",
-    description: "Popular for small batches",
-    statements: "25 Pages",
-    features: ["Download in 4 Formats"],
+    name: "Basic Pack",
+    price: "$20",
+    amountInRupee: 1999,
+    unit: "one-time",
+    description: "Best for occasional usage",
+    statements: "1,000 Pages",
+    features: ["Excel/CSV exports", "Tally/MT940 available"],
     highlighted: true,
   },
   {
     planId: "per_page_power",
     category: "perPage",
-    name: "Power",
-    price: "$3",
-    amountInRupee: 299,
-    unit: "/conversion",
-    description: "For larger batches",
-    statements: "50 Pages",
-    features: ["Download in 4 Formats"],
+    name: "Pro Pack",
+    price: "$200",
+    amountInRupee: 19999,
+    unit: "one-time",
+    description: "High-volume credits for teams",
+    statements: "10,000 Pages",
+    features: ["Excel/CSV exports", "Tally/MT940 available", "Priority processing"],
   },
 ];
 
@@ -514,43 +406,21 @@ const PricingPage = () => {
             </span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Choose your perfect plan. One-time page packs, monthly subscriptions, or yearly savings.
+            Simple one-time credit packs. Buy once and use credits anytime.
           </p>
           <p className="text-sm font-medium text-yellow-300/90">
             Analyzed PDF is a paid-only feature and is not available on free usage.
           </p>
         </section>
 
-        {/* One-time plans */}
+        {/* Credit packs */}
         <section className="mb-12 space-y-4">
-          <h2 className="text-xl md:text-2xl font-bold text-white">One-time plans</h2>
+          <h2 className="text-xl md:text-2xl font-bold text-white">Credit packs</h2>
           <p className="text-sm text-muted-foreground">
-            Quick conversion with no commitments.
+            No subscriptions, no renewal pressure.
           </p>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 gap-8">
             {perPagePlans.map(renderPlanCard)}
-          </div>
-        </section>
-
-        {/* Monthly plans */}
-        <section className="mb-12 space-y-4">
-          <h2 className="text-xl md:text-2xl font-bold text-white">Monthly plans</h2>
-          <p className="text-sm text-muted-foreground">
-            Perfect for regular analysis with AI power.
-          </p>
-          <div className="grid md:grid-cols-3 gap-8">
-            {monthlyPlans.map(renderPlanCard)}
-          </div>
-        </section>
-
-        {/* Yearly plans */}
-        <section className="mb-12 space-y-4">
-          <h2 className="text-xl md:text-2xl font-bold text-white">Yearly plans</h2>
-          <p className="text-sm text-muted-foreground">
-            Maximum savings for heavy users.
-          </p>
-          <div className="grid md:grid-cols-3 gap-8">
-            {yearlyPlans.map(renderPlanCard)}
           </div>
         </section>
 
