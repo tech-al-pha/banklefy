@@ -250,42 +250,6 @@ const Settings = () => {
       ),
     },
     {
-      id: "account-delete",
-      title: "Delete account",
-      description: "Permanently remove your account and data.",
-      category: "account",
-      tone: "danger",
-      icon: <Trash2 className="h-5 w-5 text-red-300" />,
-      component: (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-red-400/40 text-red-300 hover:text-red-200 hover:border-red-300/60"
-            >
-              <Trash2 className="h-4 w-4 mr-2 text-red-300" />
-              Delete account
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent className="bg-background border-border">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground">
-                Delete Account
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      ),
-    },
-    {
       id: "pref-language",
       title: "Language preference",
       description: "Choose your default language for Banklefy.",
@@ -406,7 +370,7 @@ const Settings = () => {
             <ul className="space-y-1">
               {billingHistory.map((entry) => (
                 <li key={entry.id} className="text-foreground">
-                  {entry.currency} {entry.amount} â€” {entry.status}
+                  {entry.currency} {entry.amount} - {entry.status}
                 </li>
               ))}
             </ul>
@@ -443,7 +407,7 @@ const Settings = () => {
     {
       id: "security-sessions",
       title: "Active sessions",
-      description: "Youâ€™re signed in on the current device.",
+      description: "You're signed in on the current device.",
       category: "security",
       icon: <ShieldCheck className="h-5 w-5" />,
       component: (
@@ -515,9 +479,45 @@ const Settings = () => {
     {
       id: "privacy-assurance",
       title: "File privacy",
-      description: "We never store your files â€” only your converted results and account data.",
+      description: "We never store your files - only your converted results and account data.",
       category: "privacy",
       icon: <Shield className="h-5 w-5" />,
+    },
+    {
+      id: "account-delete",
+      title: "Delete account",
+      description: "Permanently remove your account and data.",
+      category: "account",
+      tone: "danger",
+      icon: <Trash2 className="h-5 w-5 text-red-300" />,
+      component: (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-400/40 text-red-300 hover:text-red-200 hover:border-red-300/60"
+            >
+              <Trash2 className="h-4 w-4 mr-2 text-red-300" />
+              Delete account
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="bg-background border-border">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground">
+                Delete Account
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ),
     },
   ], [
     billingHistory,
