@@ -1,11 +1,14 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRequireAuth } from "@/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSettings } from "@/hooks/useSettings";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import Logo from "@/components/Logo";
@@ -35,8 +38,15 @@ import {
   Palette,
   MonitorSmartphone,
   SlidersHorizontal,
+  Mail,
+  CreditCard,
+  ShieldCheck,
+  UserCircle2,
+  Lock,
+  Bell,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatPlanLabel } from "@/lib/planLabels";
 
 interface SettingItem {
   id: string;
@@ -53,6 +63,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { conversionsUsed, conversionsLimit, remaining, planType, loading: usageLoading } = useUsageLimit();
   const {
     settings,
     loading: settingsLoading,
@@ -60,9 +71,54 @@ const Settings = () => {
     updateSetting,
     exportUserData,
     deleteAccount,
+    updateProfile,
+    sendPasswordReset,
   } = useSettings();
   
   const [searchQuery, setSearchQuery] = useState("");
+  const [displayName, setDisplayName] = useState(user?.user_metadata?.full_name ?? "");
+  const [nameChanged, setNameChanged] = useState(false);
+  const [email, setEmail] = useState(user?.email ?? "");
+  const [emailChanged, setEmailChanged] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [billingHistory, setBillingHistory] = useState<Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    created_at: string;
+    plan_id: string;
+  }>>([]);
+  const [billingLoading, setBillingLoading] = useState(false);
+
+  const planLabel = formatPlanLabel(planType);
+  const memberSince = user?.created_at ? new Date(user.created_at) : null;
+  const lastSignIn = user?.last_sign_in_at ? new Date(user.last_sign_in_at) : null;
+
+  useEffect(() => {
+    setDisplayName(user?.user_metadata?.full_name ?? "");
+    setEmail(user?.email ?? "");
+    setNameChanged(false);
+    setEmailChanged(false);
+  }, [user]);
+
+  useEffect(() => {
+    const fetchBilling = async () => {
+      if (!user) return;
+      setBillingLoading(true);
+      const { data, error } = await supabase
+        .from("razorpay_payments")
+        .select("id, amount, currency, status, created_at, plan_id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (!error && data) {
+        setBillingHistory(data);
+      }
+      setBillingLoading(false);
+    };
+    fetchBilling();
+  }, [user]);
 
   const handleExportData = useCallback(async () => {
     if (user?.id) {
@@ -74,31 +130,345 @@ const Settings = () => {
     await deleteAccount();
   }, [deleteAccount]);
 
+  const handleSaveName = useCallback(async () => {
+    const nextName = displayName.trim();
+    if (!nextName) return;
+    await updateProfile(nextName);
+    setNameChanged(false);
+  }, [displayName, updateProfile]);
+
+  const handleSaveEmail = useCallback(async () => {
+    if (!user) return;
+    const nextEmail = email.trim();
+    if (!nextEmail || nextEmail === user.email) {
+      setEmailChanged(false);
+      return;
+    }
+    setEmailSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ email: nextEmail });
+      if (error) throw error;
+
+      await supabase
+        .from("profiles")
+        .update({ email: nextEmail })
+        .eq("id", user.id);
+
+      toast({
+        title: "Email update requested",
+        description: "Check your inbox to confirm the new email address.",
+      });
+      setEmailChanged(false);
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Email update failed",
+        description: error instanceof Error ? error.message : "Could not update email.",
+      });
+    } finally {
+      setEmailSaving(false);
+    }
+  }, [email, toast, user]);
+
+  const handlePasswordReset = useCallback(async () => {
+    if (!user?.email) return;
+    await sendPasswordReset(user.email);
+  }, [sendPasswordReset, user]);
+
+  const handleLogoutAll = useCallback(async () => {
+    try {
+      await supabase.auth.signOut({ scope: "global" });
+      toast({ title: "Signed out everywhere", description: "All sessions have been logged out." });
+      navigate("/auth");
+    } catch (error: unknown) {
+      toast({
+        variant: "destructive",
+        title: "Sign out failed",
+        description: error instanceof Error ? error.message : "Could not log out all devices.",
+      });
+    }
+  }, [navigate, toast]);
+
   const settingItems: SettingItem[] = useMemo(() => [
-    // Appearance
     {
-      id: "appearance-language",
-      title: t('settings.appearance.language'),
-      description: t('settings.appearance.languageDesc'),
-      category: "appearance",
-      icon: <MonitorSmartphone className="h-5 w-5" />,
-      component: <LanguageSelector />
+      id: "account-name",
+      title: "Change name",
+      description: "Update the name shown on your profile and exports.",
+      category: "account",
+      icon: <UserCircle2 className="h-5 w-5" />,
+      component: (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={displayName}
+            onChange={(e) => {
+              setDisplayName(e.target.value);
+              setNameChanged(e.target.value !== (user?.user_metadata?.full_name ?? ""));
+            }}
+            className="min-w-[220px]"
+            placeholder="Enter your name"
+          />
+          <Button size="sm" onClick={handleSaveName} disabled={!nameChanged || saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+          </Button>
+        </div>
+      ),
     },
-    // Advanced
     {
-      id: "advanced-auto-download",
-      title: t('settings.advanced.autoDownload'),
-      description: t('settings.advanced.autoDownloadDesc'),
-      category: "advanced",
+      id: "account-email",
+      title: "Change email",
+      description: "Update the email you use to sign in.",
+      category: "account",
+      icon: <Mail className="h-5 w-5" />,
+      component: (
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setEmailChanged(e.target.value !== (user?.email ?? ""));
+            }}
+            className="min-w-[240px]"
+            placeholder="you@example.com"
+          />
+          <Button size="sm" onClick={handleSaveEmail} disabled={!emailChanged || emailSaving}>
+            {emailSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+          </Button>
+        </div>
+      ),
+    },
+    {
+      id: "account-password",
+      title: "Change password",
+      description: "Send a secure reset link to your email.",
+      category: "account",
+      icon: <Lock className="h-5 w-5" />,
+      component: (
+        <Button variant="outline" size="sm" onClick={handlePasswordReset} disabled={saving}>
+          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+          Send reset email
+        </Button>
+      ),
+    },
+    {
+      id: "account-delete",
+      title: "Delete account",
+      description: "Permanently remove your account and data.",
+      category: "account",
+      tone: "danger",
+      icon: <Trash2 className="h-5 w-5 text-red-300" />,
+      component: (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-red-400/40 text-red-300 hover:text-red-200 hover:border-red-300/60"
+            >
+              <Trash2 className="h-4 w-4 mr-2 text-red-300" />
+              Delete account
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="bg-background border-border">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground">
+                Delete Account
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ),
+    },
+    {
+      id: "pref-language",
+      title: "Language preference",
+      description: "Choose your default language for Banklefy.",
+      category: "preferences",
+      icon: <MonitorSmartphone className="h-5 w-5" />,
+      component: <LanguageSelector />,
+    },
+    {
+      id: "pref-export-format",
+      title: "Default export format",
+      description: "Pick which format downloads automatically.",
+      category: "preferences",
+      icon: <Download className="h-5 w-5" />,
+      component: (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant={settings.defaultExportFormat === "xlsx" ? "default" : "outline"}
+            onClick={() => updateSetting("defaultExportFormat", "xlsx")}
+          >
+            Excel
+          </Button>
+          <Button
+            size="sm"
+            variant={settings.defaultExportFormat === "csv" ? "default" : "outline"}
+            onClick={() => updateSetting("defaultExportFormat", "csv")}
+          >
+            CSV
+          </Button>
+        </div>
+      ),
+    },
+    {
+      id: "pref-date-format",
+      title: "Default date format",
+      description: "Set how dates should appear in exports.",
+      category: "preferences",
+      icon: <SettingsIcon className="h-5 w-5" />,
+      component: (
+        <div className="flex flex-wrap gap-2">
+          {(["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"] as const).map((format) => (
+            <Button
+              key={format}
+              size="sm"
+              variant={settings.defaultDateFormat === format ? "default" : "outline"}
+              onClick={() => updateSetting("defaultDateFormat", format)}
+            >
+              {format}
+            </Button>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "pref-auto-download",
+      title: "Auto-download exports",
+      description: "Download files immediately after conversion.",
+      category: "preferences",
       icon: <SlidersHorizontal className="h-5 w-5" />,
       component: (
         <Switch
           checked={settings.autoDownload}
-          onCheckedChange={(value) => updateSetting('autoDownload', value)}
+          onCheckedChange={(value) => updateSetting("autoDownload", value)}
         />
-      )
+      ),
     },
-    // Privacy & Security
+    {
+      id: "billing-plan",
+      title: "Current plan",
+      description: "Your active subscription tier.",
+      category: "billing",
+      icon: <CreditCard className="h-5 w-5" />,
+      component: (
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className="bg-primary/20 text-primary border-primary/30">{planLabel}</Badge>
+          <Button variant="outline" size="sm" onClick={() => navigate("/pricing")}>
+            Upgrade
+          </Button>
+        </div>
+      ),
+    },
+    {
+      id: "billing-credits",
+      title: "Credits used / remaining",
+      description: "Track your daily usage and remaining credits.",
+      category: "billing",
+      icon: <BarChart3 className="h-5 w-5" />,
+      component: (
+        <div className="text-sm text-foreground">
+          <div>{conversionsUsed}/{conversionsLimit} used today</div>
+          <div className="text-primary font-semibold">{remaining} remaining</div>
+        </div>
+      ),
+    },
+    {
+      id: "billing-buy",
+      title: "Buy more credits",
+      description: "Add credits or upgrade your plan instantly.",
+      category: "billing",
+      icon: <CreditCard className="h-5 w-5" />,
+      component: (
+        <Button variant="outline" size="sm" onClick={() => navigate("/pricing")}>
+          Buy credits
+        </Button>
+      ),
+    },
+    {
+      id: "billing-history",
+      title: "Transaction / billing history",
+      description: "Recent payments and plan purchases.",
+      category: "billing",
+      icon: <CreditCard className="h-5 w-5" />,
+      component: (
+        <div className="text-sm text-muted-foreground space-y-1">
+          {billingLoading && <div>Loading history…</div>}
+          {!billingLoading && billingHistory.length === 0 && <div>No billing history yet.</div>}
+          {!billingLoading && billingHistory.length > 0 && (
+            <ul className="space-y-1">
+              {billingHistory.map((entry) => (
+                <li key={entry.id} className="text-foreground">
+                  {entry.currency} {entry.amount} â€” {entry.status}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "notifications-complete",
+      title: "Email notification on conversion complete",
+      description: "Get notified when a statement is ready to download.",
+      category: "notifications",
+      icon: <Mail className="h-5 w-5" />,
+      component: (
+        <Switch
+          checked={settings.emailNotifications}
+          onCheckedChange={(value) => updateSetting("emailNotifications", value)}
+        />
+      ),
+    },
+    {
+      id: "notifications-updates",
+      title: "Product updates",
+      description: "Receive new feature and product announcements.",
+      category: "notifications",
+      icon: <Bell className="h-5 w-5" />,
+      component: (
+        <Switch
+          checked={settings.pushNotifications}
+          onCheckedChange={(value) => updateSetting("pushNotifications", value)}
+        />
+      ),
+    },
+    {
+      id: "security-sessions",
+      title: "Active sessions",
+      description: "Youâ€™re signed in on the current device.",
+      category: "security",
+      icon: <ShieldCheck className="h-5 w-5" />,
+      component: (
+        <div className="text-sm text-muted-foreground">
+          <div className="text-foreground">Current device</div>
+          {lastSignIn && (
+            <div className="text-xs text-muted-foreground">
+              Last sign-in {lastSignIn.toLocaleString()}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "security-logout",
+      title: "Logout all devices",
+      description: "End all active sessions instantly.",
+      category: "security",
+      icon: <ShieldCheck className="h-5 w-5" />,
+      component: (
+        <Button variant="outline" size="sm" onClick={handleLogoutAll}>
+          Logout all devices
+        </Button>
+      ),
+    },
     {
       id: "privacy-edited-warning",
       title: "Edited PDF Warning Timing",
@@ -122,28 +492,12 @@ const Settings = () => {
             On Convert
           </Button>
         </div>
-      )
-    },
-    {
-      id: "privacy-visibility",
-      title: t('settings.privacy.visibility'),
-      description: t('settings.privacy.visibilityDesc'),
-      category: "privacy",
-      icon: <Eye className="h-5 w-5" />,
-      component: (
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => toast({ title: "Privacy Settings", description: "Your data is private by default and not shared with anyone." })}
-        >
-          {t('settings.privacy.manage')}
-        </Button>
-      )
+      ),
     },
     {
       id: "privacy-data",
-      title: t('settings.privacy.data'),
-      description: t('settings.privacy.dataDesc'),
+      title: "Download my data",
+      description: "Export your conversions and settings.",
       category: "privacy",
       icon: <Download className="h-5 w-5" />,
       component: (
@@ -154,62 +508,51 @@ const Settings = () => {
           disabled={saving}
         >
           {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-          {t('settings.privacy.download')}
+          Download data
         </Button>
-      )
+      ),
     },
     {
-      id: "privacy-delete",
-      title: t('settings.privacy.delete'),
-      description: t('settings.privacy.deleteDesc'),
+      id: "privacy-assurance",
+      title: "File privacy",
+      description: "We never store your files â€” only your converted results and account data.",
       category: "privacy",
-      tone: "danger",
-      icon: <Trash2 className="h-5 w-5 text-red-300" />,
-      component: (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-red-400/40 text-red-300 hover:text-red-200 hover:border-red-300/60"
-            >
-              <Trash2 className="h-4 w-4 mr-2 text-red-300" />
-              {t('settings.privacy.deleteAccount')}
-            </Button>
-            </AlertDialogTrigger>
-          <AlertDialogContent className="bg-background border-border">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground">
-                Delete Account
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )
+      icon: <Shield className="h-5 w-5" />,
     },
   ], [
-    saving,
-    settings,
-    t,
-    toast,
-    updateSetting,
+    billingHistory,
+    billingLoading,
+    conversionsLimit,
+    conversionsUsed,
+    displayName,
+    email,
+    emailChanged,
+    emailSaving,
     handleExportData,
     handleDeleteAccount,
+    handleLogoutAll,
+    handlePasswordReset,
+    handleSaveEmail,
+    handleSaveName,
+    nameChanged,
     navigate,
+    planLabel,
+    remaining,
+    saving,
+    settings,
+    updateSetting,
+    user,
+    lastSignIn,
   ]);
 
   const categories = [
-    { id: "all", label: t('settings.categories.all'), icon: <SettingsIcon className="h-4 w-4" /> },
-    { id: "appearance", label: t('settings.categories.appearance'), icon: <Palette className="h-4 w-4" /> },
-    { id: "privacy", label: t('settings.categories.privacy'), icon: <Shield className="h-4 w-4" /> },
-    { id: "advanced", label: t('settings.categories.advanced'), icon: <SlidersHorizontal className="h-4 w-4" /> },
+    { id: "all", label: "All", icon: <SettingsIcon className="h-4 w-4" /> },
+    { id: "account", label: "Account", icon: <UserCircle2 className="h-4 w-4" /> },
+    { id: "preferences", label: "Preferences", icon: <Palette className="h-4 w-4" /> },
+    { id: "billing", label: "Billing & Credits", icon: <CreditCard className="h-4 w-4" /> },
+    { id: "notifications", label: "Notifications", icon: <Mail className="h-4 w-4" /> },
+    { id: "security", label: "Security", icon: <ShieldCheck className="h-4 w-4" /> },
+    { id: "privacy", label: "Data & Privacy", icon: <Shield className="h-4 w-4" /> },
   ];
 
   const filteredSettings = useMemo(() => {
@@ -263,7 +606,7 @@ const Settings = () => {
     );
   };
 
-  if (authLoading || settingsLoading) {
+  if (authLoading || settingsLoading || usageLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-primary">Loading...</div>
