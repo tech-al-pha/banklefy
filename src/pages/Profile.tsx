@@ -22,6 +22,7 @@ import Logo from "@/components/Logo";
 import { Loader2, LogOut } from "lucide-react";
 import { formatPlanLabel } from "@/lib/planLabels";
 import { useToast } from "@/hooks/use-toast";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface RecentConversion {
   id: string;
@@ -395,11 +396,7 @@ const Profile = () => {
   };
 
   if (!user || loading || usageLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (

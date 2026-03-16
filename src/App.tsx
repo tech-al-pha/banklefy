@@ -6,12 +6,12 @@ import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { LuxuryCursor } from "@/components/LuxuryCursor";
-import { Loader2 } from "lucide-react";
 import { Suspense } from "react";
 import { Helmet, HelmetProvider } from "@dr.pogodin/react-helmet";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { RequireAuth, RequirePaid } from "@/components/RouteGuards";
+import LoadingScreen from "@/components/LoadingScreen";
 
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const Index = lazyWithRetry(() => import("./pages/Index"));
@@ -352,10 +352,7 @@ const AppRoutes = () => {
 
       <Suspense
         fallback={
-          <div className="min-h-screen bg-background flex items-center justify-center" role="status" aria-live="polite">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
-            <span className="sr-only">Loading page</span>
-          </div>
+          <LoadingScreen />
         }
       >
         <Routes>

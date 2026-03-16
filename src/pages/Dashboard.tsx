@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FileSpreadsheet, ArrowLeft, Loader2, Home } from "lucide-react";
 import { format } from "date-fns";
 import banklefyLogo from "@/assets/banklefy-logo.svg";
+import LoadingScreen from "@/components/LoadingScreen";
 
 interface Conversion {
   id: string;
@@ -128,11 +129,7 @@ const Dashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
