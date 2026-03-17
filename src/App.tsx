@@ -27,6 +27,12 @@ const SampleReport = lazyWithRetry(() => import("./pages/SampleReport"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const Help = lazyWithRetry(() => import("./pages/Help"));
 const Blog = lazyWithRetry(() => import("./pages/Blog"));
+const HowItWorksPage = lazyWithRetry(() => import("./pages/HowItWorksPage"));
+const SecurityPage = lazyWithRetry(() => import("./pages/Security"));
+const ContactPage = lazyWithRetry(() => import("./pages/Contact"));
+const CookiePolicyPage = lazyWithRetry(() => import("./pages/CookiePolicy"));
+const DocumentationPage = lazyWithRetry(() => import("./pages/Documentation"));
+const FaqsPage = lazyWithRetry(() => import("./pages/Faqs"));
 const BlogLaunch = lazyWithRetry(() => import("./pages/blog/LaunchPost"));
 const BlogAccuracy = lazyWithRetry(() => import("./pages/blog/AccuracyPost"));
 const BlogPrivacy = lazyWithRetry(() => import("./pages/blog/PrivacyPost"));
@@ -105,6 +111,30 @@ const META_BY_PATH: Record<string, RouteMeta> = {
     title: "Help Center | Banklefy",
     description:
       "Get help with supported formats, password-protected PDFs, daily limits, and refund requests.",
+  },
+  "/how-it-works": {
+    title: "How It Works | Banklefy",
+    description: "See how Banklefy converts bank statements into clean exports in three steps.",
+  },
+  "/security": {
+    title: "Security | Banklefy",
+    description: "Learn how Banklefy protects your data and conversions.",
+  },
+  "/contact": {
+    title: "Contact Us | Banklefy",
+    description: "Contact Banklefy support for help with billing or conversions.",
+  },
+  "/cookie-policy": {
+    title: "Cookie Policy | Banklefy",
+    description: "Understand how Banklefy uses cookies for sessions and security.",
+  },
+  "/documentation": {
+    title: "Documentation | Banklefy",
+    description: "Learn how to upload, convert, and export statements with Banklefy.",
+  },
+  "/faqs": {
+    title: "FAQs | Banklefy",
+    description: "Answers to common questions about conversions, limits, and refunds.",
   },
   "/blog": {
     title: "Blog | Banklefy",
@@ -370,6 +400,12 @@ const AppRoutes = () => {
           <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
           <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/help" element={<Help />} />
+          <Route path="/how-it-works" element={<HowItWorksPage />} />
+          <Route path="/security" element={<SecurityPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/cookie-policy" element={<CookiePolicyPage />} />
+          <Route path="/documentation" element={<DocumentationPage />} />
+          <Route path="/faqs" element={<FaqsPage />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/launch" element={<BlogLaunch />} />
           <Route path="/blog/accuracy" element={<BlogAccuracy />} />

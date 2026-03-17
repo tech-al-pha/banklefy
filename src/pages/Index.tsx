@@ -323,7 +323,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-primary/20 py-16 px-4 sm:px-6 bg-background">
         <div className="container mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-[1.2fr_0.9fr_0.9fr_0.9fr] gap-8 mb-12">
             <div className="space-y-4">
               <Logo />
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -331,10 +331,18 @@ const Index = () => {
               </p>
             </div>
             
-            <div className="flex flex-col md:items-center">
+            <div className="flex flex-col md:items-start">
               <div>
                 <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.product')}</h4>
                 <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li>
+                    <Link
+                      to="/how-it-works"
+                      className="text-glow-link text-left font-medium"
+                    >
+                      {t('footer.howItWorks')}
+                    </Link>
+                  </li>
                   <li>
                     <Link
                       to="/features"
@@ -353,6 +361,14 @@ const Index = () => {
                   </li>
                   <li>
                     <Link
+                      to="/security"
+                      className="text-glow-link text-left font-medium"
+                    >
+                      {t('footer.security')}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
                       to="/blog"
                       className="text-glow-link text-left font-medium"
                     >
@@ -362,8 +378,48 @@ const Index = () => {
                 </ul>
               </div>
             </div>
+
+            <div className="flex flex-col md:items-start">
+              <div>
+                <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.resources')}</h4>
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li>
+                    <Link
+                      to="/documentation"
+                      className="text-glow-link text-left font-medium"
+                    >
+                      {t('footer.docs')}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/faqs"
+                      className="text-glow-link text-left font-medium"
+                    >
+                      {t('footer.faqs')}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/sample-report"
+                      className="text-glow-link text-left font-medium"
+                    >
+                      {t('footer.sampleReport')}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/pricing#refunds"
+                      className="text-glow-link text-left font-medium"
+                    >
+                      {t('footer.refunds')}
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            </div>
             
-            <div className="flex flex-col md:items-end">
+            <div className="flex flex-col md:items-start">
               <div className="w-full md:w-auto">
                 <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.company')}</h4>
                 <ul className="space-y-3 text-sm text-muted-foreground">
@@ -373,6 +429,14 @@ const Index = () => {
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.about')}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/contact"
+                      className="text-glow-link text-left font-medium"
+                    >
+                      {t('footer.contact')}
                     </Link>
                   </li>
                   <li>
@@ -389,6 +453,14 @@ const Index = () => {
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.terms')}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/cookie-policy"
+                      className="text-glow-link text-left font-medium"
+                    >
+                      {t('footer.cookiePolicy')}
                     </Link>
                   </li>
                 </ul>
