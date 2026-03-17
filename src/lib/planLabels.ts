@@ -5,25 +5,25 @@ const normalizePlanType = (planType?: string): string => {
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
-  unlimited: 'Unlimited',
-  per_page_lite: 'Lite',
-  per_page_standard: 'Standard',
-  per_page_power: 'Power',
-  per_page_pack_basic: 'Basic Pack',
-  per_page_pack_pro: 'Pro Pack',
-  monthly_basic: 'Monthly Basic',
-  monthly_pro: 'Monthly Pro',
-  monthly_enterprise: 'Monthly Enterprise',
-  yearly_lite: 'Yearly Lite',
-  yearly_full: 'Yearly Full',
-  yearly_pro: 'Yearly Pro',
-  daily: 'Monthly Plan',
-  business: 'Yearly Plan',
+  per_page_lite: 'One-time',
+  per_page_standard: 'One-time',
+  per_page_power: 'One-time',
+  per_page_pack_basic: 'One-time',
+  per_page_pack_pro: 'One-time',
+  monthly_basic: 'Basic',
+  yearly_lite: 'Basic',
+  daily: 'Basic',
+  monthly_pro: 'Pro',
+  monthly_enterprise: 'Pro',
+  yearly_full: 'Pro',
+  yearly_pro: 'Pro',
+  business: 'Pro',
+  unlimited: 'Pro',
 };
 
 export const formatPlanLabel = (planType?: string): string => {
   const normalized = normalizePlanType(planType);
-  return PLAN_LABELS[normalized] || 'Paid Plan';
+  return PLAN_LABELS[normalized] || 'Pro';
 };
 
 export const getPlanResetMessage = (planType?: string): string => {
