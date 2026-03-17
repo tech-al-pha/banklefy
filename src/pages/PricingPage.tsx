@@ -71,20 +71,6 @@ const pricingPlans: Plan[] = [
   },
 ];
 
-const oneTimeHighlights = [
-  {
-    title: "One-time payment",
-    description: "Pay once. No subscriptions or renewals.",
-  },
-  {
-    title: "Credits never expire",
-    description: "Use your pages anytime, at your own pace.",
-  },
-  {
-    title: "Pick your pace",
-    description: "Perfect for seasonal or project-based work.",
-  },
-];
 
 const perConversionPlans: Plan[] = [
   {
@@ -510,20 +496,6 @@ const PricingPage = () => {
           </div>
         </section>
 
-        {/* One-time highlights */}
-        <section className="mb-14">
-          <div className="grid gap-4 md:grid-cols-3">
-            {oneTimeHighlights.map((item) => (
-              <Card
-                key={item.title}
-                className="rounded-2xl border border-primary/10 bg-surface-elevated/70 p-5 text-left"
-              >
-                <h3 className="text-sm font-semibold text-white">{item.title}</h3>
-                <p className="mt-2 text-xs text-muted-foreground">{item.description}</p>
-              </Card>
-            ))}
-          </div>
-        </section>
 
         <section
           id="refunds"
