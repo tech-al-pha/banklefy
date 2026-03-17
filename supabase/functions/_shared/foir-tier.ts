@@ -51,6 +51,7 @@ export const resolveUnderwritingTier = (
     normalizedPlan === 'monthly_enterprise' ||
     normalizedPlan === 'yearly_pro' ||
     normalizedPlan === 'per_page_power' ||
+    normalizedPlan === 'per_page_pack_pro' ||
     normalizedPlan === 'unlimited' ||
     normalizedPlan === 'business'
   ) {
@@ -61,6 +62,7 @@ export const resolveUnderwritingTier = (
     normalizedPlan === 'monthly_pro' ||
     normalizedPlan === 'yearly_full' ||
     normalizedPlan === 'per_page_standard' ||
+    normalizedPlan === 'per_page_pack_basic' ||
     normalizedPlan === 'daily'
   ) {
     return 'pro';

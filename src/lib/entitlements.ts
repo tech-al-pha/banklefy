@@ -116,6 +116,8 @@ export const hasMt940Access = (input: EntitlementInput): boolean =>
 export const hasTallyXmlAccess = (input: EntitlementInput): boolean => {
   const normalizedPlan = resolvePlanForFeatures(input);
   return (
+    normalizedPlan === "per_page_pack_basic" ||
+    normalizedPlan === "per_page_pack_pro" ||
     normalizedPlan === "monthly_pro" ||
     normalizedPlan === "monthly_enterprise" ||
     normalizedPlan === "yearly_full" ||
@@ -126,6 +128,12 @@ export const hasTallyXmlAccess = (input: EntitlementInput): boolean => {
 export const hasFoirDashboardAccess = (input: EntitlementInput): boolean => {
   const normalizedPlan = resolvePlanForFeatures(input);
   if (normalizedPlan === "unlimited" || normalizedPlan === "business") return true;
+  if (
+    normalizedPlan === "per_page_pack_basic" ||
+    normalizedPlan === "per_page_pack_pro"
+  ) {
+    return true;
+  }
   if (normalizedPlan.startsWith("monthly") || normalizedPlan.startsWith("yearly")) return true;
   return false;
 };
@@ -135,6 +143,7 @@ export const hasFraudDetectorAccess = (input: EntitlementInput): boolean => {
   return (
     normalizedPlan === "unlimited" ||
     normalizedPlan === "business" ||
+    normalizedPlan === "per_page_pack_pro" ||
     normalizedPlan === "monthly_pro" ||
     normalizedPlan === "monthly_enterprise" ||
     normalizedPlan === "yearly_full" ||
@@ -146,6 +155,13 @@ export const getEditPdfDetectorTier = (input: EntitlementInput): "none" | "basic
   const normalizedPlan = resolvePlanForFeatures(input);
   if (normalizedPlan === "unlimited" || normalizedPlan === "business") return "advanced";
   if (normalizedPlan === "monthly_enterprise" || normalizedPlan === "yearly_pro") return "advanced";
-  if (normalizedPlan === "monthly_pro" || normalizedPlan === "yearly_full") return "basic";
+  if (normalizedPlan === "per_page_pack_pro") return "advanced";
+  if (
+    normalizedPlan === "per_page_pack_basic" ||
+    normalizedPlan === "monthly_pro" ||
+    normalizedPlan === "yearly_full"
+  ) {
+    return "basic";
+  }
   return "none";
 };

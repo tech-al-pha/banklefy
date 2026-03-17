@@ -58,8 +58,10 @@ const extractBearerToken = (authHeader: string | null): string | null => {
 const PLAN_PAGES: Record<string, number> = {
   // One-time
   per_page_lite: 10,
-  per_page_standard: 1000,
-  per_page_power: 10000,
+  per_page_standard: 25,
+  per_page_power: 50,
+  per_page_pack_basic: 1000,
+  per_page_pack_pro: 11000,
   // Monthly
   monthly_basic: 300,
   monthly_pro: 1000,

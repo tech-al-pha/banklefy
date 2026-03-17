@@ -49,8 +49,10 @@ type PlanPricing = {
 
 const PLAN_PRICING: Record<string, PlanPricing> = {
   per_page_lite: { amount: 89, currency: 'INR' },
-  per_page_standard: { amount: 1999, currency: 'INR' },
-  per_page_power: { amount: 19999, currency: 'INR' },
+  per_page_standard: { amount: 179, currency: 'INR' },
+  per_page_power: { amount: 299, currency: 'INR' },
+  per_page_pack_basic: { amount: 1899, currency: 'INR' },
+  per_page_pack_pro: { amount: 18999, currency: 'INR' },
   monthly_basic: { amount: 899, currency: 'INR' },
   monthly_pro: { amount: 1899, currency: 'INR' },
   monthly_enterprise: { amount: 3899, currency: 'INR' },

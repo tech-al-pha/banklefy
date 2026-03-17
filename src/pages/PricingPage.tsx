@@ -24,31 +24,102 @@ type Plan = {
   editPdfDetector?: "Basic" | "Advanced";
   savings?: string;
   highlighted?: boolean;
+  isFree?: boolean;
 };
 
-const perPagePlans: Plan[] = [
+const pricingPlans: Plan[] = [
   {
-    planId: "per_page_standard",
+    planId: "free",
+    category: "perPage",
+    name: "Free",
+    price: "$0",
+    amountInRupee: 0,
+    unit: "forever",
+    description: "Try Banklefy with basic limits",
+    statements: "5 Pages / day",
+    features: ["Excel/CSV exports", "Basic parsing", "No AI-only features"],
+    isFree: true,
+  },
+  {
+    planId: "per_page_pack_basic",
     category: "perPage",
     name: "Basic Pack",
-    price: "$20",
-    amountInRupee: 1999,
+    price: "$19",
+    amountInRupee: 1899,
     unit: "one-time",
     description: "Best for occasional usage",
     statements: "1,000 Pages",
-    features: ["Excel/CSV exports", "Tally/MT940 available"],
+    features: ["Excel/CSV exports", "Tally/MT940 available", "FOIR + EMI insights"],
+    highlighted: true,
+  },
+  {
+    planId: "per_page_pack_pro",
+    category: "perPage",
+    name: "Pro Pack",
+    price: "$199",
+    amountInRupee: 18999,
+    unit: "one-time",
+    description: "High-volume credits for teams",
+    statements: "11,000 Pages",
+    features: [
+      "Excel/CSV exports",
+      "Tally/MT940 available",
+      "FOIR + EMI insights",
+      "Fraud + edited PDF checks",
+      "Priority processing",
+    ],
+  },
+];
+
+const oneTimeHighlights = [
+  {
+    title: "One-time payment",
+    description: "Pay once. No subscriptions or renewals.",
+  },
+  {
+    title: "Credits never expire",
+    description: "Use your pages anytime, at your own pace.",
+  },
+  {
+    title: "Pick your pace",
+    description: "Perfect for seasonal or project-based work.",
+  },
+];
+
+const perConversionPlans: Plan[] = [
+  {
+    planId: "per_page_lite",
+    category: "perPage",
+    name: "Lite",
+    price: "$1",
+    amountInRupee: 89,
+    unit: "/conversion",
+    description: "Quick single conversion",
+    statements: "10 Pages",
+    features: ["Analyzed PDF Report", "Download in 4 Formats"],
+  },
+  {
+    planId: "per_page_standard",
+    category: "perPage",
+    name: "Standard",
+    price: "$2",
+    amountInRupee: 179,
+    unit: "/conversion",
+    description: "Popular for small batches",
+    statements: "25 Pages",
+    features: ["Analyzed PDF Report", "Download in 4 Formats"],
     highlighted: true,
   },
   {
     planId: "per_page_power",
     category: "perPage",
-    name: "Pro Pack",
-    price: "$200",
-    amountInRupee: 19999,
-    unit: "one-time",
-    description: "High-volume credits for teams",
-    statements: "10,000 Pages",
-    features: ["Excel/CSV exports", "Tally/MT940 available", "Priority processing"],
+    name: "Power",
+    price: "$3",
+    amountInRupee: 299,
+    unit: "/conversion",
+    description: "For larger batches",
+    statements: "50 Pages",
+    features: ["Analyzed PDF Report", "Download in 4 Formats"],
   },
 ];
 
@@ -371,10 +442,14 @@ const PricingPage = () => {
                 ? "bg-primary text-primary-foreground shadow-neon"
                 : "bg-surface-elevated border border-primary/30 text-primary"
             } transition-all duration-300`}
-            onClick={() => handlePlanPurchase(plan)}
-            disabled={isProcessing}
+            onClick={() => (plan.isFree ? navigate("/?next=demo") : handlePlanPurchase(plan))}
+            disabled={plan.isFree ? false : isProcessing}
           >
-            {isProcessing ? "Opening checkout..." : "Choose Plan"}
+            {plan.isFree
+              ? "Start Free"
+              : isProcessing
+              ? "Opening checkout..."
+              : "Choose Plan"}
           </Button>
         </div>
       </Card>
@@ -413,14 +488,40 @@ const PricingPage = () => {
           </p>
         </section>
 
-        {/* Credit packs */}
+        {/* Pricing cards */}
         <section className="mb-12 space-y-4">
           <h2 className="text-xl md:text-2xl font-bold text-white">Credit packs</h2>
           <p className="text-sm text-muted-foreground">
             No subscriptions, no renewal pressure.
           </p>
-          <div className="grid md:grid-cols-2 gap-8">
-            {perPagePlans.map(renderPlanCard)}
+          <div className="grid md:grid-cols-3 gap-8">
+            {pricingPlans.map(renderPlanCard)}
+          </div>
+        </section>
+
+        {/* One-time conversion plans */}
+        <section className="mb-12 space-y-4">
+          <h2 className="text-xl md:text-2xl font-bold text-white">One-time conversions</h2>
+          <p className="text-sm text-muted-foreground">
+            Quick conversion with no commitments.
+          </p>
+          <div className="grid md:grid-cols-3 gap-8">
+            {perConversionPlans.map(renderPlanCard)}
+          </div>
+        </section>
+
+        {/* One-time highlights */}
+        <section className="mb-14">
+          <div className="grid gap-4 md:grid-cols-3">
+            {oneTimeHighlights.map((item) => (
+              <Card
+                key={item.title}
+                className="rounded-2xl border border-primary/10 bg-surface-elevated/70 p-5 text-left"
+              >
+                <h3 className="text-sm font-semibold text-white">{item.title}</h3>
+                <p className="mt-2 text-xs text-muted-foreground">{item.description}</p>
+              </Card>
+            ))}
           </div>
         </section>
 
