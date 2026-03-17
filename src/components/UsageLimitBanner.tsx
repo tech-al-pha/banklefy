@@ -74,12 +74,6 @@ export const UsageLimitBanner = ({
       if (isPerPagePlan) {
         return formatTemplate("upload.limit.paid.pack", { limit });
       }
-      if (isMonthlyPlan) {
-        return formatTemplate("upload.limit.paid.month", { limit });
-      }
-      if (isYearlyPlan) {
-        return formatTemplate("upload.limit.paid.year", { limit });
-      }
       return formatTemplate("upload.limit.paid.plan", { limit });
     })();
 
@@ -125,10 +119,8 @@ export const UsageLimitBanner = ({
               {isFreeMode
                 ? `of ${limit} ${conversionLabel} remaining today`
                 : isPerPagePlan
-                  ? `of ${limit} ${pageLabel} remaining in your pack`
-                  : isYearlyPlan
-                    ? `of ${limit} ${pageLabel} remaining this year`
-                    : `of ${limit} ${pageLabel} remaining this month`}
+                  ? `of ${limit} ${pageLabel} remaining in your one-time pack`
+                  : `of ${limit} ${pageLabel} remaining in your plan`}
             </>
           )}
           {planLabel && planLabel !== "Free" ? ` - ${planLabel}` : ""}

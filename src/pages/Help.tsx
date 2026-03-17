@@ -208,7 +208,7 @@ const Help = () => {
       icon: BadgeDollarSign,
       title: "Billing and Plans",
       items: [
-        "One-time, monthly, and yearly plans are available on the Pricing page.",
+        "Free, Basic, Pro, and One-time plans are available on the Pricing page.",
         "Payments are processed securely via Razorpay.",
         "Refund details and requests are handled from the Pricing page.",
         "Keep your order ID for faster support.",

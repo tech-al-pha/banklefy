@@ -32,18 +32,11 @@ export const getPlanResetMessage = (planType?: string): string => {
   if (normalized === 'free') {
     return 'Your daily limit resets at midnight.';
   }
-  if (normalized === 'unlimited') {
-    return 'Your plan has no usage limits.';
-  }
   if (normalized.startsWith('per_page')) {
     return 'This is a one-time page pack. Purchase another plan to continue.';
   }
-  if (normalized.startsWith('monthly') || normalized === 'daily') {
-    return 'Your plan usage resets at the start of the next month.';
+  if (normalized === 'unlimited') {
+    return 'Your plan has no usage limits.';
   }
-  if (normalized.startsWith('yearly') || normalized === 'business') {
-    return 'Your plan usage resets at the start of the next year.';
-  }
-
-  return 'Your plan usage resets with your billing cycle.';
+  return 'Your plan usage resets based on your billing cycle.';
 };
