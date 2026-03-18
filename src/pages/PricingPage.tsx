@@ -274,7 +274,7 @@ const PricingPage = () => {
         toast.error("Payment verification failed.");
       }
     } catch (err) {
-      console.error("Verification error:", err);
+      if (import.meta.env.DEV) { console.error("Verification error:", err); }
       toast.error("Payment verification failed. Please contact support.");
     }
   };
@@ -351,7 +351,7 @@ const PricingPage = () => {
       });
       checkout.open();
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) { console.error(error); }
       toast.error(error instanceof Error ? error.message : "Unable to start Razorpay checkout.");
       if (error instanceof Error && error.message.toLowerCase().includes("session expired")) {
         navigate("/auth");

@@ -37,7 +37,7 @@ const emitMetric = (name: VitalsName, value: number) => {
   };
 
   // Keep this lightweight and safe in production.
-  console.info("[WEB_VITAL]", payload);
+  if (import.meta.env.DEV) { console.info("[WEB_VITAL]", payload); }
 
   if (navigator.sendBeacon && import.meta.env.VITE_WEB_VITALS_ENDPOINT) {
     try {

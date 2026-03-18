@@ -48,7 +48,7 @@ export const useSubscriptionTier = () => {
       if (!isMounted) return;
 
       if (error) {
-        console.error("Failed to load subscription tier:", error);
+        if (import.meta.env.DEV) { console.error("Failed to load subscription tier:", error); }
         setTier("free");
         setPlanType(null);
       } else {

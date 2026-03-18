@@ -55,12 +55,12 @@ const Dashboard = () => {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Conversions query error:", error);
+        if (import.meta.env.DEV) { console.error("Conversions query error:", error); }
         throw error;
       }
       setConversions(data || []);
     } catch (error: unknown) {
-      console.error("Error fetching conversions:", error);
+      if (import.meta.env.DEV) { console.error("Error fetching conversions:", error); }
       toast({
         variant: "destructive",
         title: "Error",
@@ -104,7 +104,7 @@ const Dashboard = () => {
         description: "Excel file downloaded successfully.",
       });
     } catch (error: unknown) {
-      console.error("Download error:", error);
+      if (import.meta.env.DEV) { console.error("Download error:", error); }
       toast({
         variant: "destructive",
         title: "Download Failed",

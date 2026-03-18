@@ -156,7 +156,7 @@ export const useUsageLimit = () => {
       }
 
       const message = err instanceof Error ? err.message : 'Failed to check usage limit';
-      console.error('Error checking usage limit:', err);
+      if (import.meta.env.DEV) { console.error('Error checking usage limit:', err); }
       setUsageLimit(prev => ({
         ...prev,
         loading: false,

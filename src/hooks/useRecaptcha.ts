@@ -106,7 +106,7 @@ export const useRecaptcha = () => {
     let isMounted = true;
 
     if (!isRecaptchaConfigured) {
-      console.warn('[reCAPTCHA] Missing VITE_RECAPTCHA_SITE_KEY. Skipping load.');
+      if (import.meta.env.DEV) { console.warn('[reCAPTCHA] Missing VITE_RECAPTCHA_SITE_KEY. Skipping load.'); }
       return () => {
         isMounted = false;
       };
@@ -119,7 +119,7 @@ export const useRecaptcha = () => {
         }
       })
       .catch((err) => {
-        console.error('reCAPTCHA failed to load:', err);
+        if (import.meta.env.DEV) { console.error('reCAPTCHA failed to load:', err); }
       });
 
     return () => {
@@ -137,7 +137,7 @@ export const useRecaptcha = () => {
     const token = await window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action });
       return token;
     } catch (error) {
-      console.error('reCAPTCHA execution failed:', error);
+      if (import.meta.env.DEV) { console.error('reCAPTCHA execution failed:', error); }
       return null;
     }
   }, []);

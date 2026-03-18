@@ -63,13 +63,13 @@ export const useSettings = () => {
             .maybeSingle();
 
           if (error) {
-            console.error('Failed to load profile:', error);
-          } else if (profile) {
+            if (import.meta.env.DEV) { console.error('Failed to load profile:', error); }
+        } else if (profile) {
             setProfileData(profile);
           }
         }
       } catch (e) {
-        console.warn('Failed to load settings:', e);
+        if (import.meta.env.DEV) { console.warn('Failed to load settings:', e); }
       } finally {
         setLoading(false);
       }
@@ -97,7 +97,7 @@ export const useSettings = () => {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
       } catch (e) {
-        console.warn('Failed to save settings:', e);
+        if (import.meta.env.DEV) { console.warn('Failed to save settings:', e); }
       }
       return newSettings;
     });
@@ -122,7 +122,7 @@ export const useSettings = () => {
         .eq('id', user.id);
 
       if (profileError) {
-        console.error('Profile table update error:', profileError);
+        if (import.meta.env.DEV) { console.error('Profile table update error:', profileError); }
         // Don't throw - auth update succeeded
       }
 

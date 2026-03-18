@@ -270,7 +270,7 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
       safeSessionSet("chatAuraFileName", file.name);
       appendAssistantMessage(`Loaded ${file.name}. You can now ask questions from this statement.`);
     } catch (error) {
-      console.error("Chat Aura PDF upload failed:", error);
+      if (import.meta.env.DEV) { console.error("Chat Aura PDF upload failed:", error); }
       setPdfUploadError("Failed to read this PDF. Please try another file.");
     } finally {
       setIsPreparingPdf(false);
@@ -351,7 +351,7 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
         setChatUsed(newUsage);
       }
     } catch (err) {
-      console.error("Chat error:", err);
+      if (import.meta.env.DEV) { console.error("Chat error:", err); }
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",

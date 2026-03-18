@@ -19,7 +19,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("App error boundary caught an error:", error, info);
+    if (import.meta.env.DEV) { console.error("App error boundary caught an error:", error, info); }
   }
 
   componentDidUpdate(prevProps: ErrorBoundaryProps) {

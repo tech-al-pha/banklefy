@@ -138,7 +138,7 @@ export const PdfPreview = ({
       }
     } catch (err: unknown) {
       setPreviewError('Failed to initialize PDF viewer');
-      console.error('PDF load error:', err);
+      if (import.meta.env.DEV) { console.error('PDF load error:', err); }
     } finally {
       setLoading(false);
     }
@@ -168,7 +168,7 @@ export const PdfPreview = ({
         }).promise;
       }
     } catch (err) {
-      console.error('Page render error:', err);
+      if (import.meta.env.DEV) { console.error('Page render error:', err); }
     }
   };
 
