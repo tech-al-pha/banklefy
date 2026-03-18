@@ -28,7 +28,7 @@ const PrivacyPost = () => {
             Privacy
           </div>
           <h1 className="mt-6 text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-white">
-            Privacy by Default: Session-Based Access and Secure Handling
+            Privacy by Default: Secure File Handling and Deletion Control
           </h1>
           <p className="mt-4 text-base sm:text-lg text-muted-foreground">
             Feb 7, 2026 · 4 min read
@@ -38,20 +38,22 @@ const PrivacyPost = () => {
         <article className="space-y-6 text-base sm:text-lg text-muted-foreground leading-relaxed">
           <p>
             We built Banklefy to handle sensitive financial data with care. Statements are processed to
-            generate your export, and access is tied to your session and download links.
+            generate your export, temporary files are tied to your active session, and saved conversions
+            remain in your account history until you delete them.
           </p>
 
           <h2 className="text-2xl font-bold text-white">How access works</h2>
           <ul className="list-disc pl-6 space-y-2">
-            <li>Files are available while your session is active and download links are visible.</li>
+            <li>Temporary files are available while your session is active.</li>
+            <li>Saved conversions remain in your account history until you delete them.</li>
             <li>Exports are generated on-demand for your selected format.</li>
             <li>We do not sell or share your statement data.</li>
           </ul>
 
           <h2 className="text-2xl font-bold text-white">What you can do</h2>
           <p>
-            For high‑sensitivity workflows, export the data you need, download it, and close the session
-            once you are done. You stay in control of how long access remains available.
+            For high-sensitivity workflows, export the data you need, download it, and delete the saved
+            conversion when you are done. You stay in control of how long it remains available.
           </p>
         </article>
 

@@ -43,7 +43,7 @@ const Privacy = () => {
     {
       icon: Database,
       title: "Data We Collect",
-      content: "We may collect account details (like email), file metadata, and the files you upload to provide the service. We may also collect basic usage logs (IP address, timestamps, device/browser) for security and abuse prevention.",
+      content: "We may collect account details (like email), file metadata, and the files you upload to provide the service. We may also collect basic usage logs (IP address, timestamps, device/browser) for security and abuse prevention. Saved conversions may remain in your account history until you delete them.",
     },
     {
       icon: Users,
@@ -68,7 +68,7 @@ const Privacy = () => {
     {
       icon: LockOpen,
       title: "Your Rights",
-      content: "You can access and update your account information. Download access is session-based.",
+      content: "You can access and update your account information. Download access is available while you are signed in, and you can remove saved conversions from your account.",
     },
     {
       icon: CheckCircle,

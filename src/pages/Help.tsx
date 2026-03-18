@@ -121,7 +121,7 @@ const Help = () => {
       title: "Exports and Downloads",
       items: [
         "Export to Excel (.xlsx), CSV, JSON, MT940, and PDF reports.",
-        "Download files during your active session.",
+        "Download files from your session or account history.",
         "If a download fails, refresh the page and retry the export.",
         "For accounting tools, Excel or CSV is recommended.",
         "PDF reports are best for sharing, Excel/CSV are best for analysis.",
@@ -206,9 +206,9 @@ const Help = () => {
     {
       id: "billing",
       icon: BadgeDollarSign,
-      title: "Billing and Plans",
+      title: "Billing and Credit Packs",
       items: [
-        "Free, Basic, Pro, and One-time plans are available on the Pricing page.",
+        "Free usage and one-time credit packs are available on the Pricing page.",
         "Payments are processed securely via Razorpay.",
         "Refund details and requests are handled from the Pricing page.",
         "Keep your order ID for faster support.",

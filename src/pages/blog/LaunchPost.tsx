@@ -52,7 +52,7 @@ const LaunchPost = () => {
           <ul className="list-disc pl-6 space-y-2">
             <li>Reliable extraction for common Indian bank layouts.</li>
             <li>Deterministic parsing for text PDFs to avoid unnecessary OCR.</li>
-            <li>Secure processing flow with clear session-based access.</li>
+            <li>Secure processing flow with clear user-controlled access.</li>
           </ul>
 
           <h2 className="text-2xl font-bold text-white">Who this is for</h2>

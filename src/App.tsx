@@ -61,7 +61,7 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   "/pricing": {
     title: "Pricing | Banklefy Bank Statement Converter",
     description:
-      "Transparent pricing for AI bank statement conversion. Free trials and paid plans with higher limits and premium exports.",
+      "Transparent INR pricing for AI bank statement conversion. Free trial and one-time credit packs with higher limits and premium exports.",
   },
   "/features": {
     title: "Features | Banklefy Bank Statement Converter",
@@ -149,8 +149,8 @@ const META_BY_PATH: Record<string, RouteMeta> = {
     description: "Learn the OCR safeguards and scanning tips that improve bank statement accuracy.",
   },
   "/blog/privacy": {
-    title: "Privacy by Default: Session-Based Access and Secure Handling",
-    description: "How Banklefy handles statement access, downloads, and privacy.",
+    title: "Privacy by Default: Secure File Handling and Deletion Control",
+    description: "How Banklefy handles temporary uploads, saved conversions, and privacy.",
   },
   "/blog/multi-format-export": {
     title: "Multi-Format Export: Excel, CSV, JSON, XML & MT940 | Banklefy",
@@ -187,9 +187,6 @@ const getSiteUrl = () => {
   const configured = import.meta.env.VITE_SITE_URL as string | undefined;
   if (configured && configured.trim()) {
     return configured.replace(/\/+$/, "");
-  }
-  if (typeof window !== "undefined") {
-    return window.location.origin;
   }
   return "https://banklefy.vercel.app";
 };
@@ -256,6 +253,8 @@ const getStructuredDataByRoute = (
     isPartOf: { "@id": `${siteUrl}/#website` },
   };
 
+  const baseSchemas = [organizationSchema, websiteSchema, webPageSchema];
+
   if (pathname === "/") {
     schemas.push(organizationSchema, websiteSchema, softwareApplicationSchema);
     return schemas;
@@ -292,12 +291,111 @@ const getStructuredDataByRoute = (
         },
       ],
     };
-    schemas.push(webPageSchema, faqSchema);
+    schemas.push(...baseSchemas, faqSchema);
+    return schemas;
+  }
+
+  if (pathname === "/faqs") {
+    const faqSchema: JsonLd = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: "Which statement formats are supported?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Banklefy supports PDF, JPG, and PNG bank statements, including scanned pages.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Do you support password-protected PDFs?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Yes. Enter the PDF password in the unlock field before conversion.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "How accurate are conversions?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Text-based PDFs use deterministic parsing; scanned PDFs use OCR with balance checks for accuracy.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Which export formats are available?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Exports include Excel, CSV, and additional premium formats depending on plan.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Is my data stored?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Temporary files are available during your active session. Saved conversions remain in your account history until you delete them.",
+          },
+        },
+      ],
+    };
+    schemas.push(...baseSchemas, faqSchema);
+    return schemas;
+  }
+
+  if (pathname === "/how-it-works") {
+    const howToSchema: JsonLd = {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      name: "How Banklefy works",
+      description: "Upload, convert, and download clean bank statement exports.",
+      step: [
+        {
+          "@type": "HowToStep",
+          name: "Upload your statement",
+          text: "Upload a PDF, JPG, or PNG bank statement.",
+        },
+        {
+          "@type": "HowToStep",
+          name: "Convert with Banklefy",
+          text: "We parse text PDFs deterministically or run OCR for scanned files.",
+        },
+        {
+          "@type": "HowToStep",
+          name: "Download exports",
+          text: "Download Excel or CSV outputs in seconds.",
+        },
+      ],
+    };
+    schemas.push(...baseSchemas, howToSchema);
+    return schemas;
+  }
+
+  if (pathname === "/pricing") {
+    const pricingSchema: JsonLd = {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      name: "Banklefy Bank Statement Converter",
+      applicationCategory: "FinanceApplication",
+      operatingSystem: "Web Browser",
+      description: meta.description,
+      url: canonical,
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "INR",
+        description: "Free plan available with paid upgrades.",
+      },
+    };
+    schemas.push(...baseSchemas, pricingSchema);
     return schemas;
   }
 
   if (pathname === "/about") {
-    schemas.push({
+    schemas.push(...baseSchemas, {
       "@context": "https://schema.org",
       "@type": "AboutPage",
       name: meta.title,
@@ -309,7 +407,7 @@ const getStructuredDataByRoute = (
   }
 
   if (pathname === "/blog") {
-    schemas.push({
+    schemas.push(...baseSchemas, {
       "@context": "https://schema.org",
       "@type": "CollectionPage",
       name: meta.title,
@@ -321,7 +419,7 @@ const getStructuredDataByRoute = (
   }
 
   if (pathname.startsWith("/blog/")) {
-    schemas.push({
+    schemas.push(...baseSchemas, {
       "@context": "https://schema.org",
       "@type": "Article",
       headline: meta.title,
@@ -332,7 +430,7 @@ const getStructuredDataByRoute = (
     return schemas;
   }
 
-  schemas.push(webPageSchema);
+  schemas.push(...baseSchemas);
   return schemas;
 };
 
@@ -341,9 +439,13 @@ const AppRoutes = () => {
   const normalizedPathname = normalizePathname(location.pathname);
   const meta = META_BY_PATH[normalizedPathname] || DEFAULT_META;
   const siteUrl = getSiteUrl();
+  const currentOrigin =
+    typeof window !== "undefined" ? window.location.origin.replace(/\/+$/, "") : null;
   const canonical = `${siteUrl}${normalizedPathname === "/" ? "/" : normalizedPathname}`;
   const imageUrl = toAbsoluteUrl(meta.image || DEFAULT_META.image || "/og-banklefy.jpg", siteUrl);
-  const shouldNoIndex = NO_INDEX_PREFIXES.some((path) => normalizedPathname.startsWith(path));
+  const shouldNoIndex =
+    NO_INDEX_PREFIXES.some((path) => normalizedPathname.startsWith(path)) ||
+    (currentOrigin ? currentOrigin !== siteUrl : false);
   const structuredData = getStructuredDataByRoute(normalizedPathname, canonical, siteUrl, meta);
 
   return (

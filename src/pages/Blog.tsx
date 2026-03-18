@@ -43,10 +43,10 @@ const posts = [
   {
     id: "privacy",
     slug: "/blog/privacy",
-    title: "Privacy by Default: Session-Based Access and Secure Handling",
+    title: "Privacy by Default: Secure File Handling and Deletion Control",
     date: "Feb 7, 2026",
     excerpt:
-      "A short overview of how Banklefy stores files temporarily for download and protects sensitive financial data.",
+      "A short overview of how Banklefy handles temporary files, saved conversions, and sensitive financial data.",
     cta: "Read more",
   },
   {

@@ -14,7 +14,7 @@ export const Hero = () => {
     "Edited PDF detector with integrity checks.",
     "Accurate debit, credit, and balance mapping.",
     "FOIR, EMI load, and risk insights.",
-    "Secure processing with session-based access.",
+    "Secure processing with user-controlled access.",
   ];
 
   return (

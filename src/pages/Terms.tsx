@@ -21,7 +21,7 @@ const Terms = () => {
     {
       icon: Heart,
       title: "Your Content & License",
-      content: "You retain ownership of your files. You grant us a limited license to process, store, and transmit your files and results solely to provide and support the service. Download access is available during your active session and while download links are displayed; files may be removed after processing or when the session ends.",
+      content: "You retain ownership of your files. You grant us a limited license to process, store, and transmit your files and results solely to provide and support the service. Uploaded files and generated outputs may remain in your account history until you delete the conversion or your account, and some failed or orphaned uploads may be cleaned up automatically.",
     },
     {
       icon: AlertCircle,
@@ -106,7 +106,7 @@ const Terms = () => {
             Please review our <Button variant="link" className="px-1 text-primary" onClick={() => navigate('/privacy')}>Privacy Policy</Button>.
           </p>
           <p className="text-sm text-muted-foreground">
-            Last updated: March 15, 2026
+            Last updated: March 18, 2026
           </p>
         </div>
       </section>
