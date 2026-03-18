@@ -1481,7 +1481,6 @@ export const UploadDemo = () => {
           const retryWithFileData = await invokeConvertDocument(requestBody);
           data = retryWithFileData;
           // Continue with normal success path below.
-          // eslint-disable-next-line no-lonely-if
         } else {
         const isRequiresImageFallbackError =
           isPdf &&

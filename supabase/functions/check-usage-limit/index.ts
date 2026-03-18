@@ -53,6 +53,44 @@ const getCorsHeaders = (req: Request) => ({
 import { getTrackingKey } from '../_shared/client-id.ts';
 import { resolveEffectiveLimit } from '../_shared/limit-resolver.ts';
 
+type SupabaseAdmin = Parameters<typeof resolveEffectiveLimit>[0]['supabaseAdmin'];
+
+type SubscriptionRow = {
+  conversions_used: number;
+  conversions_limit: number;
+  last_reset_date: string;
+  timezone: string;
+  plan_type?: string | null;
+  tier?: string | null;
+  free_daily_limit?: number | null;
+  free_daily_used?: number | null;
+  monthly_limit?: number | null;
+  monthly_used?: number | null;
+  yearly_limit?: number | null;
+  yearly_used?: number | null;
+  pack_limit?: number | null;
+  pack_used?: number | null;
+};
+
+type AnonymousUsageRow = {
+  conversions_count: number;
+  last_reset_date: string;
+  timezone: string;
+  ip_address?: string;
+  tracking_key?: string;
+  conversions_used?: number | null;
+};
+
+type AnonymousUsageInsert = {
+  ip_address?: string;
+  tracking_key?: string;
+  conversions_count?: number;
+  last_reset_date?: string;
+  timezone?: string;
+};
+
+type AnonymousUsageUpdate = Partial<AnonymousUsageInsert>;
+
 // Sanitize error messages to prevent information leakage
 const sanitizeError = (error: unknown): string => {
   if (error instanceof Error) {
@@ -162,7 +200,7 @@ const normalizeLegacyPlanType = (planType: string, conversionsLimit: number): st
   return planType;
 };
 
-const resolvePlanType = (row: Record<string, unknown> | null): string => {
+const resolvePlanType = (row: SubscriptionRow | null): string => {
   if (!row) return 'free';
   const conversionsLimit = toNumber(row.conversions_limit, 0);
   const planType = normalizePlan(row.plan_type);
@@ -196,21 +234,21 @@ const getResetBoundary = (planType: string, dateParts: { year: string; month: st
 };
 
 const updateAnonymousUsage = async (
-  supabaseAdmin: any,
+  supabaseAdmin: SupabaseAdmin,
   keyColumn: 'ip_address' | 'tracking_key',
   trackingKey: string,
-  payload: Record<string, unknown>,
+  payload: AnonymousUsageUpdate,
 ) => {
   const { error } = await supabaseAdmin
     .from('anonymous_usage')
-    .update(payload as any)
+    .update(payload)
     .eq(keyColumn, trackingKey);
 
   return { error };
 };
 
 const readAnonymousUsage = async (
-  supabaseAdmin: any,
+  supabaseAdmin: SupabaseAdmin,
   trackingKey: string,
 ) => {
   const firstTry = await supabaseAdmin
@@ -238,7 +276,7 @@ const checkLimitFallback = async ({
   trackingKey,
   timezone,
 }: {
-  supabaseAdmin: any;
+  supabaseAdmin: SupabaseAdmin;
   userId: string | null;
   trackingKey: string;
   timezone: string;
@@ -254,7 +292,7 @@ const checkLimitFallback = async ({
         .eq('user_id', userId)
         .maybeSingle();
 
-      let row = (subscriptionResponse.data as Record<string, unknown> | null) ?? null;
+      let row: SubscriptionRow | null = subscriptionResponse.data;
 
       if (subscriptionResponse.error) {
         console.error('Fallback subscription read failed:', subscriptionResponse.error);
@@ -275,7 +313,7 @@ const checkLimitFallback = async ({
             last_reset_date: today,
             timezone,
             plan_type: 'free',
-          } as any)
+          })
           .select('*')
           .maybeSingle();
 
@@ -288,7 +326,7 @@ const checkLimitFallback = async ({
           };
         }
 
-        row = (created.data as Record<string, unknown> | null) ?? {
+        row = created.data ?? {
           conversions_used: 0,
           conversions_limit: 5,
           last_reset_date: today,
@@ -321,7 +359,7 @@ const checkLimitFallback = async ({
             conversions_used: 0,
             last_reset_date: resetBoundary,
             timezone,
-          } as any)
+          })
           .eq('user_id', userId);
 
         if (resetError) {
@@ -348,11 +386,11 @@ const checkLimitFallback = async ({
       };
     }
 
-    let row = (anonRead.data as Record<string, unknown> | null) ?? null;
+    let row: AnonymousUsageRow | null = anonRead.data;
     const keyColumn = anonRead.keyColumn;
 
     if (!row) {
-      const insertPayload: Record<string, unknown> = {
+      const insertPayload: AnonymousUsageInsert = {
         conversions_count: 0,
         last_reset_date: today,
         timezone,
@@ -361,7 +399,7 @@ const checkLimitFallback = async ({
 
       const created = await supabaseAdmin
         .from('anonymous_usage')
-        .insert(insertPayload as any)
+        .insert(insertPayload)
         .select('*')
         .maybeSingle();
 
@@ -374,9 +412,10 @@ const checkLimitFallback = async ({
         };
       }
 
-      row = (created.data as Record<string, unknown> | null) ?? {
+      row = created.data ?? {
         conversions_count: 0,
         last_reset_date: today,
+        timezone,
       };
     }
 
@@ -460,7 +499,7 @@ Deno.serve(async (req) => {
     const supabaseAdmin = createClient(
       supabaseUrl,
       supabaseServiceRoleKey || supabaseAnonKey,
-    );
+    ) as SupabaseAdmin;
 
     // ============= AUTHENTICATION CHECK =============
     // Use token validation without elevating to service-role.

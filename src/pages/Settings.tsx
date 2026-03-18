@@ -93,7 +93,10 @@ const Settings = () => {
 
   const planLabel = formatPlanLabel(planType);
   const memberSince = user?.created_at ? new Date(user.created_at) : null;
-  const lastSignIn = user?.last_sign_in_at ? new Date(user.last_sign_in_at) : null;
+  const lastSignIn = useMemo(
+    () => (user?.last_sign_in_at ? new Date(user.last_sign_in_at) : null),
+    [user?.last_sign_in_at],
+  );
 
   useEffect(() => {
     setDisplayName(user?.user_metadata?.full_name ?? "");

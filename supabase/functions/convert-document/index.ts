@@ -3,6 +3,7 @@
 // STRICT USAGE CONTROL: IP-based limits, page limits, admin whitelist
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 // Import modular processors
 import {
@@ -59,7 +60,105 @@ import type { ExportFormat } from '../_shared/export-builders.ts';
 import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
-import { resolveEffectiveLimit } from '../_shared/limit-resolver.ts';
+import { resolveEffectiveLimit, type LimitResolverDatabase } from '../_shared/limit-resolver.ts';
+import type { Database as AppDatabase } from '../../../src/integrations/supabase/types.ts';
+
+type CategoryCorrectionsTable = AppDatabase['public']['Tables']['category_corrections'];
+
+type ConversionRow = AppDatabase['public']['Tables']['conversions']['Row'] & {
+  pages_processed?: number | null;
+  processed_via?: string | null;
+  output_tier?: string | null;
+  processing_timings?: Record<string, unknown> | null;
+  processing_total_ms?: number | null;
+};
+
+type ConversionInsert = AppDatabase['public']['Tables']['conversions']['Insert'] & {
+  pages_processed?: number | null;
+  processed_via?: string | null;
+  output_tier?: string | null;
+  processing_timings?: Record<string, unknown> | null;
+  processing_total_ms?: number | null;
+};
+
+type ConversionUpdate = Partial<ConversionInsert>;
+
+type SubscriptionRow = LimitResolverDatabase['public']['Tables']['subscriptions']['Row'] & {
+  pages_used_this_month?: number | null;
+};
+
+type SubscriptionInsert = LimitResolverDatabase['public']['Tables']['subscriptions']['Insert'] & {
+  pages_used_this_month?: number | null;
+};
+
+type SubscriptionUpdate = LimitResolverDatabase['public']['Tables']['subscriptions']['Update'] & {
+  pages_used_this_month?: number | null;
+};
+
+type AnonymousUsageRow = LimitResolverDatabase['public']['Tables']['anonymous_usage']['Row'];
+type AnonymousUsageInsert = LimitResolverDatabase['public']['Tables']['anonymous_usage']['Insert'];
+type AnonymousUsageUpdate = LimitResolverDatabase['public']['Tables']['anonymous_usage']['Update'];
+
+type DocumentDatabase = {
+  public: Omit<LimitResolverDatabase['public'], 'Tables'> & {
+    Tables: LimitResolverDatabase['public']['Tables'] & {
+      category_corrections: CategoryCorrectionsTable;
+      conversions: {
+        Row: ConversionRow;
+        Insert: ConversionInsert;
+        Update: ConversionUpdate;
+        Relationships: [];
+      };
+      subscriptions: {
+        Row: SubscriptionRow;
+        Insert: SubscriptionInsert;
+        Update: SubscriptionUpdate;
+        Relationships: [];
+      };
+    };
+  };
+};
+
+type DocumentSupabaseClient = SupabaseClient<DocumentDatabase>;
+
+type SubscriptionLookupRow = {
+  conversions_used?: number | null;
+  conversions_limit?: number | null;
+  last_reset_date?: string | null;
+  timezone?: string | null;
+  tier?: string | null;
+  plan_type?: string | null;
+  free_daily_limit?: number | null;
+  free_daily_used?: number | null;
+  monthly_limit?: number | null;
+  monthly_used?: number | null;
+  yearly_limit?: number | null;
+  yearly_used?: number | null;
+  pack_limit?: number | null;
+  pack_used?: number | null;
+  monthly_reset_date?: string | null;
+  yearly_reset_date?: string | null;
+  pages_used_this_month?: number | null;
+};
+
+type AnonymousUsageLookupRow = {
+  conversions_count?: number | null;
+  conversions_used?: number | null;
+  last_reset_date?: string | null;
+  timezone?: string | null;
+  ip_address?: string | null;
+  tracking_key?: string | null;
+};
+
+type AnonymousUsageLookupInsert = {
+  ip_address?: string;
+  tracking_key?: string;
+  conversions_count?: number;
+  last_reset_date?: string;
+  timezone?: string;
+};
+
+type AnonymousUsageLookupUpdate = Partial<AnonymousUsageLookupInsert>;
 
 type PdfJsModule = {
   getDocument: (options: Record<string, unknown>) => { promise: Promise<unknown> };
@@ -2455,7 +2554,7 @@ const normalizeLegacyPlanType = (planType: string, conversionsLimit: number): st
   return planType;
 };
 
-const resolvePlanType = (row: Record<string, unknown> | null): string => {
+const resolvePlanType = (row: SubscriptionLookupRow | null): string => {
   if (!row) return 'free';
   const conversionsLimit = toNumber(row.conversions_limit, 0);
   const planType = normalizePlan(row.plan_type);
@@ -2515,21 +2614,21 @@ const getResetBoundary = (planType: string, dateParts: { year: string; month: st
 };
 
 const updateAnonymousUsage = async (
-  supabaseAdmin: any,
+  supabaseAdmin: DocumentSupabaseClient,
   keyColumn: 'ip_address' | 'tracking_key',
   trackingKey: string,
-  payload: Record<string, unknown>,
+  payload: AnonymousUsageLookupUpdate,
 ) => {
   const { error } = await supabaseAdmin
     .from('anonymous_usage')
-    .update(payload as any)
+    .update(payload)
     .eq(keyColumn, trackingKey);
 
   return { error };
 };
 
 const readAnonymousUsage = async (
-  supabaseAdmin: any,
+  supabaseAdmin: DocumentSupabaseClient,
   trackingKey: string,
 ) => {
   const firstTry = await supabaseAdmin
@@ -2557,7 +2656,7 @@ const checkLimitFallback = async ({
   trackingKey,
   timezone,
 }: {
-  supabaseAdmin: any;
+  supabaseAdmin: DocumentSupabaseClient;
   userId: string | null;
   trackingKey: string;
   timezone: string;
@@ -2573,7 +2672,7 @@ const checkLimitFallback = async ({
         .eq('user_id', userId)
         .maybeSingle();
 
-      let row = (subscriptionResponse.data as Record<string, unknown> | null) ?? null;
+      let row: SubscriptionLookupRow | null = subscriptionResponse.data;
 
       if (subscriptionResponse.error) {
         console.error('Fallback subscription read failed:', subscriptionResponse.error);
@@ -2594,7 +2693,7 @@ const checkLimitFallback = async ({
             last_reset_date: today,
             timezone,
             plan_type: 'free',
-          } as any)
+          })
           .select('*')
           .maybeSingle();
 
@@ -2607,7 +2706,7 @@ const checkLimitFallback = async ({
           };
         }
 
-        row = (created.data as Record<string, unknown> | null) ?? {
+        row = created.data ?? {
           conversions_used: 0,
           conversions_limit: 5,
           last_reset_date: today,
@@ -2616,25 +2715,25 @@ const checkLimitFallback = async ({
       }
 
       const planType = resolvePlanType(row);
-      const rowData = row as Record<string, unknown>;
+      const rowData = row;
       const hasBuckets = Object.prototype.hasOwnProperty.call(rowData, 'free_daily_limit');
-      const lastResetDate = toDateString(rowData.last_reset_date);
+      const lastResetDate = toDateString(rowData?.last_reset_date);
       const resetBoundary = getResetBoundary(planType, dateParts);
 
       if (hasBuckets) {
-        const freeLimit = toNumber(rowData.free_daily_limit, 5);
-        let freeUsed = toNumber(rowData.free_daily_used, 0);
-        const monthlyLimit = toNumber(rowData.monthly_limit, 0);
-        let monthlyUsed = toNumber(rowData.monthly_used, 0);
-        const yearlyLimit = toNumber(rowData.yearly_limit, 0);
-        let yearlyUsed = toNumber(rowData.yearly_used, 0);
-        const packLimit = toNumber(rowData.pack_limit, 0);
-        const packUsed = toNumber(rowData.pack_used, 0);
+        const freeLimit = toNumber(rowData?.free_daily_limit, 5);
+        let freeUsed = toNumber(rowData?.free_daily_used, 0);
+        const monthlyLimit = toNumber(rowData?.monthly_limit, 0);
+        let monthlyUsed = toNumber(rowData?.monthly_used, 0);
+        const yearlyLimit = toNumber(rowData?.yearly_limit, 0);
+        let yearlyUsed = toNumber(rowData?.yearly_used, 0);
+        const packLimit = toNumber(rowData?.pack_limit, 0);
+        const packUsed = toNumber(rowData?.pack_used, 0);
 
         const monthBoundary = `${dateParts.year}-${dateParts.month}-01`;
         const yearBoundary = `${dateParts.year}-01-01`;
-        const monthReset = toDateString(rowData.monthly_reset_date);
-        const yearReset = toDateString(rowData.yearly_reset_date);
+        const monthReset = toDateString(rowData?.monthly_reset_date);
+        const yearReset = toDateString(rowData?.yearly_reset_date);
 
         if (!lastResetDate || lastResetDate < dateParts.isoDate) {
           freeUsed = 0;
@@ -2656,8 +2755,8 @@ const checkLimitFallback = async ({
         };
       }
 
-      const conversionsLimit = toNumber(rowData.conversions_limit, 5);
-      let conversionsUsed = toNumber(rowData.conversions_used, 0);
+      const conversionsLimit = toNumber(rowData?.conversions_limit, 5);
+      let conversionsUsed = toNumber(rowData?.conversions_used, 0);
 
       if (resetBoundary && (!lastResetDate || lastResetDate < resetBoundary)) {
         const { error: resetError } = await supabaseAdmin
@@ -2666,7 +2765,7 @@ const checkLimitFallback = async ({
             conversions_used: 0,
             last_reset_date: resetBoundary,
             timezone,
-          } as any)
+          })
           .eq('user_id', userId);
 
         if (resetError) {
@@ -2693,11 +2792,11 @@ const checkLimitFallback = async ({
       };
     }
 
-    let row = (anonRead.data as Record<string, unknown> | null) ?? null;
+    let row: AnonymousUsageLookupRow | null = anonRead.data;
     const keyColumn = anonRead.keyColumn;
 
     if (!row) {
-      const insertPayload: Record<string, unknown> = {
+      const insertPayload: AnonymousUsageLookupInsert = {
         conversions_count: 0,
         last_reset_date: today,
         timezone,
@@ -2706,7 +2805,7 @@ const checkLimitFallback = async ({
 
       const created = await supabaseAdmin
         .from('anonymous_usage')
-        .insert(insertPayload as any)
+        .insert(insertPayload)
         .select('*')
         .maybeSingle();
 
@@ -2719,9 +2818,10 @@ const checkLimitFallback = async ({
         };
       }
 
-      row = (created.data as Record<string, unknown> | null) ?? {
+      row = created.data ?? {
         conversions_count: 0,
         last_reset_date: today,
+        timezone,
       };
     }
 
@@ -2763,7 +2863,7 @@ const incrementUsageFallback = async ({
   incrementBy,
   timezone,
 }: {
-  supabaseAdmin: any;
+  supabaseAdmin: DocumentSupabaseClient;
   userId: string | null;
   trackingKey: string;
   incrementBy: number;
@@ -2794,11 +2894,11 @@ const incrementUsageFallback = async ({
             last_reset_date: today,
             timezone,
             plan_type: 'free',
-          } as any);
+          });
         return { ok: !insertError, error: insertError };
       }
 
-      const rowData = row as Record<string, unknown>;
+      const rowData = row;
       const hasBuckets = Object.prototype.hasOwnProperty.call(rowData, 'free_daily_limit');
       if (hasBuckets) {
         let remaining = incrementBy;
@@ -2837,7 +2937,7 @@ const incrementUsageFallback = async ({
             conversions_used: conversionsUsed,
             conversions_limit: conversionsLimit,
             timezone,
-          } as any)
+          })
           .eq('user_id', userId);
         return { ok: !updateError, error: updateError };
       }
@@ -2845,7 +2945,7 @@ const incrementUsageFallback = async ({
       const nextValue = toNumber(rowData.conversions_used, 0) + incrementBy;
       const { error: updateError } = await supabaseAdmin
         .from('subscriptions')
-        .update({ conversions_used: nextValue, timezone } as any)
+        .update({ conversions_used: nextValue, timezone })
         .eq('user_id', userId);
       return { ok: !updateError, error: updateError };
     }
@@ -2856,10 +2956,10 @@ const incrementUsageFallback = async ({
     }
 
     const keyColumn = anonRead.keyColumn;
-    const row = (anonRead.data as Record<string, unknown> | null) ?? null;
+    const row: AnonymousUsageLookupRow | null = anonRead.data;
 
     if (!row) {
-      const payload: Record<string, unknown> = {
+      const payload: AnonymousUsageLookupInsert = {
         conversions_count: incrementBy,
         last_reset_date: today,
         timezone,
@@ -2867,7 +2967,7 @@ const incrementUsageFallback = async ({
       payload[keyColumn] = trackingKey;
       const { error: insertError } = await supabaseAdmin
         .from('anonymous_usage')
-        .insert(payload as any);
+        .insert(payload);
       return { ok: !insertError, error: insertError };
     }
 
@@ -2890,7 +2990,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  let supabaseAdmin: any = null;
+  let supabaseAdmin: DocumentSupabaseClient | null = null;
   let shouldCleanupUploadedSource = false;
   let uploadedSourcePath: string | null = null;
   let sharedPdf: PdfDocumentProxy | null = null;
@@ -2943,7 +3043,7 @@ Deno.serve(async (req) => {
     const trackingKey = await getTrackingKey(req);
 
     // Create Supabase admin client (service role for privileged operations)
-    supabaseAdmin = createClient(
+    supabaseAdmin = createClient<DocumentDatabase>(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
@@ -2966,7 +3066,7 @@ Deno.serve(async (req) => {
         console.log('Authenticated user detected');
 
         // Create user-scoped client for RLS-protected operations
-        supabase = createClient(
+        supabase = createClient<DocumentDatabase>(
           Deno.env.get('SUPABASE_URL') ?? '',
           Deno.env.get('SUPABASE_ANON_KEY') ?? '',
           { global: { headers: { Authorization: authHeader } } }
@@ -4670,7 +4770,7 @@ Deno.serve(async (req) => {
       try {
         const { error: updateError } = await supabase
           .from('conversions')
-          .update({ processed_via: processedVia, output_tier: outputTier } as any)
+          .update({ processed_via: processedVia, output_tier: outputTier })
           .eq('id', conversion.id);
         if (updateError && !/processed_via|output_tier/i.test(updateError.message || '')) {
           console.error('Failed to update conversion processed_via:', updateError);
@@ -4837,7 +4937,7 @@ Deno.serve(async (req) => {
 
           const { error: ledgerError } = await supabaseAdmin
             .from('conversions')
-            .update({ processing_timings: updatedTimings } as any)
+            .update({ processing_timings: updatedTimings })
             .eq('id', conversion.id);
 
           if (ledgerError) {
@@ -4990,7 +5090,7 @@ Deno.serve(async (req) => {
       try {
         const { error: timingError } = await supabase
           .from('conversions')
-          .update({ processing_timings: timing, processing_total_ms: timing.total_ms } as any)
+          .update({ processing_timings: timing, processing_total_ms: timing.total_ms })
           .eq('id', conversion.id);
         if (timingError && !/processing_timings|processing_total_ms/i.test(timingError.message || '')) {
           console.error('Failed to update conversion timings:', timingError);

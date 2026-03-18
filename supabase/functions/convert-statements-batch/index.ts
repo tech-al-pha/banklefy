@@ -2,6 +2,7 @@
 // Processes multiple statements in one request and optionally returns a merged Excel.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 import {
   assessClientPdfParsedTransactions,
@@ -59,7 +60,48 @@ import {
 } from '../_shared/multi-statement.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
-import { resolveEffectiveLimit } from '../_shared/limit-resolver.ts';
+import { resolveEffectiveLimit, type LimitResolverDatabase } from '../_shared/limit-resolver.ts';
+import type { Database as AppDatabase } from '../../../src/integrations/supabase/types.ts';
+
+type CategoryCorrectionsTable = AppDatabase['public']['Tables']['category_corrections'];
+
+type ConversionsTable = {
+  Row: AppDatabase['public']['Tables']['conversions']['Row'] & {
+    pages_processed?: number | null;
+  };
+  Insert: AppDatabase['public']['Tables']['conversions']['Insert'] & {
+    pages_processed?: number | null;
+  };
+  Update: AppDatabase['public']['Tables']['conversions']['Update'] & {
+    pages_processed?: number | null;
+  };
+  Relationships: [];
+};
+
+type SubscriptionsTable = {
+  Row: LimitResolverDatabase['public']['Tables']['subscriptions']['Row'] & {
+    pages_used_this_month?: number | null;
+  };
+  Insert: LimitResolverDatabase['public']['Tables']['subscriptions']['Insert'] & {
+    pages_used_this_month?: number | null;
+  };
+  Update: LimitResolverDatabase['public']['Tables']['subscriptions']['Update'] & {
+    pages_used_this_month?: number | null;
+  };
+  Relationships: [];
+};
+
+type BatchDatabase = {
+  public: Omit<LimitResolverDatabase['public'], 'Tables'> & {
+    Tables: LimitResolverDatabase['public']['Tables'] & {
+      category_corrections: CategoryCorrectionsTable;
+      conversions: ConversionsTable;
+      subscriptions: SubscriptionsTable;
+    };
+  };
+};
+
+type BatchSupabaseClient = SupabaseClient<BatchDatabase>;
 
 type PdfJsModule = {
   getDocument: (options: Record<string, unknown>) => { promise: Promise<unknown> };
@@ -900,7 +942,7 @@ const mergeProviderResults = (primary: OCRResult, secondary: OCRResult): OCRResu
 const sanitizeFileName = (fileName: string): string =>
   fileName.replace(/[\\/]/g, '').substring(0, 255);
 
-const buildCategoryCorrections = async (supabaseAdmin: any, userId?: string) => {
+const buildCategoryCorrections = async (supabaseAdmin: BatchSupabaseClient, userId?: string) => {
   if (!userId) return undefined;
   const { data: corrections } = await supabaseAdmin
     .from('category_corrections')
@@ -1688,7 +1730,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  let supabaseAdmin: any = null;
+  let supabaseAdmin: BatchSupabaseClient | null = null;
   const pendingSourceCleanupPaths = new Set<string>();
 
   try {
@@ -1704,7 +1746,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    supabaseAdmin = createClient(
+    supabaseAdmin = createClient<BatchDatabase>(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );

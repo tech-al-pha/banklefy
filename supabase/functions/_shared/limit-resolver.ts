@@ -1,6 +1,132 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-type SupabaseLike = ReturnType<typeof createClient> | any;
+type SubscriptionRow = {
+  id: string;
+  user_id: string;
+  conversions_used: number;
+  conversions_limit: number;
+  last_reset_date: string;
+  timezone: string;
+  tier: 'free' | 'daily' | 'business' | null;
+  plan_type: string | null;
+  free_daily_limit: number | null;
+  free_daily_used: number | null;
+  monthly_limit: number | null;
+  monthly_used: number | null;
+  yearly_limit: number | null;
+  yearly_used: number | null;
+  pack_limit: number | null;
+  pack_used: number | null;
+  monthly_reset_date: string | null;
+  yearly_reset_date: string | null;
+  is_unlimited?: boolean | null;
+  unlimited?: boolean | null;
+  unlimited_flag?: boolean | null;
+  [key: string]: unknown;
+};
+
+type SubscriptionInsert = {
+  user_id: string;
+  conversions_used?: number;
+  conversions_limit?: number;
+  last_reset_date?: string;
+  timezone?: string;
+  tier?: 'free' | 'daily' | 'business' | null;
+  plan_type?: string | null;
+  free_daily_limit?: number;
+  free_daily_used?: number;
+  monthly_limit?: number;
+  monthly_used?: number;
+  yearly_limit?: number;
+  yearly_used?: number;
+  pack_limit?: number;
+  pack_used?: number;
+  monthly_reset_date?: string | null;
+  yearly_reset_date?: string | null;
+};
+
+type SubscriptionUpdate = Partial<SubscriptionInsert>;
+
+type AnonymousUsageRow = {
+  id: string;
+  ip_address: string;
+  tracking_key?: string;
+  conversions_count: number;
+  conversions_used?: number | null;
+  last_reset_date: string;
+  timezone: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+type AnonymousUsageInsert = {
+  ip_address?: string;
+  tracking_key?: string;
+  conversions_count?: number;
+  last_reset_date?: string;
+  timezone?: string;
+};
+
+type AnonymousUsageUpdate = Partial<AnonymousUsageInsert>;
+
+type UserRoleRow = {
+  id: string;
+  role: 'admin' | 'user';
+  user_id: string;
+};
+
+type UserRoleInsert = {
+  id?: string;
+  role?: 'admin' | 'user';
+  user_id: string;
+};
+
+type UserRoleUpdate = Partial<UserRoleInsert>;
+
+export type LimitResolverDatabase = {
+  public: {
+    Tables: {
+      anonymous_usage: {
+        Row: AnonymousUsageRow;
+        Insert: AnonymousUsageInsert;
+        Update: AnonymousUsageUpdate;
+        Relationships: [];
+      };
+      subscriptions: {
+        Row: SubscriptionRow;
+        Insert: SubscriptionInsert;
+        Update: SubscriptionUpdate;
+        Relationships: [];
+      };
+      user_roles: {
+        Row: UserRoleRow;
+        Insert: UserRoleInsert;
+        Update: UserRoleUpdate;
+        Relationships: [];
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      has_role: {
+        Args: {
+          _user_id: string;
+          _role: 'admin';
+        };
+        Returns: boolean;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
+};
+
+export type SupabaseLike = SupabaseClient<LimitResolverDatabase>;
 
 type AuthUser = {
   id: string;
@@ -105,7 +231,7 @@ const normalizeLegacyPlanType = (planType: string, conversionsLimit: number): st
   return planType;
 };
 
-const resolvePlanType = (row: Record<string, unknown> | null, conversionsLimitHint?: number): string => {
+const resolvePlanType = (row: SubscriptionRow | null, conversionsLimitHint?: number): string => {
   const hint = Number.isFinite(Number(conversionsLimitHint))
     ? Number(conversionsLimitHint)
     : toNumber(row?.conversions_limit, 0);
@@ -168,7 +294,7 @@ const ensureSubscriptionRow = async (
   userId: string,
   timezone: string,
   today: string,
-): Promise<Record<string, unknown>> => {
+): Promise<SubscriptionRow> => {
   const { data, error } = await supabaseAdmin
     .from('subscriptions')
     .select('*')
@@ -179,7 +305,7 @@ const ensureSubscriptionRow = async (
     throw new Error(`resolveEffectiveLimit: failed to read subscriptions (${error.message})`);
   }
 
-  if (data) return data as Record<string, unknown>;
+  if (data) return data;
 
   const { data: created, error: insertError } = await supabaseAdmin
     .from('subscriptions')
@@ -190,7 +316,7 @@ const ensureSubscriptionRow = async (
       last_reset_date: today,
       timezone,
       plan_type: 'free',
-    } as any)
+    })
     .select('*')
     .single();
 
@@ -198,10 +324,10 @@ const ensureSubscriptionRow = async (
     throw new Error(`resolveEffectiveLimit: failed to create subscriptions row (${insertError?.message ?? 'unknown'})`);
   }
 
-  return created as Record<string, unknown>;
+  return created;
 };
 
-const hasExplicitUnlimitedFlag = (row: Record<string, unknown>): boolean => {
+const hasExplicitUnlimitedFlag = (row: SubscriptionRow): boolean => {
   const booleanFlags = ['is_unlimited', 'unlimited', 'unlimited_flag'] as const;
   for (const key of booleanFlags) {
     if (row[key] === true) return true;
@@ -211,7 +337,7 @@ const hasExplicitUnlimitedFlag = (row: Record<string, unknown>): boolean => {
   return planType === 'unlimited' || tier === 'unlimited';
 };
 
-const hasFiniteConfiguredLimit = (row: Record<string, unknown>): boolean => {
+const hasFiniteConfiguredLimit = (row: SubscriptionRow): boolean => {
   const explicitLimit = toNumber(row.conversions_limit, 0);
   const freeLimit = toNumber(row.free_daily_limit, 0);
   const monthlyLimit = toNumber(row.monthly_limit, 0);
@@ -257,7 +383,7 @@ const resolveAnonymousLimit = async (
     .maybeSingle();
 
   let keyColumn: 'ip_address' | 'tracking_key' = 'ip_address';
-  let row = readByIp.data as Record<string, unknown> | null;
+  let row: AnonymousUsageRow | null = readByIp.data;
   let readError = readByIp.error;
 
   if (
@@ -271,7 +397,7 @@ const resolveAnonymousLimit = async (
       .eq('tracking_key', trackingKey)
       .maybeSingle();
     keyColumn = 'tracking_key';
-    row = readByTracking.data as Record<string, unknown> | null;
+    row = readByTracking.data;
     readError = readByTracking.error;
   }
 
@@ -280,7 +406,7 @@ const resolveAnonymousLimit = async (
   }
 
   if (!row) {
-    const insertPayload: Record<string, unknown> = {
+    const insertPayload: AnonymousUsageInsert = {
       conversions_count: 0,
       last_reset_date: today,
       timezone,
@@ -288,27 +414,27 @@ const resolveAnonymousLimit = async (
     insertPayload[keyColumn] = trackingKey;
     const { data: inserted, error: insertError } = await supabaseAdmin
       .from('anonymous_usage')
-      .insert(insertPayload as any)
+      .insert(insertPayload)
       .select('*')
       .single();
     if (insertError || !inserted) {
       throw new Error(`resolveEffectiveLimit: failed to create anonymous usage (${insertError?.message ?? 'unknown'})`);
     }
-    row = inserted as Record<string, unknown>;
+    row = inserted;
   }
 
   let used = toNumber(row.conversions_count ?? row.conversions_used, 0);
   const lastResetDate = toDateString(row.last_reset_date);
   if (!lastResetDate || lastResetDate < today) {
     used = 0;
-    const resetPayload: Record<string, unknown> = {
+    const resetPayload: AnonymousUsageUpdate = {
       conversions_count: 0,
       last_reset_date: today,
       timezone,
     };
     const { error: updateError } = await supabaseAdmin
       .from('anonymous_usage')
-      .update(resetPayload as any)
+      .update(resetPayload)
       .eq(keyColumn, trackingKey);
     if (updateError) {
       throw new Error(`resolveEffectiveLimit: failed to reset anonymous usage (${updateError.message})`);
@@ -372,7 +498,7 @@ export const resolveEffectiveLimit = async ({
           conversions_used: 0,
           last_reset_date: resetBoundary,
           timezone,
-        } as any)
+        })
         .eq('user_id', user.id);
       if (resetError) {
         throw new Error(`resolveEffectiveLimit: failed to reset conversions_used (${resetError.message})`);
@@ -432,7 +558,7 @@ export const resolveEffectiveLimit = async ({
           monthly_reset_date: shouldResetMonthly ? monthBoundary : row.monthly_reset_date,
           yearly_reset_date: shouldResetYearly ? yearBoundary : row.yearly_reset_date,
           timezone,
-        } as any)
+        })
         .eq('user_id', user.id);
 
       if (bucketResetError) {
