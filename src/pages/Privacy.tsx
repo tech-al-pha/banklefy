@@ -53,7 +53,7 @@ const Privacy = () => {
     {
       icon: Shield,
       title: "Payment Processors",
-      content: "Razorpay handles our billing and subscription payments. Razorpay temporarily sees the payment details you enter, and we only receive confirmation, transaction IDs, and invoices necessary to unlock paid features. Razorpay processes that data under their own Terms & Privacy Policy.",
+      content: "Razorpay handles our billing and plan payments. Razorpay temporarily sees the payment details you enter, and we only receive confirmation, transaction IDs, and invoices necessary to unlock paid features. Razorpay processes that data under their own Terms & Privacy Policy.",
     },
     {
       icon: Server,

@@ -1235,7 +1235,6 @@ export const UploadDemo = () => {
 
         if (sessionError || !sessionData.session) {
           // Session might be stale, try to refresh
-          console.log('Session stale or missing, attempting refresh...');
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
 
           if (refreshError || !refreshData.session) {

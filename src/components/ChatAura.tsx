@@ -148,6 +148,7 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const greetingInitializedRef = useRef(false);
 
   const isLimitReached = !user && chatUsed >= 1;
   const remainingChats = user ? "?" : Math.max(0, 1 - chatUsed);
@@ -159,6 +160,11 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
   }, [messages]);
 
   useEffect(() => {
+    if (greetingInitializedRef.current) {
+      return;
+    }
+    greetingInitializedRef.current = true;
+
     const greeting: Message = {
       id: "greeting",
       role: "assistant",
@@ -168,8 +174,7 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
       timestamp: new Date(),
     };
     setMessages([greeting]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeFileName, activePdfContext, t]);
 
   useEffect(() => {
     if (!user) {

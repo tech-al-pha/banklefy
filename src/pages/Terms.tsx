@@ -66,7 +66,7 @@ const Terms = () => {
     {
       icon: FileText,
       title: "Payment Processing",
-      content: "Payments and subscriptions are handled through Razorpay. Your payment information is sent directly to Razorpay and processed under their Terms & Conditions and Privacy Policy; we only store invoices and confirmation tokens needed to grant access to premium features.",
+      content: "Payments and plan purchases are handled through Razorpay. Your payment information is sent directly to Razorpay and processed under their Terms & Conditions and Privacy Policy; we only store invoices and confirmation tokens needed to grant access to paid features.",
     },
   ];
 

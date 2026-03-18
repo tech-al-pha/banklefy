@@ -322,7 +322,7 @@ const Settings = () => {
     {
       id: "billing-plan",
       title: "Current plan",
-      description: "Your active subscription tier.",
+      description: "Your active plan.",
       category: "billing",
       icon: <CreditCard className="h-5 w-5" />,
       component: (
