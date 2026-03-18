@@ -22,6 +22,7 @@ import {
 import banklefyLogo from "@/assets/banklefy-logo.svg";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { buildStatementCsv, parseStatementArchive } from "@/lib/statement-export";
 const loadPdfUtils = () => import("./uploadDemo/pdfUtils");
 const loadExporters = () => import("./uploadDemo/exporters");
 import { ResultsSection } from "./uploadDemo/ResultsSection";
@@ -453,94 +454,42 @@ export const UploadDemo = () => {
     mergedBankInfo: BankInfo | null,
     resolvedCurrency: string,
   ): Promise<string> => {
-    const XLSX = await import("xlsx");
-    const rows: Array<Array<string | number>> = [];
+    const normalizedBankInfo = {
+      bankName: mergedBankInfo?.bankName ?? "",
+      accountNumber: mergedBankInfo?.accountNumber ?? "",
+      accountHolder: mergedBankInfo?.accountHolder ?? "",
+      currency: mergedBankInfo?.currency || resolvedCurrency,
+      iban: mergedBankInfo?.iban,
+      ifsc: mergedBankInfo?.ifsc,
+      swift: mergedBankInfo?.swift,
+      routingNumber: mergedBankInfo?.routingNumber,
+      sortCode: mergedBankInfo?.sortCode,
+      bsb: mergedBankInfo?.bsb,
+      micr: mergedBankInfo?.micr,
+      statementPeriod: mergedBankInfo?.statementPeriod,
+      openingBalance: mergedBankInfo?.openingBalance,
+      closingBalance: mergedBankInfo?.closingBalance,
+    };
 
-    const metadataRows: Array<[string, string | number | undefined | null]> = [
-      ["Bank Name", mergedBankInfo?.bankName],
-      ["Currency Type", mergedBankInfo?.currency || resolvedCurrency],
-      ["Account Number", mergedBankInfo?.accountNumber],
-      ["Account Holder Name", mergedBankInfo?.accountHolder],
-      ["Statement Period", mergedBankInfo?.statementPeriod],
-      ["IBAN", mergedBankInfo?.iban],
-      ["IFSC", mergedBankInfo?.ifsc],
-      ["SWIFT", mergedBankInfo?.swift],
-      ["Routing Number", mergedBankInfo?.routingNumber],
-      ["Opening Balance", mergedBankInfo?.openingBalance],
-      ["Closing Balance", mergedBankInfo?.closingBalance],
-      ["Generated On", new Date().toLocaleString("en-IN")],
-    ];
+    const { data, error } = await supabase.functions.invoke<{ excelData?: string; error?: string; message?: string }>(
+      "generate-xlsx",
+      {
+        body: {
+          transactions: allTransactions,
+          bankInfo: normalizedBankInfo,
+        },
+      },
+    );
 
-    metadataRows.forEach(([label, value]) => {
-      if (value === undefined || value === null || value === "") return;
-      rows.push([label, value]);
-    });
+    if (error) {
+      throw error;
+    }
 
-    if (rows.length > 0) rows.push([]);
+    if (!data?.excelData) {
+      throw new Error(data?.error || data?.message || "Failed to generate merged Excel file.");
+    }
 
-    rows.push([
-      "Date",
-      "Description",
-      "Debit",
-      "Credit",
-      "Balance",
-      "Category",
-      "Duplicate",
-      "Balance Mismatch",
-      "Confidence",
-    ]);
-
-    allTransactions.forEach((transaction) => {
-      const debitValue = Number(transaction.debit || 0);
-      const creditValue = Number(transaction.credit || 0);
-      const balanceValue =
-        transaction.balance === null || transaction.balance === undefined || (transaction.balance as unknown) === ""
-          ? ""
-          : Number(transaction.balance);
-      rows.push([
-        transaction.date || "",
-        transaction.description || "",
-        debitValue === 0 ? "" : debitValue,
-        creditValue === 0 ? "" : creditValue,
-        Number.isFinite(Number(balanceValue)) ? Number(balanceValue) : "",
-        transaction.category || "",
-        transaction.isDuplicate ? "YES" : "",
-        transaction.balanceMismatch ? "YES" : "",
-        Number.isFinite(Number(transaction.confidenceScore))
-          ? Number(Number(transaction.confidenceScore).toFixed(3))
-          : "",
-      ]);
-    });
-
-    rows.push([]);
-    rows.push([
-      "",
-      "TOTAL",
-      Number(sumMoney(allTransactions.map((transaction) => Number(transaction.debit || 0))).toFixed(2)),
-      Number(sumMoney(allTransactions.map((transaction) => Number(transaction.credit || 0))).toFixed(2)),
-      "",
-      "",
-      "",
-      "",
-      "",
-    ]);
-
-    const worksheet = XLSX.utils.aoa_to_sheet(rows);
-    worksheet["!cols"] = [
-      { wch: 14 },
-      { wch: 60 },
-      { wch: 14 },
-      { wch: 14 },
-      { wch: 16 },
-      { wch: 18 },
-      { wch: 12 },
-      { wch: 16 },
-      { wch: 12 },
-    ];
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Statement");
-    return XLSX.write(workbook, { bookType: "xlsx", type: "base64" });
+    return data.excelData;
   };
   const getExportBaseName = () => {
     const preferredName =
@@ -1007,7 +956,7 @@ export const UploadDemo = () => {
                 await uploadSourceFileWithRetry(`${user.id}/${stagedFilePath}`, file);
                 preparedUploadedFileIdRef.current.set(cacheKey, stagedFilePath);
               } catch (uploadError) {
-                console.error("Pre-upload failed for selected file, will retry at convert time:", uploadError);
+                if (import.meta.env.DEV) { console.error("Pre-upload failed for selected file, will retry at convert time:", uploadError); }
                 preparedUploadedFileIdRef.current.delete(cacheKey);
               }
             }
@@ -1238,7 +1187,7 @@ export const UploadDemo = () => {
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
 
           if (refreshError || !refreshData.session) {
-            console.error('Failed to refresh session:', refreshError);
+            if (import.meta.env.DEV) { console.error('Failed to refresh session:', refreshError); }
             throw new Error('Session expired. Please sign in again.');
           } else {
             accessToken = refreshData.session.access_token;
@@ -1377,7 +1326,7 @@ export const UploadDemo = () => {
             responseCurrency,
           );
         } catch (mergeError) {
-          console.error("Failed to compose merged XLSX for chunked PDF:", mergeError);
+          if (import.meta.env.DEV) { console.error("Failed to compose merged XLSX for chunked PDF:", mergeError); }
         }
         const chunkDownloadResults = chunkResponses.map((chunkResponse, index) => {
           const hasDownload = !!(chunkResponse.excelData || chunkResponse.resultPath);
@@ -1579,7 +1528,12 @@ export const UploadDemo = () => {
           );
           if (autoFormat === "csv") {
             await downloadCsvFromPayload(
-              { excelData: data.excelData, resultPath: data.resultPath ?? null },
+              {
+                jsonData: data.jsonData ?? null,
+                transactions: data.transactions,
+                bankInfo: data.bankInfo ?? null,
+                currencyCode: responseCurrency,
+              },
               autoDownloadName,
               { silent: true },
             );
@@ -1591,7 +1545,7 @@ export const UploadDemo = () => {
             );
           }
         } catch (autoDownloadError: unknown) {
-          console.error('Auto-download failed:', autoDownloadError);
+          if (import.meta.env.DEV) { console.error('Auto-download failed:', autoDownloadError); }
           toast({
             variant: "destructive",
             title: "Auto-download failed",
@@ -1700,7 +1654,7 @@ Analytics Summary:
         fileInputRef.current.value = '';
       }
     } catch (error: unknown) {
-      console.error('Conversion error:', error);
+      if (import.meta.env.DEV) { console.error('Conversion error:', error); }
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
 
       if (errorMessage.toLowerCase().includes('session expired')) {
@@ -1922,7 +1876,7 @@ Analytics Summary:
         if (sessionError || !sessionData.session) {
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
           if (refreshError || !refreshData.session) {
-            console.error('Failed to refresh session for batch conversion:', refreshError);
+            if (import.meta.env.DEV) { console.error('Failed to refresh session for batch conversion:', refreshError); }
             throw new Error('Session expired. Please sign in again.');
           } else {
             accessToken = refreshData.session.access_token;
@@ -2065,7 +2019,7 @@ Analytics Summary:
         fileInputRef.current.value = '';
       }
     } catch (error: unknown) {
-      console.error('Batch conversion error:', error);
+      if (import.meta.env.DEV) { console.error('Batch conversion error:', error); }
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
 
       if (errorMessage.toLowerCase().includes('session expired')) {
@@ -2175,17 +2129,28 @@ Analytics Summary:
     };
 
   const downloadCsvFromPayload = async (
-    payload: { excelData?: string | null; resultPath?: string | null },
+    payload: {
+      jsonData?: string | null;
+      transactions?: Transaction[];
+      bankInfo?: BankInfo | null;
+      currencyCode?: string;
+    },
     fileName: string,
     options?: { silent?: boolean },
   ) => {
     const silent = options?.silent ?? false;
     try {
-      const buffer = await getExcelBufferFromPayload(payload);
-      const XLSX = await import("xlsx");
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const csv = XLSX.utils.sheet_to_csv(sheet);
+      const archive = parseStatementArchive(payload.jsonData);
+      const csv = archive
+        ? buildStatementCsv(archive)
+        : payload.transactions && payload.transactions.length > 0
+          ? buildStatementCsv(payload.transactions)
+          : null;
+
+      if (!csv) {
+        throw new Error("No JSON export data available.");
+      }
+
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
 
       const url = URL.createObjectURL(blob);
@@ -2204,7 +2169,7 @@ Analytics Summary:
         });
       }
     } catch (error: unknown) {
-      console.error("CSV download failed:", error);
+      if (import.meta.env.DEV) { console.error("CSV download failed:", error); }
       if (!silent) {
         toast({
           variant: "destructive",
@@ -2223,7 +2188,7 @@ Analytics Summary:
     try {
       await downloadExcelFromPayload(conversionResult, singleDownloadFileName);
     } catch (error: unknown) {
-      console.error('Download error:', error);
+      if (import.meta.env.DEV) { console.error('Download error:', error); }
       toast({
         variant: "destructive",
         title: "Download failed",
@@ -2283,7 +2248,7 @@ Analytics Summary:
         description: `${successCount} ${pluralize(successCount, "file")} downloaded.`,
       });
     } catch (error: unknown) {
-      console.error('Batch download error:', error);
+      if (import.meta.env.DEV) { console.error('Batch download error:', error); }
       toast({
         variant: "destructive",
         title: "Download failed",
@@ -2336,7 +2301,7 @@ Analytics Summary:
         description: "Your merged Excel file has been downloaded.",
       });
     } catch (error: unknown) {
-      console.error('Merge download error:', error);
+      if (import.meta.env.DEV) { console.error('Merge download error:', error); }
       toast({
         variant: "destructive",
         title: "Download failed",

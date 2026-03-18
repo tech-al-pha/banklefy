@@ -55,15 +55,14 @@ import {
   generateFraudAlerts,
   calculateIntegrityScore,
 } from '../_shared/risk-alert-engine.ts';
-import { runStandardizedExportPipeline, decodeArtifactToText, encodeArtifactToBase64 } from '../_shared/export-orchestrator.ts';
+import { runStandardizedExportPipeline, encodeArtifactToBase64 } from '../_shared/export-orchestrator.ts';
+import { buildJsonExport, buildMt940Export } from '../_shared/export-formatters.ts';
 import type { ExportFormat } from '../_shared/export-builders.ts';
 import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
-import { resolveEffectiveLimit, type LimitResolverDatabase } from '../_shared/limit-resolver.ts';
+import { resolveEffectiveLimit, type LimitResolverDatabase, type SupabaseLike } from '../_shared/limit-resolver.ts';
 import type { Database as AppDatabase } from '../../../src/integrations/supabase/types.ts';
-
-type CategoryCorrectionsTable = AppDatabase['public']['Tables']['category_corrections'];
 
 type ConversionRow = AppDatabase['public']['Tables']['conversions']['Row'] & {
   pages_processed?: number | null;
@@ -100,9 +99,14 @@ type AnonymousUsageInsert = LimitResolverDatabase['public']['Tables']['anonymous
 type AnonymousUsageUpdate = LimitResolverDatabase['public']['Tables']['anonymous_usage']['Update'];
 
 type DocumentDatabase = {
-  public: Omit<LimitResolverDatabase['public'], 'Tables'> & {
-    Tables: LimitResolverDatabase['public']['Tables'] & {
-      category_corrections: CategoryCorrectionsTable;
+  public: Omit<AppDatabase['public'], 'Tables'> & {
+    Tables: Omit<AppDatabase['public']['Tables'], 'anonymous_usage' | 'conversions' | 'subscriptions'> & {
+      anonymous_usage: {
+        Row: AnonymousUsageRow;
+        Insert: AnonymousUsageInsert;
+        Update: AnonymousUsageUpdate;
+        Relationships: [];
+      };
       conversions: {
         Row: ConversionRow;
         Insert: ConversionInsert;
@@ -3047,19 +3051,20 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    const supabaseAdminClient = supabaseAdmin!;
 
     // ============= AUTHENTICATION CHECK =============
     // Detect authenticated users via Authorization: Bearer <token> header
     // Use supabaseAdmin.auth.getUser(token) to validate the token server-side
     const authHeader = req.headers.get('Authorization');
     let user = null;
-    let supabase = supabaseAdmin;
+    let supabase = supabaseAdminClient;
 
     if (authHeader && authHeader.startsWith('Bearer ') && authHeader !== 'Bearer null') {
       const token = authHeader.replace('Bearer ', '');
 
       // Validate token using admin client for secure server-side verification
-      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      const { data: { user: authUser }, error: authError } = await supabaseAdminClient.auth.getUser(token);
 
       if (!authError && authUser) {
         user = authUser;
@@ -3197,7 +3202,7 @@ Deno.serve(async (req) => {
       let fileData: Blob | null = null;
       let downloadError: { message?: string } | null = null;
       for (let attempt = 1; attempt <= 3; attempt += 1) {
-        const response = await supabaseAdmin.storage
+        const response = await supabaseAdminClient.storage
           .from('bank-statements')
           .download(storageFilePath);
         fileData = response.data ?? null;
@@ -3399,7 +3404,7 @@ Deno.serve(async (req) => {
     } else {
       try {
         limitState = await resolveEffectiveLimit({
-          supabaseAdmin,
+          supabaseAdmin: supabaseAdminClient as unknown as SupabaseLike,
           user,
           trackingKey,
           timezone: userTimezone,
@@ -3502,7 +3507,7 @@ Deno.serve(async (req) => {
 
       let { data: convData, error: convError } = await supabase
         .from('conversions')
-        .insert(insertPayload)
+        .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
         .select()
         .single();
 
@@ -3512,7 +3517,7 @@ Deno.serve(async (req) => {
         delete insertPayload.pages_processed;
         ({ data: convData, error: convError } = await supabase
           .from('conversions')
-          .insert(insertPayload)
+          .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
           .select()
           .single());
       }
@@ -3523,7 +3528,7 @@ Deno.serve(async (req) => {
         delete insertPayload.file_path;
         ({ data: convData, error: convError } = await supabase
           .from('conversions')
-          .insert(insertPayload)
+          .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
           .select()
           .single());
       }
@@ -4836,7 +4841,24 @@ Deno.serve(async (req) => {
       includeCompatibilityBundle: false,
       prepareDownload: async (artifact) => {
         const fileSize = artifact.fileBuffer.byteLength;
-        return { downloadUrl: null, storagePath: null, fileSize };
+        if (!user || !conversion) {
+          return { downloadUrl: null, storagePath: null, fileSize };
+        }
+
+        const storagePath = `${user.id}/${conversion.id}/result.xlsx`;
+        const { error: uploadError } = await supabaseAdminClient.storage
+          .from('bank-statements')
+          .upload(storagePath, artifact.fileBuffer, {
+            upsert: true,
+            contentType: artifact.mimeType,
+          });
+
+        if (uploadError) {
+          console.error('Failed to persist XLSX export artifact:', uploadError);
+          return { downloadUrl: null, storagePath: null, fileSize };
+        }
+
+        return { downloadUrl: null, storagePath, fileSize };
       },
       commitExportTransaction: async (payload) => {
         const currentRemaining = Math.max(0, conversionsLimit - conversionsUsed);
@@ -4845,7 +4867,7 @@ Deno.serve(async (req) => {
         let existingAuditEntry: Record<string, unknown> | null = null;
         let existingTimings: Record<string, unknown> = {};
         if (user && conversion) {
-          const { data: conversionRow, error: conversionError } = await supabaseAdmin
+          const { data: conversionRow, error: conversionError } = await supabaseAdminClient
             .from('conversions')
             .select('processing_timings')
             .eq('id', conversion.id)
@@ -4892,9 +4914,9 @@ Deno.serve(async (req) => {
           }
         }
 
-        const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
-          p_ip_address: user ? null : trackingKey,
-          p_user_id: user ? user.id : null,
+        const { error: incrementError } = await supabaseAdminClient.rpc('increment_usage_count', {
+          p_ip_address: user ? undefined : trackingKey,
+          p_user_id: user ? user.id : undefined,
           p_increment: incrementBy,
         });
         if (incrementError) {
@@ -4935,7 +4957,7 @@ Deno.serve(async (req) => {
             },
           };
 
-          const { error: ledgerError } = await supabaseAdmin
+          const { error: ledgerError } = await supabaseAdminClient
             .from('conversions')
             .update({ processing_timings: updatedTimings })
             .eq('id', conversion.id);
@@ -4987,11 +5009,21 @@ Deno.serve(async (req) => {
 
     const compatibility = exportResult.compatibility;
     const excelArtifact = compatibility.xlsx ?? (exportResult.primary.format === 'xlsx' ? exportResult.primary : undefined);
-    const jsonArtifact = compatibility.json ?? (exportResult.primary.format === 'json' ? exportResult.primary : undefined);
-    const mt940Artifact = compatibility.mt940 ?? (exportResult.primary.format === 'mt940' ? exportResult.primary : undefined);
-
-    const jsonData = decodeArtifactToText(jsonArtifact) ?? undefined;
-    const mt940Data = decodeArtifactToText(mt940Artifact) ?? undefined;
+    const jsonData = buildJsonExport({
+      transactions,
+      bankMetadata: bankInfo,
+      summary: {
+        totalCredits,
+        totalDebits,
+        netFlow,
+      },
+    });
+    const mt940Data = buildMt940Export({
+      transactions,
+      bankMetadata: bankInfo,
+      statementReference: conversion?.id ?? undefined,
+    });
+    const exportPayload = JSON.parse(jsonData) as AppDatabase['public']['Tables']['conversions']['Update']['export_payload'];
 
     let excelBase64: string | null = null;
     if (!user || !resultPath) {
@@ -5005,10 +5037,12 @@ Deno.serve(async (req) => {
           status: 'completed',
           completed_at: new Date().toISOString(),
           result_path: resultPath,
+          export_payload: exportPayload,
+          error_message: null,
         })
         .eq('id', conversion.id);
 
-      await supabaseAdmin
+      await supabaseAdminClient
         .from('risk_analysis')
         .upsert({
           user_id: user.id,
@@ -5025,10 +5059,10 @@ Deno.serve(async (req) => {
           salary_credits: underwritingResult.salaryCredits,
           emi_debits: underwritingResult.emiDebits,
           risk_flags: riskAnalysis.riskFlags,
-        });
+        } as unknown as AppDatabase['public']['Tables']['risk_analysis']['Insert']);
 
       for (const alert of fraudAlerts) {
-        await supabaseAdmin
+        await supabaseAdminClient
           .from('fraud_alerts')
           .insert({
             user_id: user.id,
@@ -5038,7 +5072,7 @@ Deno.serve(async (req) => {
             description: alert.description,
             affected_rows: alert.affectedRows,
             metadata: alert.metadata,
-          });
+          } as AppDatabase['public']['Tables']['fraud_alerts']['Insert']);
       }
     }
 

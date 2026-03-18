@@ -484,16 +484,16 @@ const withArtifactMeta = (
   rowCount,
 });
 
-const buildForFormat = (
+const buildForFormat = async (
   format: ExportFormat,
   transactions: ReadonlyArray<Transaction>,
   metadata: ExportMetadata,
   input: ExportPipelineInput,
-): ExportPreparedArtifact => {
+): Promise<ExportPreparedArtifact> => {
   const rowCount = transactions.length;
   switch (format) {
     case 'xlsx':
-      return withArtifactMeta(format, buildXLSX(transactions, metadata, input.xlsxContext), rowCount);
+      return withArtifactMeta(format, await buildXLSX(transactions, metadata, input.xlsxContext), rowCount);
     case 'csv':
       return withArtifactMeta(format, buildCSV(transactions, metadata), rowCount);
     case 'json':
@@ -505,7 +505,7 @@ const buildForFormat = (
     case 'foir_report':
       return withArtifactMeta(format, buildFOIRReport(transactions, metadata), rowCount);
     default:
-      return withArtifactMeta('xlsx', buildXLSX(transactions, metadata, input.xlsxContext), rowCount);
+      return withArtifactMeta('xlsx', await buildXLSX(transactions, metadata, input.xlsxContext), rowCount);
   }
 };
 
@@ -708,7 +708,7 @@ export const runStandardizedExportPipeline = async (
   } as ExportMetadata;
 
   const inputDataHash = await hashBytes(JSON.stringify(normalized.map((tx) => txHash(tx))));
-  let primary = buildForFormat(effectiveFormat, normalized, metadata, input);
+  let primary = await buildForFormat(effectiveFormat, normalized, metadata, input);
   let integrity = validateBufferIntegrity(primary, normalized.length);
   if (!integrity.ok) {
     return {
@@ -722,7 +722,7 @@ export const runStandardizedExportPipeline = async (
   }
 
   let outputHash = await hashBytes(primary.fileBuffer);
-  const deterministicCandidate = buildForFormat(effectiveFormat, normalized, metadata, input);
+  const deterministicCandidate = await buildForFormat(effectiveFormat, normalized, metadata, input);
   const deterministicIntegrity = validateBufferIntegrity(deterministicCandidate, normalized.length);
   if (!deterministicIntegrity.ok) {
     return {
@@ -736,7 +736,7 @@ export const runStandardizedExportPipeline = async (
   }
   const deterministicHash = await hashBytes(deterministicCandidate.fileBuffer);
   if (outputHash !== deterministicHash) {
-    const finalCandidate = buildForFormat(effectiveFormat, normalized, metadata, input);
+    const finalCandidate = await buildForFormat(effectiveFormat, normalized, metadata, input);
     const finalIntegrity = validateBufferIntegrity(finalCandidate, normalized.length);
     if (!finalIntegrity.ok) {
       return {
@@ -853,7 +853,7 @@ export const runStandardizedExportPipeline = async (
     const baseFormats: Array<'xlsx' | 'csv' | 'json' | 'mt940'> = ['xlsx', 'csv', 'json', 'mt940'];
     for (const format of baseFormats) {
       if (!planCaps.allowedFormats.has(format)) continue;
-      const artifact = buildForFormat(format, normalized, metadata, input);
+      const artifact = await buildForFormat(format, normalized, metadata, input);
       const compatIntegrity = validateBufferIntegrity(artifact, normalized.length);
       if (compatIntegrity.ok) {
         compatibility[format] = artifact;

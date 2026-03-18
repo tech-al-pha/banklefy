@@ -5,7 +5,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
-import { buildMt940, buildStatementJson, downloadTextFile } from "@/lib/statement-export";
+import {
+  buildMt940,
+  buildStatementCsv,
+  downloadTextFile,
+  parseStatementArchive,
+} from "@/lib/statement-export";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,6 +39,7 @@ interface RecentConversion {
   result_path?: string | null;
   file_path?: string;
   error_message?: string | null;
+  export_payload?: unknown | null;
 }
 
 const Profile = () => {
@@ -65,7 +71,7 @@ const Profile = () => {
     }
     const { data, error } = await supabase
       .from("conversions")
-      .select("id, original_filename, status, created_at, completed_at, result_path, file_path, error_message")
+      .select("id, original_filename, status, created_at, completed_at, result_path, file_path, error_message, export_payload")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -228,105 +234,6 @@ const Profile = () => {
     return safe || fallback;
   };
 
-  const parseAmount = (value: unknown): number => {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const cleaned = value.replace(/,/g, "").trim();
-      if (!cleaned) return 0;
-      const parsed = Number(cleaned);
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-    return 0;
-  };
-
-  const parseWorkbookExportData = async (buffer: ArrayBuffer) => {
-    const XLSX = await import("xlsx");
-    const workbook = XLSX.read(buffer, { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, {
-      header: 1,
-      raw: false,
-      defval: "",
-    }) as (string | number)[][];
-
-    const bankMeta: {
-      bankName?: string;
-      accountNumber?: string;
-      accountHolder?: string;
-      currency?: string;
-      iban?: string;
-      statementPeriod?: string;
-    } = {};
-
-    const hasLabel = (label: string, rowValue: string) => rowValue.trim().toLowerCase() === label;
-    for (const row of rows.slice(0, 16)) {
-      const key = String(row[0] ?? "").trim().toLowerCase();
-      const value = String(row[1] ?? "").trim();
-      if (!value) continue;
-
-      if (hasLabel("bank name", key)) bankMeta.bankName = value;
-      if (hasLabel("currency type", key)) bankMeta.currency = value;
-      if (hasLabel("account number", key)) bankMeta.accountNumber = value;
-      if (hasLabel("account holder name", key)) bankMeta.accountHolder = value;
-      if (hasLabel("statement period", key)) bankMeta.statementPeriod = value;
-      if (hasLabel("iban", key)) bankMeta.iban = value;
-    }
-
-    const headerRowIndex = rows.findIndex((row) => {
-      const cells = row.map((cell) => String(cell ?? "").trim().toLowerCase());
-      return (
-        cells.some((cell) => cell === "date" || cell.includes("transaction date")) &&
-        cells.some((cell) => cell.includes("description") || cell.includes("narration")) &&
-        cells.some((cell) => cell.includes("debit")) &&
-        cells.some((cell) => cell.includes("credit")) &&
-        cells.some((cell) => cell.includes("balance"))
-      );
-    });
-
-    if (headerRowIndex < 0) {
-      throw new Error("Could not locate transaction table in workbook.");
-    }
-
-    const headers = rows[headerRowIndex].map((cell) => String(cell ?? "").trim().toLowerCase());
-    const dateIndex = headers.findIndex((header) => header === "date" || header.includes("transaction date"));
-    const referenceIndex = headers.findIndex((header) => header.includes("reference"));
-    const descriptionIndex = headers.findIndex((header) => header.includes("description") || header.includes("narration"));
-    const debitIndex = headers.findIndex((header) => header.includes("debit"));
-    const creditIndex = headers.findIndex((header) => header.includes("credit"));
-    const balanceIndex = headers.findIndex((header) => header.includes("balance"));
-
-    if (dateIndex < 0 || descriptionIndex < 0 || debitIndex < 0 || creditIndex < 0 || balanceIndex < 0) {
-      throw new Error("Workbook columns are missing required transaction fields.");
-    }
-
-    const transactions = rows
-      .slice(headerRowIndex + 1)
-      .map((row) => {
-        const description = String(row[descriptionIndex] ?? "").trim();
-        const date = String(row[dateIndex] ?? "").trim();
-        if (!date || !description) return null;
-        if (description.toLowerCase() === "total") return null;
-
-        const referenceText = referenceIndex >= 0 ? String(row[referenceIndex] ?? "").trim() : "";
-        return {
-          date,
-          description,
-          refNumber: referenceText || undefined,
-          debit: parseAmount(row[debitIndex]),
-          credit: parseAmount(row[creditIndex]),
-          balance: parseAmount(row[balanceIndex]),
-          category: "Uncategorized",
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => Boolean(item));
-
-    if (transactions.length === 0) {
-      throw new Error("No transactions found in workbook.");
-    }
-
-    return { transactions, bankMeta };
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
@@ -359,6 +266,14 @@ const Profile = () => {
     return buffer;
   };
 
+  const getExportArchive = (item: RecentConversion) => {
+    const archive = parseStatementArchive(item.export_payload);
+    if (!archive || !archive.transactions || archive.transactions.length === 0) {
+      throw new Error("JSON export data is not available for this conversion yet.");
+    }
+    return archive;
+  };
+
   const downloadExcel = async (item: RecentConversion) => {
     try {
       setDownloadingId(item.id);
@@ -386,11 +301,8 @@ const Profile = () => {
   const downloadAsCsv = async (item: RecentConversion) => {
     try {
       setDownloadingId(item.id);
-      const buffer = await fetchResultBuffer(item);
-      const XLSX = await import("xlsx");
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const csv = XLSX.utils.sheet_to_csv(sheet);
+      const archive = getExportArchive(item);
+      const csv = buildStatementCsv(archive);
       const blob = new Blob([csv], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -414,13 +326,8 @@ const Profile = () => {
   const downloadAsJson = async (item: RecentConversion) => {
     try {
       setDownloadingId(item.id);
-      const buffer = await fetchResultBuffer(item);
-      const { transactions, bankMeta } = await parseWorkbookExportData(buffer);
-      const content = buildStatementJson({
-        transactions,
-        bankInfo: bankMeta,
-        currencyCode: bankMeta.currency,
-      });
+      const archive = getExportArchive(item);
+      const content = JSON.stringify(archive, null, 2);
 
       downloadTextFile(
         content,
@@ -441,12 +348,11 @@ const Profile = () => {
   const downloadAsMt940 = async (item: RecentConversion) => {
     try {
       setDownloadingId(item.id);
-      const buffer = await fetchResultBuffer(item);
-      const { transactions, bankMeta } = await parseWorkbookExportData(buffer);
+      const archive = getExportArchive(item);
       const content = buildMt940({
-        transactions,
-        bankInfo: bankMeta,
-        currencyCode: bankMeta.currency,
+        transactions: archive.transactions,
+        bankInfo: archive.bankInfo,
+        currencyCode: archive.currency,
         statementReference: item.id,
       });
 

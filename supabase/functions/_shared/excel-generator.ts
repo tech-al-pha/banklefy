@@ -1,7 +1,4 @@
-﻿// ============= STATEMENT EXCEL GENERATOR =============
-// Focused on strict data preservation and required schema only.
-
-import * as XLSX from 'https://esm.sh/xlsx@0.18.5';
+import ExcelJS from 'https://esm.sh/exceljs@4.4.0';
 import type {
   Transaction,
   FraudAlert,
@@ -51,26 +48,20 @@ export interface ExcelConfig {
   bankInfo?: BankInfo;
 }
 
-type SheetStyle = Record<string, unknown>;
-
-type SheetCell = {
-  v?: unknown;
-  f?: string;
-  t?: string;
-  z?: string;
-  s?: SheetStyle;
-};
-
-type Worksheet = Record<string, SheetCell> & {
-  '!cols'?: Array<{ wch?: number }>;
-  '!rows'?: Array<{ hpt?: number }>;
-};
-
 type SheetValue = string | number | boolean | null | undefined;
-
 type SheetRow = SheetValue[];
-
 type SheetData = SheetRow[];
+
+type ColumnLayout = {
+  headers: string[];
+  includeReferenceColumn: boolean;
+  descriptionColumn: number;
+  debitColumn: number;
+  creditColumn: number;
+  balanceColumn: number;
+  pricingMismatchColumn: number;
+  duplicateFlagColumn: number;
+};
 
 const THEME = {
   headerBg: '1E3A5F',
@@ -101,32 +92,44 @@ export const netStyle = {
   font: { bold: true },
 } as const;
 
-const debitTotalStyle = {
-  font: { bold: true, color: { rgb: THEME.debitRed } },
-  alignment: { horizontal: 'right' },
+const excelHeaderStyle = {
+  font: { bold: true, color: { argb: `FF${THEME.headerFg}` } },
+  fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${THEME.headerBg}` } },
+  alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
   border: {
-    top: { style: 'double', color: { rgb: THEME.border } },
-    bottom: { style: 'double', color: { rgb: THEME.border } },
+    top: { style: 'thin', color: { argb: `FF${THEME.border}` } },
+    bottom: { style: 'thin', color: { argb: `FF${THEME.border}` } },
+    left: { style: 'thin', color: { argb: `FF${THEME.border}` } },
+    right: { style: 'thin', color: { argb: `FF${THEME.border}` } },
   },
-} as SheetStyle;
+} as const;
 
-const creditTotalStyle = {
-  font: { bold: true, color: { rgb: THEME.creditGreen } },
-  alignment: { horizontal: 'right' },
-  border: {
-    top: { style: 'double', color: { rgb: THEME.border } },
-    bottom: { style: 'double', color: { rgb: THEME.border } },
-  },
-} as SheetStyle;
-
-const totalLabelStyle = {
+const excelTotalLabelStyle = {
   font: { bold: true },
   alignment: { horizontal: 'right' },
   border: {
-    top: { style: 'double', color: { rgb: THEME.border } },
-    bottom: { style: 'double', color: { rgb: THEME.border } },
+    top: { style: 'double', color: { argb: `FF${THEME.border}` } },
+    bottom: { style: 'double', color: { argb: `FF${THEME.border}` } },
   },
-} as SheetStyle;
+} as const;
+
+const excelTotalDebitStyle = {
+  font: { bold: true, color: { argb: `FF${THEME.debitRed}` } },
+  alignment: { horizontal: 'right' },
+  border: {
+    top: { style: 'double', color: { argb: `FF${THEME.border}` } },
+    bottom: { style: 'double', color: { argb: `FF${THEME.border}` } },
+  },
+} as const;
+
+const excelTotalCreditStyle = {
+  font: { bold: true, color: { argb: `FF${THEME.creditGreen}` } },
+  alignment: { horizontal: 'right' },
+  border: {
+    top: { style: 'double', color: { argb: `FF${THEME.border}` } },
+    bottom: { style: 'double', color: { argb: `FF${THEME.border}` } },
+  },
+} as const;
 
 const TABLE_HEADERS_WITH_REF = [
   'Date',
@@ -150,56 +153,9 @@ const TABLE_HEADERS_NO_REF = [
 ];
 
 const TABLE_HEADER_VARIANTS = [TABLE_HEADERS_WITH_REF, TABLE_HEADERS_NO_REF] as const;
-
 const MONEY_FORMAT = '#,##0.00';
 
-interface ColumnLayout {
-  headers: string[];
-  includeReferenceColumn: boolean;
-  descriptionColumn: number;
-  debitColumn: number;
-  creditColumn: number;
-  balanceColumn: number;
-  pricingMismatchColumn: number;
-  duplicateFlagColumn: number;
-}
-
-function setCellStyle(ws: Worksheet, addr: string, style: SheetStyle) {
-  if (!ws[addr]) return;
-  ws[addr].s = { ...(ws[addr].s || {}), ...style };
-}
-
-function setCellFormat(ws: Worksheet, addr: string, format: string) {
-  if (!ws[addr]) return;
-  ws[addr].z = format;
-}
-
-function setRowStyle(ws: Worksheet, row: number, colCount: number, style: SheetStyle) {
-  for (let c = 0; c < colCount; c++) {
-    const addr = XLSX.utils.encode_cell({ r: row, c });
-    setCellStyle(ws, addr, style);
-  }
-}
-
-function autoFitCols(allData: SheetData, headers: string[]) {
-  return headers.map((_, colIdx) => {
-    let maxLen = headers[colIdx]?.length || 10;
-    allData.forEach((row) => {
-      const cell = row[colIdx];
-      let len = 0;
-      if (cell === null || cell === undefined) {
-        len = 0;
-      } else {
-        len = String(cell).length;
-      }
-      if (len > maxLen) maxLen = len;
-    });
-    return { wch: Math.min(Math.max(maxLen + 2, 8), 70) };
-  });
-}
-
-const normalizeToken = (value: string): string =>
-  value.toLowerCase().replace(/[^a-z0-9]/g, '');
+const normalizeToken = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const isReferenceEmbeddedInDescription = (reference: string, description: string): boolean => {
   const ref = normalizeToken(reference);
@@ -217,7 +173,6 @@ const shouldIncludeReferenceColumn = (transactions: Transaction[]): boolean => {
     isReferenceEmbeddedInDescription(transaction.refNumber || '', transaction.description || '')
   ).length;
 
-  // If references are already embedded in narration for almost all rows, skip dedicated reference column.
   const embeddedRatio = embeddedCount / withReference.length;
   if (embeddedRatio >= 0.8) return false;
 
@@ -282,9 +237,8 @@ function buildAccountRows(bankInfo?: BankInfo, statementPeriod?: string): SheetD
   return rows;
 }
 
-function numberOrBlank(value: unknown): number | string {
+function toMoneyCell(value: unknown): number | string {
   if (typeof value === 'number' && !Number.isNaN(value)) {
-    // Normalize to minor units to avoid floating-point drift in Excel totals.
     return fromMinorUnits(toMinorUnits(value));
   }
   return value === 0 ? 0 : '';
@@ -292,9 +246,7 @@ function numberOrBlank(value: unknown): number | string {
 
 function buildTransactionRows(transactions: Transaction[], layout: ColumnLayout): SheetData {
   return transactions.map((transaction) => {
-    const row: SheetRow = [
-      transaction.date || '',
-    ];
+    const row: SheetRow = [transaction.date || ''];
 
     if (layout.includeReferenceColumn) {
       row.push(transaction.refNumber || '');
@@ -302,9 +254,9 @@ function buildTransactionRows(transactions: Transaction[], layout: ColumnLayout)
 
     row.push(
       transaction.description || '',
-      numberOrBlank(transaction.debit),
-      numberOrBlank(transaction.credit),
-      numberOrBlank(transaction.balance),
+      toMoneyCell(transaction.debit),
+      toMoneyCell(transaction.credit),
+      toMoneyCell(transaction.balance),
       transaction.balanceMismatch ? 'YES' : '',
       transaction.isDuplicate ? 'YES' : '',
     );
@@ -321,101 +273,155 @@ function buildTotalsRow(layout: ColumnLayout): SheetRow {
   return row;
 }
 
-export function generateProfessionalExcel(config: ExcelConfig): ExcelGenerationResult {
-  const workbook = XLSX.utils.book_new();
-  const rows: SheetData = [];
+function measureColumnWidths(rows: SheetData): Array<{ width: number }> {
+  const maxColumns = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  const widths: Array<{ width: number }> = [];
+
+  for (let column = 0; column < maxColumns; column += 1) {
+    let maxLength = 8;
+    for (const row of rows) {
+      const cell = row[column];
+      const value = cell === null || cell === undefined ? '' : String(cell);
+      if (value.length > maxLength) {
+        maxLength = value.length;
+      }
+    }
+    widths.push({ width: Math.min(Math.max(maxLength + 2, 8), 70) });
+  }
+
+  return widths;
+}
+
+function applyWorksheetStyling(
+  worksheet: ExcelJS.Worksheet,
+  rows: SheetData,
+  layout: ColumnLayout,
+  headerRowIndex: number,
+  totalRowIndex: number,
+  dataStartRow: number,
+  dataEndRow: number,
+) {
+  const headerRow = worksheet.getRow(headerRowIndex + 1);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: `FF${THEME.headerFg}` } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${THEME.headerBg}` } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: `FF${THEME.border}` } },
+      bottom: { style: 'thin', color: { argb: `FF${THEME.border}` } },
+      left: { style: 'thin', color: { argb: `FF${THEME.border}` } },
+      right: { style: 'thin', color: { argb: `FF${THEME.border}` } },
+    };
+  });
+
+  const totalRow = worksheet.getRow(totalRowIndex + 1);
+  const totalLabelCell = totalRow.getCell(layout.descriptionColumn + 1);
+  totalLabelCell.font = { bold: true };
+  totalLabelCell.alignment = { horizontal: 'right' };
+  totalLabelCell.border = {
+    top: { style: 'double', color: { argb: `FF${THEME.border}` } },
+    bottom: { style: 'double', color: { argb: `FF${THEME.border}` } },
+  };
+
+  const debitAddr = `${columnLetter(layout.debitColumn)}${totalRowIndex + 1}`;
+  const creditAddr = `${columnLetter(layout.creditColumn)}${totalRowIndex + 1}`;
+  const debitCell = worksheet.getCell(debitAddr);
+  const creditCell = worksheet.getCell(creditAddr);
+  debitCell.font = { bold: true, color: { argb: `FF${THEME.debitRed}` } };
+  creditCell.font = { bold: true, color: { argb: `FF${THEME.creditGreen}` } };
+  debitCell.alignment = { horizontal: 'right' };
+  creditCell.alignment = { horizontal: 'right' };
+  debitCell.border = {
+    top: { style: 'double', color: { argb: `FF${THEME.border}` } },
+    bottom: { style: 'double', color: { argb: `FF${THEME.border}` } },
+  };
+  creditCell.border = {
+    top: { style: 'double', color: { argb: `FF${THEME.border}` } },
+    bottom: { style: 'double', color: { argb: `FF${THEME.border}` } },
+  };
+
+  for (let rowIndex = dataStartRow; rowIndex <= dataEndRow; rowIndex += 1) {
+    for (const columnIndex of [layout.debitColumn, layout.creditColumn, layout.balanceColumn]) {
+      const cell = worksheet.getCell(rowIndex, columnIndex + 1);
+      cell.numFmt = MONEY_FORMAT;
+      cell.alignment = { horizontal: 'right' };
+    }
+  }
+
+  debitCell.numFmt = MONEY_FORMAT;
+  creditCell.numFmt = MONEY_FORMAT;
+
+  worksheet.columns = measureColumnWidths(rows);
+  worksheet.views = [{ state: 'frozen', ySplit: headerRowIndex + 1 }];
+}
+
+function columnLetter(index: number): string {
+  let n = index + 1;
+  let result = '';
+  while (n > 0) {
+    const remainder = (n - 1) % 26;
+    result = String.fromCharCode(65 + remainder) + result;
+    n = Math.floor((n - remainder) / 26);
+  }
+  return result;
+}
+
+async function buildWorkbook(
+  sheetName: string,
+  rows: SheetData,
+  layout: ColumnLayout,
+): Promise<ExcelGenerationResult> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Banklefy';
+  workbook.created = new Date();
+  const worksheet = workbook.addWorksheet(sheetName);
+  worksheet.addRows(rows);
+
+  const headerRowIndex = rows.findIndex((row) =>
+    TABLE_HEADER_VARIANTS.some((expectedHeaders) =>
+      expectedHeaders.every((header, idx) => (row[idx] ?? '') === header)
+    )
+  );
+  const totalRowIndex = rows.length - 1;
+  const dataStartRow = headerRowIndex + 2;
+  const dataEndRow = totalRowIndex + 1;
+
+  applyWorksheetStyling(worksheet, rows, layout, headerRowIndex, totalRowIndex, dataStartRow, dataEndRow);
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return {
+    buffer: toArrayBuffer(buffer),
+    sheets: [sheetName],
+  };
+}
+
+function toArrayBuffer(value: unknown): ArrayBuffer {
+  if (value instanceof ArrayBuffer) return value;
+  if (ArrayBuffer.isView(value)) {
+    return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer;
+  }
+  throw new Error('Unexpected Excel buffer type');
+}
+
+export async function generateProfessionalExcel(config: ExcelConfig): Promise<ExcelGenerationResult> {
   const layout = buildColumnLayout(config.transactions);
+  const rows: SheetData = [];
 
   rows.push(...buildAccountRows(config.bankInfo));
-  const headerRowIndex = rows.length;
   rows.push(layout.headers);
   const txnRows = buildTransactionRows(config.transactions, layout);
   rows.push(...txnRows);
-
-  // Add totals row with formulas
-  const dataStartRow = headerRowIndex + 2; // 1-indexed, after header
-  const dataEndRow = headerRowIndex + 1 + txnRows.length;
-  const totalRowIndex = rows.length;
   rows.push(buildTotalsRow(layout));
 
-  const ws = XLSX.utils.aoa_to_sheet(rows) as Worksheet;
-
-  // Add SUM formulas for Debit and Credit
-  const debitCol = XLSX.utils.encode_col(layout.debitColumn);
-  const creditCol = XLSX.utils.encode_col(layout.creditColumn);
-  const balanceCol = XLSX.utils.encode_col(layout.balanceColumn);
-  const debitAddr = `${debitCol}${totalRowIndex + 1}`;
-  const creditAddr = `${creditCol}${totalRowIndex + 1}`;
-
-  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n', v: 0 };
-  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n', v: 0 };
-
-  // Ensure debit/credit/balance columns keep decimal precision in Excel.
-  for (let r = dataStartRow; r <= dataEndRow; r++) {
-    setCellFormat(ws, `${debitCol}${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `${creditCol}${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `${balanceCol}${r}`, MONEY_FORMAT);
-  }
-  setCellFormat(ws, debitAddr, MONEY_FORMAT);
-  setCellFormat(ws, creditAddr, MONEY_FORMAT);
-
-  ws['!cols'] = autoFitCols(rows, layout.headers);
-  setRowStyle(ws, headerRowIndex, layout.headers.length, headerStyle);
-
-  // Style the totals row
-  const totalLabelAddr = `${XLSX.utils.encode_col(layout.descriptionColumn)}${totalRowIndex + 1}`;
-  setCellStyle(ws, totalLabelAddr, totalLabelStyle);
-  setCellStyle(ws, debitAddr, debitTotalStyle);
-  setCellStyle(ws, creditAddr, creditTotalStyle);
-
-  XLSX.utils.book_append_sheet(workbook, ws, 'Transactions');
-  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-  return { buffer, sheets: ['Transactions'] };
+  const workbook = await buildWorkbook('Transactions', rows, layout);
+  return workbook;
 }
 
-export function generateSimpleExcel(transactions: Transaction[]): ArrayBuffer {
-  const workbook = XLSX.utils.book_new();
+export async function generateSimpleExcel(transactions: Transaction[]): Promise<ArrayBuffer> {
   const layout = buildColumnLayout(transactions);
-  const txnRows = buildTransactionRows(transactions, layout);
-  const rows: SheetData = [layout.headers, ...txnRows];
-  
-  // Add totals row
-  const dataStartRow = 2; // 1-indexed, after header
-  const dataEndRow = 1 + txnRows.length;
-  const totalRowIndex = rows.length;
-  rows.push(buildTotalsRow(layout));
-
-  const ws = XLSX.utils.aoa_to_sheet(rows) as Worksheet;
-  
-  // Add SUM formulas for Debit and Credit
-  const debitCol = XLSX.utils.encode_col(layout.debitColumn);
-  const creditCol = XLSX.utils.encode_col(layout.creditColumn);
-  const balanceCol = XLSX.utils.encode_col(layout.balanceColumn);
-  const debitAddr = `${debitCol}${totalRowIndex + 1}`;
-  const creditAddr = `${creditCol}${totalRowIndex + 1}`;
-
-  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n', v: 0 };
-  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n', v: 0 };
-
-  for (let r = dataStartRow; r <= dataEndRow; r++) {
-    setCellFormat(ws, `${debitCol}${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `${creditCol}${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `${balanceCol}${r}`, MONEY_FORMAT);
-  }
-  setCellFormat(ws, debitAddr, MONEY_FORMAT);
-  setCellFormat(ws, creditAddr, MONEY_FORMAT);
-
-  ws['!cols'] = autoFitCols(rows, layout.headers);
-  setRowStyle(ws, 0, layout.headers.length, headerStyle);
-  
-  // Style the totals row
-  const totalLabelAddr = `${XLSX.utils.encode_col(layout.descriptionColumn)}${totalRowIndex + 1}`;
-  setCellStyle(ws, totalLabelAddr, totalLabelStyle);
-  setCellStyle(ws, debitAddr, debitTotalStyle);
-  setCellStyle(ws, creditAddr, creditTotalStyle);
-
-  XLSX.utils.book_append_sheet(workbook, ws, 'Transactions');
-  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  const rows: SheetData = [layout.headers, ...buildTransactionRows(transactions, layout), buildTotalsRow(layout)];
+  const workbook = await buildWorkbook('Transactions', rows, layout);
+  return workbook.buffer;
 }
 
 export interface MergedExcelConfig {
@@ -429,60 +435,22 @@ export interface MergedExcelConfig {
   };
 }
 
-export function generateMergedStatementsExcel(config: MergedExcelConfig): ExcelGenerationResult {
-  const workbook = XLSX.utils.book_new();
-  const rows: SheetData = [];
+export async function generateMergedStatementsExcel(config: MergedExcelConfig): Promise<ExcelGenerationResult> {
   const layout = buildColumnLayout(config.transactions);
-
+  const rows: SheetData = [];
   const statementPeriod = config.statementPeriod || config.bankInfo.statementPeriod || '';
-  rows.push(...buildAccountRows(config.bankInfo, statementPeriod));
 
-  const headerRowIndex = rows.length;
+  rows.push(...buildAccountRows(config.bankInfo, statementPeriod));
   rows.push(layout.headers);
   const txnRows = buildTransactionRows(config.transactions, layout);
   rows.push(...txnRows);
-
-  // Add totals row with formulas
-  const dataStartRow = headerRowIndex + 2; // 1-indexed, after header
-  const dataEndRow = headerRowIndex + 1 + txnRows.length;
-  const totalRowIndex = rows.length;
   rows.push(buildTotalsRow(layout));
 
-  const ws = XLSX.utils.aoa_to_sheet(rows) as Worksheet;
-  
-  // Add SUM formulas for Debit and Credit
-  const debitCol = XLSX.utils.encode_col(layout.debitColumn);
-  const creditCol = XLSX.utils.encode_col(layout.creditColumn);
-  const balanceCol = XLSX.utils.encode_col(layout.balanceColumn);
-  const debitAddr = `${debitCol}${totalRowIndex + 1}`;
-  const creditAddr = `${creditCol}${totalRowIndex + 1}`;
-
-  ws[debitAddr] = { f: `SUM(${debitCol}${dataStartRow}:${debitCol}${dataEndRow})`, t: 'n', v: 0 };
-  ws[creditAddr] = { f: `SUM(${creditCol}${dataStartRow}:${creditCol}${dataEndRow})`, t: 'n', v: 0 };
-
-  for (let r = dataStartRow; r <= dataEndRow; r++) {
-    setCellFormat(ws, `${debitCol}${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `${creditCol}${r}`, MONEY_FORMAT);
-    setCellFormat(ws, `${balanceCol}${r}`, MONEY_FORMAT);
-  }
-  setCellFormat(ws, debitAddr, MONEY_FORMAT);
-  setCellFormat(ws, creditAddr, MONEY_FORMAT);
-
-  ws['!cols'] = autoFitCols(rows, layout.headers);
-  setRowStyle(ws, headerRowIndex, layout.headers.length, headerStyle);
-  
-  // Style the totals row
-  const totalLabelAddr = `${XLSX.utils.encode_col(layout.descriptionColumn)}${totalRowIndex + 1}`;
-  setCellStyle(ws, totalLabelAddr, totalLabelStyle);
-  setCellStyle(ws, debitAddr, debitTotalStyle);
-  setCellStyle(ws, creditAddr, creditTotalStyle);
-
-  XLSX.utils.book_append_sheet(workbook, ws, 'Merged Statement');
-  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-  return { buffer, sheets: ['Merged Statement'] };
+  const workbook = await buildWorkbook('Merged Statement', rows, layout);
+  return workbook;
 }
 
-export function validateExcelStructure(buffer: ArrayBuffer): {
+export async function validateExcelStructure(buffer: ArrayBuffer): Promise<{
   valid: boolean;
   hasTransactions: boolean;
   hasAudit: boolean;
@@ -490,17 +458,17 @@ export function validateExcelStructure(buffer: ArrayBuffer): {
   headersBold: boolean;
   hasFormulas: boolean;
   errors: string[];
-} {
+}> {
   const errors: string[] = [];
   let hasTransactions = false;
   let headersBold = false;
   let hasFormulas = false;
 
   try {
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames.includes('Transactions')
-      ? 'Transactions'
-      : workbook.SheetNames[0];
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheetName = workbook.worksheets.find((worksheet) => worksheet.name === 'Transactions')?.name
+      ?? workbook.worksheets[0]?.name;
 
     if (!sheetName) {
       errors.push('Missing Transactions sheet');
@@ -515,12 +483,31 @@ export function validateExcelStructure(buffer: ArrayBuffer): {
       };
     }
 
+    const worksheet = workbook.getWorksheet(sheetName);
+    if (!worksheet) {
+      errors.push('Missing Transactions sheet');
+      return {
+        valid: false,
+        hasTransactions: false,
+        hasAudit: false,
+        hasSummary: false,
+        headersBold,
+        hasFormulas,
+        errors,
+      };
+    }
+
     hasTransactions = true;
-    const ws = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as SheetData;
+    const rows: SheetData = [];
+    worksheet.eachRow({ includeEmpty: true }, (row) => {
+      const values = row.values as unknown[];
+      rows.push(
+        values.slice(1).map((cell) => (cell === null || cell === undefined ? '' : (cell as SheetValue))) as SheetRow,
+      );
+    });
 
     let headerRowIndex = -1;
-    for (let r = 0; r < rows.length; r++) {
+    for (let r = 0; r < rows.length; r += 1) {
       const row = rows[r] || [];
       const matches = TABLE_HEADER_VARIANTS.some((expectedHeaders) =>
         expectedHeaders.every((header, idx) => (row[idx] ?? '') === header)
@@ -534,17 +521,17 @@ export function validateExcelStructure(buffer: ArrayBuffer): {
     if (headerRowIndex === -1) {
       errors.push('Missing transaction header row');
     } else {
-      const headerCell = ws[XLSX.utils.encode_cell({ r: headerRowIndex, c: 0 })];
-      headersBold = headerCell?.s?.font?.bold === true;
+      const headerCell = worksheet.getRow(headerRowIndex + 1).getCell(1);
+      headersBold = headerCell.font?.bold === true;
     }
 
-    for (const addr in ws) {
-      const cell = ws[addr];
-      if (cell?.f) {
-        hasFormulas = true;
-        break;
-      }
-    }
+    worksheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        if (cell?.value && typeof cell.value === 'object' && !Array.isArray(cell.value) && 'formula' in cell.value) {
+          hasFormulas = true;
+        }
+      });
+    });
   } catch (e) {
     errors.push(`Parse error: ${e instanceof Error ? e.message : 'Unknown'}`);
   }

@@ -82,12 +82,12 @@ export const buildCSV = (
   };
 };
 
-export const buildXLSX = (
+export const buildXLSX = async (
   transactions: ReadonlyArray<Transaction>,
   _metadata: ExportMetadata,
   context: XlsxBuilderContext,
-): ExportBuildArtifact => {
-  const excel = generateProfessionalExcel({
+): Promise<ExportBuildArtifact> => {
+  const excel = await generateProfessionalExcel({
     transactions: [...transactions],
     analytics: context.analytics,
     underwriting: context.underwriting,

@@ -1,4 +1,9 @@
-﻿import { buildMt940, buildStatementJson, downloadTextFile } from "@/lib/statement-export";
+import {
+  buildMt940,
+  buildStatementCsv,
+  buildStatementJson,
+  downloadTextFile,
+} from "@/lib/statement-export";
 import type { Transaction, Analytics, BankInfo } from "./types";
 
 type ToastFn = (args: { title: string; description?: string; variant?: "destructive" }) => void;
@@ -25,33 +30,16 @@ const getExportBaseName = (value?: string): string => {
   const safe = noExtension
     .replace(/[<>:"/\\|?*]/g, ' ')
     .replace(/\s+/g, ' ')
-    .replace(/\.+$/g, '')
+    .replace(/\.+$/, '')
     .trim();
   return safe || 'bank-statement';
 };
 
-export const exportAsCSV = ({ transactions, exportBaseName, toast, sumMoney }: ExportContext) => {
+export const exportAsCSV = ({ transactions, exportBaseName, toast }: ExportContext) => {
   if (transactions.length === 0) return;
 
-  const headers = ['Date', 'Description', 'Debit', 'Credit', 'Balance'];
-  const totalDebit = sumMoney(transactions.map((t) => t.debit || 0));
-  const totalCredit = sumMoney(transactions.map((t) => t.credit || 0));
-
-  const csvRows = [
-    headers.join(','),
-    ...transactions.map(t =>
-      [
-        t.date || '',
-        `"${(t.description || '').replace(/"/g, '""')}"`,
-        t.debit || '',
-        t.credit || '',
-        t.balance ?? '',
-      ].join(',')
-    ),
-    ['', 'TOTAL', totalDebit.toFixed(2), totalCredit.toFixed(2), ''].join(','),
-  ];
-
-  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+  const csvContent = buildStatementCsv(transactions);
+  const blob = new Blob([csvContent], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -100,7 +88,7 @@ export const exportAsJSON = async ({
       description: 'Your transaction data has been exported to JSON.',
     });
   } catch (error: unknown) {
-    console.error('JSON export error:', error);
+    if (import.meta.env.DEV) { console.error('JSON export error:', error); }
     toast({
       variant: 'destructive',
       title: 'JSON export failed',
@@ -140,7 +128,7 @@ export const exportAsMT940 = async ({
       description: 'Your transaction data has been exported to MT940.',
     });
   } catch (error: unknown) {
-    console.error('MT940 export error:', error);
+    if (import.meta.env.DEV) { console.error('MT940 export error:', error); }
     toast({
       variant: 'destructive',
       title: 'MT940 export failed',
@@ -156,7 +144,6 @@ const sanitizeLedgerName = (name: string): string => {
     .replace(/[<>]/g, '')
     .trim() || 'Suspense';
 };
-
 
 const formatTallyDate = (value?: string): string => {
   if (!value) return '';
@@ -233,11 +220,11 @@ export const exportAsTallyXml = ({ transactions, exportBaseName, toast, getError
 </ENVELOPE>
 `;
 
-  const blob = new Blob([xml], { type: 'text/xml' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${getExportBaseName(exportBaseName)}.xml`;
+    const blob = new Blob([xml], { type: 'text/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${getExportBaseName(exportBaseName)}.xml`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -248,7 +235,7 @@ export const exportAsTallyXml = ({ transactions, exportBaseName, toast, getError
       description: 'Import this XML into Tally Prime as Vouchers.',
     });
   } catch (error: unknown) {
-    console.error('Tally export error:', error);
+    if (import.meta.env.DEV) { console.error('Tally export error:', error); }
     toast({
       variant: 'destructive',
       title: 'Tally export failed',

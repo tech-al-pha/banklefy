@@ -21,6 +21,22 @@ export interface StatementExportBankInfo {
   closingBalance?: number;
 }
 
+export interface StatementArchiveSummary {
+  totalTransactions: number;
+  totalCredits: number;
+  totalDebits: number;
+  netFlow: number;
+}
+
+export interface StatementArchive {
+  format?: "banklefy-json-v1";
+  generatedAt?: string;
+  currency?: string;
+  bankInfo?: StatementExportBankInfo;
+  summary?: StatementArchiveSummary;
+  transactions?: StatementExportTransaction[];
+}
+
 type JsonExportArgs = {
   transactions: StatementExportTransaction[];
   analytics?: Analytics | null;
@@ -57,6 +73,80 @@ const sanitizeText = (value: unknown, fallback = "", maxLength = 120): string =>
     .trim();
   const normalized = cleaned || fallback;
   return normalized.length > maxLength ? normalized.slice(0, maxLength) : normalized;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+const normalizeArchiveTransaction = (value: unknown): StatementExportTransaction | null => {
+  if (!isRecord(value)) return null;
+  const date = sanitizeText(value.date, "", 40);
+  const description = sanitizeText(value.description, "", 250);
+  if (!date || !description) return null;
+  return {
+    date,
+    description,
+    category: sanitizeText(value.category, "Other", 80),
+    debit: roundMoney(toFiniteNumber(value.debit)),
+    credit: roundMoney(toFiniteNumber(value.credit)),
+    balance: roundMoney(toFiniteNumber(value.balance)),
+    refNumber: sanitizeText(value.refNumber, "", 80),
+  };
+};
+
+export const parseStatementArchive = (value: unknown): StatementArchive | null => {
+  if (!value) return null;
+
+  let source: unknown = value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+      source = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!isRecord(source)) return null;
+
+  const transactions = Array.isArray(source.transactions)
+    ? source.transactions.map((item) => normalizeArchiveTransaction(item)).filter((item): item is StatementExportTransaction => Boolean(item))
+    : [];
+
+  const bankInfo = isRecord(source.bankInfo)
+    ? {
+        bankName: sanitizeText(source.bankInfo.bankName, "", 120) || undefined,
+        accountNumber: sanitizeText(source.bankInfo.accountNumber, "", 80) || undefined,
+        accountHolder: sanitizeText(source.bankInfo.accountHolder, "", 160) || undefined,
+        currency: sanitizeText(source.bankInfo.currency, "", 12) || undefined,
+        iban: sanitizeText(source.bankInfo.iban, "", 80) || undefined,
+        statementPeriod: sanitizeText(source.bankInfo.statementPeriod, "", 80) || undefined,
+        openingBalance: toFiniteNumber(source.bankInfo.openingBalance),
+        closingBalance: toFiniteNumber(source.bankInfo.closingBalance),
+      }
+    : undefined;
+
+  const summary = isRecord(source.summary)
+    ? {
+        totalTransactions: Math.max(0, Math.trunc(toFiniteNumber(source.summary.totalTransactions))),
+        totalCredits: roundMoney(toFiniteNumber(source.summary.totalCredits)),
+        totalDebits: roundMoney(toFiniteNumber(source.summary.totalDebits)),
+        netFlow: roundMoney(toFiniteNumber(source.summary.netFlow)),
+      }
+    : undefined;
+
+  if (transactions.length === 0 && !bankInfo && !summary) return null;
+
+  return {
+    format: source.format === "banklefy-json-v1" ? "banklefy-json-v1" : undefined,
+    generatedAt: typeof source.generatedAt === "string" ? source.generatedAt : undefined,
+    currency: sanitizeText(source.currency, "", 12) || undefined,
+    bankInfo,
+    summary,
+    transactions,
+  };
 };
 
 const parseDate = (value: unknown): Date | null => {
@@ -151,6 +241,44 @@ const inferClosingBalance = (
     return roundMoney(bankInfo.closingBalance);
   }
   return roundMoney(toNumber(lastTransaction?.balance));
+};
+
+const csvEscape = (value: unknown): string => {
+  const str = String(value ?? "");
+  if (str.includes('"') || str.includes(",") || str.includes("\n")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
+
+const formatCsvAmount = (value: unknown): string => {
+  const amount = roundMoney(toNumber(value));
+  if (!Number.isFinite(amount) || amount === 0) return "";
+  return amount.toFixed(2);
+};
+
+export const buildStatementCsv = (
+  archiveOrTransactions: StatementArchive | StatementExportTransaction[],
+): string => {
+  const transactions = Array.isArray(archiveOrTransactions)
+    ? archiveOrTransactions
+    : archiveOrTransactions.transactions ?? [];
+  const header = ["Date", "Description", "Category", "Debit", "Credit", "Balance", "Reference"];
+  const rows = transactions.map((transaction) => ([
+    transaction.date || "",
+    transaction.description || "",
+    transaction.category || "",
+    formatCsvAmount(transaction.debit),
+    formatCsvAmount(transaction.credit),
+    formatCsvAmount(transaction.balance),
+    transaction.refNumber || "",
+  ]));
+
+  const totalDebit = roundMoney(transactions.reduce((sum, transaction) => sum + toNumber(transaction.debit), 0));
+  const totalCredit = roundMoney(transactions.reduce((sum, transaction) => sum + toNumber(transaction.credit), 0));
+  const totalRow = ["", "TOTAL", "", totalDebit.toFixed(2), totalCredit.toFixed(2), "", ""];
+
+  return [header, ...rows, totalRow].map((row) => row.map(csvEscape).join(",")).join("\n");
 };
 
 export const buildStatementJson = ({

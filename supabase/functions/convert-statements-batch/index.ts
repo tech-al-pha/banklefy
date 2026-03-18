@@ -60,10 +60,8 @@ import {
 } from '../_shared/multi-statement.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
-import { resolveEffectiveLimit, type LimitResolverDatabase } from '../_shared/limit-resolver.ts';
+import { resolveEffectiveLimit, type LimitResolverDatabase, type SupabaseLike } from '../_shared/limit-resolver.ts';
 import type { Database as AppDatabase } from '../../../src/integrations/supabase/types.ts';
-
-type CategoryCorrectionsTable = AppDatabase['public']['Tables']['category_corrections'];
 
 type ConversionsTable = {
   Row: AppDatabase['public']['Tables']['conversions']['Row'] & {
@@ -92,9 +90,8 @@ type SubscriptionsTable = {
 };
 
 type BatchDatabase = {
-  public: Omit<LimitResolverDatabase['public'], 'Tables'> & {
-    Tables: LimitResolverDatabase['public']['Tables'] & {
-      category_corrections: CategoryCorrectionsTable;
+  public: Omit<AppDatabase['public'], 'Tables'> & {
+    Tables: Omit<AppDatabase['public']['Tables'], 'conversions' | 'subscriptions'> & {
       conversions: ConversionsTable;
       subscriptions: SubscriptionsTable;
     };
@@ -1680,7 +1677,7 @@ const processStatement = async (params: {
     };
   });
 
-  const excelResult = generateProfessionalExcel({
+  const excelResult = await generateProfessionalExcel({
     transactions,
     analytics: {
       totalCredits,
@@ -1750,14 +1747,15 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    const supabaseAdminClient = supabaseAdmin!;
 
     const authHeader = req.headers.get('Authorization');
     let user = null;
-    let supabase = supabaseAdmin;
+    let supabase = supabaseAdminClient;
 
     if (authHeader && authHeader.startsWith('Bearer ') && authHeader !== 'Bearer null') {
       const token = authHeader.replace('Bearer ', '');
-      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      const { data: { user: authUser }, error: authError } = await supabaseAdminClient.auth.getUser(token);
       if (!authError && authUser) {
         user = authUser;
         supabase = createClient(
@@ -1853,7 +1851,7 @@ Deno.serve(async (req) => {
 
     try {
       const effectiveLimit = await resolveEffectiveLimit({
-        supabaseAdmin,
+        supabaseAdmin: supabaseAdminClient as unknown as SupabaseLike,
         user,
         trackingKey,
         timezone: userTimezone,
@@ -2036,7 +2034,7 @@ Deno.serve(async (req) => {
         // Retrieve bytes (for validation and non-PDF extraction)
         let bytes = new Uint8Array();
         if (user && file.fileId) {
-          const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+          const { data: fileData, error: downloadError } = await supabaseAdminClient.storage
             .from('bank-statements')
             .download(`${user.id}/${file.fileId}`);
 
@@ -2092,7 +2090,7 @@ Deno.serve(async (req) => {
 
           let { data: convData, error: convError } = await supabase
             .from('conversions')
-            .insert(insertPayload)
+            .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
             .select()
             .single();
 
@@ -2102,7 +2100,7 @@ Deno.serve(async (req) => {
             delete insertPayload.pages_processed;
             ({ data: convData, error: convError } = await supabase
               .from('conversions')
-              .insert(insertPayload)
+              .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
               .select()
               .single());
           }
@@ -2149,15 +2147,39 @@ Deno.serve(async (req) => {
           paidPagesConsumed += pagesToCharge;
         }
 
-        // Keep export ephemeral: no persistent result upload.
-        const resultPath: string | null = null;
+        let resultPath: string | null = null;
         if (user && conversionRecord) {
+          const storagePath = `${user.id}/${conversionRecord.id}/result.xlsx`;
+          const { error: uploadError } = await supabaseAdminClient.storage
+            .from('bank-statements')
+            .upload(storagePath, excelBuffer, {
+              upsert: true,
+              contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            });
+          if (uploadError) {
+            console.error('Failed to persist batch XLSX export artifact:', uploadError);
+          } else {
+            resultPath = storagePath;
+          }
+        }
+
+        if (user && conversionRecord) {
+          const exportPayload = JSON.parse(buildJsonExport({
+            transactions,
+            bankMetadata,
+            summary: {
+              totalCredits: totals.totalCredits,
+              totalDebits: totals.totalDebits,
+              netFlow: fromMinorUnits(toMinorUnits(totals.totalCredits) - toMinorUnits(totals.totalDebits)),
+            },
+          }));
           await supabase
             .from('conversions')
             .update({
               status: 'completed',
               completed_at: new Date().toISOString(),
-              result_path: null,
+              result_path: resultPath,
+              export_payload: exportPayload,
               error_message: null,
             })
             .eq('id', conversionRecord.id);
@@ -2225,7 +2247,7 @@ Deno.serve(async (req) => {
 
     if (validation.canMerge) {
       const merged = buildMergedStatement(statementData);
-      const mergedExcel = generateMergedStatementsExcel({
+      const mergedExcel = await generateMergedStatementsExcel({
         bankInfo: merged.bankInfo,
         statementPeriod: merged.statementPeriod,
         transactions: merged.mergedTransactions,
@@ -2253,9 +2275,9 @@ Deno.serve(async (req) => {
     const incrementBy = isFreeMode ? successfulConversions : pagesWithDataTotal;
     let remaining = Math.max(0, conversionsLimit - conversionsUsed);
     if (incrementBy > 0) {
-      const { error: incrementError } = await supabaseAdmin.rpc('increment_usage_count', {
-        p_ip_address: user ? null : trackingKey,
-        p_user_id: user ? user.id : null,
+      const { error: incrementError } = await supabaseAdminClient.rpc('increment_usage_count', {
+        p_ip_address: user ? undefined : trackingKey,
+        p_user_id: user ? user.id : undefined,
         p_increment: incrementBy,
       });
       if (incrementError) {

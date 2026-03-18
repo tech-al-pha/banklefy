@@ -85,6 +85,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           error_message: string | null
+          export_payload: Json | null
           file_path: string
           id: string
           original_filename: string
@@ -96,6 +97,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           error_message?: string | null
+          export_payload?: Json | null
           file_path: string
           id?: string
           original_filename: string
@@ -107,6 +109,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           error_message?: string | null
+          export_payload?: Json | null
           file_path?: string
           id?: string
           original_filename?: string
@@ -443,7 +446,7 @@ export type Database = {
         Returns: boolean
       }
       increment_usage_count: {
-        Args: { p_ip_address?: string; p_user_id?: string }
+        Args: { p_ip_address?: string; p_user_id?: string; p_increment?: number }
         Returns: boolean
       }
     }
