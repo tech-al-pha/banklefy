@@ -1,5 +1,30 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
+type ConversionStorageMetadata = {
+  sourcePath: string | null;
+  resultPath: string | null;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+};
+
+const getConversionStorageMetadata = (value: unknown): ConversionStorageMetadata => {
+  if (!isRecord(value)) {
+    return { sourcePath: null, resultPath: null };
+  }
+
+  const storage = isRecord(value.storage) ? value.storage : null;
+  return {
+    sourcePath: typeof storage?.sourcePath === "string" ? storage.sourcePath : null,
+    resultPath: typeof storage?.resultPath === "string" ? storage.resultPath : null,
+  };
+};
+
+const getResultStoragePath = (userId: string, conversionId: string): string => {
+  return `${userId}/${conversionId}/result.xlsx`;
+};
+
 const getAllowedOrigin = (requestOrigin: string | null): string => {
   const envOrigin = Deno.env.get("ALLOWED_ORIGIN");
 
@@ -87,7 +112,7 @@ Deno.serve(async (req) => {
 
     const { data: conversion, error: conversionError } = await supabaseAdmin
       .from("conversions")
-      .select("id, user_id, file_path, result_path")
+      .select("id, user_id, status, processing_timings")
       .eq("id", conversionId)
       .single();
 
@@ -105,22 +130,28 @@ Deno.serve(async (req) => {
       });
     }
 
-    const paths: string[] = [];
-    if (conversion.file_path) {
-      const normalizedPath = conversion.file_path.includes("/")
-        ? conversion.file_path
-        : `${conversion.user_id}/${conversion.file_path}`;
-      paths.push(normalizedPath);
-    }
-    if (conversion.result_path) {
-      paths.push(conversion.result_path);
+    const paths = new Set<string>();
+    const storage = getConversionStorageMetadata(conversion.processing_timings);
+    const userId = conversion.user_id ?? user.id;
+
+    if (storage.sourcePath) {
+      const normalizedSourcePath = storage.sourcePath.includes("/")
+        ? storage.sourcePath
+        : `${userId}/${storage.sourcePath}`;
+      paths.add(normalizedSourcePath);
     }
 
-    if (paths.length > 0) {
+    if (storage.resultPath) {
+      paths.add(storage.resultPath);
+    } else if (conversion.status === "completed") {
+      paths.add(getResultStoragePath(userId, conversion.id));
+    }
+
+    if (paths.size > 0) {
       const { error: removeError } = await supabaseAdmin
         .storage
         .from("bank-statements")
-        .remove(paths);
+        .remove(Array.from(paths));
       if (removeError) {
         console.error("Failed to remove storage files:", removeError);
       }
