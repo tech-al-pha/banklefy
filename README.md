@@ -33,7 +33,7 @@ Secure • Fast • Mobile-Friendly
 
 ### Pricing
 Affordable & flexible plans starting from $1 per conversion  
-Monthly subscriptions from $9 – no hidden fees, maximum value.
+Basic subscriptions from $20 – no hidden fees, maximum value.
 
 ## Roadmap – What's Coming Next
 - Team collaboration: Shared workspaces, role-based access, and real-time comments
