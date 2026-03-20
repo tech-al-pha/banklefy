@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { formatProcessingDuration, getConversionResultStoragePath } from "@/lib/conversion-history";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -21,13 +22,10 @@ import LoadingScreen from "@/components/LoadingScreen";
 
 interface Conversion {
   id: string;
-  original_filename: string;
-  status: string;
-  created_at: string;
-  completed_at: string | null;
-  result_path: string | null;
-  error_message: string | null;
-  file_path: string;
+  file_name: string | null;
+  status: string | null;
+  created_at: string | null;
+  processing_total_ms: number | null;
 }
 
 const Dashboard = () => {
@@ -50,7 +48,7 @@ const Dashboard = () => {
       // Query conversions table - RLS ensures only user's own data is returned
       const { data, error } = await supabase
         .from("conversions")
-        .select("id, original_filename, status, created_at, completed_at, result_path, error_message, file_path")
+        .select("id, file_name, status, created_at, processing_total_ms")
         .eq("user_id", user.id) // Explicit filter even though RLS handles it
         .order("created_at", { ascending: false });
 
@@ -80,20 +78,26 @@ const Dashboard = () => {
   }, [user, navigate, fetchConversions]);
 
   const downloadExcel = async (conversion: Conversion) => {
-    if (!conversion.result_path) return;
+    if (!user) return;
 
     setDownloadingId(conversion.id);
     try {
+      const storagePath = getConversionResultStoragePath(user.id, conversion.id);
       const { data, error } = await supabase.storage
         .from("bank-statements")
-        .download(conversion.result_path);
+        .download(storagePath);
 
       if (error) throw error;
 
       const url = URL.createObjectURL(data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${conversion.original_filename.replace(/\.[^/.]+$/, "")}_converted.xlsx`;
+      const baseName = (conversion.file_name ?? "bank-statement")
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[<>:"/\\|?*]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim() || "bank-statement";
+      a.download = `${baseName}_converted.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -115,8 +119,8 @@ const Dashboard = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (status: string | null) => {
+    switch (status ?? "unknown") {
       case "completed":
         return <Badge className="bg-green-600">Completed</Badge>;
       case "processing":
@@ -212,7 +216,7 @@ const Dashboard = () => {
                       <TableHead>File Name</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
-                      <TableHead>Completed</TableHead>
+                      <TableHead>Duration</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -220,19 +224,17 @@ const Dashboard = () => {
                     {conversions.map((conversion) => (
                       <TableRow key={conversion.id}>
                         <TableCell className="font-medium">
-                          {conversion.original_filename}
+                          {conversion.file_name || "Bank statement"}
                         </TableCell>
                         <TableCell>{getStatusBadge(conversion.status)}</TableCell>
                         <TableCell>
-                          {format(new Date(conversion.created_at), "MMM d, yyyy HH:mm")}
+                          {conversion.created_at ? format(new Date(conversion.created_at), "MMM d, yyyy HH:mm") : "-"}
                         </TableCell>
                         <TableCell>
-                          {conversion.completed_at
-                            ? format(new Date(conversion.completed_at), "MMM d, yyyy HH:mm")
-                            : "-"}
+                          {formatProcessingDuration(conversion.processing_total_ms)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {conversion.status === "completed" && conversion.result_path ? (
+                          {conversion.status === "completed" ? (
                             <Button
                               size="sm"
                               onClick={() => downloadExcel(conversion)}
@@ -248,7 +250,7 @@ const Dashboard = () => {
                             </Button>
                           ) : conversion.status === "failed" ? (
                             <span className="text-sm text-destructive">
-                              {conversion.error_message || "Conversion failed"}
+                              Conversion failed
                             </span>
                           ) : (
                             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
