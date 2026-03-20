@@ -54,21 +54,17 @@ export const useUsageLimit = () => {
       return Number.isFinite(numeric) ? numeric : fallback;
     };
 
-    const stackedLimit =
-      toNumber(row.free_daily_limit, 5) +
-      toNumber(row.monthly_limit, 0) +
-      toNumber(row.yearly_limit, 0) +
-      toNumber(row.pack_limit, 0);
-    const stackedUsed =
-      toNumber(row.free_daily_used, 0) +
-      toNumber(row.monthly_used, 0) +
-      toNumber(row.yearly_used, 0) +
-      toNumber(row.pack_used, 0);
-
-    const conversionsLimit = Math.max(toNumber(row.conversions_limit, 0), stackedLimit);
+    const explicitLimit = toNumber(row.conversions_limit, 0);
+    const freeLimit = toNumber(row.free_daily_limit, 5);
+    const packLimit = toNumber(row.pack_limit, 0);
+    const conversionsLimit = explicitLimit > 0 ? explicitLimit : Math.max(freeLimit, packLimit);
     const conversionsUsed = Math.min(
       conversionsLimit,
-      Math.max(toNumber(row.conversions_used, 0), stackedUsed),
+      Math.max(
+        toNumber(row.conversions_used, 0),
+        toNumber(row.free_daily_used, 0),
+        toNumber(row.pack_used, 0),
+      ),
     );
 
     const rawPlan =
@@ -109,6 +105,10 @@ export const useUsageLimit = () => {
 
       if (error) {
         throw new Error(error.message || 'Failed to check usage limit');
+      }
+
+      if (!data) {
+        throw new Error('Usage limit response was empty');
       }
 
       let resolvedLimit = data.conversionsLimit ?? defaultLimit;
