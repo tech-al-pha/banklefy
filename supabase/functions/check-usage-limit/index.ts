@@ -169,34 +169,20 @@ const toNumber = (value: unknown, fallback: number): number => {
   return Number.isFinite(numeric) ? numeric : fallback;
 };
 
-const normalizeLegacyPlanType = (planType: string, conversionsLimit: number): string => {
-  if (
-    planType === 'free' ||
-    planType === 'unlimited' ||
-    planType.startsWith('monthly') ||
-    planType.startsWith('yearly') ||
-    planType.startsWith('per_page')
-  ) {
-    return planType;
-  }
+const getCurrentPackFromLimit = (conversionsLimit: number): string | null => {
+  if (conversionsLimit >= 11000) return 'per_page_pack_pro';
+  if (conversionsLimit >= 1000) return 'per_page_pack_basic';
+  if (conversionsLimit >= 50) return 'per_page_power';
+  if (conversionsLimit >= 25) return 'per_page_standard';
+  if (conversionsLimit >= 10) return 'per_page_lite';
+  return null;
+};
 
-  if (planType === 'daily') {
-    if (conversionsLimit >= 4500) return 'monthly_enterprise';
-    if (conversionsLimit >= 1000) return 'monthly_pro';
-    if (conversionsLimit >= 300) return 'monthly_basic';
-    return 'daily';
-  }
-
-  if (planType === 'business') {
-    if (conversionsLimit >= 65000) return 'yearly_pro';
-    if (conversionsLimit >= 15000) return 'yearly_full';
-    if (conversionsLimit >= 5000) return 'yearly_lite';
-    if (conversionsLimit === 50) return 'per_page_power';
-    if (conversionsLimit === 25) return 'per_page_standard';
-    if (conversionsLimit === 10) return 'per_page_lite';
-    return 'business';
-  }
-
+const resolveCurrentPlanType = (planType: string, conversionsLimit: number): string => {
+  const inferredPack = getCurrentPackFromLimit(conversionsLimit);
+  if (planType === 'free') return inferredPack ?? 'free';
+  if (planType === 'unlimited') return conversionsLimit >= 900000 ? 'unlimited' : (inferredPack ?? 'free');
+  if (planType.startsWith('per_page')) return planType;
   return planType;
 };
 
@@ -204,8 +190,8 @@ const resolvePlanType = (row: SubscriptionRow | null): string => {
   if (!row) return 'free';
   const conversionsLimit = toNumber(row.conversions_limit, 0);
   const planType = normalizePlan(row.plan_type);
-  if (planType !== 'free') return normalizeLegacyPlanType(planType, conversionsLimit);
-  return normalizeLegacyPlanType(normalizePlan(row.tier), conversionsLimit);
+  if (planType !== 'free') return resolveCurrentPlanType(planType, conversionsLimit);
+  return resolveCurrentPlanType(normalizePlan(row.tier), conversionsLimit);
 };
 
 const toDateString = (value: unknown): string | null => {
@@ -215,21 +201,10 @@ const toDateString = (value: unknown): string | null => {
   return parsed.toISOString().slice(0, 10);
 };
 
-const isKnownPaidPlan = (normalizedPlan: string): boolean =>
-  normalizedPlan === 'unlimited' ||
-  normalizedPlan.startsWith('per_page') ||
-  normalizedPlan.startsWith('monthly') ||
-  normalizedPlan.startsWith('yearly') ||
-  normalizedPlan === 'daily' ||
-  normalizedPlan === 'business';
-
 const getResetBoundary = (planType: string, dateParts: { year: string; month: string; isoDate: string }): string | null => {
   const normalizedPlan = normalizePlan(planType);
-  const isMonthly = normalizedPlan.startsWith('monthly') || normalizedPlan === 'daily';
-  const isYearly = normalizedPlan.startsWith('yearly') || normalizedPlan === 'business';
-  if (isMonthly) return `${dateParts.year}-${dateParts.month}-01`;
-  if (isYearly) return `${dateParts.year}-01-01`;
-  if (!isKnownPaidPlan(normalizedPlan)) return dateParts.isoDate;
+  if (normalizedPlan === 'free') return dateParts.isoDate;
+  if (normalizedPlan === 'unlimited' || normalizedPlan.startsWith('per_page')) return null;
   return null;
 };
 
@@ -330,29 +305,37 @@ const checkLimitFallback = async ({
           conversions_used: 0,
           conversions_limit: 5,
           last_reset_date: today,
+          timezone,
           plan_type: 'free',
         };
       }
 
-      const planType = resolvePlanType(row);
-      const baseLimit = toNumber(row.conversions_limit, 5);
-      const baseUsed = toNumber(row.conversions_used, 0);
-      const stackedLimit =
-        toNumber(row.free_daily_limit, 5) +
-        toNumber(row.monthly_limit, 0) +
-        toNumber(row.yearly_limit, 0) +
-        toNumber(row.pack_limit, 0);
-      const stackedUsed =
-        toNumber(row.free_daily_used, 0) +
-        toNumber(row.monthly_used, 0) +
-        toNumber(row.yearly_used, 0) +
-        toNumber(row.pack_used, 0);
-      const conversionsLimit = Math.max(baseLimit, stackedLimit);
-      let conversionsUsed = Math.min(conversionsLimit, Math.max(baseUsed, stackedUsed));
-      const lastResetDate = toDateString(row.last_reset_date);
+      const currentRow: SubscriptionRow = row ?? {
+        conversions_used: 0,
+        conversions_limit: 5,
+        last_reset_date: today,
+        timezone,
+        plan_type: 'free',
+      };
+      const planType = resolvePlanType(currentRow);
+      const baseLimit = toNumber(currentRow.conversions_limit, 5);
+      const baseUsed = toNumber(currentRow.conversions_used, 0);
+      const freeLimit = toNumber(currentRow.free_daily_limit, 5);
+      const freeUsed = toNumber(currentRow.free_daily_used, 0);
+      const packLimit = toNumber(currentRow.pack_limit, 0);
+      const packUsed = toNumber(currentRow.pack_used, 0);
+      const conversionsLimit = baseLimit > 0 ? baseLimit : Math.max(freeLimit, packLimit);
+      let conversionsUsed = Math.min(conversionsLimit, Math.max(baseUsed, freeUsed, packUsed));
+      const lastResetDate = toDateString(currentRow.last_reset_date);
       const resetBoundary = getResetBoundary(planType, dateParts);
+      const resolvedPlan =
+        planType.startsWith('per_page')
+          ? planType
+          : packLimit > 0
+            ? resolveCurrentPlanType('free', packLimit)
+            : planType;
 
-      if (resetBoundary && (!lastResetDate || lastResetDate < resetBoundary)) {
+      if (resolvedPlan === 'free' && resetBoundary && (!lastResetDate || lastResetDate < resetBoundary)) {
         const { error: resetError } = await supabaseAdmin
           .from('subscriptions')
           .update({
@@ -372,7 +355,7 @@ const checkLimitFallback = async ({
       return {
         conversionsUsed,
         conversionsLimit,
-        planType,
+        planType: resolvedPlan,
       };
     }
 
