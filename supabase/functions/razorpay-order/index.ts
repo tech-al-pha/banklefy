@@ -53,12 +53,6 @@ const PLAN_PRICING: Record<string, PlanPricing> = {
   per_page_power: { amount: 299, currency: 'INR' },
   per_page_pack_basic: { amount: 1899, currency: 'INR' },
   per_page_pack_pro: { amount: 18999, currency: 'INR' },
-  monthly_basic: { amount: 899, currency: 'INR' },
-  monthly_pro: { amount: 1899, currency: 'INR' },
-  monthly_enterprise: { amount: 3899, currency: 'INR' },
-  yearly_lite: { amount: 8999, currency: 'INR' },
-  yearly_full: { amount: 18999, currency: 'INR' },
-  yearly_pro: { amount: 37999, currency: 'INR' },
 };
 
 const buildNotes = (planId: string, userId: string, extra?: Record<string, unknown>) => {
