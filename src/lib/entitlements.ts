@@ -8,6 +8,16 @@ export type EntitlementInput = {
 export const normalizePlanType = (planType?: string | null): string =>
   (planType ?? "free").toLowerCase().trim();
 
+const getCurrentPackFromLimit = (limit: number | null): string | null => {
+  if (limit === null) return null;
+  if (limit >= 11000) return "per_page_pack_pro";
+  if (limit >= 1000) return "per_page_pack_basic";
+  if (limit >= 50) return "per_page_power";
+  if (limit >= 25) return "per_page_standard";
+  if (limit >= 10) return "per_page_lite";
+  return null;
+};
+
 export const resolveEffectivePlanType = (
   planType?: string | null,
   conversionsLimit?: number | null,
@@ -17,89 +27,26 @@ export const resolveEffectivePlanType = (
     ? conversionsLimit
     : null;
   const isTrueUnlimitedLimit = limit !== null && limit >= 900000;
+  const currentPackFromLimit = getCurrentPackFromLimit(limit);
 
-  if (
-    normalizedPlan === "free" ||
-    normalizedPlan.startsWith("per_page") ||
-    normalizedPlan.startsWith("monthly") ||
-    normalizedPlan.startsWith("yearly")
-  ) {
-    if (normalizedPlan === "free" && limit !== null) {
-      if (limit >= 65000) return "yearly_pro";
-      if (limit >= 15000) return "yearly_full";
-      if (limit >= 5000) return "yearly_lite";
-      if (limit >= 4500) return "monthly_enterprise";
-      if (limit >= 1000) return "monthly_pro";
-      if (limit >= 300) return "monthly_basic";
-      if (limit >= 50) return "per_page_power";
-      if (limit >= 25) return "per_page_standard";
-      if (limit >= 10) return "per_page_lite";
-    }
-    return normalizedPlan;
+  if (normalizedPlan === "free") {
+    return currentPackFromLimit ?? "free";
   }
 
   if (normalizedPlan === "unlimited") {
     if (isTrueUnlimitedLimit) return "unlimited";
-    if (limit !== null) {
-      if (limit >= 65000) return "yearly_pro";
-      if (limit >= 15000) return "yearly_full";
-      if (limit >= 5000) return "yearly_lite";
-      if (limit >= 4500) return "monthly_enterprise";
-      if (limit >= 1000) return "monthly_pro";
-      if (limit >= 300) return "monthly_basic";
-      if (limit >= 50) return "per_page_power";
-      if (limit >= 25) return "per_page_standard";
-      if (limit >= 10) return "per_page_lite";
-      return "free";
-    }
-    return "free";
+    return currentPackFromLimit ?? "free";
   }
 
-  if (normalizedPlan === "daily") {
-    if (limit !== null) {
-      if (limit >= 4500) return "monthly_enterprise";
-      if (limit >= 1000) return "monthly_pro";
-      if (limit >= 300) return "monthly_basic";
-    }
-    return "daily";
-  }
-
-  if (normalizedPlan === "business") {
-    if (limit !== null) {
-      if (limit >= 65000) return "yearly_pro";
-      if (limit >= 15000) return "yearly_full";
-      if (limit >= 5000) return "yearly_lite";
-      if (limit === 50) return "per_page_power";
-      if (limit === 25) return "per_page_standard";
-      if (limit === 10) return "per_page_lite";
-    }
-    return "business";
-  }
+  if (normalizedPlan.startsWith("per_page")) return normalizedPlan;
 
   return normalizedPlan;
 };
 
-export const isPaidPlan = ({ planType, tier, conversionsLimit, isAuthenticated }: EntitlementInput): boolean => {
+export const isPaidPlan = ({ planType, conversionsLimit }: EntitlementInput): boolean => {
   const normalizedPlan = resolveEffectivePlanType(planType, conversionsLimit);
 
-  if (normalizedPlan && normalizedPlan !== "free") {
-    return (
-      normalizedPlan === "unlimited" ||
-      normalizedPlan.startsWith("per_page") ||
-      normalizedPlan.startsWith("monthly") ||
-      normalizedPlan.startsWith("yearly") ||
-      normalizedPlan === "daily" ||
-      normalizedPlan === "business"
-    );
-  }
-
-  if (tier && tier !== "free") {
-    return true;
-  }
-
-  if (typeof conversionsLimit === "number") {
-    return (isAuthenticated ?? true) && conversionsLimit > 5;
-  }
+  if (normalizedPlan === "unlimited" || normalizedPlan.startsWith("per_page")) return true;
 
   return false;
 };
@@ -118,49 +65,31 @@ export const hasTallyXmlAccess = (input: EntitlementInput): boolean => {
   return (
     normalizedPlan === "per_page_pack_basic" ||
     normalizedPlan === "per_page_pack_pro" ||
-    normalizedPlan === "monthly_pro" ||
-    normalizedPlan === "monthly_enterprise" ||
-    normalizedPlan === "yearly_full" ||
-    normalizedPlan === "yearly_pro"
+    normalizedPlan === "unlimited"
   );
 };
 
 export const hasFoirDashboardAccess = (input: EntitlementInput): boolean => {
   const normalizedPlan = resolvePlanForFeatures(input);
-  if (normalizedPlan === "unlimited" || normalizedPlan === "business") return true;
-  if (
+  return (
+    normalizedPlan === "unlimited" ||
     normalizedPlan === "per_page_pack_basic" ||
     normalizedPlan === "per_page_pack_pro"
-  ) {
-    return true;
-  }
-  if (normalizedPlan.startsWith("monthly") || normalizedPlan.startsWith("yearly")) return true;
-  return false;
+  );
 };
 
 export const hasFraudDetectorAccess = (input: EntitlementInput): boolean => {
   const normalizedPlan = resolvePlanForFeatures(input);
   return (
     normalizedPlan === "unlimited" ||
-    normalizedPlan === "business" ||
-    normalizedPlan === "per_page_pack_pro" ||
-    normalizedPlan === "monthly_pro" ||
-    normalizedPlan === "monthly_enterprise" ||
-    normalizedPlan === "yearly_full" ||
-    normalizedPlan === "yearly_pro"
+    normalizedPlan === "per_page_pack_pro"
   );
 };
 
 export const getEditPdfDetectorTier = (input: EntitlementInput): "none" | "basic" | "advanced" => {
   const normalizedPlan = resolvePlanForFeatures(input);
-  if (normalizedPlan === "unlimited" || normalizedPlan === "business") return "advanced";
-  if (normalizedPlan === "monthly_enterprise" || normalizedPlan === "yearly_pro") return "advanced";
-  if (normalizedPlan === "per_page_pack_pro") return "advanced";
-  if (
-    normalizedPlan === "per_page_pack_basic" ||
-    normalizedPlan === "monthly_pro" ||
-    normalizedPlan === "yearly_full"
-  ) {
+  if (normalizedPlan === "unlimited" || normalizedPlan === "per_page_pack_pro") return "advanced";
+  if (normalizedPlan === "per_page_pack_basic") {
     return "basic";
   }
   return "none";
