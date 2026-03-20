@@ -48,32 +48,22 @@ export const resolveUnderwritingTier = (
   if (normalizedPlan === 'free') return 'none';
 
   if (
-    normalizedPlan === 'monthly_enterprise' ||
-    normalizedPlan === 'yearly_pro' ||
     normalizedPlan === 'per_page_power' ||
     normalizedPlan === 'per_page_pack_pro' ||
-    normalizedPlan === 'unlimited' ||
-    normalizedPlan === 'business'
+    normalizedPlan === 'unlimited'
   ) {
     return 'advanced';
   }
 
   if (
-    normalizedPlan === 'monthly_pro' ||
-    normalizedPlan === 'yearly_full' ||
     normalizedPlan === 'per_page_standard' ||
-    normalizedPlan === 'per_page_pack_basic' ||
-    normalizedPlan === 'daily'
+    normalizedPlan === 'per_page_pack_basic'
   ) {
     return 'pro';
   }
 
   if (
-    normalizedPlan === 'monthly_basic' ||
-    normalizedPlan === 'yearly_lite' ||
     normalizedPlan === 'per_page_lite' ||
-    normalizedPlan.startsWith('monthly') ||
-    normalizedPlan.startsWith('yearly') ||
     normalizedPlan.startsWith('per_page')
   ) {
     return 'basic';
