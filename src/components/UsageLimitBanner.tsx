@@ -13,7 +13,6 @@ interface UsageLimitBannerProps {
   status?: string; // Status code from backend
   pagesDetected?: number;
   maxPagesAllowed?: number;
-  used?: number; // Pages/conversions used
   planType?: string; // User's plan type
 }
 
@@ -25,7 +24,6 @@ export const UsageLimitBanner = ({
   status,
   pagesDetected,
   maxPagesAllowed,
-  used = 0,
   planType = 'free',
 }: UsageLimitBannerProps) => {
   const navigate = useNavigate();
@@ -34,10 +32,8 @@ export const UsageLimitBanner = ({
   const normalizedPlan = (planType || "free").toLowerCase();
   const isUnlimitedPlan = normalizedPlan === "unlimited" && Number.isFinite(limit) && limit >= 900000;
   const isPerPagePlan = normalizedPlan.startsWith("per_page");
-  const isMonthlyPlan = normalizedPlan.startsWith("monthly") || normalizedPlan === "daily";
-  const isYearlyPlan = normalizedPlan.startsWith("yearly") || normalizedPlan === "business";
-  const isKnownPaidPlan = isPerPagePlan || isMonthlyPlan || isYearlyPlan || isUnlimitedPlan;
-  const isFreeMode = !isKnownPaidPlan && (!isAuthenticated || normalizedPlan === "free" || limit <= 5);
+  const isKnownPaidPlan = isPerPagePlan || isUnlimitedPlan;
+  const isFreeMode = !isKnownPaidPlan;
   const isPaidPlan = !isFreeMode;
   const conversionLabel = remaining === 1 ? "conversion" : "conversions";
   const pageLabel = remaining === 1 ? "page" : "pages";
