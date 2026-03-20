@@ -62,21 +62,12 @@ const PLAN_PAGES: Record<string, number> = {
   per_page_power: 50,
   per_page_pack_basic: 1000,
   per_page_pack_pro: 11000,
-  // Monthly
-  monthly_basic: 300,
-  monthly_pro: 1000,
-  monthly_enterprise: 4500,
-  // Yearly
-  yearly_lite: 5000,
-  yearly_full: 15000,
-  yearly_pro: 65000,
 };
 
 const toIsoDate = (value: Date): string => value.toISOString().slice(0, 10);
 
-const getTierForPlan = (planId: string): 'free' | 'daily' | 'business' => {
-  if (planId.startsWith('yearly_')) return 'business';
-  if (planId.startsWith('monthly_')) return 'daily';
+const getTierForPlan = (planId: string): 'free' | 'business' => {
+  if (planId.startsWith('per_page_')) return 'business';
   return 'free';
 };
 
@@ -239,7 +230,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  console.error('RPC payment finalization failed. Falling back to legacy path.', {
+  console.error('RPC payment finalization failed. Falling back to database path.', {
     planId,
     orderId: order.id,
     rpcError,
@@ -289,12 +280,11 @@ Deno.serve(async (req) => {
   const pagesAdded = alreadyProcessed ? 0 : pagesToAdd;
 
   if (!alreadyProcessed) {
-    const isRecurringPlan = planId.startsWith('monthly_') || planId.startsWith('yearly_');
     const planTier = getTierForPlan(planId);
     const resetDate = toIsoDate(new Date());
     const { data: existingSubscription, error: subscriptionReadError } = await supabaseAdmin
       .from('subscriptions')
-      .select('conversions_limit, conversions_used, free_daily_limit, free_daily_used, monthly_limit, monthly_used, yearly_limit, yearly_used, pack_limit, pack_used, tier, plan_type')
+      .select('conversions_limit, conversions_used, free_daily_limit, free_daily_used, pack_limit, pack_used, tier, plan_type')
       .eq('user_id', userId)
       .maybeSingle();
 
@@ -308,20 +298,14 @@ Deno.serve(async (req) => {
         user_id: userId,
         tier: planTier,
         plan_type: planId,
-        conversions_limit: 0,
+        conversions_limit: pagesToAdd,
         conversions_used: 0,
         free_daily_limit: 5,
         free_daily_used: 0,
-        monthly_limit: planId.startsWith('monthly_') ? pagesToAdd : 0,
-        monthly_used: 0,
-        yearly_limit: planId.startsWith('yearly_') ? pagesToAdd : 0,
-        yearly_used: 0,
-        pack_limit: planId.startsWith('per_page_') ? pagesToAdd : 0,
+        pack_limit: pagesToAdd,
         pack_used: 0,
         last_reset_date: resetDate,
         timezone: 'UTC',
-        monthly_reset_date: resetDate,
-        yearly_reset_date: resetDate,
       });
 
       if (subscriptionInsertError) {
@@ -329,31 +313,19 @@ Deno.serve(async (req) => {
         return respond(req, 500, { error: 'Failed to finalize payment.' });
       }
     } else {
-      const retainedTier =
-        !isRecurringPlan && existingSubscription.tier && existingSubscription.tier !== 'free'
-          ? existingSubscription.tier
-          : planTier;
-
-      const nextMonthly = Number(existingSubscription.monthly_limit || 0) + (planId.startsWith('monthly_') ? pagesToAdd : 0);
-      const nextYearly = Number(existingSubscription.yearly_limit || 0) + (planId.startsWith('yearly_') ? pagesToAdd : 0);
-      const nextPack = Number(existingSubscription.pack_limit || 0) + (planId.startsWith('per_page_') ? pagesToAdd : 0);
-      const freeDailyLimit = Math.max(5, Number(existingSubscription.free_daily_limit || 5));
-      const freeDailyUsed = Number(existingSubscription.free_daily_used || 0);
-      const monthlyUsed = Number(existingSubscription.monthly_used || 0);
-      const yearlyUsed = Number(existingSubscription.yearly_used || 0);
-      const packUsed = Number(existingSubscription.pack_used || 0);
-
-      const nextLimit = freeDailyLimit + nextMonthly + nextYearly + nextPack;
-      const nextUsed = freeDailyUsed + monthlyUsed + yearlyUsed + packUsed;
+      const existingLimit = Number(existingSubscription.conversions_limit || 0);
+      const existingUsed = Number(existingSubscription.conversions_used || 0);
+      const nextLimit = Math.max(existingLimit, 0) + pagesToAdd;
+      const nextUsed = Math.min(nextLimit, existingUsed);
 
       const updatePayload: Record<string, unknown> = {
         conversions_limit: nextLimit,
         conversions_used: nextUsed,
-        free_daily_limit: freeDailyLimit,
-        monthly_limit: nextMonthly,
-        yearly_limit: nextYearly,
-        pack_limit: nextPack,
-        tier: retainedTier,
+        free_daily_limit: Math.max(5, Number(existingSubscription.free_daily_limit || 5)),
+        free_daily_used: Number(existingSubscription.free_daily_used || 0),
+        pack_limit: nextLimit,
+        pack_used: nextUsed,
+        tier: planTier,
         plan_type: planId,
       };
 
