@@ -339,32 +339,67 @@ const callGroqTextExtraction = async (extractedText: string): Promise<GroqTextEx
 
   const start = Date.now();
   try {
-    const prompt = `Extract transaction rows from bank statement text.\n\nReturn ONLY valid JSON with key "transactions".\nEach item must include: date, description, debit, credit, balance, refNumber.\nRules:\n- No invented rows\n- If a field is missing, set it to "UNKNOWN" for text or 0 for numbers\n- Keep debit/credit positive\n- Do not output headers or summary lines.`;
+    const prompt = `You extract bank statement transactions with exact numeric fidelity.
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+Return ONLY valid JSON with key "transactions".
+Each item must include: date, description, debit, credit, balance, refNumber.
+
+Rules:
+- Copy numbers exactly as shown. Do not infer missing digits, do not round, do not merge digits from different rows or columns.
+- If a numeric cell is blank or unreadable, use 0.
+- Keep debit, credit, and balance as positive numbers.
+- Never swap debit and credit columns.
+- Do not invent rows, headers, totals, summaries, or page artifacts.
+- If a text field is missing, use "UNKNOWN".
+- If refNumber is missing, use "".
+
+Return ONLY valid JSON. No markdown, no code blocks.`;
+
+    const requestPayload = {
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0,
+      top_p: 1,
+      max_tokens: 8000,
+      response_format: { type: 'json_object' as const },
+      messages: [
+        { role: 'system', content: prompt },
+        { role: 'user', content: extractedText.slice(0, 30000) },
+      ],
+    };
+
+    let response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${GROQ_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0,
-        max_tokens: 8000,
-        messages: [
-          { role: 'system', content: prompt },
-          { role: 'user', content: extractedText.slice(0, 30000) },
-        ],
-      }),
+      body: JSON.stringify(requestPayload),
     });
 
     if (!response.ok) {
-      return {
-        success: false,
-        transactions: [],
-        error: `Groq text extraction failed (${response.status})`,
-        processingTimeMs: Date.now() - start,
-      };
+      const firstErrorText = await response.text();
+      if (response.status === 400) {
+        response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...requestPayload,
+            response_format: undefined,
+          }),
+        });
+      }
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          transactions: [],
+          error: `Groq text extraction failed (${response.status})${errorText || firstErrorText ? `: ${errorText || firstErrorText}` : ''}`,
+          processingTimeMs: Date.now() - start,
+        };
+      }
     }
 
     const payload = await response.json();
