@@ -1,27 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { useSettings } from "@/hooks/useSettings";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  buildMt940,
-  buildStatementCsv,
-  downloadTextFile,
-  parseStatementArchive,
-} from "@/lib/statement-export";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Logo from "@/components/Logo";
@@ -29,27 +15,14 @@ import { Camera, Loader2, LogOut } from "lucide-react";
 import { formatPlanLabel } from "@/lib/planLabels";
 import { useToast } from "@/hooks/use-toast";
 import LoadingScreen from "@/components/LoadingScreen";
-
-interface RecentConversion {
-  id: string;
-  original_filename: string;
-  status: string;
-  created_at: string;
-  completed_at?: string | null;
-  result_path?: string | null;
-  file_path?: string;
-  error_message?: string | null;
-  export_payload?: unknown | null;
-}
+import type { ChangeEvent } from "react";
 
 const Profile = () => {
-  const { user, session, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { conversionsUsed, conversionsLimit, remaining, planType, loading: usageLoading } = useUsageLimit();
   const { profileData, updateProfile, sendPasswordReset, saving } = useSettings();
-  const [recent, setRecent] = useState<RecentConversion[]>([]);
-  const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState("");
   const [nameChanged, setNameChanged] = useState(false);
   const [email, setEmail] = useState(user?.email ?? "");
@@ -58,65 +31,36 @@ const Profile = () => {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [totalConversions, setTotalConversions] = useState<number | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const workbookCache = useState(() => new Map<string, ArrayBuffer>())[0];
   const authFlags = user as { email_confirmed_at?: string | null; confirmed_at?: string | null } | null;
   const isVerified = Boolean(authFlags?.email_confirmed_at || authFlags?.confirmed_at);
-
-  const fetchRecent = useCallback(async (showLoading = false) => {
-    if (!user) return;
-    if (showLoading) {
-      setLoading(true);
-    }
-    const { data, error } = await supabase
-      .from("conversions")
-      .select("id, original_filename, status, created_at, completed_at, result_path, file_path, error_message, export_payload")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (!error) {
-      setRecent(data || []);
-    }
-    const { count } = await supabase
-      .from("conversions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id);
-    if (typeof count === "number") {
-      setTotalConversions(count);
-    }
-    if (showLoading) {
-      setLoading(false);
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!user) {
       navigate("/auth");
       return;
     }
-    fetchRecent(true);
-  }, [user, navigate, fetchRecent]);
 
-  useEffect(() => {
-    if (!user) return;
+    let isActive = true;
+    setTotalConversions(null);
 
-    const channel = supabase
-      .channel(`profile-conversions-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversions", filter: `user_id=eq.${user.id}` },
-        () => {
-          fetchRecent();
-        },
-      )
-      .subscribe();
+    const loadTotalConversions = async () => {
+      const { count, error } = await supabase
+        .from("conversions")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      if (!isActive) return;
+      if (!error && typeof count === "number") {
+        setTotalConversions(count);
+      }
+    };
+
+    loadTotalConversions();
 
     return () => {
-      supabase.removeChannel(channel);
+      isActive = false;
     };
-  }, [user, fetchRecent]);
+  }, [navigate, user]);
 
   useEffect(() => {
     const name = profileData?.full_name || user?.user_metadata?.full_name || "";
@@ -126,8 +70,6 @@ const Profile = () => {
     setEmailChanged(false);
     setAvatarUrl(profileData?.avatar_url ?? (user?.user_metadata?.avatar_url as string | undefined) ?? null);
   }, [profileData, user]);
-
-  const visibleRecent = useMemo(() => recent, [recent]);
 
   const handleSaveName = async () => {
     await updateProfile(displayName);
@@ -147,11 +89,6 @@ const Profile = () => {
       const { error } = await supabase.auth.updateUser({ email: nextEmail });
       if (error) throw error;
 
-      await supabase
-        .from("profiles")
-        .update({ email: nextEmail })
-        .eq("id", user.id);
-
       toast({
         title: "Email update requested",
         description: "Check your inbox to confirm the new email address.",
@@ -168,7 +105,7 @@ const Profile = () => {
     }
   };
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user) return;
     if (!file.type.startsWith("image/")) {
@@ -218,190 +155,12 @@ const Profile = () => {
     }
   };
 
-  const memberSince = user?.created_at ? format(new Date(user.created_at), "MMM d, yyyy") : "—";
+  const memberSince = user?.created_at ? format(new Date(user.created_at), "MMM d, yyyy") : "-";
   const planLabel = formatPlanLabel(planType);
   const displayNameFallback = profileData?.full_name || user?.user_metadata?.full_name || "Member";
   const userEmailFallback = user?.email ?? "-";
 
-  const sanitizeFileBaseName = (value?: string | null, fallback = "bank-statement") => {
-    const source = (value ?? "").trim();
-    const noExtension = source.replace(/\.[^/.\\]+$/, "");
-    const safe = noExtension
-      .replace(/[<>:"/\\|?*]/g, " ")
-      .replace(/\s+/g, " ")
-      .replace(/\.+$/g, "")
-      .trim();
-    return safe || fallback;
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <Badge className="bg-green-600">Completed</Badge>;
-      case "processing":
-        return <Badge className="bg-yellow-600">Processing</Badge>;
-      case "failed":
-        return <Badge variant="destructive">Failed</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-
-  const fetchResultBuffer = async (item: RecentConversion) => {
-    if (!item.result_path) {
-      throw new Error("Result not available yet.");
-    }
-    const cached = workbookCache.get(item.id);
-    if (cached) return cached;
-
-    const { data, error } = await supabase.storage
-      .from("bank-statements")
-      .download(item.result_path);
-
-    if (error || !data) {
-      throw new Error(error?.message || "Failed to download result file.");
-    }
-    const buffer = await data.arrayBuffer();
-    workbookCache.set(item.id, buffer);
-    return buffer;
-  };
-
-  const getExportArchive = (item: RecentConversion) => {
-    const archive = parseStatementArchive(item.export_payload);
-    if (!archive || !archive.transactions || archive.transactions.length === 0) {
-      throw new Error("JSON export data is not available for this conversion yet.");
-    }
-    return archive;
-  };
-
-  const downloadExcel = async (item: RecentConversion) => {
-    try {
-      setDownloadingId(item.id);
-      const buffer = await fetchResultBuffer(item);
-      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${sanitizeFileBaseName(item.original_filename)}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error: unknown) {
-      toast({
-        variant: "destructive",
-        title: "Download failed",
-        description: error instanceof Error ? error.message : "Failed to download file.",
-      });
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
-  const downloadAsCsv = async (item: RecentConversion) => {
-    try {
-      setDownloadingId(item.id);
-      const archive = getExportArchive(item);
-      const csv = buildStatementCsv(archive);
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${sanitizeFileBaseName(item.original_filename)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (error: unknown) {
-      toast({
-        variant: "destructive",
-        title: "CSV export failed",
-        description: error instanceof Error ? error.message : "Failed to export CSV.",
-      });
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
-  const downloadAsJson = async (item: RecentConversion) => {
-    try {
-      setDownloadingId(item.id);
-      const archive = getExportArchive(item);
-      const content = JSON.stringify(archive, null, 2);
-
-      downloadTextFile(
-        content,
-        `${sanitizeFileBaseName(item.original_filename)}.json`,
-        "application/json;charset=utf-8",
-      );
-    } catch (error: unknown) {
-      toast({
-        variant: "destructive",
-        title: "JSON export failed",
-        description: error instanceof Error ? error.message : "Failed to export JSON.",
-      });
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
-  const downloadAsMt940 = async (item: RecentConversion) => {
-    try {
-      setDownloadingId(item.id);
-      const archive = getExportArchive(item);
-      const content = buildMt940({
-        transactions: archive.transactions,
-        bankInfo: archive.bankInfo,
-        currencyCode: archive.currency,
-        statementReference: item.id,
-      });
-
-      downloadTextFile(
-        content,
-        `${sanitizeFileBaseName(item.original_filename)}.mt940`,
-        "text/plain;charset=utf-8",
-      );
-    } catch (error: unknown) {
-      toast({
-        variant: "destructive",
-        title: "MT940 export failed",
-        description: error instanceof Error ? error.message : "Failed to export MT940.",
-      });
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
-  const handleDeleteConversion = async (item: RecentConversion) => {
-    if (!session?.access_token) {
-      toast({
-        variant: "destructive",
-        title: "Not authorized",
-        description: "Please sign in again to delete this file.",
-      });
-      return;
-    }
-    try {
-      setDeletingId(item.id);
-      const { error } = await supabase.functions.invoke("delete-conversion", {
-        body: { conversionId: item.id },
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (error) throw new Error(error.message || "Failed to delete conversion");
-      setRecent((prev) => prev.filter((c) => c.id !== item.id));
-      toast({ title: "Deleted", description: "File and data deleted successfully." });
-    } catch (error: unknown) {
-      toast({
-        variant: "destructive",
-        title: "Delete failed",
-        description: error instanceof Error ? error.message : "Failed to delete conversion.",
-      });
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  if (!user || loading || usageLoading) {
+  if (!user || usageLoading) {
     return <LoadingScreen />;
   }
 
@@ -544,7 +303,6 @@ const Profile = () => {
               </div>
             </div>
           </Card>
-
         </div>
       </main>
     </div>
