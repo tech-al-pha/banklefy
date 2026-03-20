@@ -64,23 +64,20 @@ import { getTrackingKey } from '../_shared/client-id.ts';
 import { resolveEffectiveLimit, type LimitResolverDatabase, type SupabaseLike } from '../_shared/limit-resolver.ts';
 import type { Database as AppDatabase } from '../../../src/integrations/supabase/types.ts';
 
-type ConversionRow = AppDatabase['public']['Tables']['conversions']['Row'] & {
-  pages_processed?: number | null;
-  processed_via?: string | null;
-  output_tier?: string | null;
-  processing_timings?: Record<string, unknown> | null;
-  processing_total_ms?: number | null;
-};
+type ConversionRow = AppDatabase['public']['Tables']['conversions']['Row'];
 
-type ConversionInsert = AppDatabase['public']['Tables']['conversions']['Insert'] & {
-  pages_processed?: number | null;
-  processed_via?: string | null;
-  output_tier?: string | null;
-  processing_timings?: Record<string, unknown> | null;
-  processing_total_ms?: number | null;
-};
+type ConversionInsert = AppDatabase['public']['Tables']['conversions']['Insert'];
 
 type ConversionUpdate = Partial<ConversionInsert>;
+
+type LooseTable = {
+  Row: Record<string, unknown>;
+  Insert: Record<string, unknown>;
+  Update: Record<string, unknown>;
+  Relationships: [];
+};
+
+type ConversionProcessingTimings = NonNullable<AppDatabase['public']['Tables']['conversions']['Update']['processing_timings']>;
 
 type SubscriptionRow = LimitResolverDatabase['public']['Tables']['subscriptions']['Row'] & {
   pages_used_this_month?: number | null;
@@ -101,6 +98,7 @@ type AnonymousUsageUpdate = LimitResolverDatabase['public']['Tables']['anonymous
 type DocumentDatabase = {
   public: Omit<AppDatabase['public'], 'Tables'> & {
     Tables: Omit<AppDatabase['public']['Tables'], 'anonymous_usage' | 'conversions' | 'subscriptions'> & {
+      category_corrections: LooseTable;
       anonymous_usage: {
         Row: AnonymousUsageRow;
         Insert: AnonymousUsageInsert;
@@ -113,6 +111,8 @@ type DocumentDatabase = {
         Update: ConversionUpdate;
         Relationships: [];
       };
+      fraud_alerts: LooseTable;
+      risk_analysis: LooseTable;
       subscriptions: {
         Row: SubscriptionRow;
         Insert: SubscriptionInsert;
@@ -124,6 +124,38 @@ type DocumentDatabase = {
 };
 
 type DocumentSupabaseClient = SupabaseClient<DocumentDatabase>;
+
+type ConversionTimingStorage = {
+  sourcePath?: string | null;
+  resultPath?: string | null;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
+const getProcessingTimings = (value: unknown): Record<string, unknown> => {
+  return isRecord(value) ? { ...value } : {};
+};
+
+const getTimingStorage = (value: unknown): ConversionTimingStorage => {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const storage = isRecord(value.storage) ? value.storage : null;
+  return {
+    sourcePath: typeof storage?.sourcePath === 'string' ? storage.sourcePath : null,
+    resultPath: typeof storage?.resultPath === 'string' ? storage.resultPath : null,
+  };
+};
+
+const mergeProcessingTimings = (existing: unknown, patch: Record<string, unknown>): ConversionProcessingTimings => {
+  return {
+    ...getProcessingTimings(existing),
+    ...patch,
+  } as ConversionProcessingTimings;
+};
 
 type SubscriptionLookupRow = {
   conversions_used?: number | null;
@@ -2527,34 +2559,20 @@ const normalizeRequestedFormat = (value: unknown): ExportFormat => {
   return 'xlsx';
 };
 
-const normalizeLegacyPlanType = (planType: string, conversionsLimit: number): string => {
-  if (
-    planType === 'free' ||
-    planType === 'unlimited' ||
-    planType.startsWith('monthly') ||
-    planType.startsWith('yearly') ||
-    planType.startsWith('per_page')
-  ) {
-    return planType;
-  }
+const getCurrentPackFromLimit = (conversionsLimit: number): string | null => {
+  if (conversionsLimit >= 11000) return 'per_page_pack_pro';
+  if (conversionsLimit >= 1000) return 'per_page_pack_basic';
+  if (conversionsLimit >= 50) return 'per_page_power';
+  if (conversionsLimit >= 25) return 'per_page_standard';
+  if (conversionsLimit >= 10) return 'per_page_lite';
+  return null;
+};
 
-  if (planType === 'daily') {
-    if (conversionsLimit >= 4500) return 'monthly_enterprise';
-    if (conversionsLimit >= 1000) return 'monthly_pro';
-    if (conversionsLimit >= 300) return 'monthly_basic';
-    return 'daily';
-  }
-
-  if (planType === 'business') {
-    if (conversionsLimit >= 65000) return 'yearly_pro';
-    if (conversionsLimit >= 15000) return 'yearly_full';
-    if (conversionsLimit >= 5000) return 'yearly_lite';
-    if (conversionsLimit === 50) return 'per_page_power';
-    if (conversionsLimit === 25) return 'per_page_standard';
-    if (conversionsLimit === 10) return 'per_page_lite';
-    return 'business';
-  }
-
+const resolveCurrentPlanType = (planType: string, conversionsLimit: number): string => {
+  const inferredPack = getCurrentPackFromLimit(conversionsLimit);
+  if (planType === 'free') return inferredPack ?? 'free';
+  if (planType === 'unlimited') return conversionsLimit >= 900000 ? 'unlimited' : (inferredPack ?? 'free');
+  if (planType.startsWith('per_page')) return planType;
   return planType;
 };
 
@@ -2562,17 +2580,9 @@ const resolvePlanType = (row: SubscriptionLookupRow | null): string => {
   if (!row) return 'free';
   const conversionsLimit = toNumber(row.conversions_limit, 0);
   const planType = normalizePlan(row.plan_type);
-  if (planType !== 'free') return normalizeLegacyPlanType(planType, conversionsLimit);
-  return normalizeLegacyPlanType(normalizePlan(row.tier), conversionsLimit);
+  if (planType !== 'free') return resolveCurrentPlanType(planType, conversionsLimit);
+  return resolveCurrentPlanType(normalizePlan(row.tier), conversionsLimit);
 };
-
-const isKnownPaidPlan = (normalizedPlan: string): boolean =>
-  normalizedPlan === 'unlimited' ||
-  normalizedPlan.startsWith('per_page') ||
-  normalizedPlan.startsWith('monthly') ||
-  normalizedPlan.startsWith('yearly') ||
-  normalizedPlan === 'daily' ||
-  normalizedPlan === 'business';
 
 const getDatePartsInTimezone = (timezone: string) => {
   try {
@@ -2609,11 +2619,8 @@ const getDatePartsInTimezone = (timezone: string) => {
 
 const getResetBoundary = (planType: string, dateParts: { year: string; month: string; isoDate: string }): string | null => {
   const normalizedPlan = normalizePlan(planType);
-  const isMonthly = normalizedPlan.startsWith('monthly') || normalizedPlan === 'daily';
-  const isYearly = normalizedPlan.startsWith('yearly') || normalizedPlan === 'business';
-  if (isMonthly) return `${dateParts.year}-${dateParts.month}-01`;
-  if (isYearly) return `${dateParts.year}-01-01`;
-  if (!isKnownPaidPlan(normalizedPlan)) return dateParts.isoDate;
+  if (normalizedPlan === 'free') return dateParts.isoDate;
+  if (normalizedPlan === 'unlimited' || normalizedPlan.startsWith('per_page')) return null;
   return null;
 };
 
@@ -2720,49 +2727,56 @@ const checkLimitFallback = async ({
 
       const planType = resolvePlanType(row);
       const rowData = row;
-      const hasBuckets = Object.prototype.hasOwnProperty.call(rowData, 'free_daily_limit');
+      const explicitLimit = toNumber(rowData?.conversions_limit, 0);
+      const hasBuckets =
+        Object.prototype.hasOwnProperty.call(rowData, 'free_daily_limit') ||
+        Object.prototype.hasOwnProperty.call(rowData, 'pack_limit');
       const lastResetDate = toDateString(rowData?.last_reset_date);
       const resetBoundary = getResetBoundary(planType, dateParts);
 
       if (hasBuckets) {
         const freeLimit = toNumber(rowData?.free_daily_limit, 5);
         let freeUsed = toNumber(rowData?.free_daily_used, 0);
-        const monthlyLimit = toNumber(rowData?.monthly_limit, 0);
-        let monthlyUsed = toNumber(rowData?.monthly_used, 0);
-        const yearlyLimit = toNumber(rowData?.yearly_limit, 0);
-        let yearlyUsed = toNumber(rowData?.yearly_used, 0);
         const packLimit = toNumber(rowData?.pack_limit, 0);
         const packUsed = toNumber(rowData?.pack_used, 0);
 
-        const monthBoundary = `${dateParts.year}-${dateParts.month}-01`;
-        const yearBoundary = `${dateParts.year}-01-01`;
-        const monthReset = toDateString(rowData?.monthly_reset_date);
-        const yearReset = toDateString(rowData?.yearly_reset_date);
-
-        if (!lastResetDate || lastResetDate < dateParts.isoDate) {
+        if (planType === 'free' && (!lastResetDate || lastResetDate < dateParts.isoDate)) {
           freeUsed = 0;
-        }
-        if (!monthReset || monthReset < monthBoundary) {
-          monthlyUsed = 0;
-        }
-        if (!yearReset || yearReset < yearBoundary) {
-          yearlyUsed = 0;
+          const { error: resetError } = await supabaseAdmin
+            .from('subscriptions')
+            .update({
+              free_daily_used: 0,
+              last_reset_date: dateParts.isoDate,
+              timezone,
+            })
+            .eq('user_id', userId);
+          if (resetError) {
+            console.error('Fallback subscription reset failed:', resetError);
+          }
         }
 
-        const conversionsLimit = freeLimit + monthlyLimit + yearlyLimit + packLimit;
-        const conversionsUsed = freeUsed + monthlyUsed + yearlyUsed + packUsed;
+        if (planType.startsWith('per_page') || packLimit > 0) {
+          const resolvedPlan = planType.startsWith('per_page')
+            ? planType
+            : resolveCurrentPlanType('free', packLimit);
+          return {
+            conversionsUsed: packUsed,
+            conversionsLimit: packLimit,
+            planType: resolvedPlan,
+          };
+        }
 
         return {
-          conversionsUsed,
-          conversionsLimit,
-          planType,
+          conversionsUsed: freeUsed,
+          conversionsLimit: freeLimit,
+          planType: 'free',
         };
       }
 
-      const conversionsLimit = toNumber(rowData?.conversions_limit, 5);
+      const conversionsLimit = explicitLimit > 0 ? explicitLimit : toNumber(rowData?.free_daily_limit, 5);
       let conversionsUsed = toNumber(rowData?.conversions_used, 0);
 
-      if (resetBoundary && (!lastResetDate || lastResetDate < resetBoundary)) {
+      if (planType === 'free' && resetBoundary && (!lastResetDate || lastResetDate < resetBoundary)) {
         const { error: resetError } = await supabaseAdmin
           .from('subscriptions')
           .update({
@@ -2903,41 +2917,40 @@ const incrementUsageFallback = async ({
       }
 
       const rowData = row;
-      const hasBuckets = Object.prototype.hasOwnProperty.call(rowData, 'free_daily_limit');
+      const hasBuckets =
+        Object.prototype.hasOwnProperty.call(rowData, 'free_daily_limit') ||
+        Object.prototype.hasOwnProperty.call(rowData, 'pack_limit');
       if (hasBuckets) {
-        let remaining = incrementBy;
         const freeLimit = toNumber(rowData.free_daily_limit, 5);
-        let freeUsed = toNumber(rowData.free_daily_used, 0);
+        const freeUsed = toNumber(rowData.free_daily_used, 0);
         const packLimit = toNumber(rowData.pack_limit, 0);
-        let packUsed = toNumber(rowData.pack_used, 0);
-        const monthlyLimit = toNumber(rowData.monthly_limit, 0);
-        let monthlyUsed = toNumber(rowData.monthly_used, 0);
-        const yearlyLimit = toNumber(rowData.yearly_limit, 0);
-        let yearlyUsed = toNumber(rowData.yearly_used, 0);
+        const packUsed = toNumber(rowData.pack_used, 0);
+        const normalizedPlanType = typeof rowData.plan_type === 'string' ? rowData.plan_type.toLowerCase() : '';
 
-        const take = (limit: number, used: number) => {
-          const avail = Math.max(0, limit - used);
-          const consume = Math.min(avail, remaining);
-          remaining -= consume;
-          return used + consume;
-        };
+        if (normalizedPlanType.startsWith('per_page') || packLimit > 0) {
+          const currentLimit = toNumber(rowData.conversions_limit, 0) || packLimit;
+          const nextValue = Math.min(currentLimit > 0 ? currentLimit : Number.MAX_SAFE_INTEGER, toNumber(rowData.conversions_used, 0) + incrementBy);
 
-        freeUsed = take(freeLimit, freeUsed);
-        packUsed = take(packLimit, packUsed);
-        monthlyUsed = take(monthlyLimit, monthlyUsed);
-        yearlyUsed = take(yearlyLimit, yearlyUsed);
+          const { error: updateError } = await supabaseAdmin
+            .from('subscriptions')
+            .update({
+              pack_used: nextValue,
+              conversions_used: nextValue,
+              conversions_limit: Math.max(currentLimit, nextValue),
+              timezone,
+            })
+            .eq('user_id', userId);
+          return { ok: !updateError, error: updateError };
+        }
 
-        const conversionsUsed = freeUsed + packUsed + monthlyUsed + yearlyUsed;
-        const conversionsLimit = freeLimit + packLimit + monthlyLimit + yearlyLimit;
+        const nextFreeUsed = Math.min(freeLimit, freeUsed + incrementBy);
+        const conversionsUsed = nextFreeUsed;
+        const conversionsLimit = freeLimit;
 
         const { error: updateError } = await supabaseAdmin
           .from('subscriptions')
           .update({
-            free_daily_used: freeUsed,
-            pack_used: packUsed,
-            monthly_used: monthlyUsed,
-            yearly_used: yearlyUsed,
-            pages_used_this_month: monthlyUsed,
+            free_daily_used: nextFreeUsed,
             conversions_used: conversionsUsed,
             conversions_limit: conversionsLimit,
             timezone,
@@ -3052,6 +3065,28 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     const supabaseAdminClient = supabaseAdmin!;
+
+    const readConversionTimings = async (conversionId: string): Promise<Record<string, unknown>> => {
+      const { data, error } = await supabaseAdminClient
+        .from('conversions')
+        .select('processing_timings')
+        .eq('id', conversionId)
+        .single();
+
+      if (error || !data) {
+        return {};
+      }
+
+      return getProcessingTimings((data as Record<string, unknown>).processing_timings);
+    };
+
+    const updateConversionTimings = async (conversionId: string, patch: Record<string, unknown>) => {
+      const existingTimings = await readConversionTimings(conversionId);
+      return supabaseAdminClient
+        .from('conversions')
+        .update({ processing_timings: mergeProcessingTimings(existingTimings, patch) })
+        .eq('id', conversionId);
+    };
 
     // ============= AUTHENTICATION CHECK =============
     // Detect authenticated users via Authorization: Bearer <token> header
@@ -3435,10 +3470,9 @@ Deno.serve(async (req) => {
     });
 
     const normalizedPlanType = userPlanType.toLowerCase();
-    const isMonthlyPlan = normalizedPlanType.startsWith('monthly') || normalizedPlanType === 'daily';
-    const isYearlyPlan = normalizedPlanType.startsWith('yearly') || normalizedPlanType === 'business';
     const isPerPagePlan = normalizedPlanType.startsWith('per_page');
-    const isPaidPlan = !!user && (isMonthlyPlan || isYearlyPlan || isPerPagePlan || conversionsLimit > 5);
+    const isUnlimitedPlan = normalizedPlanType === 'unlimited' && conversionsLimit >= 900000;
+    const isPaidPlan = !!user && (isPerPagePlan || isUnlimitedPlan);
     const isFreeMode = !isPaidPlan;
     const underwritingTier = resolveUnderwritingTier(userPlanType, false);
     const remainingQuota = Math.max(0, conversionsLimit - conversionsUsed);
@@ -3499,39 +3533,16 @@ Deno.serve(async (req) => {
     if (user) {
       const insertPayload: Record<string, unknown> = {
         user_id: user.id,
-        original_filename: fileName,
-        file_path: fileId,
+        file_name: fileName,
         status: 'processing',
+        processing_timings: storageFilePath ? { storage: { sourcePath: storageFilePath } } : null,
       };
-      insertPayload.pages_processed = pageCount;
 
-      let { data: convData, error: convError } = await supabase
+      const { data: convData, error: convError } = await supabase
         .from('conversions')
         .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
         .select()
         .single();
-
-      // Some deployed DBs do not have `pages_processed` column yet.
-      // Retry without it so history records are still created.
-      if (convError && /pages_processed/i.test(convError.message || '')) {
-        delete insertPayload.pages_processed;
-        ({ data: convData, error: convError } = await supabase
-          .from('conversions')
-          .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
-          .select()
-          .single());
-      }
-
-      // Some deployed DBs do not have `file_path` column yet.
-      // Retry without it so history records are still created.
-      if (convError && /file_path/i.test(convError.message || '')) {
-        delete insertPayload.file_path;
-        ({ data: convData, error: convError } = await supabase
-          .from('conversions')
-          .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
-          .select()
-          .single());
-      }
 
       if (convError) {
         console.error('Failed to create conversion record:', convError);
@@ -4560,17 +4571,20 @@ Deno.serve(async (req) => {
       const pagesToCharge = Math.max(1, pagesWithData);
       if ((conversionsUsed + pagesToCharge) > conversionsLimit) {
         const remainingPages = Math.max(0, conversionsLimit - conversionsUsed);
-        const periodLabel = isYearlyPlan ? 'year' : isMonthlyPlan ? 'month' : 'plan';
+        const periodLabel = isPerPagePlan ? 'pack' : 'plan';
         const errorMessage = `This file has data on ${pagesToCharge} page${pagesToCharge === 1 ? '' : 's'}, but only ${remainingPages} page${remainingPages === 1 ? '' : 's'} remain in your ${periodLabel}.`;
 
         if (conversion) {
-          await supabase
+          await updateConversionTimings(conversion.id, {
+            failure: {
+              message: errorMessage,
+              at: new Date().toISOString(),
+              reason: 'page_limit_exceeded',
+            },
+          });
+          await supabaseAdminClient
             .from('conversions')
-            .update({
-              status: 'failed',
-              completed_at: new Date().toISOString(),
-              error_message: errorMessage,
-            })
+            .update({ status: 'failed' })
             .eq('id', conversion.id);
         }
 
@@ -4683,7 +4697,10 @@ Deno.serve(async (req) => {
 
       if (corrections && corrections.length > 0) {
         categoryCorrections = new Map();
-        corrections.forEach((c: { description_pattern: string; corrected_category: string }) => {
+        corrections.forEach((c: { description_pattern?: unknown; corrected_category?: unknown }) => {
+          if (typeof c.description_pattern !== 'string' || typeof c.corrected_category !== 'string') {
+            return;
+          }
           categoryCorrections!.set(c.description_pattern.toLowerCase(), c.corrected_category);
         });
         console.log(`Loaded ${corrections.length} category corrections for user`);
@@ -4773,15 +4790,15 @@ Deno.serve(async (req) => {
     const outputTier = processedVia === 'deterministic' ? 'fast' : 'safe';
     if (conversion?.id) {
       try {
-        const { error: updateError } = await supabase
-          .from('conversions')
-          .update({ processed_via: processedVia, output_tier: outputTier })
-          .eq('id', conversion.id);
-        if (updateError && !/processed_via|output_tier/i.test(updateError.message || '')) {
-          console.error('Failed to update conversion processed_via:', updateError);
+        const { error: updateError } = await updateConversionTimings(conversion.id, {
+          processedVia,
+          outputTier,
+        });
+        if (updateError) {
+          console.error('Failed to update conversion processing metadata:', updateError);
         }
       } catch (updateError) {
-        console.error('Conversion processed_via update crashed:', updateError);
+        console.error('Conversion processing metadata update crashed:', updateError);
       }
     }
 
@@ -4955,7 +4972,7 @@ Deno.serve(async (req) => {
               ...currentAudit,
               [payload.exportId]: exportEntry,
             },
-          };
+          } as ConversionProcessingTimings;
 
           const { error: ledgerError } = await supabaseAdminClient
             .from('conversions')
@@ -5023,7 +5040,6 @@ Deno.serve(async (req) => {
       bankMetadata: bankInfo,
       statementReference: conversion?.id ?? undefined,
     });
-    const exportPayload = JSON.parse(jsonData) as AppDatabase['public']['Tables']['conversions']['Update']['export_payload'];
 
     let excelBase64: string | null = null;
     if (!user || !resultPath) {
@@ -5031,14 +5047,20 @@ Deno.serve(async (req) => {
     }
 
     if (user && conversion) {
-      await supabase
+      const storageTimings = {
+        storage: {
+          sourcePath: uploadedSourcePath,
+          resultPath,
+        },
+      };
+      await supabaseAdminClient
         .from('conversions')
         .update({
           status: 'completed',
-          completed_at: new Date().toISOString(),
-          result_path: resultPath,
-          export_payload: exportPayload,
-          error_message: null,
+          processing_timings: mergeProcessingTimings(
+            await readConversionTimings(conversion.id),
+            storageTimings,
+          ),
         })
         .eq('id', conversion.id);
 
@@ -5059,7 +5081,7 @@ Deno.serve(async (req) => {
           salary_credits: underwritingResult.salaryCredits,
           emi_debits: underwritingResult.emiDebits,
           risk_flags: riskAnalysis.riskFlags,
-        } as unknown as AppDatabase['public']['Tables']['risk_analysis']['Insert']);
+        } as unknown as DocumentDatabase['public']['Tables']['risk_analysis']['Insert']);
 
       for (const alert of fraudAlerts) {
         await supabaseAdminClient
@@ -5072,7 +5094,7 @@ Deno.serve(async (req) => {
             description: alert.description,
             affected_rows: alert.affectedRows,
             metadata: alert.metadata,
-          } as AppDatabase['public']['Tables']['fraud_alerts']['Insert']);
+          } as DocumentDatabase['public']['Tables']['fraud_alerts']['Insert']);
       }
     }
 
@@ -5122,9 +5144,12 @@ Deno.serve(async (req) => {
     }
     if (conversion?.id) {
       try {
-        const { error: timingError } = await supabase
+        const { error: timingError } = await supabaseAdminClient
           .from('conversions')
-          .update({ processing_timings: timing, processing_total_ms: timing.total_ms })
+          .update({
+            processing_timings: mergeProcessingTimings(await readConversionTimings(conversion.id), timing),
+            processing_total_ms: timing.total_ms,
+          })
           .eq('id', conversion.id);
         if (timingError && !/processing_timings|processing_total_ms/i.test(timingError.message || '')) {
           console.error('Failed to update conversion timings:', timingError);
