@@ -5,6 +5,9 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+type SupabaseInvokeOptions = NonNullable<Parameters<typeof supabase.functions.invoke>[1]>;
+type SupabaseInvokeBody = SupabaseInvokeOptions["body"];
+
 export interface InvokeOptions<TBody = unknown> {
   body?: TBody;
   headers?: Record<string, string>;
@@ -29,7 +32,7 @@ const extractErrorMessage = (payload: unknown, fallback: string) => {
  * Invoke a Supabase Edge Function via explicit REST call.
  * This is deployment-agnostic and does not rely on any internal proxy.
  */
-export async function invokeEdgeFunction<TResponse = unknown, TBody = unknown>(
+export async function invokeEdgeFunction<TResponse = unknown, TBody extends SupabaseInvokeBody = SupabaseInvokeBody>(
   functionName: string,
   options: InvokeOptions<TBody> = {}
 ): Promise<InvokeResult<TResponse>> {
