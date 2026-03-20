@@ -290,15 +290,26 @@ const resolvePlanCapabilities = (rawPlan: string, isAdminOverride: boolean): Pla
   }
 
   const core = new Set<ExportFormat>(['xlsx', 'csv', 'json', 'mt940']);
-  const paid = plan.startsWith('monthly') || plan.startsWith('yearly') || plan.startsWith('per_page') || plan === 'business';
+  const isUnlimited = plan === 'unlimited';
+  const isBasicPack = plan === 'per_page_pack_basic';
+  const isProPack = plan === 'per_page_pack_pro';
+  const isCurrentPaidPack = plan.startsWith('per_page') || isUnlimited;
+  const allowFoirExport = isUnlimited || isBasicPack || isProPack;
+  const allowFraudPreview = isUnlimited || isProPack;
+  const allowedFormats = new Set<ExportFormat>(core);
+
+  if (allowFoirExport) {
+    allowedFormats.add('foir_report');
+  }
+  if (allowFraudPreview) {
+    allowedFormats.add('fraud_report');
+  }
 
   return {
     planName: plan || 'free',
-    allowedFormats: paid
-      ? new Set<ExportFormat>([...core, 'fraud_report', 'foir_report'])
-      : core,
-    allowFraudPreview: paid,
-    allowFoirExport: paid,
+    allowedFormats: isCurrentPaidPack ? allowedFormats : core,
+    allowFraudPreview,
+    allowFoirExport,
   };
 };
 
