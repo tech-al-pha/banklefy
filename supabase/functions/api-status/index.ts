@@ -40,6 +40,24 @@ const getCorsHeaders = (req: Request) => ({
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 });
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
+const getProcessingTimings = (value: unknown): Record<string, unknown> => {
+  return isRecord(value) ? { ...value } : {};
+};
+
+const getTimingField = (timings: Record<string, unknown>, key: string): string | null => {
+  const value = timings[key];
+  return typeof value === 'string' ? value : null;
+};
+
+const getFailureMessage = (timings: Record<string, unknown>): string | null => {
+  const failure = isRecord(timings.failure) ? timings.failure : null;
+  return typeof failure?.message === 'string' ? failure.message : null;
+};
+
 const parseRateLimits = (headers: Headers) => {
   const lookup = (keys: string[]) => {
     for (const key of keys) {
@@ -231,20 +249,31 @@ Deno.serve(async (req) => {
     const apiErrorRegex = /(limit|quota|rate limit|too many requests|429|groq|vision|ocr|mistral|supabase|storage|edge function|timeout|gateway|auth|token|session)/i;
     const { data: failedConversions } = await supabaseAdmin
       .from('conversions')
-      .select('id, created_at, error_message, status')
+      .select('id, created_at, status, file_name, processing_timings, processing_total_ms')
       .eq('status', 'failed')
-      .not('error_message', 'is', null)
       .order('created_at', { ascending: false })
       .limit(50);
 
     const recentErrors = (failedConversions || [])
-      .filter((c) => c.error_message && apiErrorRegex.test(c.error_message))
-      .slice(0, 10)
-      .map((c) => ({
-        id: c.id,
-        created_at: c.created_at,
-        message: c.error_message,
-      }));
+      .map((conversion) => {
+        const timings = getProcessingTimings(conversion.processing_timings);
+        const message = getFailureMessage(timings);
+        const processingTotalMs = typeof conversion.processing_total_ms === 'number'
+          ? conversion.processing_total_ms
+          : null;
+
+        return {
+          id: conversion.id,
+          created_at: conversion.created_at,
+          file_name: conversion.file_name ?? null,
+          message,
+          processing_total_ms: processingTotalMs,
+          processed_via: getTimingField(timings, 'processedVia') ?? getTimingField(timings, 'parseMode'),
+          output_tier: getTimingField(timings, 'outputTier'),
+        };
+      })
+      .filter((c) => c.message && apiErrorRegex.test(c.message))
+      .slice(0, 10);
 
     return new Response(
       JSON.stringify({
@@ -263,4 +292,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
