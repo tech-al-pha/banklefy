@@ -63,18 +63,14 @@ import { getTrackingKey } from '../_shared/client-id.ts';
 import { resolveEffectiveLimit, type LimitResolverDatabase, type SupabaseLike } from '../_shared/limit-resolver.ts';
 import type { Database as AppDatabase } from '../../../src/integrations/supabase/types.ts';
 
-type ConversionsTable = {
-  Row: AppDatabase['public']['Tables']['conversions']['Row'] & {
-    pages_processed?: number | null;
-  };
-  Insert: AppDatabase['public']['Tables']['conversions']['Insert'] & {
-    pages_processed?: number | null;
-  };
-  Update: AppDatabase['public']['Tables']['conversions']['Update'] & {
-    pages_processed?: number | null;
-  };
+type LooseTable = {
+  Row: Record<string, unknown>;
+  Insert: Record<string, unknown>;
+  Update: Record<string, unknown>;
   Relationships: [];
 };
+
+type ConversionProcessingTimings = NonNullable<AppDatabase['public']['Tables']['conversions']['Update']['processing_timings']>;
 
 type SubscriptionsTable = {
   Row: LimitResolverDatabase['public']['Tables']['subscriptions']['Row'] & {
@@ -92,7 +88,8 @@ type SubscriptionsTable = {
 type BatchDatabase = {
   public: Omit<AppDatabase['public'], 'Tables'> & {
     Tables: Omit<AppDatabase['public']['Tables'], 'conversions' | 'subscriptions'> & {
-      conversions: ConversionsTable;
+      category_corrections: LooseTable;
+      conversions: AppDatabase['public']['Tables']['conversions'];
       subscriptions: SubscriptionsTable;
     };
   };
@@ -939,6 +936,21 @@ const mergeProviderResults = (primary: OCRResult, secondary: OCRResult): OCRResu
 const sanitizeFileName = (fileName: string): string =>
   fileName.replace(/[\\/]/g, '').substring(0, 255);
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
+const getProcessingTimings = (value: unknown): Record<string, unknown> => {
+  return isRecord(value) ? { ...value } : {};
+};
+
+const mergeProcessingTimings = (existing: unknown, patch: Record<string, unknown>): ConversionProcessingTimings => {
+  return {
+    ...getProcessingTimings(existing),
+    ...patch,
+  } as ConversionProcessingTimings;
+};
+
 const buildCategoryCorrections = async (supabaseAdmin: BatchSupabaseClient, userId?: string) => {
   if (!userId) return undefined;
   const { data: corrections } = await supabaseAdmin
@@ -950,7 +962,10 @@ const buildCategoryCorrections = async (supabaseAdmin: BatchSupabaseClient, user
   if (!corrections || corrections.length === 0) return undefined;
 
   const map = new Map<string, string>();
-  corrections.forEach((c: { description_pattern: string; corrected_category: string }) => {
+  corrections.forEach((c: { description_pattern?: unknown; corrected_category?: unknown }) => {
+    if (typeof c.description_pattern !== 'string' || typeof c.corrected_category !== 'string') {
+      return;
+    }
     map.set(c.description_pattern.toLowerCase(), c.corrected_category);
   });
   return map;
@@ -1749,6 +1764,28 @@ Deno.serve(async (req) => {
     );
     const supabaseAdminClient = supabaseAdmin!;
 
+    const readConversionTimings = async (conversionId: string): Promise<ConversionProcessingTimings> => {
+      const { data, error } = await supabaseAdminClient
+        .from('conversions')
+        .select('processing_timings')
+        .eq('id', conversionId)
+        .single();
+
+      if (error || !data) {
+        return {} as ConversionProcessingTimings;
+      }
+
+      return getProcessingTimings(data.processing_timings) as ConversionProcessingTimings;
+    };
+
+    const updateConversionTimings = async (conversionId: string, patch: Record<string, unknown>) => {
+      const existingTimings = await readConversionTimings(conversionId);
+      return supabaseAdminClient
+        .from('conversions')
+        .update({ processing_timings: mergeProcessingTimings(existingTimings, patch) })
+        .eq('id', conversionId);
+    };
+
     const authHeader = req.headers.get('Authorization');
     let user = null;
     let supabase = supabaseAdminClient;
@@ -1889,10 +1926,9 @@ Deno.serve(async (req) => {
     }
 
     const normalizedPlanType = userPlanType.toLowerCase();
-    const isMonthlyPlan = normalizedPlanType.startsWith('monthly') || normalizedPlanType === 'daily';
-    const isYearlyPlan = normalizedPlanType.startsWith('yearly') || normalizedPlanType === 'business';
     const isPerPagePlan = normalizedPlanType.startsWith('per_page');
-    const isPaidPlan = !!user && (isMonthlyPlan || isYearlyPlan || isPerPagePlan || conversionsLimit > 5);
+    const isUnlimitedPlan = normalizedPlanType === 'unlimited' && conversionsLimit >= 900000;
+    const isPaidPlan = !!user && (isPerPagePlan || isUnlimitedPlan);
     const isFreeMode = !isPaidPlan;
     const underwritingTier = resolveUnderwritingTier(userPlanType, false);
     const remainingQuota = Math.max(0, conversionsLimit - conversionsUsed);
@@ -1965,7 +2001,9 @@ Deno.serve(async (req) => {
 
     for (const file of files as StatementPayload[]) {
       const sanitizedName = sanitizeFileName(file.fileName);
+      const fileStartedAt = Date.now();
       let conversionRecord: { id: string } | null = null;
+      const sourcePath: string | null = user && file.fileId ? `${user.id}/${file.fileId}` : null;
       const lowerName = sanitizedName.toLowerCase();
       const isPdf = lowerName.endsWith('.pdf');
       const hasPdfPageImages = Array.isArray(file.pdfPageImages) && file.pdfPageImages.length > 0;
@@ -2010,7 +2048,7 @@ Deno.serve(async (req) => {
           if (remainingPagesBeforeFile <= 0) {
             failures.push({
               fileName: sanitizedName,
-              error: `No page credits left in your ${isYearlyPlan ? 'yearly' : isMonthlyPlan ? 'monthly' : 'current'} plan.`,
+              error: 'No page credits left in your current pack.',
             });
             continue;
           }
@@ -2076,34 +2114,26 @@ Deno.serve(async (req) => {
         }
 
         // Create conversion record (authenticated only)
-        if (user && file.fileId) {
-          const sourcePath = `${user.id}/${file.fileId}`;
+        if (user && sourcePath) {
           const insertPayload: Record<string, unknown> = {
             user_id: user.id,
-            original_filename: sanitizedName,
-            file_path: file.fileId,
+            file_name: sanitizedName,
             status: 'processing',
+            processing_timings: {
+              storage: {
+                sourcePath,
+              },
+              batch: {
+                pagesProcessed: filePageCount,
+              },
+            },
           };
-          insertPayload.pages_processed = Array.isArray(file.pdfPageImages) && file.pdfPageImages.length > 0
-            ? file.pdfPageImages.length
-            : 1;
 
-          let { data: convData, error: convError } = await supabase
+          const { data: convData, error: convError } = await supabaseAdminClient
             .from('conversions')
             .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
             .select()
             .single();
-
-          // Some deployed DBs do not have `pages_processed` column yet.
-          // Retry without it so history records are still created.
-          if (convError && /pages_processed/i.test(convError.message || '')) {
-            delete insertPayload.pages_processed;
-            ({ data: convData, error: convError } = await supabase
-              .from('conversions')
-              .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
-              .select()
-              .single());
-          }
 
           if (convError) {
             console.error('Failed to create conversion record:', convError);
@@ -2128,17 +2158,27 @@ Deno.serve(async (req) => {
           const remainingPagesBeforeFile = paidRemainingQuota - paidPagesConsumed;
           const pagesToCharge = Math.max(1, pagesWithData);
           if (pagesToCharge > remainingPagesBeforeFile) {
-            const periodLabel = isYearlyPlan ? 'year' : isMonthlyPlan ? 'month' : 'plan';
+            const periodLabel = isPerPagePlan ? 'pack' : 'plan';
             const message = `This file has data on ${pagesToCharge} page${pagesToCharge === 1 ? '' : 's'}, but only ${remainingPagesBeforeFile} page${remainingPagesBeforeFile === 1 ? '' : 's'} remain in your ${periodLabel}.`;
 
             failures.push({ fileName: sanitizedName, error: message });
             if (conversionRecord) {
-              await supabase
+              await updateConversionTimings(conversionRecord.id, {
+                storage: {
+                  sourcePath,
+                  resultPath: null,
+                },
+                failure: {
+                  message,
+                  at: new Date().toISOString(),
+                  reason: 'page_limit_exceeded',
+                },
+              });
+              await supabaseAdminClient
                 .from('conversions')
                 .update({
                   status: 'failed',
-                  completed_at: new Date().toISOString(),
-                  error_message: message,
+                  processing_total_ms: Date.now() - fileStartedAt,
                 })
                 .eq('id', conversionRecord.id);
             }
@@ -2164,23 +2204,17 @@ Deno.serve(async (req) => {
         }
 
         if (user && conversionRecord) {
-          const exportPayload = JSON.parse(buildJsonExport({
-            transactions,
-            bankMetadata,
-            summary: {
-              totalCredits: totals.totalCredits,
-              totalDebits: totals.totalDebits,
-              netFlow: fromMinorUnits(toMinorUnits(totals.totalCredits) - toMinorUnits(totals.totalDebits)),
+          await updateConversionTimings(conversionRecord.id, {
+            storage: {
+              sourcePath,
+              resultPath,
             },
-          }));
-          await supabase
+          });
+          await supabaseAdminClient
             .from('conversions')
             .update({
               status: 'completed',
-              completed_at: new Date().toISOString(),
-              result_path: resultPath,
-              export_payload: exportPayload,
-              error_message: null,
+              processing_total_ms: Date.now() - fileStartedAt,
             })
             .eq('id', conversionRecord.id);
         }
@@ -2206,12 +2240,22 @@ Deno.serve(async (req) => {
         const message = sanitizeError(error);
         failures.push({ fileName: sanitizedName, error: message });
         if (conversionRecord) {
-          await supabase
+          await updateConversionTimings(conversionRecord.id, {
+            storage: {
+              sourcePath,
+              resultPath: null,
+            },
+            failure: {
+              message,
+              at: new Date().toISOString(),
+              reason: 'processing_error',
+            },
+          });
+          await supabaseAdminClient
             .from('conversions')
             .update({
               status: 'failed',
-              completed_at: new Date().toISOString(),
-              error_message: message,
+              processing_total_ms: Date.now() - fileStartedAt,
             })
             .eq('id', conversionRecord.id);
         }
