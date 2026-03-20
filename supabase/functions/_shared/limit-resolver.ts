@@ -178,6 +178,15 @@ const toDateString = (value: unknown): string | null => {
   return parsed.toISOString().slice(0, 10);
 };
 
+const getCurrentPackFromLimit = (limit: number): string | null => {
+  if (limit >= 11000) return 'per_page_pack_pro';
+  if (limit >= 1000) return 'per_page_pack_basic';
+  if (limit >= 50) return 'per_page_power';
+  if (limit >= 25) return 'per_page_standard';
+  if (limit >= 10) return 'per_page_lite';
+  return null;
+};
+
 const getDatePartsInTimezone = (timezone: string): DateParts => {
   try {
     const parts = new Intl.DateTimeFormat('en-US', {
@@ -200,32 +209,20 @@ const getDatePartsInTimezone = (timezone: string): DateParts => {
   }
 };
 
-const normalizeLegacyPlanType = (planType: string, conversionsLimit: number): string => {
-  if (
-    planType === 'free' ||
-    planType === 'unlimited' ||
-    planType.startsWith('monthly') ||
-    planType.startsWith('yearly') ||
-    planType.startsWith('per_page')
-  ) {
+const resolveCurrentPlanType = (planType: string, conversionsLimit: number): string => {
+  const inferredPack = getCurrentPackFromLimit(conversionsLimit);
+
+  if (planType === 'free') {
+    return inferredPack ?? 'free';
+  }
+
+  if (planType === 'unlimited') {
+    if (conversionsLimit >= UNLIMITED_LIMIT) return 'unlimited';
+    return inferredPack ?? 'free';
+  }
+
+  if (planType.startsWith('per_page')) {
     return planType;
-  }
-
-  if (planType === 'daily') {
-    if (conversionsLimit >= 4500) return 'monthly_enterprise';
-    if (conversionsLimit >= 1000) return 'monthly_pro';
-    if (conversionsLimit >= 300) return 'monthly_basic';
-    return 'daily';
-  }
-
-  if (planType === 'business') {
-    if (conversionsLimit >= 65000) return 'yearly_pro';
-    if (conversionsLimit >= 15000) return 'yearly_full';
-    if (conversionsLimit >= 5000) return 'yearly_lite';
-    if (conversionsLimit === 50) return 'per_page_power';
-    if (conversionsLimit === 25) return 'per_page_standard';
-    if (conversionsLimit === 10) return 'per_page_lite';
-    return 'business';
   }
 
   return planType;
@@ -236,17 +233,15 @@ const resolvePlanType = (row: SubscriptionRow | null, conversionsLimitHint?: num
     ? Number(conversionsLimitHint)
     : toNumber(row?.conversions_limit, 0);
   const planType = normalizePlan(row?.plan_type);
-  if (planType !== 'free') return normalizeLegacyPlanType(planType, hint);
-  return normalizeLegacyPlanType(normalizePlan(row?.tier), hint);
+  if (planType !== 'free') return resolveCurrentPlanType(planType, hint);
+  return resolveCurrentPlanType(normalizePlan(row?.tier), hint);
 };
 
 const getResetBoundary = (planType: string, dateParts: DateParts): string | null => {
   const normalizedPlan = normalizePlan(planType);
-  const isMonthly = normalizedPlan.startsWith('monthly') || normalizedPlan === 'daily';
-  const isYearly = normalizedPlan.startsWith('yearly') || normalizedPlan === 'business';
-  if (isMonthly) return `${dateParts.year}-${dateParts.month}-01`;
-  if (isYearly) return `${dateParts.year}-01-01`;
-  return dateParts.isoDate;
+  if (normalizedPlan === 'free') return dateParts.isoDate;
+  if (normalizedPlan === 'unlimited' || normalizedPlan.startsWith('per_page')) return null;
+  return null;
 };
 
 const getOwnerEmailSet = (): Set<string> => {
@@ -340,10 +335,8 @@ const hasExplicitUnlimitedFlag = (row: SubscriptionRow): boolean => {
 const hasFiniteConfiguredLimit = (row: SubscriptionRow): boolean => {
   const explicitLimit = toNumber(row.conversions_limit, 0);
   const freeLimit = toNumber(row.free_daily_limit, 0);
-  const monthlyLimit = toNumber(row.monthly_limit, 0);
-  const yearlyLimit = toNumber(row.yearly_limit, 0);
   const packLimit = toNumber(row.pack_limit, 0);
-  return explicitLimit > 0 || freeLimit > 0 || monthlyLimit > 0 || yearlyLimit > 0 || packLimit > 0;
+  return explicitLimit > 0 || freeLimit > 0 || packLimit > 0;
 };
 
 const resolveAdminRole = async (supabaseAdmin: SupabaseLike, userId: string): Promise<boolean> => {
@@ -516,65 +509,68 @@ export const resolveEffectiveLimit = async ({
     });
   }
 
-  // 3) Stacked buckets
+  // 3) Bucket fallback for rows without a consolidated limit
   const hasBuckets =
     Object.prototype.hasOwnProperty.call(row, 'free_daily_limit') ||
-    Object.prototype.hasOwnProperty.call(row, 'monthly_limit') ||
-    Object.prototype.hasOwnProperty.call(row, 'yearly_limit') ||
     Object.prototype.hasOwnProperty.call(row, 'pack_limit');
 
   if (hasBuckets) {
+    const planType = resolvePlanType(row, explicitLimit);
     const freeLimit = toNumber(row.free_daily_limit, DEFAULT_AUTH_LIMIT);
     let freeUsed = toNumber(row.free_daily_used, 0);
-    const monthlyLimit = toNumber(row.monthly_limit, 0);
-    let monthlyUsed = toNumber(row.monthly_used, 0);
-    const yearlyLimit = toNumber(row.yearly_limit, 0);
-    let yearlyUsed = toNumber(row.yearly_used, 0);
     const packLimit = toNumber(row.pack_limit, 0);
     const packUsed = toNumber(row.pack_used, 0);
-
-    const monthBoundary = `${dateParts.year}-${dateParts.month}-01`;
-    const yearBoundary = `${dateParts.year}-01-01`;
     const lastResetDate = toDateString(row.last_reset_date);
-    const monthReset = toDateString(row.monthly_reset_date);
-    const yearReset = toDateString(row.yearly_reset_date);
 
-    const shouldResetFree = !lastResetDate || lastResetDate < dateParts.isoDate;
-    const shouldResetMonthly = !monthReset || monthReset < monthBoundary;
-    const shouldResetYearly = !yearReset || yearReset < yearBoundary;
+    if (planType === 'free') {
+      const shouldResetFree = !lastResetDate || lastResetDate < dateParts.isoDate;
+      if (shouldResetFree) {
+        freeUsed = 0;
+        const { error: resetError } = await supabaseAdmin
+          .from('subscriptions')
+          .update({
+            free_daily_used: freeUsed,
+            last_reset_date: dateParts.isoDate,
+            timezone,
+          })
+          .eq('user_id', user.id);
 
-    if (shouldResetFree) freeUsed = 0;
-    if (shouldResetMonthly) monthlyUsed = 0;
-    if (shouldResetYearly) yearlyUsed = 0;
-
-    if (shouldResetFree || shouldResetMonthly || shouldResetYearly) {
-      const { error: bucketResetError } = await supabaseAdmin
-        .from('subscriptions')
-        .update({
-          free_daily_used: freeUsed,
-          monthly_used: monthlyUsed,
-          yearly_used: yearlyUsed,
-          last_reset_date: shouldResetFree ? dateParts.isoDate : row.last_reset_date,
-          monthly_reset_date: shouldResetMonthly ? monthBoundary : row.monthly_reset_date,
-          yearly_reset_date: shouldResetYearly ? yearBoundary : row.yearly_reset_date,
-          timezone,
-        })
-        .eq('user_id', user.id);
-
-      if (bucketResetError) {
-        throw new Error(`resolveEffectiveLimit: failed to reset stacked buckets (${bucketResetError.message})`);
+        if (resetError) {
+          throw new Error(`resolveEffectiveLimit: failed to reset free bucket (${resetError.message})`);
+        }
       }
+
+      return buildResult({
+        conversionsUsed: freeUsed,
+        conversionsLimit: freeLimit > 0 ? freeLimit : DEFAULT_AUTH_LIMIT,
+        planType: 'free',
+        isAuthenticated: true,
+        isAdmin,
+        isOwner,
+        isUnlimited: false,
+      });
     }
 
-    const stackedLimit = freeLimit + monthlyLimit + yearlyLimit + packLimit;
-    const stackedUsed = freeUsed + monthlyUsed + yearlyUsed + packUsed;
-
-    if (stackedLimit > 0) {
-      const planType = resolvePlanType(row, stackedLimit);
+    if (planType.startsWith('per_page') || packLimit > 0) {
+      const resolvedPlan = planType.startsWith('per_page')
+        ? planType
+        : resolveCurrentPlanType('free', packLimit);
       return buildResult({
-        conversionsUsed: stackedUsed,
-        conversionsLimit: stackedLimit,
-        planType,
+        conversionsUsed: packUsed,
+        conversionsLimit: packLimit,
+        planType: resolvedPlan,
+        isAuthenticated: true,
+        isAdmin,
+        isOwner,
+        isUnlimited: false,
+      });
+    }
+
+    if (freeLimit > 0) {
+      return buildResult({
+        conversionsUsed: freeUsed,
+        conversionsLimit: freeLimit,
+        planType: 'free',
         isAuthenticated: true,
         isAdmin,
         isOwner,
