@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getPdfWorkerSrc } from "@/lib/pdfWorker";
+import type { PDFDocumentProxy, PageViewport } from "pdfjs-dist";
 
 interface PdfPreviewProps {
   file: File;
@@ -16,28 +17,6 @@ interface PdfPreviewProps {
 interface PageThumbnail {
   pageNum: number;
   dataUrl: string;
-}
-
-interface PdfViewport {
-  width: number;
-  height: number;
-}
-
-interface PdfPage {
-  getViewport: (params: { scale: number }) => PdfViewport;
-  render: (params: { canvasContext: CanvasRenderingContext2D; viewport: PdfViewport }) => {
-    promise: Promise<void>;
-  };
-}
-
-interface PdfDocument {
-  numPages: number;
-  getPage: (pageNum: number) => Promise<PdfPage>;
-}
-
-interface PdfJsModule {
-  getDocument: (src: unknown) => { promise: Promise<PdfDocument> };
-  GlobalWorkerOptions: { workerSrc: string };
 }
 
 interface PdfJsError {
@@ -59,7 +38,7 @@ export const PdfPreview = ({
   const [isEncrypted, setIsEncrypted] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pdfDocRef = useRef<PdfDocument | null>(null);
+  const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
 
   const loadPdf = useCallback(async () => {
     setLoading(true);
@@ -68,7 +47,7 @@ export const PdfPreview = ({
     
     try {
       // Dynamically import pdf.js
-      const pdfjsLib = (await import('pdfjs-dist')) as PdfJsModule;
+      const pdfjsLib = await import("pdfjs-dist");
 
       // Use bundled worker (same-origin) to avoid cross-origin loading issues.
       pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
@@ -96,7 +75,7 @@ export const PdfPreview = ({
 
         for (let i = 1; i <= maxThumbnails; i++) {
           const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 0.3 });
+          const viewport: PageViewport = page.getViewport({ scale: 0.3 });
           
           const canvas = document.createElement('canvas');
           const context = canvas.getContext('2d');
@@ -144,7 +123,7 @@ export const PdfPreview = ({
     }
   }, [file, password, onPasswordError]);
 
-  const renderPage = async (pdf: PdfDocument, pageNum: number) => {
+  const renderPage = async (pdf: PDFDocumentProxy, pageNum: number) => {
     if (!canvasRef.current) return;
     
     try {
