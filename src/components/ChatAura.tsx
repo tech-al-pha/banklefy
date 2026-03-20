@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 import { supabase } from "@/integrations/supabase/client";
+import { getConversionResultStoragePath } from "@/lib/conversion-history";
 import { getPdfWorkerSrc } from "@/lib/pdfWorker";
 
 interface Message {
@@ -29,10 +30,9 @@ interface Message {
 
 interface RecentConversion {
   id: string;
-  original_filename: string;
-  created_at: string;
-  result_path: string | null;
-  status: string;
+  file_name: string | null;
+  created_at: string | null;
+  status: string | null;
 }
 
 interface ChatAuraProps {
@@ -189,7 +189,7 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("conversions")
-        .select("id, original_filename, created_at, result_path, status")
+        .select("id, file_name, created_at, status")
         .eq("user_id", user.id)
         .gte("created_at", since)
         .order("created_at", { ascending: false });
@@ -226,11 +226,11 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
     const normalizedMessage = message.toLowerCase();
     const normalize = (name: string) => name.toLowerCase().replace(/\.[^/.]+$/, "");
     const candidates = [...recentConversions].sort(
-      (a, b) => b.original_filename.length - a.original_filename.length,
+      (a, b) => (b.file_name?.length ?? 0) - (a.file_name?.length ?? 0),
     );
     return candidates.find((conv) =>
-      normalizedMessage.includes(conv.original_filename.toLowerCase()) ||
-      normalizedMessage.includes(normalize(conv.original_filename)),
+      (conv.file_name ? normalizedMessage.includes(conv.file_name.toLowerCase()) : false) ||
+      (conv.file_name ? normalizedMessage.includes(normalize(conv.file_name)) : false),
     ) || null;
   };
 
@@ -313,18 +313,18 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
           pdfContext: activePdfContext || null,
           recentConversions: recentConversions.map((conv) => ({
             id: conv.id,
-            fileName: conv.original_filename,
-            createdAt: conv.created_at,
+            fileName: conv.file_name ?? "document",
+            createdAt: conv.created_at ?? "",
             status: conv.status,
-            resultPath: conv.result_path,
+            resultPath: user ? getConversionResultStoragePath(user.id, conv.id) : null,
           })),
           selectedConversion: matchedConversion
             ? {
                 id: matchedConversion.id,
-                fileName: matchedConversion.original_filename,
-                createdAt: matchedConversion.created_at,
+                fileName: matchedConversion.file_name ?? "document",
+                createdAt: matchedConversion.created_at ?? "",
                 status: matchedConversion.status,
-                resultPath: matchedConversion.result_path,
+                resultPath: user ? getConversionResultStoragePath(user.id, matchedConversion.id) : null,
               }
             : null,
           conversationHistory: messages.map((m) => ({ role: m.role, content: m.content })),
