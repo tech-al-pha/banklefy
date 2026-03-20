@@ -131,10 +131,14 @@ export const useRecaptcha = () => {
   const executeRecaptcha = useCallback(async (action: string = 'convert'): Promise<string | null> => {
     try {
       await ensureRecaptchaLoaded();
-    if (!isRecaptchaConfigured) {
-      throw new Error('Missing VITE_RECAPTCHA_SITE_KEY');
-    }
-    const token = await window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action });
+      if (!isRecaptchaConfigured) {
+        throw new Error('Missing VITE_RECAPTCHA_SITE_KEY');
+      }
+      const grecaptcha = window.grecaptcha;
+      if (!grecaptcha) {
+        throw new Error('reCAPTCHA is not available.');
+      }
+      const token = await grecaptcha.execute(RECAPTCHA_SITE_KEY, { action });
       return token;
     } catch (error) {
       if (import.meta.env.DEV) { console.error('reCAPTCHA execution failed:', error); }
