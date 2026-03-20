@@ -60,6 +60,8 @@ const toNumber = (value: unknown): number => {
   return 0;
 };
 
+const toFiniteNumber = (value: unknown): number => toNumber(value);
+
 const roundMoney = (value: number): number => {
   if (!Number.isFinite(value)) return 0;
   return Math.round((value + Number.EPSILON) * 100) / 100;
