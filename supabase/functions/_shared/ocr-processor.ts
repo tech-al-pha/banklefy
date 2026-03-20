@@ -650,10 +650,12 @@ const lockColumnsByBalanceDirection = (rows: RawTransaction[], strictMode: boole
 
     const debit = roundMoney2(Math.abs(Number(normalized[i].debit || 0)));
     const credit = roundMoney2(Math.abs(Number(normalized[i].credit || 0)));
-    const amount = Math.max(debit, credit);
+    const preferredSide: 'credit' | 'debit' = delta > 0 ? 'credit' : 'debit';
+    const deltaAbs = roundMoney2(Math.abs(delta));
+    const amount = chooseBalanceAwareAmount(debit, credit, deltaAbs, preferredSide);
     if (amount <= 0) continue;
 
-    if (delta > 0) {
+    if (preferredSide === 'credit') {
       normalized[i].credit = amount;
       normalized[i].debit = 0;
     } else {
@@ -670,54 +672,103 @@ const replaceDigitAt = (value: string, index: number, digit: string): string =>
 
 const toAmountString = (value: number): string => roundMoney2(value).toFixed(2);
 
-const tryDigitCorrectionForMismatch = (
-  observedAmount: number,
-  expectedAmount: number,
-): number | undefined => {
-  const mismatch = roundMoney2(Math.abs(observedAmount - expectedAmount));
-  const allowedMismatch =
-    Math.abs(mismatch - 10) <= 0.01 ||
-    Math.abs(mismatch - 100) <= 0.01 ||
-    Math.abs(mismatch - 0.1) <= 0.01;
-  if (!allowedMismatch) return undefined;
-
+// Try the common OCR/Groq amount drift patterns before we trust the raw number.
+const buildAmountCorrectionCandidates = (amount: number): number[] => {
   const candidates = new Set<number>();
   const addCandidate = (value: number) => {
     if (!Number.isFinite(value) || value <= 0) return;
     candidates.add(roundMoney2(value));
   };
 
-  addCandidate(observedAmount * 10);
-  addCandidate(observedAmount * 100);
-  addCandidate(observedAmount / 10);
-  addCandidate(observedAmount / 100);
+  addCandidate(amount * 10);
+  addCandidate(amount * 100);
+  addCandidate(amount * 1000);
+  addCandidate(amount / 10);
+  addCandidate(amount / 100);
+  addCandidate(amount / 1000);
 
-  const observedText = toAmountString(observedAmount).replace('.', '');
-  for (let i = 0; i < observedText.length; i += 1) {
-    const current = observedText[i];
+  const compactAmount = toAmountString(amount).replace('.', '');
+  for (let i = 0; i < compactAmount.length; i += 1) {
+    const current = compactAmount[i];
     if (!/\d/.test(current)) continue;
     for (let d = 0; d <= 9; d += 1) {
       const digit = String(d);
       if (digit === current) continue;
-      const swapped = replaceDigitAt(observedText, i, digit);
+      const swapped = replaceDigitAt(compactAmount, i, digit);
       const normalized = Number(`${swapped.slice(0, -2)}.${swapped.slice(-2)}`);
       addCandidate(normalized);
     }
-    if (current === '6') addCandidate(Number(replaceDigitAt(observedText, i, '8').replace(/(\d{2})$/, '.$1')));
-    if (current === '6') addCandidate(Number(replaceDigitAt(observedText, i, '9').replace(/(\d{2})$/, '.$1')));
-    if (current === '8') addCandidate(Number(replaceDigitAt(observedText, i, '6').replace(/(\d{2})$/, '.$1')));
-    if (current === '8') addCandidate(Number(replaceDigitAt(observedText, i, '9').replace(/(\d{2})$/, '.$1')));
-    if (current === '9') addCandidate(Number(replaceDigitAt(observedText, i, '6').replace(/(\d{2})$/, '.$1')));
-    if (current === '9') addCandidate(Number(replaceDigitAt(observedText, i, '8').replace(/(\d{2})$/, '.$1')));
+    if (current === '6') addCandidate(Number(replaceDigitAt(compactAmount, i, '8').replace(/(\d{2})$/, '.$1')));
+    if (current === '6') addCandidate(Number(replaceDigitAt(compactAmount, i, '9').replace(/(\d{2})$/, '.$1')));
+    if (current === '8') addCandidate(Number(replaceDigitAt(compactAmount, i, '6').replace(/(\d{2})$/, '.$1')));
+    if (current === '8') addCandidate(Number(replaceDigitAt(compactAmount, i, '9').replace(/(\d{2})$/, '.$1')));
+    if (current === '9') addCandidate(Number(replaceDigitAt(compactAmount, i, '6').replace(/(\d{2})$/, '.$1')));
+    if (current === '9') addCandidate(Number(replaceDigitAt(compactAmount, i, '8').replace(/(\d{2})$/, '.$1')));
   }
 
-  for (const candidate of candidates) {
-    if (Math.abs(candidate - expectedAmount) <= 0.01) {
-      return roundMoney2(candidate);
+  return [...candidates];
+};
+
+const repairAmountUsingBalanceDelta = (observedAmount: number, expectedAmount: number): number => {
+  if (!Number.isFinite(observedAmount) || observedAmount <= 0) return observedAmount;
+  if (!Number.isFinite(expectedAmount) || expectedAmount <= 0) return roundMoney2(observedAmount);
+
+  const target = roundMoney2(expectedAmount);
+  const observed = roundMoney2(observedAmount);
+  let best = observed;
+  let bestDiff = Math.abs(observed - target);
+
+  for (const candidate of buildAmountCorrectionCandidates(observed)) {
+    const diff = Math.abs(candidate - target);
+    if (diff + 0.0001 < bestDiff) {
+      best = candidate;
+      bestDiff = diff;
     }
   }
 
-  return undefined;
+  const acceptanceWindow = Math.max(2, target * 0.05);
+  if (bestDiff <= acceptanceWindow && bestDiff < Math.abs(observed - target)) {
+    return roundMoney2(best);
+  }
+
+  return observed;
+};
+
+// Use the running balance to pick the amount that is most internally consistent.
+const chooseBalanceAwareAmount = (
+  debit: number,
+  credit: number,
+  expectedAmount: number,
+  preferredSide: 'debit' | 'credit',
+): number => {
+  const candidates: Array<{ amount: number; side: 'debit' | 'credit' }> = [];
+  if (debit > 0) {
+    candidates.push({ amount: repairAmountUsingBalanceDelta(debit, expectedAmount), side: 'debit' });
+  }
+  if (credit > 0) {
+    candidates.push({ amount: repairAmountUsingBalanceDelta(credit, expectedAmount), side: 'credit' });
+  }
+
+  if (candidates.length === 0) return 0;
+  if (candidates.length === 1) return roundMoney2(candidates[0].amount);
+
+  let best = candidates[0];
+  let bestDiff = Math.abs(best.amount - expectedAmount);
+  for (let i = 1; i < candidates.length; i += 1) {
+    const candidate = candidates[i];
+    const diff = Math.abs(candidate.amount - expectedAmount);
+    if (diff + 0.0001 < bestDiff) {
+      best = candidate;
+      bestDiff = diff;
+      continue;
+    }
+    if (Math.abs(diff - bestDiff) <= 0.01 && candidate.side === preferredSide && best.side !== preferredSide) {
+      best = candidate;
+      bestDiff = diff;
+    }
+  }
+
+  return roundMoney2(best.amount);
 };
 
 const applyRowLevelBalanceValidation = (rows: RawTransaction[]): RawTransaction[] => {
@@ -751,11 +802,11 @@ const applyRowLevelBalanceValidation = (rows: RawTransaction[]): RawTransaction[
     }
 
     const direction: 'credit' | 'debit' = delta >= 0 ? 'credit' : 'debit';
-    const observed = direction === 'credit'
-      ? (credit > 0 ? credit : debit)
-      : (debit > 0 ? debit : credit);
-    const corrected = tryDigitCorrectionForMismatch(observed, deltaAbs);
-    const finalAmount = corrected ?? observed;
+    const finalAmount = chooseBalanceAwareAmount(debit, credit, deltaAbs, direction);
+    if (finalAmount <= 0) {
+      normalized[i] = setLowConfidence({ ...normalized[i], debit, credit });
+      continue;
+    }
 
     if (direction === 'credit') {
       credit = finalAmount;
@@ -1921,31 +1972,6 @@ const determineFirstBalance = (ocrText: string): number | undefined => {
   return undefined;
 };
 
-const correctAdcbAmountUsingBalanceDelta = (amount: number, deltaAbs: number): number => {
-  if (!Number.isFinite(amount) || amount <= 0) return amount;
-  if (!Number.isFinite(deltaAbs) || deltaAbs <= 0) return amount;
-
-  const tolerance = Math.max(1, deltaAbs * 0.015);
-  if (Math.abs(amount - deltaAbs) <= tolerance) return roundMoney2(deltaAbs);
-
-  const candidates = [amount, amount * 10, amount * 100, amount / 10, amount / 100]
-    .filter((candidate) => Number.isFinite(candidate) && candidate > 0);
-  let best = amount;
-  let bestDiff = Math.abs(amount - deltaAbs);
-  for (const candidate of candidates) {
-    const diff = Math.abs(candidate - deltaAbs);
-    if (diff < bestDiff) {
-      best = candidate;
-      bestDiff = diff;
-    }
-  }
-
-  if (bestDiff <= Math.max(2, deltaAbs * 0.05)) {
-    return roundMoney2(best);
-  }
-  return roundMoney2(amount);
-};
-
 const inferDebitCreditFromDrafts = (drafts: AdcbRowDraft[], openingBalance?: number): RawTransaction[] => {
   if (drafts.length === 0) return [];
 
@@ -1964,7 +1990,7 @@ const inferDebitCreditFromDrafts = (drafts: AdcbRowDraft[], openingBalance?: num
     if (prevBalance !== undefined) {
       const delta = draft.balance - prevBalance;
       const deltaAbs = Math.abs(delta);
-      resolvedAmount = correctAdcbAmountUsingBalanceDelta(baseAmount, deltaAbs);
+      resolvedAmount = repairAmountUsingBalanceDelta(baseAmount, deltaAbs);
 
       if (deltaAbs > 0.01) {
         if (delta > 0) {
