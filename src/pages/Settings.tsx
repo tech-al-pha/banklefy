@@ -152,11 +152,6 @@ const Settings = () => {
       const { error } = await supabase.auth.updateUser({ email: nextEmail });
       if (error) throw error;
 
-      await supabase
-        .from("profiles")
-        .update({ email: nextEmail })
-        .eq("id", user.id);
-
       toast({
         title: "Email update requested",
         description: "Check your inbox to confirm the new email address.",
