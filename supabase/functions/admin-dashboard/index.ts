@@ -41,6 +41,46 @@ const getCorsHeaders = (req: Request) => ({
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 });
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
+const getProcessingTimings = (value: unknown): Record<string, unknown> => {
+  return isRecord(value) ? { ...value } : {};
+};
+
+const getTimingField = (timings: Record<string, unknown>, key: string): string | null => {
+  const value = timings[key];
+  return typeof value === 'string' ? value : null;
+};
+
+const getFailureMessage = (timings: Record<string, unknown>): string | null => {
+  const failure = isRecord(timings.failure) ? timings.failure : null;
+  return typeof failure?.message === 'string' ? failure.message : null;
+};
+
+const getCompletedAt = (
+  createdAt: string | null,
+  processingTotalMs: number | null,
+  timings: Record<string, unknown>,
+): string | null => {
+  const completedAt = getTimingField(timings, 'completedAt') ?? getTimingField(timings, 'completed_at');
+  if (completedAt) {
+    return completedAt;
+  }
+
+  if (!createdAt || typeof processingTotalMs !== 'number') {
+    return null;
+  }
+
+  const createdDate = new Date(createdAt);
+  if (Number.isNaN(createdDate.getTime())) {
+    return null;
+  }
+
+  return new Date(createdDate.getTime() + processingTotalMs).toISOString();
+};
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
@@ -189,7 +229,7 @@ Deno.serve(async (req) => {
     // Fetch all conversions
     const { data: conversions, error: convError } = await supabaseAdmin
       .from('conversions')
-      .select('id, user_id, status, created_at, completed_at, original_filename, error_message, processed_via, output_tier, processing_total_ms')
+      .select('id, user_id, status, created_at, file_name, processing_timings, processing_total_ms')
       .order('created_at', { ascending: false });
 
     if (convError) {
@@ -211,6 +251,20 @@ Deno.serve(async (req) => {
     const profileById = new Map((profiles || []).map((p) => [p.id, p]));
     const subByUserId = new Map((subscriptions || []).map((s) => [s.user_id, s]));
     const roleByUserId = new Map((roles || []).map((r) => [r.user_id, r.role]));
+    const normalizedConversions = (conversions || []).map((conversion) => {
+      const timings = getProcessingTimings(conversion.processing_timings);
+      const processingTotalMs = typeof conversion.processing_total_ms === 'number'
+        ? conversion.processing_total_ms
+        : null;
+
+      return {
+        ...conversion,
+        completed_at: getCompletedAt(conversion.created_at, processingTotalMs, timings),
+        error_message: getFailureMessage(timings),
+        output_tier: getTimingField(timings, 'outputTier'),
+        processed_via: getTimingField(timings, 'processedVia') ?? getTimingField(timings, 'parseMode'),
+      };
+    });
 
     const enrichedUsers = allAuthUsers.map((user) => {
       const profile = profileById.get(user.id);
@@ -246,11 +300,11 @@ Deno.serve(async (req) => {
     }, { completed: 0, processing: 0, failed: 0 });
 
     const conversionStats = {
-      total: conversions?.length || 0,
+      total: normalizedConversions.length,
       completed: statusCounts.completed,
       processing: statusCounts.processing,
       failed: statusCounts.failed,
-      todayCount: conversions?.filter(c => c.created_at?.startsWith(today)).length || 0,
+      todayCount: normalizedConversions.filter((c) => c.created_at?.startsWith(today)).length || 0,
     };
 
     // Calculate daily stats for last 7 days
@@ -259,7 +313,7 @@ Deno.serve(async (req) => {
       const date = new Date();
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
-      const count = conversions?.filter(c => c.created_at?.startsWith(dateStr)).length || 0;
+      const count = normalizedConversions.filter((c) => c.created_at?.startsWith(dateStr)).length || 0;
       dailyStats.push({ date: dateStr, count });
     }
 
@@ -279,7 +333,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         users: enrichedUsers,
-        conversions: conversions || [],
+        conversions: normalizedConversions,
         stats: conversionStats,
         dailyStats,
         anonymousSummary,
