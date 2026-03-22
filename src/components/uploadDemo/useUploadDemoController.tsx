@@ -160,6 +160,9 @@ export const useUploadDemoController = () => {
   >(new Map());
   const preparedPdfImagesRef = useRef<Map<string, string[]>>(new Map());
   const preparedUploadedFileIdRef = useRef<Map<string, string>>(new Map());
+  const passwordAutoSubmitTimerRef = useRef<number | null>(null);
+  const lastAutoSubmittedPasswordRef = useRef<string>("");
+  const runSelectedConversionRef = useRef<(mode: ConversionMode) => void>(() => {});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { hasChatAuraAccess } = useSubscriptionTier();
@@ -1177,6 +1180,7 @@ export const useUploadDemoController = () => {
             if (requiresPasswordFromPayload) {
               setPasswordError(true);
               setShowPasswordInput(true);
+              setLastError(null);
             }
             if (payloadData.message || payloadData.error) {
               message = payloadData.message || payloadData.error || message;
@@ -1202,10 +1206,11 @@ export const useUploadDemoController = () => {
           if (data.limitReached) {
             refreshUsageLimit();
           }
-          if (data.requiresPassword) {
-            setPasswordError(true);
-            setShowPasswordInput(true);
-          }
+        if (data.requiresPassword) {
+          setPasswordError(true);
+          setShowPasswordInput(true);
+          setLastError(null);
+        }
           const resourceError =
             parseStructuredErrorCode(data) === "WORKER_LIMIT" ||
             isLikelyEdgeResourceError(data.message || data.error || "Conversion failed");
@@ -1616,7 +1621,7 @@ Analytics Summary:
           errorMessage.toLowerCase().includes('encrypted') ||
           errorMessage.toLowerCase().includes('protected')) {
         setPasswordError(true);
-        setLastError({ message: 'This PDF is password-protected. Please enter the correct password.', canRetry: true });
+        setLastError(null);
         toast({
           variant: "destructive",
           title: "Password Required",
@@ -1846,6 +1851,7 @@ Analytics Summary:
         if (payload.requiresPassword) {
           setPasswordError(true);
           setShowPasswordInput(true);
+          setLastError(null);
         }
         if (payload.message || payload.error) {
           message = payload.message || payload.error || message;
@@ -1865,6 +1871,7 @@ Analytics Summary:
         if (payload.requiresPassword) {
           setPasswordError(true);
           setShowPasswordInput(true);
+          setLastError(null);
           throw new Error(payload.error);
         }
         throw new Error(payload.error);
@@ -1980,7 +1987,7 @@ Analytics Summary:
           errorMessage.toLowerCase().includes('encrypted') ||
           errorMessage.toLowerCase().includes('protected')) {
         setPasswordError(true);
-        setLastError({ message: 'This PDF is password-protected. Please enter the correct password.', canRetry: true });
+        setLastError(null);
         toast({
           variant: "destructive",
           title: "Password Required",
@@ -2365,10 +2372,62 @@ Analytics Summary:
     void handleConvert(undefined, mode);
   };
 
+  runSelectedConversionRef.current = runSelectedConversion;
+
+  useEffect(() => {
+    const targetFile = selectedFile ?? selectedFiles[0] ?? null;
+    const password = pdfPassword.trim();
+
+    if (passwordAutoSubmitTimerRef.current) {
+      window.clearTimeout(passwordAutoSubmitTimerRef.current);
+      passwordAutoSubmitTimerRef.current = null;
+    }
+
+    if (!targetFile || !showPasswordInput || limitReached || uploading || converting || !password) {
+      if (!password) {
+        lastAutoSubmittedPasswordRef.current = "";
+      }
+      return undefined;
+    }
+
+    const cacheKey = `${getFileCacheKey(targetFile)}::${password}`;
+    if (lastAutoSubmittedPasswordRef.current === cacheKey) {
+      return undefined;
+    }
+
+    passwordAutoSubmitTimerRef.current = window.setTimeout(() => {
+      lastAutoSubmittedPasswordRef.current = cacheKey;
+      setPasswordError(false);
+      setLastError(null);
+      runSelectedConversionRef.current(conversionMode);
+    }, 250);
+
+    return () => {
+      if (passwordAutoSubmitTimerRef.current) {
+        window.clearTimeout(passwordAutoSubmitTimerRef.current);
+        passwordAutoSubmitTimerRef.current = null;
+      }
+    };
+  }, [
+    selectedFile,
+    selectedFiles,
+    showPasswordInput,
+    limitReached,
+    uploading,
+    converting,
+    pdfPassword,
+    conversionMode,
+  ]);
+
   const handleUnlockPassword = () => {
-    if (!pdfPassword.trim()) {
+    const password = pdfPassword.trim();
+    const targetFile = selectedFile ?? selectedFiles[0] ?? null;
+    if (!password) {
       setPasswordError(true);
       return;
+    }
+    if (targetFile) {
+      lastAutoSubmittedPasswordRef.current = `${getFileCacheKey(targetFile)}::${password}`;
     }
     setPasswordError(false);
     setLastError(null);

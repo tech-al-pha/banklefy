@@ -3,6 +3,7 @@ import { ResultsSection } from "./ResultsSection";
 import { UploadDemoHeader } from "./UploadDemoHeader";
 import { UploadDemoUploadCard } from "./UploadDemoUploadCard";
 import { UploadDemoPasswordCard } from "./UploadDemoPasswordCard";
+import { UploadDemoPasswordErrorCard } from "./UploadDemoPasswordErrorCard";
 import { UploadDemoEditedWarningCard } from "./UploadDemoEditedWarningCard";
 import { UploadDemoErrorCard } from "./UploadDemoErrorCard";
 import { UploadDemoConvertActions } from "./UploadDemoConvertActions";
@@ -230,6 +231,15 @@ export const UploadDemoView = ({
                   onPasswordChange={handlePasswordChange}
                   onUnlock={handleUnlockPassword}
                   onTogglePassword={handleTogglePassword}
+                />
+
+                <UploadDemoPasswordErrorCard
+                  selectedFile={selectedFile}
+                  selectedFiles={selectedFiles}
+                  passwordError={passwordError}
+                  limitReached={limitReached}
+                  uploading={uploading}
+                  converting={converting}
                 />
 
                 <UploadDemoEditedWarningCard

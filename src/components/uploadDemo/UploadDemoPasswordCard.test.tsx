@@ -59,7 +59,6 @@ describe("UploadDemoPasswordCard", () => {
 
     expect(screen.getByText("locked-statement.pdf")).toBeInTheDocument();
     expect(screen.getByText("1.00 MB - Password required")).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("Incorrect password. Please try again.");
 
     const passwordInput = screen.getByLabelText("PDF password");
     expect(passwordInput).toHaveAttribute("type", "password");

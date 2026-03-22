@@ -23,7 +23,17 @@ export const UploadDemoErrorCard = ({
   converting,
   onRetry,
 }: UploadDemoErrorCardProps) => {
-  if (!lastError || (!selectedFile && selectedFilesCount === 0) || converting || uploading) {
+  const errorMessage = lastError?.message.toLowerCase() ?? "";
+
+  if (
+    !lastError ||
+    (!selectedFile && selectedFilesCount === 0) ||
+    converting ||
+    uploading ||
+    errorMessage.includes("password") ||
+    errorMessage.includes("encrypted") ||
+    errorMessage.includes("protected")
+  ) {
     return null;
   }
 

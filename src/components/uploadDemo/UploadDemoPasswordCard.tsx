@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Eye, EyeOff, Loader2, Lock } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock } from "lucide-react";
 
 type UploadDemoPasswordCardProps = {
   selectedFile: File | null;
@@ -39,7 +39,6 @@ export const UploadDemoPasswordCard = ({
 }: UploadDemoPasswordCardProps) => {
   const targetFile = selectedFile ?? selectedFiles[0] ?? null;
   const pdfPasswordHelpId = "pdf-password-help";
-  const pdfPasswordErrorId = "pdf-password-error";
 
   if (!targetFile || !showPasswordInput || limitReached) {
     return null;
@@ -81,7 +80,7 @@ export const UploadDemoPasswordCard = ({
               }
             }}
             aria-invalid={passwordError}
-            aria-describedby={`${pdfPasswordHelpId}${passwordError ? ` ${pdfPasswordErrorId}` : ""}`}
+            aria-describedby={pdfPasswordHelpId}
             className={`bg-[#0f0f0f] border pr-10 text-white placeholder:text-white/40 ${
               passwordError ? "border-red-500/60 focus:border-red-500" : "border-white/10 focus:border-white/30"
             }`}
@@ -112,13 +111,6 @@ export const UploadDemoPasswordCard = ({
           )}
         </Button>
       </div>
-
-      {passwordError && (
-        <p id={pdfPasswordErrorId} role="alert" className="text-xs text-red-300 flex items-center gap-1">
-          <AlertTriangle className="h-3.5 w-3.5" />
-          Incorrect password. Please try again.
-        </p>
-      )}
     </div>
   );
 };
