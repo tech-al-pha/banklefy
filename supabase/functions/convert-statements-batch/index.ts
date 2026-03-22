@@ -183,7 +183,7 @@ const inferBatchDebitCredit = (line: string, amount: number): { debit: number; c
   const absAmount = Math.abs(amount);
   if (
     amount < 0 ||
-    /\bdr\b|\bdebit\b|withdraw|purchase|payment|charge|fee|atm|pos\b|sent\b|outward|transfer to/i.test(lower)
+    /\bdr\b|\bdebit\b|withdraw|purchase|payment|charge|charges|chgs|fee|atm|pos\b|sent\b|outward|transfer to/i.test(lower)
   ) {
     return { debit: absAmount, credit: 0 };
   }

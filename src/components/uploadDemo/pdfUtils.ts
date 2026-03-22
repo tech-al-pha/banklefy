@@ -555,7 +555,7 @@ export const detectPasswordProtectedPdf = async (file: File): Promise<boolean> =
 };
 
 const DATE_TOKEN = /\d{2}[/-]\d{2}[/-]\d{4}/;
-const ROW_START_PATTERN = /^(\d{2}[/-]\d{2}[/-]\d{4})\s+(\d{2}[/-]\d{2}[/-]\d{4})\s+(.+)$/;
+const ROW_START_PATTERN = /^(\d{2}[/-]\d{2}[/-]\d{4})(?:\s+(\d{2}[/-]\d{2}[/-]\d{4}))?\s+(.+)$/;
 const AMOUNT_PATTERN = /-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g;
 const PERIOD_FROM_TO_PATTERN =
   /\bfrom\b\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s*(?:to|-)\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i;
@@ -596,6 +596,27 @@ const parseAmount = (value: string): number => {
   const normalized = value.replace(/,/g, "").trim();
   const amount = Number(normalized);
   return Number.isFinite(amount) ? amount : 0;
+};
+
+const inferDebitCreditFromContext = (
+  text: string,
+  amount: number,
+): { debit: number; credit: number } => {
+  const lower = text.toLowerCase();
+  const absAmount = Math.abs(amount);
+  if (
+    amount < 0 ||
+    /\bdr\b|\bdebit\b|withdraw|purchase|payment|charge|charges|chgs|fee|atm|pos\b|sent\b|outward|transfer to/i.test(lower)
+  ) {
+    return { debit: absAmount, credit: 0 };
+  }
+  if (amount > 0 && (/\bcr\b|\bcredit\b|deposit|salary|refund|interest|received|inward|transfer from/i.test(lower))) {
+    return { debit: 0, credit: absAmount };
+  }
+  if (amount > 0) {
+    return { debit: 0, credit: absAmount };
+  }
+  return { debit: absAmount, credit: 0 };
 };
 
 const escapeRegExp = (value: string): string =>
@@ -850,6 +871,42 @@ const extractAmountsWithDashPlaceholders = (
   return null;
 };
 
+const extractFlexibleAmounts = (
+  text: string,
+): { textWithoutAmounts: string; debit: number; credit: number; balance: number } | null => {
+  const strict = extractAmounts(text) || extractAmountsWithDashPlaceholders(text);
+  if (strict) return strict;
+
+  const normalizedText = text.replace(/\s+/g, " ").trim();
+  if (!normalizedText) return null;
+
+  const amountRegex = /([+-]?\(?\d{1,3}(?:,\d{3})+\)?(?:\.\d{1,4})?|\(?[+-]?\d{1,7}(?:\.\d{1,4})?\)?)(?:\s*(CR|DR))?/gi;
+  const matches: Array<{ raw: string; marker: string | null }> = [];
+  let match: RegExpExecArray | null;
+  while ((match = amountRegex.exec(normalizedText)) !== null) {
+    matches.push({ raw: match[0], marker: match[2] ? match[2].toUpperCase() : null });
+  }
+
+  if (matches.length < 2) return null;
+
+  const amountToken = matches[matches.length - 2];
+  const balanceToken = matches[matches.length - 1];
+  const amount = parseAmount(amountToken.raw);
+  const explicitMarker = amountToken.marker;
+  const inferred = explicitMarker === "CR"
+    ? { debit: 0, credit: Math.abs(amount) }
+    : explicitMarker === "DR"
+      ? { debit: Math.abs(amount), credit: 0 }
+      : inferDebitCreditFromContext(normalizedText, amount);
+
+  return {
+    textWithoutAmounts: normalizedText.replace(amountRegex, " ").replace(/\s+/g, " ").trim(),
+    debit: inferred.debit,
+    credit: inferred.credit,
+    balance: Math.abs(parseAmount(balanceToken.raw)),
+  };
+};
+
 export const extractPdfDataFromText = async (
   file: File,
   options?: { password?: string; maxPdfRenderPages?: number },
@@ -905,12 +962,12 @@ export const extractPdfDataFromText = async (
         flushCurrent();
 
         const [, transactionDateToken, valueDateToken, trailing] = rowStart;
-        const amounts = extractAmounts(trailing) || extractAmountsWithDashPlaceholders(trailing);
+        const amounts = extractFlexibleAmounts(trailing);
         const descriptionText = (amounts?.textWithoutAmounts || trailing).trim();
 
         current = {
           date: normalizeDate(transactionDateToken),
-          valueDate: normalizeDate(valueDateToken),
+          valueDate: normalizeDate(valueDateToken || transactionDateToken),
           description: descriptionText,
           debit: amounts?.debit ?? 0,
           credit: amounts?.credit ?? 0,
@@ -923,7 +980,7 @@ export const extractPdfDataFromText = async (
 
       if (!current) continue;
 
-      const maybeAmounts = extractAmounts(line) || extractAmountsWithDashPlaceholders(line);
+      const maybeAmounts = extractFlexibleAmounts(line);
       if (maybeAmounts && current.balance === 0 && current.debit === 0 && current.credit === 0) {
         current.debit = maybeAmounts.debit;
         current.credit = maybeAmounts.credit;

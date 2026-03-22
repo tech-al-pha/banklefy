@@ -342,7 +342,7 @@ const inferDebitCreditFromContext = (
 ): { debit: number; credit: number } => {
   const lower = text.toLowerCase();
   const absAmount = Math.abs(amount);
-  if (amount < 0 || /\bdr\b|\bdebit\b|withdraw|purchase|payment|charge|fee|atm|pos\b|sent\b|outward|transfer to/i.test(lower)) {
+  if (amount < 0 || /\bdr\b|\bdebit\b|withdraw|purchase|payment|charge|charges|chgs|fee|atm|pos\b|sent\b|outward|transfer to/i.test(lower)) {
     return { debit: absAmount, credit: 0 };
   }
   if (amount > 0 && (/\bcr\b|\bcredit\b|deposit|salary|refund|interest|received|inward|transfer from/i.test(lower))) {
@@ -1000,9 +1000,17 @@ const extractPdfTextTransactionsFromBytes = async (
       })
       .map(({ _descriptionParts, _sourceLineNumber, _sourceRawLine, ...rest }) => rest);
 
-    // Fallback parser for text-based PDFs where line-anchored parsing under-extracts.
+    const currentTransactionBounds = getTransactionDateBounds(transactions);
+    const textDateBounds = getTextDateBounds(allLines.join('\n'));
+    const coverageGapDetected = Boolean(
+      (textDateBounds.end != null && currentTransactionBounds.end != null &&
+        textDateBounds.end - currentTransactionBounds.end >= DAY_IN_MS),
+    );
+
+    // Fallback parser for text-based PDFs where line-anchored parsing under-extracts
+    // or clearly stops before the extracted text / statement period does.
     const recoveryThreshold = Math.max(12, Math.ceil(pdf.numPages * 4));
-    if (pdf.numPages >= 5 && transactions.length < recoveryThreshold && allLines.length > 0) {
+    if (pdf.numPages >= 5 && allLines.length > 0 && (transactions.length < recoveryThreshold || coverageGapDetected)) {
       const regexFallbackRows: RawTransaction[] = [];
       for (const rawLine of allLines) {
         const line = rawLine.trim().replace(/\s+/g, ' ');
@@ -1033,9 +1041,23 @@ const extractPdfTextTransactionsFromBytes = async (
       const fallbackRows =
         tokenFallbackRows.length > regexFallbackRows.length ? tokenFallbackRows : regexFallbackRows;
 
-      if (fallbackRows.length > transactions.length) {
+      const fallbackBounds = getTransactionDateBounds(fallbackRows);
+      const fallbackExtendsCoverage =
+        fallbackBounds.end != null &&
+        currentTransactionBounds.end != null &&
+        fallbackBounds.end > currentTransactionBounds.end;
+
+      if (fallbackRows.length > transactions.length || fallbackExtendsCoverage) {
         const recoveredRows = mergeOcrTransactionsDeterministic(transactions, fallbackRows);
-        transactions = recoveredRows.length > transactions.length ? recoveredRows : fallbackRows;
+        const recoveredBounds = getTransactionDateBounds(recoveredRows);
+        const recoveredExtendsCoverage =
+          recoveredBounds.end != null &&
+          currentTransactionBounds.end != null &&
+          recoveredBounds.end > currentTransactionBounds.end;
+        transactions =
+          recoveredRows.length > transactions.length || recoveredExtendsCoverage
+            ? recoveredRows
+            : fallbackRows;
       }
     }
 
@@ -1755,6 +1777,30 @@ const getStatementPeriodBounds = (statementPeriod?: string): { start?: number; e
   const end = parseStatementTimestamp(matches[1]);
   if (start == null || end == null) return {};
   return { start, end };
+};
+
+const getTextDateBounds = (text: string): { start?: number; end?: number } => {
+  if (!text) return {};
+
+  const timestamps: number[] = [];
+  const datePattern =
+    /\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})\b/g;
+  for (const line of text.split('\n')) {
+    const matches = line.match(datePattern) || [];
+    for (const token of matches) {
+      const timestamp = parseStatementTimestamp(token);
+      if (timestamp != null && Number.isFinite(timestamp)) {
+        timestamps.push(timestamp);
+      }
+    }
+  }
+
+  if (timestamps.length === 0) return {};
+  timestamps.sort((a, b) => a - b);
+  return {
+    start: timestamps[0],
+    end: timestamps[timestamps.length - 1],
+  };
 };
 
 const detectStatementCoverageGap = (
