@@ -59,6 +59,7 @@ import { runStandardizedExportPipeline, encodeArtifactToBase64 } from '../_share
 import { buildJsonExport, buildMt940Export } from '../_shared/export-formatters.ts';
 import type { ExportFormat } from '../_shared/export-builders.ts';
 import { sanitizeTransactions } from '../_shared/transaction-sanitizer.ts';
+import { isPdfPasswordError } from '../_shared/pdf-errors.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
 import { resolveEffectiveLimit, type LimitResolverDatabase, type SupabaseLike } from '../_shared/limit-resolver.ts';
@@ -1578,17 +1579,6 @@ type ConfidenceBreakdown = {
 };
 
 const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
-
-const isPdfPasswordError = (error: unknown): boolean => {
-  const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return (
-    msg.includes('password') ||
-    msg.includes('encrypted') ||
-    msg.includes('need a password') ||
-    msg.includes('incorrect password') ||
-    msg.includes('passwordexception')
-  );
-};
 
 const toBase64FromBytes = (bytes: Uint8Array): string => {
   if (!bytes || bytes.length === 0) return '';
