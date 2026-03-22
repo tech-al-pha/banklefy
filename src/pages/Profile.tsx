@@ -130,7 +130,7 @@ const Profile = () => {
 
       const { error: profileError } = await supabase
         .from("profiles")
-        .update({ avatar_url: publicUrl })
+        .update({ full_name: user.user_metadata?.full_name || null } as never)
         .eq("id", user.id);
       if (profileError) throw profileError;
 

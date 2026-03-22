@@ -58,14 +58,14 @@ export const useSettings = () => {
         if (user) {
           const { data: profile, error } = await supabase
             .from('profiles')
-            .select('full_name, avatar_url')
+            .select('full_name')
             .eq('id', user.id)
             .maybeSingle();
 
           if (error) {
             if (import.meta.env.DEV) { console.error('Failed to load profile:', error); }
         } else if (profile) {
-            setProfileData(profile);
+            setProfileData(profile as { full_name: string | null; avatar_url?: string | null });
           }
         }
       } catch (e) {
