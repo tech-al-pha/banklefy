@@ -2037,7 +2037,10 @@ Deno.serve(async (req) => {
         fileClientParsedBankMetadata,
         fileClientParsedTransactions,
       );
-      const forceOcrForLargeDocument = isPdf && filePageCount >= FULL_PAGE_OCR_COVERAGE_THRESHOLD;
+      const forceOcrForLargeDocument =
+        isPdf &&
+        filePageCount >= FULL_PAGE_OCR_COVERAGE_THRESHOLD &&
+        !fileClientParseAssessment.useDeterministic;
       const fileAdaptiveOcrStrategy = deriveAdaptiveOcrStrategy(
         lowerName,
         filePageCount,

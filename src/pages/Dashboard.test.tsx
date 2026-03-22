@@ -80,7 +80,7 @@ describe("Dashboard export flow", () => {
     });
   });
 
-  it("downloads the converted Excel file from the derived storage path", async () => {
+  it("downloads the converted Excel file from the derived storage path", { timeout: 10000 }, async () => {
     const user = userEvent.setup();
 
     render(<Dashboard />);

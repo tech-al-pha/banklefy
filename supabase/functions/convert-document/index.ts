@@ -3774,7 +3774,10 @@ Deno.serve(async (req) => {
       isPdf &&
       clientParsedTransactions.length >= PDF_DETERMINISTIC_FAST_PATH_MIN_ROWS &&
       clientPdfParseAssessment.mismatchRatio <= PDF_DETERMINISTIC_FAST_PATH_MAX_MISMATCH;
-    const forceOcrForLargeDocument = isPdf && pageCount >= FULL_PAGE_OCR_COVERAGE_THRESHOLD;
+    const forceOcrForLargeDocument =
+      isPdf &&
+      pageCount >= FULL_PAGE_OCR_COVERAGE_THRESHOLD &&
+      !structuralScan.hasSelectableText;
     const hardTextGateActive =
       isPdf &&
       structuralScan.hasSelectableText === true &&

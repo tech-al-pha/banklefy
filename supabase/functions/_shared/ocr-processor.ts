@@ -1388,14 +1388,58 @@ export const correctMinorBalanceDrift = (
 };
 
 const detectBankNameFromText = (text: string): string | undefined => {
+  const lines = text
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  const headerText = lines.slice(0, 40).join(' ');
+  const headerCandidates: Array<[RegExp, string]> = [
+    [/state bank of india/i, 'State Bank of India'],
+    [/hdfc bank/i, 'HDFC Bank'],
+    [/icici bank/i, 'ICICI Bank'],
+    [/axis bank/i, 'Axis Bank'],
+    [/emirates\s+nbd/i, 'Emirates NBD'],
+    [/abu dhabi commercial bank/i, 'ADCB'],
+    [/first abu dhabi bank/i, 'FAB'],
+    [/wio bank/i, 'Wio Bank'],
+    [/bank of baroda/i, 'Bank of Baroda'],
+    [/punjab national bank/i, 'Punjab National Bank'],
+    [/kotak mahindra bank/i, 'Kotak Mahindra Bank'],
+    [/canara bank/i, 'Canara Bank'],
+    [/indian bank/i, 'Indian Bank'],
+    [/idfc first bank/i, 'IDFC FIRST Bank'],
+    [/federal bank/i, 'Federal Bank'],
+    [/yes bank/i, 'YES Bank'],
+    [/chase/i, 'Chase'],
+    [/bank of america/i, 'Bank of America'],
+    [/wells fargo/i, 'Wells Fargo'],
+    [/citibank|citi bank/i, 'Citi'],
+    [/barclays/i, 'Barclays'],
+    [/hsbc/i, 'HSBC'],
+    [/lloyds/i, 'Lloyds'],
+    [/natwest/i, 'NatWest'],
+    [/monzo/i, 'Monzo'],
+    [/revolut/i, 'Revolut'],
+    [/dbs/i, 'DBS'],
+    [/ocbc/i, 'OCBC'],
+    [/uob/i, 'UOB'],
+    [/standard chartered/i, 'Standard Chartered'],
+  ];
+
+  for (const [pattern, label] of headerCandidates) {
+    if (pattern.test(headerText)) return label;
+  }
+
   const lower = text.toLowerCase();
   const knownBanks: Array<[RegExp, string]> = [
-    [/adcb|abu dhabi commercial bank/i, 'ADCB'],
-    [/emirates\s+nbd/i, 'Emirates NBD'],
+    [/state bank of india|sbi/i, 'State Bank of India'],
     [/hdfc/i, 'HDFC Bank'],
     [/icici/i, 'ICICI Bank'],
-    [/state bank of india|sbi/i, 'SBI'],
     [/axis bank/i, 'Axis Bank'],
+    [/adcb|abu dhabi commercial bank/i, 'ADCB'],
+    [/emirates\s+nbd/i, 'Emirates NBD'],
     [/fab|first abu dhabi bank/i, 'FAB'],
     [/wio bank|wio/i, 'Wio Bank'],
   ];

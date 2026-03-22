@@ -62,4 +62,17 @@ describe("ocr-processor numeric repair", () => {
 
     expect(metadata?.statementPeriod).toBe("2026-01-01 - 2026-03-20");
   });
+
+  it("prefers the statement header bank name over merchant noise", () => {
+    const metadata = extractBankMetadataFromOcrText(
+      [
+        "Statement of Account",
+        "State Bank of India",
+        "Transaction note: payment made at HDFC merchant",
+        "Another narration mentioning HDFC Bank as beneficiary",
+      ].join("\n"),
+    );
+
+    expect(metadata?.bankName).toBe("State Bank of India");
+  });
 });
