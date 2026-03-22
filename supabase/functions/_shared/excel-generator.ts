@@ -7,6 +7,7 @@ import type {
   ReconciliationResult,
 } from '../_shared/financial-engine.ts';
 import { fromMinorUnits, toMinorUnits } from '../_shared/money.ts';
+import { chooseStatementPeriodLabel } from './statement-period.ts';
 
 export interface ExcelGenerationResult {
   buffer: ArrayBuffer;
@@ -406,8 +407,9 @@ function toArrayBuffer(value: unknown): ArrayBuffer {
 export async function generateProfessionalExcel(config: ExcelConfig): Promise<ExcelGenerationResult> {
   const layout = buildColumnLayout(config.transactions);
   const rows: SheetData = [];
+  const statementPeriod = chooseStatementPeriodLabel(config.bankInfo?.statementPeriod, config.transactions);
 
-  rows.push(...buildAccountRows(config.bankInfo));
+  rows.push(...buildAccountRows(config.bankInfo, statementPeriod));
   rows.push(layout.headers);
   const txnRows = buildTransactionRows(config.transactions, layout);
   rows.push(...txnRows);
@@ -438,7 +440,10 @@ export interface MergedExcelConfig {
 export async function generateMergedStatementsExcel(config: MergedExcelConfig): Promise<ExcelGenerationResult> {
   const layout = buildColumnLayout(config.transactions);
   const rows: SheetData = [];
-  const statementPeriod = config.statementPeriod || config.bankInfo.statementPeriod || '';
+  const statementPeriod = chooseStatementPeriodLabel(
+    config.statementPeriod || config.bankInfo.statementPeriod,
+    config.transactions,
+  );
 
   rows.push(...buildAccountRows(config.bankInfo, statementPeriod));
   rows.push(layout.headers);

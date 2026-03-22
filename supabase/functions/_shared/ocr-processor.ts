@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-escape */
 // ============= GROQ VISION OCR PROCESSOR =============
 // Using Groq's Llama Vision model for OCR
 
@@ -83,7 +84,7 @@ OUTPUT FORMAT - Return a JSON object with TWO parts:
     "sortCode": "Sort code if present (UK)",
     "bsb": "BSB if present (Australia)",
     "micr": "MICR if present",
-    "statementPeriod": "e.g., 01/01/2025 - 31/01/2025",
+    "statementPeriod": "e.g., 01/01/2025 - 31/01/2025. Copy the statement header period only; do not infer it from transaction rows or page footers.",
     "openingBalance": 1000.00,
     "closingBalance": 5000.00
   },
@@ -174,6 +175,7 @@ STRICT TABLE RULES:
 7) Ignore summary/header/footer lines and page numbers.
 8) If both Transaction Date and Value Date exist, use Transaction Date.
 9) Never output negative debit or credit; output positive numbers.
+10. Only copy statementPeriod from an explicit statement header or date-range label. Do not infer it from transaction rows.
 
 Reference number rule:
 - Populate refNumber only if there is a dedicated reference/ID column.
@@ -1181,17 +1183,29 @@ export async function callMistralVisionOCR(
 
 const MONTH_TO_NUM: Record<string, string> = {
   jan: '01',
+  january: '01',
   feb: '02',
+  february: '02',
   mar: '03',
+  march: '03',
   apr: '04',
+  april: '04',
   may: '05',
   jun: '06',
+  june: '06',
   jul: '07',
+  july: '07',
   aug: '08',
+  august: '08',
   sep: '09',
+  sept: '09',
+  september: '09',
   oct: '10',
+  october: '10',
   nov: '11',
+  november: '11',
   dec: '12',
+  december: '12',
 };
 
 const parseStatementDate = (value: string, defaultYear?: string): string | undefined => {
@@ -1214,14 +1228,20 @@ const parseStatementDate = (value: string, defaultYear?: string): string | undef
     return `${yyyy}-${mm}-${dd}`;
   }
 
-  const monthText = clean.match(/^(\d{1,2})[-/ ]([A-Za-z]{3})[-/ ](\d{2,4})$/);
-  const monthTextWithoutYear = clean.match(/^(\d{1,2})[-/ ]([A-Za-z]{3})[-/]?$/);
-  const dateMatch = monthText || monthTextWithoutYear;
+  const monthText = clean.match(/^(\d{1,2})[-/ ]([A-Za-z]{3,9})[-/ ](\d{2,4})$/);
+  const monthTextWithoutYear = clean.match(/^(\d{1,2})[-/ ]([A-Za-z]{3,9})[-/]?$/);
+  const monthFirst = clean.match(/^([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{2,4})$/);
+  const monthFirstWithoutYear = clean.match(/^([A-Za-z]{3,9})\s+(\d{1,2})$/);
+  const dateMatch = monthText || monthTextWithoutYear || monthFirst || monthFirstWithoutYear;
   if (!dateMatch) return undefined;
-  const dd = dateMatch[1].padStart(2, '0');
-  const mm = MONTH_TO_NUM[dateMatch[2].toLowerCase()];
+  const dd = monthText || monthTextWithoutYear ? dateMatch[1].padStart(2, '0') : dateMatch[2].padStart(2, '0');
+  const mm = MONTH_TO_NUM[(monthText || monthTextWithoutYear) ? dateMatch[2].toLowerCase() : dateMatch[1].toLowerCase()];
   if (!mm) return undefined;
-  const yearTokenRaw = monthText ? monthText[3] : defaultYear;
+  const yearTokenRaw = monthText
+    ? monthText[3]
+    : monthFirst
+      ? monthFirst[3]
+      : defaultYear;
   let yearToken = yearTokenRaw;
   if (yearToken && defaultYear) {
     const yearNum = Number(yearToken);
@@ -1426,22 +1446,40 @@ const extractAccountHolderFromText = (text: string): string | undefined => {
 };
 
 const extractStatementPeriodFromText = (text: string): string | undefined => {
-  const startEnd = text.match(
-    /start\s*date\s*:\s*([0-9A-Za-z/-]+)\s*end\s*date\s*:\s*([0-9A-Za-z/-]+)/i,
-  );
-  if (startEnd) {
-    const from = parseStatementDate(startEnd[1]) || startEnd[1];
-    const to = parseStatementDate(startEnd[2]) || startEnd[2];
-    return `${from} - ${to}`;
-  }
+  const lines = text
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
 
-  const fromTo = text.match(
-    /\bfrom\b\s*:?\s*([0-9A-Za-z/-]+)\s*(?:to|-)\s*([0-9A-Za-z/-]+)/i,
-  );
-  if (fromTo) {
-    const from = parseStatementDate(fromTo[1]) || fromTo[1];
-    const to = parseStatementDate(fromTo[2]) || fromTo[2];
-    return `${from} - ${to}`;
+  const patterns: RegExp[] = [
+    /statement of transactions[\s\S]{0,120}?for the period\s+(.+?)\s+(?:to|[-–—])\s+(.+)$/i,
+    /statement period\s*[:\-]?\s*(.+?)\s+(?:to|[-–—])\s+(.+)$/i,
+    /date range\s*[:\-]?\s*(.+?)\s+(?:to|[-–—])\s+(.+)$/i,
+    /\bperiod\b\s*[:\-]?\s*(.+?)\s+(?:to|[-–—])\s+(.+)$/i,
+    /start\s*date\s*:\s*(.+?)\s+end\s*date\s*:\s*(.+)$/i,
+    /\bfrom\b\s*:?\s*(.+?)\s+(?:to|[-–—])\s+(.+)$/i,
+  ];
+
+  for (const rawLine of lines.slice(0, 120)) {
+    const line = rawLine.replace(/\s+/g, ' ').trim();
+    if (!/(statement of transactions|statement period|for the period|date range|\bperiod\b|\bfrom\b)/i.test(line)) continue;
+    if (
+      /(transaction date|value date|debit|credit|balance|particulars|withdrawals|deposits)/i.test(line) &&
+      !/(statement of transactions|statement period|for the period|date range)/i.test(line)
+    ) {
+      continue;
+    }
+
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+      if (!match) continue;
+      const from = parseStatementDate(match[1]) || match[1].trim();
+      const to = parseStatementDate(match[2]) || match[2].trim();
+      if (from && to) {
+        return `${from} - ${to}`;
+      }
+    }
   }
   return undefined;
 };

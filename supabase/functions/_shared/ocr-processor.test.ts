@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { normalizeOcrRawTransactions, scoreRunningBalanceFlow } from "./ocr-processor.ts";
+import {
+  extractBankMetadataFromOcrText,
+  normalizeOcrRawTransactions,
+  scoreRunningBalanceFlow,
+} from "./ocr-processor.ts";
 
 describe("ocr-processor numeric repair", () => {
   it("repairs a missing-zero debit using the running balance", () => {
@@ -45,5 +49,17 @@ describe("ocr-processor numeric repair", () => {
     expect(rows[1].debit).toBe(900);
     expect(rows[1].credit).toBe(0);
     expect(scoreRunningBalanceFlow(rows).mismatchRatio).toBe(0);
+  });
+
+  it("extracts the statement header period and ignores transaction-row date ranges", () => {
+    const metadata = extractBankMetadataFromOcrText(
+      [
+        "Statement of Transactions in Savings Account Number: 055801621094 in INR for the period January 01, 2026 - March 20, 2026",
+        "DATE MODE PARTICULARS DEPOSITS WITHDRAWALS BALANCE",
+        "11-03-2026 - 14-03-2026 UPI/TEST/123 100.00 0.00 200.00",
+      ].join("\n"),
+    );
+
+    expect(metadata?.statementPeriod).toBe("2026-01-01 - 2026-03-20");
   });
 });

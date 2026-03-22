@@ -27,6 +27,7 @@ import {
   fallbackCategorize,
   type ProcessedTransaction,
 } from '../_shared/categorizer.ts';
+import { chooseStatementPeriodLabel } from '../_shared/statement-period.ts';
 import {
   performExtraction,
   performCategorization,
@@ -78,7 +79,7 @@ type LooseTable = {
   Relationships: [];
 };
 
-type ConversionProcessingTimings = NonNullable<AppDatabase['public']['Tables']['conversions']['Update']['processing_timings']>;
+type ConversionProcessingTimings = Record<string, unknown>;
 
 type SubscriptionRow = LimitResolverDatabase['public']['Tables']['subscriptions']['Row'] & {
   pages_used_this_month?: number | null;
@@ -3073,10 +3074,15 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     const supabaseAdminClient = supabaseAdmin!;
+    const conversionsTable = () => supabaseAdminClient.from('conversions') as unknown as {
+      select: (...args: unknown[]) => any;
+      update: (...args: unknown[]) => any;
+      insert: (...args: unknown[]) => any;
+      upsert: (...args: unknown[]) => any;
+    };
 
     const readConversionTimings = async (conversionId: string): Promise<Record<string, unknown>> => {
-      const { data, error } = await supabaseAdminClient
-        .from('conversions')
+      const { data, error } = await conversionsTable()
         .select('processing_timings')
         .eq('id', conversionId)
         .single();
@@ -3090,8 +3096,7 @@ Deno.serve(async (req) => {
 
     const updateConversionTimings = async (conversionId: string, patch: Record<string, unknown>) => {
       const existingTimings = await readConversionTimings(conversionId);
-      return supabaseAdminClient
-        .from('conversions')
+      return conversionsTable()
         .update({ processing_timings: mergeProcessingTimings(existingTimings, patch) })
         .eq('id', conversionId);
     };
@@ -4837,6 +4842,10 @@ Deno.serve(async (req) => {
     );
     if (bankInfo) {
       bankInfo.currency = normalizeCurrencyCode(bankInfo.currency);
+      const correctedStatementPeriod = chooseStatementPeriodLabel(bankInfo.statementPeriod, transactions);
+      if (correctedStatementPeriod) {
+        bankInfo.statementPeriod = correctedStatementPeriod;
+      }
     }
 
     let resultPath: string | null = null;
@@ -4957,7 +4966,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        const { error: incrementError } = await supabaseAdminClient.rpc('increment_usage_count', {
+        const { error: incrementError } = await (supabaseAdminClient.rpc as any)('increment_usage_count', {
           p_ip_address: user ? undefined : trackingKey,
           p_user_id: user ? user.id : undefined,
           p_increment: incrementBy,
@@ -5000,8 +5009,7 @@ Deno.serve(async (req) => {
             },
           } as ConversionProcessingTimings;
 
-          const { error: ledgerError } = await supabaseAdminClient
-            .from('conversions')
+          const { error: ledgerError } = await conversionsTable()
             .update({ processing_timings: updatedTimings })
             .eq('id', conversion.id);
 
@@ -5170,8 +5178,7 @@ Deno.serve(async (req) => {
     }
     if (conversion?.id) {
       try {
-        const { error: timingError } = await supabaseAdminClient
-          .from('conversions')
+        const { error: timingError } = await conversionsTable()
           .update({
             processing_timings: mergeProcessingTimings(await readConversionTimings(conversion.id), timing),
             processing_total_ms: timing.total_ms,
