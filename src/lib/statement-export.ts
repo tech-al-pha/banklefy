@@ -1,4 +1,5 @@
 import type { Analytics } from "@/components/uploadDemo/types";
+import { parseStatementDateToIso } from "@/lib/date-parsing";
 
 export interface StatementExportTransaction {
   date: string;
@@ -155,27 +156,10 @@ const parseDate = (value: unknown): Date | null => {
   if (!value) return null;
   if (value instanceof Date && Number.isFinite(value.getTime())) return value;
 
-  const raw = String(value).trim();
-  if (!raw) return null;
-
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (iso) {
-    return new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
-  }
-
-  const ymdSlash = raw.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-  if (ymdSlash) {
-    return new Date(Date.UTC(Number(ymdSlash[1]), Number(ymdSlash[2]) - 1, Number(ymdSlash[3])));
-  }
-
-  const dmy = raw.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
-  if (dmy) {
-    return new Date(Date.UTC(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1])));
-  }
-
-  const parsed = new Date(raw);
-  if (!Number.isFinite(parsed.getTime())) return null;
-  return parsed;
+  const iso = parseStatementDateToIso(value);
+  if (!iso) return null;
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
 };
 
 const formatYymmdd = (date: Date): string => {

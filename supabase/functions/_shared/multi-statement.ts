@@ -7,6 +7,7 @@ import {
   reconcileBalances,
 } from '../_shared/financial-engine.ts';
 import { fromMinorUnits, sumMinorUnits } from '../_shared/money.ts';
+import { parseStatementDateToTimestamp } from '../../../src/lib/date-parsing.ts';
 import type { BankMetadata } from '../_shared/ocr-processor.ts';
 import type { BankInfo } from '../_shared/excel-generator.ts';
 
@@ -96,8 +97,8 @@ const parseFlexibleDate = (value?: string): Date | null => {
   const numeric = parseNumericDate(trimmed);
   if (numeric) return numeric;
 
-  const parsed = new Date(trimmed);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const timestamp = parseStatementDateToTimestamp(trimmed);
+  return timestamp == null ? null : new Date(timestamp);
 };
 
 const parseStatementPeriod = (period?: string): { start?: Date; end?: Date } => {

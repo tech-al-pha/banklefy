@@ -1,4 +1,5 @@
 import type { Transaction } from './financial-engine.ts';
+import { parseStatementDateToTimestamp } from '../../../src/lib/date-parsing.ts';
 
 const MONTH_LOOKUP: Record<string, number> = {
   jan: 1,
@@ -74,8 +75,8 @@ const parseStatementDate = (value: string): Date | null => {
     }
   }
 
-  const parsed = new Date(clean);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const timestamp = parseStatementDateToTimestamp(clean);
+  return timestamp == null ? null : new Date(timestamp);
 };
 
 const formatTransactionDate = (value: string): string => {

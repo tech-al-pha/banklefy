@@ -86,4 +86,27 @@ describe("export-formatters", () => {
     expect(mt940).toContain(":86:Salary payment");
     expect(mt940).toContain(":62F:C240102USD115,00");
   });
+
+  it("handles single-digit slash dates as DD/MM", () => {
+    const mt940 = buildMt940Export({
+      transactions: [
+        {
+          date: "5/1/2026",
+          description: "Salary payment",
+          debit: 0,
+          credit: 25,
+          balance: 115,
+          refNumber: "REF-2",
+        },
+      ],
+      bankMetadata: {
+        accountNumber: "AE12",
+        currency: "usd",
+      },
+      statementReference: "STATEMENT-01",
+    });
+
+    expect(mt940).toContain(":61:260105C25,00NTRF//REF2");
+    expect(mt940).toContain(":62F:C260105USD115,00");
+  });
 });

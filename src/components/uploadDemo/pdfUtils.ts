@@ -1,4 +1,5 @@
 import { getPdfWorkerSrc } from "@/lib/pdfWorker";
+import { parseStatementDateToIso } from "@/lib/date-parsing";
 
 type PdfDocument = {
   numPages: number;
@@ -588,10 +589,7 @@ type PositionedToken = {
 };
 
 const normalizeDate = (value: string): string => {
-  const match = value.trim().match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
-  if (!match) return value.trim();
-  const [, dd, mm, yyyy] = match;
-  return `${yyyy}-${mm}-${dd}`;
+  return parseStatementDateToIso(value) ?? value.trim();
 };
 
 const parseAmount = (value: string): number => {

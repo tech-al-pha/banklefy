@@ -22,6 +22,7 @@ import {
   type RawTransaction,
   type BankMetadata,
 } from '../_shared/ocr-processor.ts';
+import { parseStatementDateToTimestamp } from '../../../src/lib/date-parsing.ts';
 import {
   CATEGORY_LIST,
   fallbackCategorize,
@@ -999,7 +1000,8 @@ const extractPdfTextTransactionsFromBytes = async (
       .map(({ _descriptionParts, _sourceLineNumber, _sourceRawLine, ...rest }) => rest);
 
     // Fallback parser for text-based PDFs where line-anchored parsing under-extracts.
-    if (transactions.length < 2 && allLines.length > 0) {
+    const recoveryThreshold = Math.max(12, Math.ceil(pdf.numPages * 4));
+    if (pdf.numPages >= 5 && transactions.length < recoveryThreshold && allLines.length > 0) {
       const regexFallbackRows: RawTransaction[] = [];
       for (const rawLine of allLines) {
         const line = rawLine.trim().replace(/\s+/g, ' ');
@@ -1031,7 +1033,8 @@ const extractPdfTextTransactionsFromBytes = async (
         tokenFallbackRows.length > regexFallbackRows.length ? tokenFallbackRows : regexFallbackRows;
 
       if (fallbackRows.length > transactions.length) {
-        transactions = fallbackRows;
+        const recoveredRows = mergeOcrTransactionsDeterministic(transactions, fallbackRows);
+        transactions = recoveredRows.length > transactions.length ? recoveredRows : fallbackRows;
       }
     }
 
@@ -1378,8 +1381,8 @@ const detectDebitCreditOrderFromDates = (rows: RawTransaction[]): 'chron' | 'rev
   if (rows.length < 3) return null;
   const timestamps = rows
     .map((row) => {
-      const parsed = Date.parse(normalizeDate(String(row.date || '')));
-      return Number.isFinite(parsed) ? parsed : NaN;
+      const parsed = parseStatementTimestamp(row.date);
+      return parsed == null ? NaN : parsed;
     })
     .filter((value) => Number.isFinite(value));
 
@@ -1725,11 +1728,71 @@ const countAmountLikeRows = (text: string): number => {
   return count;
 };
 
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+const parseStatementTimestamp = (value: unknown): number | null => {
+  return parseStatementDateToTimestamp(value);
+};
+
+const getTransactionDateBounds = (rows: RawTransaction[]): { start?: number; end?: number } => {
+  const timestamps = rows
+    .map((row) => parseStatementTimestamp(row.date))
+    .filter((value): value is number => value != null && Number.isFinite(value));
+  if (timestamps.length === 0) return {};
+  timestamps.sort((a, b) => a - b);
+  return {
+    start: timestamps[0],
+    end: timestamps[timestamps.length - 1],
+  };
+};
+
+const getStatementPeriodBounds = (statementPeriod?: string): { start?: number; end?: number } => {
+  if (!statementPeriod) return {};
+  const matches = statementPeriod.match(/\d{1,4}[/-]\d{1,2}[/-]\d{1,4}/g);
+  if (!matches || matches.length < 2) return {};
+  const start = parseStatementTimestamp(matches[0]);
+  const end = parseStatementTimestamp(matches[1]);
+  if (start == null || end == null) return {};
+  return { start, end };
+};
+
+const detectStatementCoverageGap = (
+  rows: RawTransaction[],
+  statementPeriod: string | undefined,
+  pageCount: number,
+): { hasGap: boolean; reasons: string[] } => {
+  const reasons: string[] = [];
+  const normalizedPageCount = Number.isFinite(pageCount) ? Math.max(1, Math.floor(pageCount)) : 1;
+  const rowsPerPage = rows.length / normalizedPageCount;
+
+  if (normalizedPageCount >= 8 && rowsPerPage < 7.5) {
+    reasons.push(`sparse_text_rows_${rowsPerPage.toFixed(1)}_per_page`);
+  }
+
+  const periodBounds = getStatementPeriodBounds(statementPeriod);
+  const rowBounds = getTransactionDateBounds(rows);
+  if (periodBounds.start == null || periodBounds.end == null || rowBounds.start == null || rowBounds.end == null) {
+    return { hasGap: reasons.length > 0, reasons };
+  }
+
+  const endOvershootDays = (rowBounds.end - periodBounds.end) / DAY_IN_MS;
+  const endShortfallDays = (periodBounds.end - rowBounds.end) / DAY_IN_MS;
+
+  if (endOvershootDays > 1) {
+    reasons.push(`rows_extend_beyond_statement_period_by_${Math.round(endOvershootDays)}d`);
+  } else if (normalizedPageCount >= 8 && endShortfallDays > 10) {
+    reasons.push(`extracted_rows_end_too_early_by_${Math.round(endShortfallDays)}d`);
+  }
+
+  return { hasGap: reasons.length > 0, reasons };
+};
+
 const computeDateContinuityScore = (rows: RawTransaction[]): number => {
   if (!rows.length) return 0;
   const parsed = rows
-    .map((row) => new Date(String(row.date || '').trim()))
-    .filter((d) => !Number.isNaN(d.getTime()));
+    .map((row) => parseStatementTimestamp(row.date))
+    .filter((value): value is number => value != null && Number.isFinite(value))
+    .map((timestamp) => new Date(timestamp));
   if (!parsed.length) return 0;
   if (parsed.length === 1) return 1;
 
@@ -2043,9 +2106,9 @@ const toNumber = (value: unknown, fallback: number): number => {
 
 const toDateString = (value: unknown): string | null => {
   if (typeof value !== 'string' || !value.trim()) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString().slice(0, 10);
+  const parsed = parseStatementTimestamp(value);
+  if (parsed == null) return null;
+  return new Date(parsed).toISOString().slice(0, 10);
 };
 
 const pickString = (value: unknown): string | undefined => {
@@ -2284,11 +2347,11 @@ const dedupeAndSortTransactions = (rows: Transaction[]): Transaction[] => {
   }
 
   deduped.sort((a, b) => {
-    const aTime = new Date(a.date || '').getTime();
-    const bTime = new Date(b.date || '').getTime();
-    if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
-    if (Number.isNaN(aTime)) return 1;
-    if (Number.isNaN(bTime)) return -1;
+    const aTime = parseStatementDateToTimestamp(a.date);
+    const bTime = parseStatementDateToTimestamp(b.date);
+    if (aTime == null && bTime == null) return 0;
+    if (aTime == null) return 1;
+    if (bTime == null) return -1;
     return aTime - bTime;
   });
   return deduped;
@@ -3708,6 +3771,15 @@ Deno.serve(async (req) => {
     });
     const clientParsedBankMetadata = normalizeClientBankMetadata(pdfParsedBankMetadata);
     const clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
+    const deterministicCoverageGap = detectStatementCoverageGap(
+      clientParsedTransactions,
+      clientParsedBankMetadata?.statementPeriod,
+      pageCount,
+    );
+    const forceOcrForIncompleteTextExtraction =
+      isPdf &&
+      hasPdfPageImages &&
+      deterministicCoverageGap.hasGap;
     timing.deterministic_parse_ms = Date.now() - deterministicStart;
     const mustUseDeterministicClientPdf =
       isPdf && !hasPdfPageImages && clientParsedTransactions.length > 0;
@@ -3768,12 +3840,14 @@ Deno.serve(async (req) => {
       deterministicConfidenceBreakdown.parseSuccessRatio >= 0.65 &&
       deterministicConfidenceBreakdown.dateContinuityScore >= 0.5 &&
       deterministicConfidenceBreakdown.columnAlignmentScore >= 0.6 &&
-      clientPdfParseAssessment.mismatchRatio <= 0.65;
+      clientPdfParseAssessment.mismatchRatio <= 0.65 &&
+      !forceOcrForIncompleteTextExtraction;
     const preferDeterministicFastPath =
       PDF_DETERMINISTIC_FAST_PATH_ENABLED &&
       isPdf &&
       clientParsedTransactions.length >= PDF_DETERMINISTIC_FAST_PATH_MIN_ROWS &&
-      clientPdfParseAssessment.mismatchRatio <= PDF_DETERMINISTIC_FAST_PATH_MAX_MISMATCH;
+      clientPdfParseAssessment.mismatchRatio <= PDF_DETERMINISTIC_FAST_PATH_MAX_MISMATCH &&
+      !forceOcrForIncompleteTextExtraction;
     const forceOcrForLargeDocument =
       isPdf &&
       pageCount >= FULL_PAGE_OCR_COVERAGE_THRESHOLD &&
@@ -3781,7 +3855,8 @@ Deno.serve(async (req) => {
     const hardTextGateActive =
       isPdf &&
       structuralScan.hasSelectableText === true &&
-      !forceOcrForLargeDocument;
+      !forceOcrForLargeDocument &&
+      !forceOcrForIncompleteTextExtraction;
     let skipOCR = false;
     if (hardTextGateActive) {
       console.log('HARD TEXT GATE ACTIVATED - SKIPPING OCR');
@@ -3819,6 +3894,7 @@ Deno.serve(async (req) => {
           !forceOcrForDenseStatement ||
           (mustUseDeterministicClientPdf && !hasPdfPageImages)
         ) &&
+        !forceOcrForIncompleteTextExtraction &&
         !forceOcrForLargeDocument
       );
     const ocrDecisionLineRef =
@@ -3830,6 +3906,11 @@ Deno.serve(async (req) => {
       if (!selectableTextDeterministicFastPath) ocrFailedConditions.push('selectable_text_fast_path_not_met');
       if (!clientPdfParseAssessment.useDeterministic) ocrFailedConditions.push('assessment_useDeterministic_false');
       if (forceOcrForDenseStatement) ocrFailedConditions.push('force_ocr_for_dense_statement_true');
+      if (forceOcrForIncompleteTextExtraction) {
+        ocrFailedConditions.push(
+          `statement_coverage_gap:${deterministicCoverageGap.reasons.join('|') || 'unknown'}`,
+        );
+      }
       if (mustUseDeterministicClientPdf && hasPdfPageImages) {
         ocrFailedConditions.push('must_use_deterministic_condition_not_applicable_with_page_images');
       }

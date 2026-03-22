@@ -12,6 +12,7 @@ import {
   type ExportMetadata,
   type XlsxBuilderContext,
 } from './export-builders.ts';
+import { parseStatementDateToIso } from '../../../src/lib/date-parsing.ts';
 
 const CRITICAL_FRAUD_FLAGS = new Set([
   'tampered_document',
@@ -31,15 +32,7 @@ const decoder = new TextDecoder();
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 
 const asIsoDate = (value: string): string | null => {
-  const source = String(value || '').trim();
-  if (!source) return null;
-  const isoLike = source.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (isoLike) return `${isoLike[1]}-${isoLike[2]}-${isoLike[3]}`;
-  const ddmmyyyy = source.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
-  if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
-  const parsed = new Date(source);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString().slice(0, 10);
+  return parseStatementDateToIso(value);
 };
 
 const toNumber = (value: unknown): number => {

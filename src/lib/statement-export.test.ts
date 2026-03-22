@@ -51,6 +51,32 @@ describe("statement export helpers", () => {
     expect(mt940).toContain(":62F:C240101INR1100,00");
   });
 
+  it("treats single-digit slash dates as DD/MM", () => {
+    const mt940 = buildMt940({
+      transactions: [
+        {
+          date: "5/1/2026",
+          description: "Salary payment",
+          credit: 100,
+          debit: 0,
+          balance: 1100,
+          refNumber: "REF1",
+        },
+      ],
+      bankInfo: {
+        accountNumber: "1234567890",
+        currency: "INR",
+        openingBalance: 1000,
+        closingBalance: 1100,
+      },
+      currencyCode: "INR",
+      statementReference: "ABC123",
+    });
+
+    expect(mt940).toContain(":61:260105C100,00NTRF//REF1");
+    expect(mt940).toContain(":62F:C260105INR1100,00");
+  });
+
   it("downloads text content through an anchor element", () => {
     const createObjectUrlSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
     const revokeObjectUrlSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
