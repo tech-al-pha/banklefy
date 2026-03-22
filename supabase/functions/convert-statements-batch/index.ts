@@ -1252,13 +1252,16 @@ const processStatement = async (params: {
     }
 
     const clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
+    const selectableTextDocument = structuralScan.hasSelectableText === true;
     const mustUseDeterministicClientPdf =
       isPdf && !hasPdfPageImages && clientParsedTransactions.length > 0;
-    const forceOcrForDenseStatement = shouldForceOcrForDenseStatement(
-      lowerFileName,
-      clientParsedBankMetadata,
-      clientParsedTransactions,
-    );
+    const forceOcrForDenseStatement = selectableTextDocument
+      ? false
+      : shouldForceOcrForDenseStatement(
+        lowerFileName,
+        clientParsedBankMetadata,
+        clientParsedTransactions,
+      );
     const adaptiveOcrStrategy = deriveAdaptiveOcrStrategy(
       lowerFileName,
       pageCount,
@@ -1275,7 +1278,7 @@ const processStatement = async (params: {
       !forceOcrForDenseStatement &&
       isPdf &&
       clientParsedTransactions.length > 0 &&
-      (clientPdfParseAssessment.useDeterministic || mustUseDeterministicClientPdf);
+      (selectableTextDocument || clientPdfParseAssessment.useDeterministic || mustUseDeterministicClientPdf);
 
     if (mustUseDeterministicClientPdf && !clientPdfParseAssessment.useDeterministic) {
       console.log(
@@ -2054,14 +2057,18 @@ Deno.serve(async (req) => {
         : [];
       const fileClientParsedBankMetadata = normalizeClientBankMetadata(file.pdfParsedBankMetadata);
       const fileClientParseAssessment = assessClientPdfParsedTransactions(fileClientParsedTransactions, filePageCount);
-      const forceOcrForDenseFile = shouldForceOcrForDenseStatement(
-        lowerName,
-        fileClientParsedBankMetadata,
-        fileClientParsedTransactions,
-      );
+      const selectableTextDocument = fileClientParsedTransactions.length > 0;
+      const forceOcrForDenseFile = selectableTextDocument
+        ? false
+        : shouldForceOcrForDenseStatement(
+          lowerName,
+          fileClientParsedBankMetadata,
+          fileClientParsedTransactions,
+        );
       const forceOcrForLargeDocument =
         isPdf &&
         filePageCount >= FULL_PAGE_OCR_COVERAGE_THRESHOLD &&
+        !selectableTextDocument &&
         !fileClientParseAssessment.useDeterministic;
       const fileAdaptiveOcrStrategy = deriveAdaptiveOcrStrategy(
         lowerName,
@@ -2074,6 +2081,7 @@ Deno.serve(async (req) => {
         (
           forceOcrForLargeDocument ||
           (
+            !selectableTextDocument &&
             fileClientParsedTransactions.length > 0 &&
             (!fileClientParseAssessment.useDeterministic || forceOcrForDenseFile)
           )

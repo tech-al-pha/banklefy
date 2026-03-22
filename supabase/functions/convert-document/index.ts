@@ -3777,18 +3777,22 @@ Deno.serve(async (req) => {
       clientParsedBankMetadata?.statementPeriod,
       pageCount,
     );
+    const selectableTextDocument = isPdf && structuralScan.hasSelectableText === true;
     const forceOcrForIncompleteTextExtraction =
       isPdf &&
       hasPdfPageImages &&
-      deterministicCoverageGap.hasGap;
+      deterministicCoverageGap.hasGap &&
+      !selectableTextDocument;
     timing.deterministic_parse_ms = Date.now() - deterministicStart;
     const mustUseDeterministicClientPdf =
       isPdf && !hasPdfPageImages && clientParsedTransactions.length > 0;
-    const forceOcrForDenseStatement = shouldForceOcrForDenseStatement(
-      lowerFileName,
-      clientParsedBankMetadata,
-      clientParsedTransactions,
-    );
+    const forceOcrForDenseStatement = selectableTextDocument
+      ? false
+      : shouldForceOcrForDenseStatement(
+        lowerFileName,
+        clientParsedBankMetadata,
+        clientParsedTransactions,
+      );
     const adaptiveOcrStrategy = deriveAdaptiveOcrStrategy(
       lowerFileName,
       pageCount,
@@ -3852,12 +3856,13 @@ Deno.serve(async (req) => {
     const forceOcrForLargeDocument =
       isPdf &&
       pageCount >= FULL_PAGE_OCR_COVERAGE_THRESHOLD &&
-      !structuralScan.hasSelectableText;
+      !selectableTextDocument;
     const hardTextGateActive =
       isPdf &&
-      structuralScan.hasSelectableText === true &&
+      selectableTextDocument &&
       !forceOcrForLargeDocument &&
-      !forceOcrForIncompleteTextExtraction;
+      !forceOcrForIncompleteTextExtraction &&
+      !forceOcrForDenseStatement;
     let skipOCR = false;
     if (hardTextGateActive) {
       console.log('HARD TEXT GATE ACTIVATED - SKIPPING OCR');

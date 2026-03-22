@@ -877,27 +877,32 @@ export const useUploadDemoController = () => {
                   transactions: parsedPdf.transactions,
                   bankMetadata: parsedPdf.bankMetadata,
                 });
-              } catch {
-                preparedPdfDataRef.current.delete(cacheKey);
-              }
 
-              setUploadPrepProgress(65);
-              setUploadPrepLabel("Preparing OCR pages...");
-              try {
-                const renderedPdfPageImages = await pdfToPageImages(file, {
-                  password: pdfPassword.trim() || undefined,
-                  maxPdfRenderPages,
-                  isFreeUsageMode,
-                  freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
-                });
-                if (Array.isArray(renderedPdfPageImages) && renderedPdfPageImages.length > 0) {
-                  preparedPdfImagesRef.current.set(cacheKey, renderedPdfPageImages);
-                  setShowScanTimeCard(true);
+                const isTextBasedPdf = (parsedPdf.transactions?.length ?? 0) > 0;
+                if (!isTextBasedPdf) {
+                  setUploadPrepProgress(65);
+                  setUploadPrepLabel("Preparing OCR pages...");
+                  try {
+                    const renderedPdfPageImages = await pdfToPageImages(file, {
+                      password: pdfPassword.trim() || undefined,
+                      maxPdfRenderPages,
+                      isFreeUsageMode,
+                      freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+                    });
+                    if (Array.isArray(renderedPdfPageImages) && renderedPdfPageImages.length > 0) {
+                      preparedPdfImagesRef.current.set(cacheKey, renderedPdfPageImages);
+                      setShowScanTimeCard(true);
+                    } else {
+                      preparedPdfImagesRef.current.delete(cacheKey);
+                    }
+                  } catch {
+                    preparedPdfImagesRef.current.delete(cacheKey);
+                  }
                 } else {
                   preparedPdfImagesRef.current.delete(cacheKey);
                 }
               } catch {
-                preparedPdfImagesRef.current.delete(cacheKey);
+                preparedPdfDataRef.current.delete(cacheKey);
               }
             }
 
@@ -1089,28 +1094,31 @@ export const useUploadDemoController = () => {
         const cacheKey = getFileCacheKey(fileToConvert);
         const cachedParsedPdf = preparedPdfDataRef.current.get(cacheKey);
         const parsedPdfTransactionsCount = cachedParsedPdf?.transactions?.length ?? 0;
+        const isTextBasedPdf = parsedPdfTransactionsCount > 0;
         if (parsedPdfTransactionsCount > 0) {
           requestBody.pdfParsedTransactions = cachedParsedPdf?.transactions;
         }
         if (cachedParsedPdf?.bankMetadata) {
           requestBody.pdfParsedBankMetadata = cachedParsedPdf.bankMetadata;
         }
-        let cachedPageImages = preparedPdfImagesRef.current.get(cacheKey);
-        if (!cachedPageImages || cachedPageImages.length === 0) {
-          const { pdfToPageImages } = await loadPdfUtils();
-          cachedPageImages = await pdfToPageImages(fileToConvert, {
-            password: pdfPassword.trim() || undefined,
-            maxPdfRenderPages,
-            isFreeUsageMode,
-            freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
-          });
-          if (Array.isArray(cachedPageImages) && cachedPageImages.length > 0) {
-            preparedPdfImagesRef.current.set(cacheKey, cachedPageImages);
+        if (!isTextBasedPdf) {
+          let cachedPageImages = preparedPdfImagesRef.current.get(cacheKey);
+          if (!cachedPageImages || cachedPageImages.length === 0) {
+            const { pdfToPageImages } = await loadPdfUtils();
+            cachedPageImages = await pdfToPageImages(fileToConvert, {
+              password: pdfPassword.trim() || undefined,
+              maxPdfRenderPages,
+              isFreeUsageMode,
+              freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+            });
+            if (Array.isArray(cachedPageImages) && cachedPageImages.length > 0) {
+              preparedPdfImagesRef.current.set(cacheKey, cachedPageImages);
+            }
           }
-        }
-        if (cachedPageImages && cachedPageImages.length > 0) {
-          requestBody.pdfPageImages = cachedPageImages;
-          setShowScanTimeCard(true);
+          if (cachedPageImages && cachedPageImages.length > 0) {
+            requestBody.pdfPageImages = cachedPageImages;
+            setShowScanTimeCard(true);
+          }
         }
       }
 
@@ -1396,6 +1404,8 @@ export const useUploadDemoController = () => {
           data = retryWithFileData;
           // Continue with normal success path below.
         } else {
+        const cachedParsedPdf = preparedPdfDataRef.current.get(getFileCacheKey(fileToConvert));
+        const isTextBasedPdf = (cachedParsedPdf?.transactions?.length ?? 0) > 0;
         const isRequiresImageFallbackError =
           isPdf &&
           !("pdfPageImages" in requestBody) &&
@@ -1406,7 +1416,7 @@ export const useUploadDemoController = () => {
             errorMessage.includes('no data extracted')
           );
 
-        if (isRequiresImageFallbackError) {
+        if (isRequiresImageFallbackError && !isTextBasedPdf) {
           setShowScanTimeCard(true);
           let renderedPdfPageImages = preparedPdfImagesRef.current.get(getFileCacheKey(fileToConvert));
           if (!renderedPdfPageImages || renderedPdfPageImages.length === 0) {
@@ -1467,6 +1477,8 @@ export const useUploadDemoController = () => {
           const retryData = await invokeConvertDocument(requestBody);
           data = retryData;
           // Continue with normal success path below.
+        } else if (isRequiresImageFallbackError && isTextBasedPdf) {
+          throw new Error("This PDF should stay on the text-extraction path. Please try again.");
         } else {
           // Lean mode: no nested retries (only OCR fallback path above).
           throw invokeError;
@@ -1766,45 +1778,48 @@ Analytics Summary:
           const cacheKey = getFileCacheKey(file);
           const cachedParsedPdf = preparedPdfDataRef.current.get(cacheKey);
           const parsedPdfTransactionsCount = cachedParsedPdf?.transactions?.length ?? 0;
+          const isTextBasedPdf = parsedPdfTransactionsCount > 0;
           if (parsedPdfTransactionsCount > 0) {
             payload.pdfParsedTransactions = cachedParsedPdf?.transactions;
           }
           if (cachedParsedPdf?.bankMetadata) {
             payload.pdfParsedBankMetadata = cachedParsedPdf.bankMetadata;
           }
-          let cachedPageImages = preparedPdfImagesRef.current.get(cacheKey);
-          if (!cachedPageImages || cachedPageImages.length === 0) {
-            const { pdfToPageImages } = await loadPdfUtils();
-            cachedPageImages = await pdfToPageImages(file, {
-              password: pdfPassword.trim() || undefined,
-              maxPdfRenderPages,
-              isFreeUsageMode,
-              freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
-            });
-            if (Array.isArray(cachedPageImages) && cachedPageImages.length > 0) {
-              preparedPdfImagesRef.current.set(cacheKey, cachedPageImages);
+          if (!isTextBasedPdf) {
+            let cachedPageImages = preparedPdfImagesRef.current.get(cacheKey);
+            if (!cachedPageImages || cachedPageImages.length === 0) {
+              const { pdfToPageImages } = await loadPdfUtils();
+              cachedPageImages = await pdfToPageImages(file, {
+                password: pdfPassword.trim() || undefined,
+                maxPdfRenderPages,
+                isFreeUsageMode,
+                freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+              });
+              if (Array.isArray(cachedPageImages) && cachedPageImages.length > 0) {
+                preparedPdfImagesRef.current.set(cacheKey, cachedPageImages);
+              }
             }
+            payload.pdfPageImages = cachedPageImages;
+            const filePdfPayloadBytes = estimatePdfPageImagesBytes(payload.pdfPageImages);
+            const filePdfPages = payload.pdfPageImages?.length ?? 0;
+            if (!payload.pdfPageImages || filePdfPages === 0) {
+              throw new Error(`PDF preparation failed for ${file.name}. Please try again.`);
+            }
+            if (filePdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES) {
+              throw new Error(buildPdfPayloadTooLargeMessage("single", filePdfPages, filePdfPayloadBytes));
+            }
+            batchPdfPayloadBytes += filePdfPayloadBytes;
+            batchPdfPages += filePdfPages;
+            if (batchPdfPayloadBytes > EDGE_FUNCTION_SAFE_BATCH_PDF_PAYLOAD_BYTES) {
+              throw new Error(buildPdfPayloadTooLargeMessage("batch", batchPdfPages, batchPdfPayloadBytes));
+            }
+            if (batchPdfPages > EDGE_FUNCTION_SAFE_BATCH_PDF_PAGES) {
+              throw new Error(
+                `Batch has ${batchPdfPages} PDF pages. For reliable processing, split into smaller batches (recommended up to ${EDGE_FUNCTION_SAFE_BATCH_PDF_PAGES} pages at a time).`,
+              );
+            }
+            setShowScanTimeCard(true);
           }
-          payload.pdfPageImages = cachedPageImages;
-          const filePdfPayloadBytes = estimatePdfPageImagesBytes(payload.pdfPageImages);
-          const filePdfPages = payload.pdfPageImages?.length ?? 0;
-          if (!payload.pdfPageImages || filePdfPages === 0) {
-            throw new Error(`PDF preparation failed for ${file.name}. Please try again.`);
-          }
-          if (filePdfPayloadBytes > EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES) {
-            throw new Error(buildPdfPayloadTooLargeMessage("single", filePdfPages, filePdfPayloadBytes));
-          }
-          batchPdfPayloadBytes += filePdfPayloadBytes;
-          batchPdfPages += filePdfPages;
-          if (batchPdfPayloadBytes > EDGE_FUNCTION_SAFE_BATCH_PDF_PAYLOAD_BYTES) {
-            throw new Error(buildPdfPayloadTooLargeMessage("batch", batchPdfPages, batchPdfPayloadBytes));
-          }
-          if (batchPdfPages > EDGE_FUNCTION_SAFE_BATCH_PDF_PAGES) {
-            throw new Error(
-              `Batch has ${batchPdfPages} PDF pages. For reliable processing, split into smaller batches (recommended up to ${EDGE_FUNCTION_SAFE_BATCH_PDF_PAGES} pages at a time).`,
-            );
-          }
-          setShowScanTimeCard(true);
         }
 
         if (user) {
