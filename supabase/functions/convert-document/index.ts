@@ -1593,7 +1593,14 @@ const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 
 const toBase64FromBytes = (bytes: Uint8Array): string => {
   if (!bytes || bytes.length === 0) return '';
-  return btoa(String.fromCharCode(...new Uint8Array(bytes)));
+  // Chunked base64 encoding to avoid stack overflow for large files (50MB+)
+  const ENCODE_CHUNK = 32768;
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += ENCODE_CHUNK) {
+    const slice = bytes.subarray(offset, Math.min(offset + ENCODE_CHUNK, bytes.length));
+    binary += String.fromCharCode.apply(null, slice as unknown as number[]);
+  }
+  return btoa(binary);
 };
 
 const decodePdfSegment = (bytes: Uint8Array, maxBytes = 300_000): string => {
