@@ -208,6 +208,21 @@ const parseDateToTs = (value?: string): number | null => {
   return Number.isFinite(ts) ? ts : null;
 };
 
+const sortTransactionsForReconciliation = (transactions: Transaction[]): Transaction[] =>
+  transactions
+    .map((transaction, index) => ({ transaction, index }))
+    .sort((left, right) => {
+      const leftTs = parseDateToTs(left.transaction.date);
+      const rightTs = parseDateToTs(right.transaction.date);
+
+      if (leftTs == null && rightTs == null) return left.index - right.index;
+      if (leftTs == null) return 1;
+      if (rightTs == null) return -1;
+      if (leftTs !== rightTs) return leftTs - rightTs;
+      return left.index - right.index;
+    })
+    .map(({ transaction }) => transaction);
+
 const inferDirectionFromDates = (transactions: Transaction[]): BalanceDirection | null => {
   let asc = 0;
   let desc = 0;
@@ -547,7 +562,8 @@ export const sanitizeTransactions = (transactions: Transaction[], options?: Sani
     if (debit === 0 && credit === 0) return false;
     return true;
   });
-  const directionCorrected = correctAmountDirection(filtered);
+  const statementOrdered = sortTransactionsForReconciliation(filtered);
+  const directionCorrected = correctAmountDirection(statementOrdered);
   const offsetAligned = maybeApplyBalanceOffset(directionCorrected, options);
   const direction = inferBalanceDirection(offsetAligned);
 
