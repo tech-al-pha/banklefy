@@ -28,6 +28,7 @@ import {
   type ProcessedTransaction,
 } from '../_shared/categorizer.ts';
 import { chooseStatementPeriodLabel } from '../_shared/statement-period.ts';
+import { FULL_PAGE_OCR_COVERAGE_THRESHOLD, shouldUseFullPageOcrCoverage } from '../_shared/ocr-routing.ts';
 import {
   performExtraction,
   performCategorization,
@@ -1149,7 +1150,7 @@ const buildSelectiveOcrPagePlan = async ({
   const fallbackAll = pageImages.map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }));
   const reasons: string[] = [];
 
-  if (totalProvidedPages > CHUNK_THRESHOLD || Boolean(password)) {
+  if (shouldUseFullPageOcrCoverage(totalProvidedPages, password)) {
     reasons.push(password ? 'password_protected_full_coverage' : 'large_document_full_coverage');
     return {
       selected: fallbackAll,
@@ -3773,7 +3774,7 @@ Deno.serve(async (req) => {
       isPdf &&
       clientParsedTransactions.length >= PDF_DETERMINISTIC_FAST_PATH_MIN_ROWS &&
       clientPdfParseAssessment.mismatchRatio <= PDF_DETERMINISTIC_FAST_PATH_MAX_MISMATCH;
-    const forceOcrForLargeDocument = isPdf && pageCount > CHUNK_THRESHOLD;
+    const forceOcrForLargeDocument = isPdf && pageCount >= FULL_PAGE_OCR_COVERAGE_THRESHOLD;
     const hardTextGateActive =
       isPdf &&
       structuralScan.hasSelectableText === true &&

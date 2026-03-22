@@ -61,6 +61,7 @@ import {
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
 import { resolveEffectiveLimit, type LimitResolverDatabase, type SupabaseLike } from '../_shared/limit-resolver.ts';
+import { FULL_PAGE_OCR_COVERAGE_THRESHOLD, shouldUseFullPageOcrCoverage } from '../_shared/ocr-routing.ts';
 import type { Database as AppDatabase } from '../../../src/integrations/supabase/types.ts';
 
 type LooseTable = {
@@ -70,7 +71,7 @@ type LooseTable = {
   Relationships: [];
 };
 
-type ConversionProcessingTimings = NonNullable<AppDatabase['public']['Tables']['conversions']['Update']['processing_timings']>;
+type ConversionProcessingTimings = Record<string, unknown>;
 
 type SubscriptionsTable = {
   Row: LimitResolverDatabase['public']['Tables']['subscriptions']['Row'] & {
@@ -533,7 +534,7 @@ const buildSelectiveOcrPagePlan = async (params: {
 }): Promise<SelectiveOcrPlan> => {
   const totalPages = Math.max(0, Math.min(params.totalPages, params.pageImages.length, params.pdfDocument.numPages));
   const fallbackAll = params.pageImages.map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }));
-  if (totalPages > 10) {
+  if (shouldUseFullPageOcrCoverage(totalPages)) {
     return {
       selected: fallbackAll,
       reasons: ['large_document_full_coverage'],
@@ -1769,25 +1770,29 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     const supabaseAdminClient = supabaseAdmin!;
+    const conversionsTable = () => supabaseAdminClient.from('conversions') as unknown as {
+      select: (...args: unknown[]) => any;
+      update: (...args: unknown[]) => any;
+      insert: (...args: unknown[]) => any;
+      upsert: (...args: unknown[]) => any;
+    };
 
     const readConversionTimings = async (conversionId: string): Promise<ConversionProcessingTimings> => {
-      const { data, error } = await supabaseAdminClient
-        .from('conversions')
+      const { data, error } = await conversionsTable()
         .select('processing_timings')
         .eq('id', conversionId)
         .single();
 
       if (error || !data) {
-        return {} as ConversionProcessingTimings;
+        return {};
       }
 
-      return getProcessingTimings(data.processing_timings) as ConversionProcessingTimings;
+      return getProcessingTimings((data as Record<string, unknown>).processing_timings);
     };
 
     const updateConversionTimings = async (conversionId: string, patch: Record<string, unknown>) => {
       const existingTimings = await readConversionTimings(conversionId);
-      return supabaseAdminClient
-        .from('conversions')
+      return conversionsTable()
         .update({ processing_timings: mergeProcessingTimings(existingTimings, patch) })
         .eq('id', conversionId);
     };
@@ -2032,7 +2037,7 @@ Deno.serve(async (req) => {
         fileClientParsedBankMetadata,
         fileClientParsedTransactions,
       );
-      const forceOcrForLargeDocument = isPdf && filePageCount > 10;
+      const forceOcrForLargeDocument = isPdf && filePageCount >= FULL_PAGE_OCR_COVERAGE_THRESHOLD;
       const fileAdaptiveOcrStrategy = deriveAdaptiveOcrStrategy(
         lowerName,
         filePageCount,
@@ -2331,7 +2336,7 @@ Deno.serve(async (req) => {
     const incrementBy = isFreeMode ? successfulConversions : pagesWithDataTotal;
     let remaining = Math.max(0, conversionsLimit - conversionsUsed);
     if (incrementBy > 0) {
-      const { error: incrementError } = await supabaseAdminClient.rpc('increment_usage_count', {
+      const { error: incrementError } = await (supabaseAdminClient.rpc as any)('increment_usage_count', {
         p_ip_address: user ? undefined : trackingKey,
         p_user_id: user ? user.id : undefined,
         p_increment: incrementBy,
