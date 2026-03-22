@@ -219,7 +219,7 @@ const AboutPage = () => {
             />
 
             <a
-              href="https://www.google.com/maps/search/?api=1&query=Kota%2C%20Rajasthan%2C%20India"
+              href="https://www.google.com/maps/search/?api=1&query=Prem%20Nagar%2C%20Kota%2C%20Rajasthan%2C%20India"
               target="_blank"
               rel="noopener noreferrer"
               className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 md:col-span-2 transition-all hover:border-primary hover:shadow-neon"
