@@ -10,7 +10,7 @@ describe("ocr-routing", () => {
     expect(shouldUseFullPageOcrCoverage(FULL_PAGE_OCR_COVERAGE_THRESHOLD - 1)).toBe(false);
   });
 
-  it("forces full coverage when a password is provided", () => {
-    expect(shouldUseFullPageOcrCoverage(1, "secret")).toBe(true);
+  it("does not force full coverage for password-protected PDFs below the threshold", () => {
+    expect(shouldUseFullPageOcrCoverage(1)).toBe(false);
   });
 });

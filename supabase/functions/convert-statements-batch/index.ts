@@ -8,6 +8,7 @@ import {
   assessClientPdfParsedTransactions,
   callGroqVisionOCR,
   callMistralVisionOCR,
+  callTesseractOcrWorker,
   correctMinorBalanceDrift,
   extractBankMetadataFromOcrText,
   mergeOcrTransactionsDeterministic,
@@ -1397,19 +1398,40 @@ const processStatement = async (params: {
                 ? mergeProviderResults(groqResult, mistralResult as OCRResult)
                 : (mistralResult as OCRResult);
               dualUsed = true;
-            } else if (groqHasRows && groqResult) {
-              pageResult = groqResult;
             } else {
-              const failureParts = [
-                groqFailureReason || 'Groq returned empty OCR result',
-                mistralFailureReason || 'Mistral returned empty OCR result',
-              ];
-              return {
-                pageResult: null,
-                strictUsed,
-                dualUsed: true,
-                error: `OCR_PROVIDERS_FAILED: page ${pageEntry.pageNumber} (${failureParts.join(' | ')})`,
-              };
+              let workerResult: OCRResult | null = null;
+              let workerFailureReason: string | null = null;
+              try {
+                workerResult = await callTesseractOcrWorker(pageBase64, pageMime, params.fileName);
+              } catch (workerError) {
+                workerFailureReason = workerError instanceof Error ? workerError.message : 'Tesseract OCR worker failed';
+              }
+
+              const workerHasRows = !!(
+                workerResult &&
+                workerResult.success &&
+                workerResult.transactions &&
+                workerResult.transactions.length > 0
+              );
+              if (workerHasRows && workerResult) {
+                pageResult = groqHasRows && groqResult
+                  ? mergeProviderResults(groqResult, workerResult)
+                  : workerResult;
+              } else if (groqHasRows && groqResult) {
+                pageResult = groqResult;
+              } else {
+                const failureParts = [
+                  groqFailureReason || 'Groq returned empty OCR result',
+                  mistralFailureReason || 'Mistral returned empty OCR result',
+                  workerFailureReason || workerResult?.error || 'Tesseract worker returned empty OCR result',
+                ];
+                return {
+                  pageResult: null,
+                  strictUsed,
+                  dualUsed: true,
+                  error: `OCR_PROVIDERS_FAILED: page ${pageEntry.pageNumber} (${failureParts.join(' | ')})`,
+                };
+              }
             }
           }
 

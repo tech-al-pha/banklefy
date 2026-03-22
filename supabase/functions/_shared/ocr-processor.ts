@@ -22,6 +22,17 @@ const GENERIC_HEADER_ALIASES: HeaderAliasMap = {
   balance: ['running balance', 'closing balance', 'ledger balance', 'available balance', 'balance'],
 };
 
+const readEnv = (key: string): string | undefined => {
+  if (typeof Deno !== 'undefined' && typeof Deno.env?.get === 'function') {
+    return Deno.env.get(key) ?? undefined;
+  }
+  if (typeof process !== 'undefined' && process.env) {
+    const value = process.env[key];
+    return value && value.length > 0 ? value : undefined;
+  }
+  return undefined;
+};
+
 export interface BankMetadata {
   bankName: string;
   accountNumber: string;
@@ -454,6 +465,9 @@ type OcrNormalizeOptions = {
 };
 
 const LOW_CONFIDENCE_THRESHOLD = 0.8;
+const OCR_WORKER_URL = (readEnv('OCR_WORKER_URL') ?? '').trim().replace(/\/+$/, '');
+const OCR_WORKER_API_KEY = (readEnv('OCR_WORKER_API_KEY') ?? '').trim();
+const OCR_WORKER_TIMEOUT_MS = Math.max(5000, Number(readEnv('OCR_WORKER_TIMEOUT_MS') ?? '45000'));
 const OCR_UNREADABLE_DESCRIPTION = 'UNREADABLE';
 
 const OCR_NOISE_ROW_PATTERN =
@@ -947,13 +961,73 @@ export async function callTesseractOcrWorker(
   mimeType: string,
   fileName?: string,
 ): Promise<OCRResult> {
-  void imageBase64;
-  void mimeType;
-  void fileName;
-  return {
-    success: false,
-    error: 'Tesseract OCR worker disabled. Groq Vision is the active OCR provider.',
-  };
+  if (!OCR_WORKER_URL) {
+    return {
+      success: false,
+      error: 'Tesseract OCR worker not configured',
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OCR_WORKER_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${OCR_WORKER_URL}/ocr/page`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(OCR_WORKER_API_KEY ? { 'x-api-key': OCR_WORKER_API_KEY } : {}),
+      },
+      body: JSON.stringify({
+        imageBase64,
+        mimeType,
+        fileName,
+        debug: false,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      return {
+        success: false,
+        error: `Tesseract OCR worker error: ${response.status}${errorText ? ` ${errorText}` : ''}`,
+      };
+    }
+
+    const payload = await response.json() as {
+      success?: boolean;
+      text?: string;
+      transactions?: unknown[];
+      bankMetadata?: Record<string, unknown> | null;
+      error?: string;
+    };
+
+    if (!payload.success) {
+      return {
+        success: false,
+        error: payload.error || 'Tesseract OCR worker returned failure',
+      };
+    }
+
+    const normalizedTransactions = Array.isArray(payload.transactions)
+      ? normalizeOcrRawTransactions(payload.transactions, { strictColumnLock: true })
+      : [];
+
+    return {
+      success: normalizedTransactions.length > 0 || Boolean(payload.text),
+      transactions: normalizedTransactions,
+      bankMetadata: payload.bankMetadata ? normalizeBankMetadata(payload.bankMetadata) : undefined,
+      metadata: summarizeOcrMetadata(normalizedTransactions),
+      text: payload.text || '',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Tesseract OCR worker request failed',
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 type GroqVisionOcrOptions = {
@@ -965,7 +1039,7 @@ export async function callGroqVisionOCR(
   mimeType: string,
   options?: GroqVisionOcrOptions,
 ): Promise<OCRResult> {
-  const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
+  const GROQ_API_KEY = readEnv('GROQ_API_KEY');
   
   if (!GROQ_API_KEY) {
     console.log('GROQ_API_KEY not configured, skipping Groq Vision OCR');
@@ -1115,7 +1189,7 @@ export async function callMistralVisionOCR(
   imageBase64: string,
   mimeType: string,
 ): Promise<OCRResult> {
-  const MISTRAL_API_KEY = Deno.env.get('MISTRAL_API_KEY');
+  const MISTRAL_API_KEY = readEnv('MISTRAL_API_KEY');
   if (!MISTRAL_API_KEY) {
     return { success: false, error: 'Mistral API key not configured' };
   }

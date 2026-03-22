@@ -11,6 +11,7 @@ import {
   classifyDocument,
   callGroqVisionOCR,
   callMistralVisionOCR,
+  callTesseractOcrWorker,
   correctMinorBalanceDrift,
   extractBankMetadataFromOcrText,
   mergeOcrTransactionsDeterministic,
@@ -1153,8 +1154,8 @@ const buildSelectiveOcrPagePlan = async ({
   const fallbackAll = pageImages.map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }));
   const reasons: string[] = [];
 
-  if (shouldUseFullPageOcrCoverage(totalProvidedPages, password)) {
-    reasons.push(password ? 'password_protected_full_coverage' : 'large_document_full_coverage');
+  if (shouldUseFullPageOcrCoverage(totalProvidedPages)) {
+    reasons.push('large_document_full_coverage');
     return {
       selected: fallbackAll,
       totalProvidedPages,
@@ -4151,22 +4152,43 @@ Deno.serve(async (req) => {
                   );
                 }
               } else {
-                if (groqHasRows && groqResult) {
+                let workerResult: OCRResult | null = null;
+                let workerFailureReason: string | null = null;
+                try {
+                  workerResult = await callTesseractOcrWorker(pageBase64, pageMime, fileName);
+                } catch (workerError) {
+                  workerFailureReason = workerError instanceof Error ? workerError.message : 'Tesseract OCR worker failed';
+                }
+
+                const workerHasRows = !!(
+                  workerResult &&
+                  workerResult.success &&
+                  workerResult.transactions &&
+                  workerResult.transactions.length > 0
+                );
+                if (workerHasRows && workerResult) {
+                  pageResult = groqHasRows && groqResult
+                    ? mergeProviderResults(groqResult, workerResult)
+                    : workerResult;
+                  console.log(`Tesseract OCR worker used for page ${pageEntry.pageNumber}.`);
+                } else if (groqHasRows && groqResult) {
                   pageResult = groqResult;
                   return { pageResult, error: null, strictUsed, dualUsed, providersFailed };
+                } else {
+                  providersFailed = true;
+                  const failureParts = [
+                    groqFailureReason || 'Groq returned empty OCR result',
+                    mistralFailureReason || 'Mistral returned empty OCR result',
+                    workerFailureReason || workerResult?.error || 'Tesseract worker returned empty OCR result',
+                  ];
+                  return {
+                    pageResult: null as OCRResult | null,
+                    error: `OCR_PROVIDERS_FAILED: page ${pageEntry.pageNumber} (${failureParts.join(' | ')})`,
+                    strictUsed,
+                    dualUsed: true,
+                    providersFailed,
+                  };
                 }
-                providersFailed = true;
-                const failureParts = [
-                  groqFailureReason || 'Groq returned empty OCR result',
-                  mistralFailureReason || 'Mistral returned empty OCR result',
-                ];
-                return {
-                  pageResult: null as OCRResult | null,
-                  error: `OCR_PROVIDERS_FAILED: page ${pageEntry.pageNumber} (${failureParts.join(' | ')})`,
-                  strictUsed,
-                  dualUsed: true,
-                  providersFailed,
-                };
               }
             }
 
