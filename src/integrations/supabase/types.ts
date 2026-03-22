@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -10,76 +10,186 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
       anonymous_usage: {
         Row: {
+          conversions_count: number
           created_at: string
-          id: number
+          id: string
+          ip_address: string
+          last_reset_date: string
+          timezone: string
+          updated_at: string
         }
         Insert: {
+          conversions_count?: number
           created_at?: string
-          id?: number
+          id?: string
+          ip_address: string
+          last_reset_date?: string
+          timezone?: string
+          updated_at?: string
         }
         Update: {
+          conversions_count?: number
           created_at?: string
-          id?: number
+          id?: string
+          ip_address?: string
+          last_reset_date?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      category_corrections: {
+        Row: {
+          corrected_category: string
+          created_at: string
+          description_pattern: string
+          id: string
+          original_category: string
+          updated_at: string
+          usage_count: number | null
+          user_id: string
+          weight: number | null
+        }
+        Insert: {
+          corrected_category: string
+          created_at?: string
+          description_pattern: string
+          id?: string
+          original_category: string
+          updated_at?: string
+          usage_count?: number | null
+          user_id: string
+          weight?: number | null
+        }
+        Update: {
+          corrected_category?: string
+          created_at?: string
+          description_pattern?: string
+          id?: string
+          original_category?: string
+          updated_at?: string
+          usage_count?: number | null
+          user_id?: string
+          weight?: number | null
         }
         Relationships: []
       }
       conversions: {
         Row: {
-          created_at: string | null
-          expires_at: string | null
-          file_name: string | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          file_path: string
           id: string
-          processing_timings: Json | null
-          processing_total_ms: number | null
-          status: string | null
-          user_id: string | null
+          original_filename: string
+          result_path: string | null
+          status: string
+          user_id: string
         }
         Insert: {
-          created_at?: string | null
-          expires_at?: string | null
-          file_name?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_path: string
           id?: string
-          processing_timings?: Json | null
-          processing_total_ms?: number | null
-          status?: string | null
-          user_id?: string | null
+          original_filename: string
+          result_path?: string | null
+          status?: string
+          user_id: string
         }
         Update: {
-          created_at?: string | null
-          expires_at?: string | null
-          file_name?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_path?: string
           id?: string
-          processing_timings?: Json | null
-          processing_total_ms?: number | null
-          status?: string | null
-          user_id?: string | null
+          original_filename?: string
+          result_path?: string | null
+          status?: string
+          user_id?: string
         }
         Relationships: []
       }
-      profiles: {
+      fraud_alerts: {
         Row: {
-          avatar_url: string | null
-          full_name: string | null
+          affected_rows: Json | null
+          alert_type: string
+          conversion_id: string
+          created_at: string
+          description: string
           id: string
-          updated_at: string | null
+          metadata: Json | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          severity: Database["public"]["Enums"]["fraud_severity"]
+          status: Database["public"]["Enums"]["alert_status"]
+          user_id: string
         }
         Insert: {
-          avatar_url?: string | null
-          full_name?: string | null
-          id: string
-          updated_at?: string | null
+          affected_rows?: Json | null
+          alert_type: string
+          conversion_id: string
+          created_at?: string
+          description: string
+          id?: string
+          metadata?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: Database["public"]["Enums"]["fraud_severity"]
+          status?: Database["public"]["Enums"]["alert_status"]
+          user_id: string
         }
         Update: {
-          avatar_url?: string | null
+          affected_rows?: Json | null
+          alert_type?: string
+          conversion_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          metadata?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: Database["public"]["Enums"]["fraud_severity"]
+          status?: Database["public"]["Enums"]["alert_status"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fraud_alerts_conversion_id_fkey"
+            columns: ["conversion_id"]
+            isOneToOne: false
+            referencedRelation: "conversions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
           full_name?: string | null
           id?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -91,13 +201,13 @@ export type Database = {
           id: string
           metadata: Json | null
           notes: Json | null
-          payment_capture: boolean
+          payment_capture: boolean | null
           plan_id: string
           razorpay_order_id: string
-          receipt: string
+          receipt: string | null
           status: string
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           amount: number
@@ -106,13 +216,13 @@ export type Database = {
           id?: string
           metadata?: Json | null
           notes?: Json | null
-          payment_capture?: boolean
+          payment_capture?: boolean | null
           plan_id: string
           razorpay_order_id: string
-          receipt: string
-          status: string
+          receipt?: string | null
+          status?: string
           updated_at?: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           amount?: number
@@ -121,13 +231,13 @@ export type Database = {
           id?: string
           metadata?: Json | null
           notes?: Json | null
-          payment_capture?: boolean
+          payment_capture?: boolean | null
           plan_id?: string
           razorpay_order_id?: string
-          receipt?: string
+          receipt?: string | null
           status?: string
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -184,126 +294,131 @@ export type Database = {
           },
         ]
       }
+      risk_analysis: {
+        Row: {
+          average_daily_balance: number | null
+          balance_mismatches: number | null
+          conversion_id: string
+          created_at: string
+          emi_debits: Json | null
+          foir_score: number | null
+          id: string
+          integrity_score: number | null
+          max_dip_amount: number | null
+          max_dip_date: string | null
+          net_cashflow: number | null
+          risk_flags: Json | null
+          salary_credits: Json | null
+          total_inflow: number | null
+          total_outflow: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          average_daily_balance?: number | null
+          balance_mismatches?: number | null
+          conversion_id: string
+          created_at?: string
+          emi_debits?: Json | null
+          foir_score?: number | null
+          id?: string
+          integrity_score?: number | null
+          max_dip_amount?: number | null
+          max_dip_date?: string | null
+          net_cashflow?: number | null
+          risk_flags?: Json | null
+          salary_credits?: Json | null
+          total_inflow?: number | null
+          total_outflow?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          average_daily_balance?: number | null
+          balance_mismatches?: number | null
+          conversion_id?: string
+          created_at?: string
+          emi_debits?: Json | null
+          foir_score?: number | null
+          id?: string
+          integrity_score?: number | null
+          max_dip_amount?: number | null
+          max_dip_date?: string | null
+          net_cashflow?: number | null
+          risk_flags?: Json | null
+          salary_credits?: Json | null
+          total_inflow?: number | null
+          total_outflow?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_analysis_conversion_id_fkey"
+            columns: ["conversion_id"]
+            isOneToOne: false
+            referencedRelation: "conversions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
+          billing_cycle_end: string
+          billing_cycle_start: string
           conversions_limit: number
           conversions_used: number
-          current_period_end: string | null
-          free_daily_limit: number
-          free_daily_used: number
-          id: string
-          last_reset_date: string | null
-          monthly_limit: number
-          monthly_reset_date: string | null
-          monthly_used: number
-          pack_limit: number
-          pack_used: number
-          pages_used_this_month: number
-          plan_type: string | null
-          status: string | null
-          tier: Database["public"]["Enums"]["subscription_tier"] | null
-          timezone: string | null
-          user_id: string | null
-          yearly_limit: number
-          yearly_reset_date: string | null
-          yearly_used: number
-        }
-        Insert: {
-          conversions_limit?: number
-          conversions_used?: number
-          current_period_end?: string | null
-          free_daily_limit?: number
-          free_daily_used?: number
-          id?: string
-          last_reset_date?: string | null
-          monthly_limit?: number
-          monthly_reset_date?: string | null
-          monthly_used?: number
-          pack_limit?: number
-          pack_used?: number
-          pages_used_this_month?: number
-          plan_type?: string | null
-          status?: string | null
-          tier?: Database["public"]["Enums"]["subscription_tier"] | null
-          timezone?: string | null
-          user_id?: string | null
-          yearly_limit?: number
-          yearly_reset_date?: string | null
-          yearly_used?: number
-        }
-        Update: {
-          conversions_limit?: number
-          conversions_used?: number
-          current_period_end?: string | null
-          free_daily_limit?: number
-          free_daily_used?: number
-          id?: string
-          last_reset_date?: string | null
-          monthly_limit?: number
-          monthly_reset_date?: string | null
-          monthly_used?: number
-          pack_limit?: number
-          pack_used?: number
-          pages_used_this_month?: number
-          plan_type?: string | null
-          status?: string | null
-          tier?: Database["public"]["Enums"]["subscription_tier"] | null
-          timezone?: string | null
-          user_id?: string | null
-          yearly_limit?: number
-          yearly_reset_date?: string | null
-          yearly_used?: number
-        }
-        Relationships: []
-      }
-      support_requests: {
-        Row: {
           created_at: string
-          email: string | null
           id: string
-          message: string
-          name: string | null
-          source: string | null
-          subject: string | null
-          user_id: string | null
+          last_reset_date: string
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          timezone: string
+          updated_at: string
+          user_id: string
         }
         Insert: {
+          billing_cycle_end?: string
+          billing_cycle_start?: string
+          conversions_limit?: number
+          conversions_used?: number
           created_at?: string
-          email?: string | null
           id?: string
-          message: string
-          name?: string | null
-          source?: string | null
-          subject?: string | null
-          user_id?: string | null
+          last_reset_date?: string
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          timezone?: string
+          updated_at?: string
+          user_id: string
         }
         Update: {
+          billing_cycle_end?: string
+          billing_cycle_start?: string
+          conversions_limit?: number
+          conversions_used?: number
           created_at?: string
-          email?: string | null
           id?: string
-          message?: string
-          name?: string | null
-          source?: string | null
-          subject?: string | null
-          user_id?: string | null
+          last_reset_date?: string
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          timezone?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
       user_roles: {
         Row: {
           id: string
-          role: string | null
-          user_id: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }
         Insert: {
           id?: string
-          role?: string | null
-          user_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }
         Update: {
           id?: string
-          role?: string | null
-          user_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -320,54 +435,22 @@ export type Database = {
           needs_reset: boolean
         }[]
       }
-      derive_subscription_tier: {
-        Args: { p_plan_type: string }
-        Returns: Database["public"]["Enums"]["subscription_tier"]
-      }
-      ensure_purge_expired_conversions_cron: { Args: never; Returns: Json }
-      has_role:
-        | {
-            Args: {
-              _role: Database["public"]["Enums"]["app_role"]
-              _user_id: string
-            }
-            Returns: boolean
-          }
-        | { Args: { _role: string; _user_id: string }; Returns: boolean }
-      increment_usage_count: {
+      has_role: {
         Args: {
-          p_increment?: number
-          p_ip_address?: string
-          p_user_id?: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }
-      process_razorpay_payment: {
-        Args: {
-          p_amount: number
-          p_currency: string
-          p_order_id: string
-          p_pages_to_add: number
-          p_plan_id: string
-          p_razorpay_order_id: string
-          p_razorpay_payment_id: string
-          p_razorpay_signature: string
-          p_user_id: string
-        }
-        Returns: {
-          already_processed: boolean
-          pages_added: number
-        }[]
+      increment_usage_count: {
+        Args: { p_ip_address?: string; p_user_id?: string }
+        Returns: boolean
       }
-      purge_expired_conversions: { Args: never; Returns: undefined }
-      recalculate_subscription_totals: {
-        Args: { p_user_id: string }
-        Returns: undefined
-      }
-      retention_health_check: { Args: never; Returns: Json }
     }
     Enums: {
+      alert_status: "pending" | "reviewed" | "dismissed" | "confirmed"
       app_role: "admin" | "user"
+      fraud_severity: "low" | "medium" | "high" | "critical"
       subscription_tier: "free" | "daily" | "business"
     }
     CompositeTypes: {
@@ -496,7 +579,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      alert_status: ["pending", "reviewed", "dismissed", "confirmed"],
       app_role: ["admin", "user"],
+      fraud_severity: ["low", "medium", "high", "critical"],
       subscription_tier: ["free", "daily", "business"],
     },
   },
