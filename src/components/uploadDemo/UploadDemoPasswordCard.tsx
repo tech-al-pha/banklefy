@@ -12,6 +12,7 @@ type UploadDemoPasswordCardProps = {
   passwordError: boolean;
   uploading: boolean;
   converting: boolean;
+  passwordUnlocking?: boolean;
   onPasswordChange: (value: string) => void;
   onUnlock: () => void;
   onTogglePassword: () => void;
@@ -33,12 +34,14 @@ export const UploadDemoPasswordCard = ({
   passwordError,
   uploading,
   converting,
+  passwordUnlocking = false,
   onPasswordChange,
   onUnlock,
   onTogglePassword,
 }: UploadDemoPasswordCardProps) => {
   const targetFile = selectedFile ?? selectedFiles[0] ?? null;
   const pdfPasswordHelpId = "pdf-password-help";
+  const isBusy = uploading || converting || passwordUnlocking;
 
   if (!targetFile || !showPasswordInput || limitReached) {
     return null;
@@ -98,10 +101,10 @@ export const UploadDemoPasswordCard = ({
         <Button
           type="button"
           onClick={onUnlock}
-          disabled={uploading || converting || !pdfPassword.trim()}
+          disabled={isBusy || !pdfPassword.trim()}
           className="sm:w-auto min-w-[120px]"
         >
-          {uploading || converting ? (
+          {isBusy ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Unlocking...

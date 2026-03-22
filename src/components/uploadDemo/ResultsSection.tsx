@@ -18,7 +18,6 @@ import {
 import {
   AlertTriangle,
   CheckCircle,
-  Clock3,
   Crown,
   Download,
   FileSpreadsheet,
@@ -27,6 +26,7 @@ import {
   Lock,
   PieChart,
   ShieldAlert,
+  ScanSearch,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -620,20 +620,31 @@ export const ResultsSection = ({
         </div>
       )}
 
-      <Card className="p-4 bg-[#141414] border border-primary/20">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-            <Clock3 className="h-4.5 w-4.5 text-primary" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-white">Scanned or image-based PDFs may take longer</p>
-            <p className="text-xs text-muted-foreground">
-              If your statement is scanned, we run deeper OCR checks for cleaner extraction. Text-based PDFs
-              typically finish faster through deterministic parsing.
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Card className="rounded-xl border border-sky-500/15 bg-sky-500/[0.06] p-3 shadow-none">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-sky-300" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">
+              Text-based PDFs
             </p>
           </div>
-        </div>
-      </Card>
+          <p className="mt-2 text-xs leading-5 text-sky-50/75">
+            Usually finish faster through deterministic parsing, but very large files still need more validation.
+          </p>
+        </Card>
+
+        <Card className="rounded-xl border border-sky-500/15 bg-sky-500/[0.06] p-3 shadow-none">
+          <div className="flex items-center gap-2">
+            <ScanSearch className="h-4 w-4 text-sky-300" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">
+              Scanned / image-based PDFs
+            </p>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-sky-50/75">
+            We run deeper OCR checks for cleaner extraction, so these usually take longer.
+          </p>
+        </Card>
+      </div>
 
       <div className="grid md:grid-cols-3 gap-6">
         <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-primary/20">

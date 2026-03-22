@@ -533,6 +533,12 @@ const buildSelectiveOcrPagePlan = async (params: {
 }): Promise<SelectiveOcrPlan> => {
   const totalPages = Math.max(0, Math.min(params.totalPages, params.pageImages.length, params.pdfDocument.numPages));
   const fallbackAll = params.pageImages.map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }));
+  if (totalPages > 10) {
+    return {
+      selected: fallbackAll,
+      reasons: ['large_document_full_coverage'],
+    };
+  }
   if (totalPages === 0) {
     return { selected: fallbackAll, reasons: ['no_pages'] };
   }
@@ -2026,6 +2032,7 @@ Deno.serve(async (req) => {
         fileClientParsedBankMetadata,
         fileClientParsedTransactions,
       );
+      const forceOcrForLargeDocument = isPdf && filePageCount > 10;
       const fileAdaptiveOcrStrategy = deriveAdaptiveOcrStrategy(
         lowerName,
         filePageCount,
@@ -2034,8 +2041,13 @@ Deno.serve(async (req) => {
       );
       const forceOcrForPdf =
         isPdf &&
-        fileClientParsedTransactions.length > 0 &&
-        (!fileClientParseAssessment.useDeterministic || forceOcrForDenseFile);
+        (
+          forceOcrForLargeDocument ||
+          (
+            fileClientParsedTransactions.length > 0 &&
+            (!fileClientParseAssessment.useDeterministic || forceOcrForDenseFile)
+          )
+        );
 
       console.log(
         `Batch file OCR strategy (${sanitizedName}): level=${fileAdaptiveOcrStrategy.level}, strict=${fileAdaptiveOcrStrategy.strictMode}:${fileAdaptiveOcrStrategy.strictMaxPages}, ` +

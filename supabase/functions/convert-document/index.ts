@@ -1148,6 +1148,16 @@ const buildSelectiveOcrPagePlan = async ({
   const fallbackAll = pageImages.map((imageDataUrl, index) => ({ pageNumber: index + 1, imageDataUrl }));
   const reasons: string[] = [];
 
+  if (totalProvidedPages > CHUNK_THRESHOLD || Boolean(password)) {
+    reasons.push(password ? 'password_protected_full_coverage' : 'large_document_full_coverage');
+    return {
+      selected: fallbackAll,
+      totalProvidedPages,
+      reasons,
+      pageDiagnostics: [],
+    };
+  }
+
   if (!bytes || bytes.length === 0 || totalProvidedPages === 0) {
     reasons.push('no_pdf_bytes_or_page_images');
     return {
@@ -3750,9 +3760,11 @@ Deno.serve(async (req) => {
       isPdf &&
       clientParsedTransactions.length >= PDF_DETERMINISTIC_FAST_PATH_MIN_ROWS &&
       clientPdfParseAssessment.mismatchRatio <= PDF_DETERMINISTIC_FAST_PATH_MAX_MISMATCH;
+    const forceOcrForLargeDocument = isPdf && pageCount > CHUNK_THRESHOLD;
     const hardTextGateActive =
       isPdf &&
-      structuralScan.hasSelectableText === true;
+      structuralScan.hasSelectableText === true &&
+      !forceOcrForLargeDocument;
     let skipOCR = false;
     if (hardTextGateActive) {
       console.log('HARD TEXT GATE ACTIVATED - SKIPPING OCR');
@@ -3789,7 +3801,8 @@ Deno.serve(async (req) => {
           selectableTextDeterministicFastPath ||
           !forceOcrForDenseStatement ||
           (mustUseDeterministicClientPdf && !hasPdfPageImages)
-        )
+        ) &&
+        !forceOcrForLargeDocument
       );
     const ocrDecisionLineRef =
       "supabase/functions/convert-document/index.ts:3282 (if canUseDeterministicClientPdf) / :3301 (else if isPdf && hasPdfPageImages => OCR)";

@@ -41,6 +41,7 @@ type UploadDemoViewProps = {
   pdfPassword: string;
   showPassword: boolean;
   passwordError: boolean;
+  passwordUnlocking: boolean;
   handlePasswordChange: (value: string) => void;
   handleUnlockPassword: () => void;
   handleTogglePassword: () => void;
@@ -128,6 +129,7 @@ export const UploadDemoView = ({
   pdfPassword,
   showPassword,
   passwordError,
+  passwordUnlocking,
   handlePasswordChange,
   handleUnlockPassword,
   handleTogglePassword,
@@ -228,6 +230,7 @@ export const UploadDemoView = ({
                   passwordError={passwordError}
                   uploading={uploading}
                   converting={converting}
+                  passwordUnlocking={passwordUnlocking}
                   onPasswordChange={handlePasswordChange}
                   onUnlock={handleUnlockPassword}
                   onTogglePassword={handleTogglePassword}
