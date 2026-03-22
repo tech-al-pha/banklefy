@@ -1493,12 +1493,13 @@ const applyOcrPostParseAdjustments = (rows: RawTransaction[]): { rows: RawTransa
 };
 
 const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
-const GLOBAL_PDF_PAGE_CAP = 50;
+const GLOBAL_PDF_PAGE_CAP = 250;
 const CHUNK_THRESHOLD = 10;
-const CHUNK_SIZE = 5;
-const MAX_TEXT_PDF_BYTES = 50 * 1024 * 1024;
-const MAX_IMAGE_UPLOAD_BYTES = 20 * 1024 * 1024;
-const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
+const CHUNK_SIZE = 25;
+const MAX_TEXT_PDF_BYTES = 100 * 1024 * 1024;
+const MAX_IMAGE_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '250');
+const OCR_CONCURRENCY_BATCH_SIZE = 8; // Process OCR pages in parallel batches of 8
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
 const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${20 * 1024 * 1024}`); // 20MB
 type DualOcrMode = 'off' | 'smart' | 'always';
