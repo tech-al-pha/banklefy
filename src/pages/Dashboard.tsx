@@ -48,15 +48,21 @@ const Dashboard = () => {
       // Query conversions table - RLS ensures only user's own data is returned
       const { data, error } = await supabase
         .from("conversions")
-        .select("id, file_name, status, created_at, processing_total_ms")
-        .eq("user_id", user.id) // Explicit filter even though RLS handles it
+        .select("id, original_filename, status, created_at")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) {
         if (import.meta.env.DEV) { console.error("Conversions query error:", error); }
         throw error;
       }
-      setConversions(data || []);
+      setConversions((data || []).map((d: Record<string, unknown>) => ({
+        id: String(d.id ?? ''),
+        file_name: String(d.original_filename ?? ''),
+        status: String(d.status ?? ''),
+        created_at: String(d.created_at ?? ''),
+        processing_total_ms: null,
+      })) as never);
     } catch (error: unknown) {
       if (import.meta.env.DEV) { console.error("Error fetching conversions:", error); }
       toast({

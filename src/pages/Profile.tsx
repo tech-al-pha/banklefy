@@ -128,11 +128,7 @@ const Profile = () => {
       const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
       const publicUrl = data.publicUrl;
 
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ avatar_url: publicUrl })
-        .eq("id", user.id);
-      if (profileError) throw profileError;
+      // Avatar URL stored in auth user metadata (profiles table has no avatar_url column)
 
       await supabase.auth.updateUser({ data: { avatar_url: publicUrl } });
       setAvatarUrl(publicUrl);

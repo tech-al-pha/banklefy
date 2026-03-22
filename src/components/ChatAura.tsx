@@ -189,15 +189,20 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
       const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("conversions")
-        .select("id, file_name, created_at, status")
+        .select("id, original_filename, created_at, status")
         .eq("user_id", user.id)
         .gte("created_at", since)
         .order("created_at", { ascending: false });
 
       if (!isMounted) return;
 
-      if (!error) {
-        setRecentConversions(data || []);
+      if (!error && data) {
+        setRecentConversions(data.map((d: Record<string, unknown>) => ({
+          id: String(d.id ?? ''),
+          file_name: String(d.original_filename ?? ''),
+          created_at: String(d.created_at ?? ''),
+          status: String(d.status ?? ''),
+        })));
       }
       setRecentLoading(false);
     };

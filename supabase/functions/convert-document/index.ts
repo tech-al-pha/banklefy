@@ -1493,12 +1493,13 @@ const applyOcrPostParseAdjustments = (rows: RawTransaction[]): { rows: RawTransa
 };
 
 const FREE_MAX_PDF_PAGES_PER_FILE = 15; // Free-tier per-file PDF cap
-const GLOBAL_PDF_PAGE_CAP = 50;
+const GLOBAL_PDF_PAGE_CAP = 250;
 const CHUNK_THRESHOLD = 10;
-const CHUNK_SIZE = 5;
-const MAX_TEXT_PDF_BYTES = 50 * 1024 * 1024;
-const MAX_IMAGE_UPLOAD_BYTES = 20 * 1024 * 1024;
-const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '120');
+const CHUNK_SIZE = 25;
+const MAX_TEXT_PDF_BYTES = 100 * 1024 * 1024;
+const MAX_IMAGE_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '250');
+const OCR_CONCURRENCY_BATCH_SIZE = 8; // Process OCR pages in parallel batches of 8
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
 const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${20 * 1024 * 1024}`); // 20MB
 type DualOcrMode = 'off' | 'smart' | 'always';
@@ -1592,7 +1593,14 @@ const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 
 const toBase64FromBytes = (bytes: Uint8Array): string => {
   if (!bytes || bytes.length === 0) return '';
-  return btoa(String.fromCharCode(...new Uint8Array(bytes)));
+  // Chunked base64 encoding to avoid stack overflow for large files (50MB+)
+  const ENCODE_CHUNK = 32768;
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += ENCODE_CHUNK) {
+    const slice = bytes.subarray(offset, Math.min(offset + ENCODE_CHUNK, bytes.length));
+    binary += String.fromCharCode.apply(null, slice as unknown as number[]);
+  }
+  return btoa(binary);
 };
 
 const decodePdfSegment = (bytes: Uint8Array, maxBytes = 300_000): string => {
@@ -3990,16 +3998,17 @@ Deno.serve(async (req) => {
         }
       }
 
-      const ocrPageResults = await Promise.all(
-        selectedOcrPages.map(async (pageEntry, index) => {
+      // Process OCR pages in concurrency-limited batches to handle 100+ page PDFs
+      // within the 5-minute timeout while avoiding API rate limits.
+      const processOcrPage = async (pageEntry: { pageNumber: number; imageDataUrl: string }, index: number) => {
           const img = pageEntry.imageDataUrl;
           if (typeof img !== 'string') {
-            return { pageResult: null, error: 'Invalid OCR page image payload', strictUsed: false, dualUsed: false };
+            return { pageResult: null as OCRResult | null, error: 'Invalid OCR page image payload', strictUsed: false, dualUsed: false, providersFailed: false };
           }
 
           const match = img.match(/^data:([^;]+);base64,(.+)$/);
           if (!match) {
-            return { pageResult: null, error: 'Invalid OCR page image encoding', strictUsed: false, dualUsed: false };
+            return { pageResult: null as OCRResult | null, error: 'Invalid OCR page image encoding', strictUsed: false, dualUsed: false, providersFailed: false };
           }
 
           const pageMime = match[1];
@@ -4062,7 +4071,7 @@ Deno.serve(async (req) => {
                   mistralFailureReason || 'Mistral returned empty OCR result',
                 ];
                 return {
-                  pageResult: null,
+                  pageResult: null as OCRResult | null,
                   error: `OCR_PROVIDERS_FAILED: page ${pageEntry.pageNumber} (${failureParts.join(' | ')})`,
                   strictUsed,
                   dualUsed: true,
@@ -4089,15 +4098,29 @@ Deno.serve(async (req) => {
             return { pageResult, error: null, strictUsed, dualUsed, providersFailed };
           } catch (pageError) {
             return {
-              pageResult: null,
+              pageResult: null as OCRResult | null,
               error: pageError instanceof Error ? pageError.message : 'OCR page processing failed',
               strictUsed,
               dualUsed,
               providersFailed,
             };
           }
-        }),
-      );
+      };
+
+      // Batch OCR processing with concurrency limit to prevent API overload
+      type OcrPageResult = Awaited<ReturnType<typeof processOcrPage>>;
+      const ocrPageResults: OcrPageResult[] = [];
+      for (let batchStart = 0; batchStart < selectedOcrPages.length; batchStart += OCR_CONCURRENCY_BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + OCR_CONCURRENCY_BATCH_SIZE, selectedOcrPages.length);
+        const batchEntries = selectedOcrPages.slice(batchStart, batchEnd);
+        const batchResults = await Promise.all(
+          batchEntries.map((entry, batchIdx) => processOcrPage(entry, batchStart + batchIdx)),
+        );
+        ocrPageResults.push(...batchResults);
+        if (batchEnd < selectedOcrPages.length) {
+          console.log(`OCR batch ${Math.floor(batchStart / OCR_CONCURRENCY_BATCH_SIZE) + 1} complete (${batchEnd}/${selectedOcrPages.length} pages)`);
+        }
+      }
 
       for (const pageOutcome of ocrPageResults) {
         if (pageOutcome.strictUsed) strictRetryCount += 1;
