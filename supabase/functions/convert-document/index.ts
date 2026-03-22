@@ -3998,16 +3998,17 @@ Deno.serve(async (req) => {
         }
       }
 
-      const ocrPageResults = await Promise.all(
-        selectedOcrPages.map(async (pageEntry, index) => {
+      // Process OCR pages in concurrency-limited batches to handle 100+ page PDFs
+      // within the 5-minute timeout while avoiding API rate limits.
+      const processOcrPage = async (pageEntry: { pageNumber: number; imageDataUrl: string }, index: number) => {
           const img = pageEntry.imageDataUrl;
           if (typeof img !== 'string') {
-            return { pageResult: null, error: 'Invalid OCR page image payload', strictUsed: false, dualUsed: false };
+            return { pageResult: null as OCRResult | null, error: 'Invalid OCR page image payload', strictUsed: false, dualUsed: false, providersFailed: false };
           }
 
           const match = img.match(/^data:([^;]+);base64,(.+)$/);
           if (!match) {
-            return { pageResult: null, error: 'Invalid OCR page image encoding', strictUsed: false, dualUsed: false };
+            return { pageResult: null as OCRResult | null, error: 'Invalid OCR page image encoding', strictUsed: false, dualUsed: false, providersFailed: false };
           }
 
           const pageMime = match[1];
@@ -4070,7 +4071,7 @@ Deno.serve(async (req) => {
                   mistralFailureReason || 'Mistral returned empty OCR result',
                 ];
                 return {
-                  pageResult: null,
+                  pageResult: null as OCRResult | null,
                   error: `OCR_PROVIDERS_FAILED: page ${pageEntry.pageNumber} (${failureParts.join(' | ')})`,
                   strictUsed,
                   dualUsed: true,
@@ -4097,15 +4098,29 @@ Deno.serve(async (req) => {
             return { pageResult, error: null, strictUsed, dualUsed, providersFailed };
           } catch (pageError) {
             return {
-              pageResult: null,
+              pageResult: null as OCRResult | null,
               error: pageError instanceof Error ? pageError.message : 'OCR page processing failed',
               strictUsed,
               dualUsed,
               providersFailed,
             };
           }
-        }),
-      );
+      };
+
+      // Batch OCR processing with concurrency limit to prevent API overload
+      type OcrPageResult = Awaited<ReturnType<typeof processOcrPage>>;
+      const ocrPageResults: OcrPageResult[] = [];
+      for (let batchStart = 0; batchStart < selectedOcrPages.length; batchStart += OCR_CONCURRENCY_BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + OCR_CONCURRENCY_BATCH_SIZE, selectedOcrPages.length);
+        const batchEntries = selectedOcrPages.slice(batchStart, batchEnd);
+        const batchResults = await Promise.all(
+          batchEntries.map((entry, batchIdx) => processOcrPage(entry, batchStart + batchIdx)),
+        );
+        ocrPageResults.push(...batchResults);
+        if (batchEnd < selectedOcrPages.length) {
+          console.log(`OCR batch ${Math.floor(batchStart / OCR_CONCURRENCY_BATCH_SIZE) + 1} complete (${batchEnd}/${selectedOcrPages.length} pages)`);
+        }
+      }
 
       for (const pageOutcome of ocrPageResults) {
         if (pageOutcome.strictUsed) strictRetryCount += 1;
