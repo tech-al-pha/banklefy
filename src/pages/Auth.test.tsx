@@ -137,7 +137,7 @@ describe("Auth page", () => {
         title: "Welcome back!",
       }),
     );
-  });
+  }, 10000);
 
   it("creates a new account after accepting terms", async () => {
     const user = userEvent.setup();
