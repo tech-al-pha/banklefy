@@ -4835,6 +4835,7 @@ Deno.serve(async (req) => {
     let transactions = sanitizeTransactions(extractedTransactions, {
       openingBalance: provisionalBankInfo?.openingBalance,
       closingBalance: provisionalBankInfo?.closingBalance,
+      preserveAmounts: selectableTextDocument || processedVia === 'deterministic',
     });
     const preDedupCount = transactions.length;
     transactions = dedupeAndSortTransactions(transactions);

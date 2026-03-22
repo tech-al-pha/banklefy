@@ -1673,6 +1673,7 @@ const processStatement = async (params: {
   const transactions = sanitizeTransactions(extractedTransactions, {
     openingBalance: provisionalBankInfo?.openingBalance,
     closingBalance: provisionalBankInfo?.closingBalance,
+    preserveAmounts: selectableTextDocument || canUseDeterministicClientPdf,
   });
 
   const reconciliation = reconcileBalances(transactions);

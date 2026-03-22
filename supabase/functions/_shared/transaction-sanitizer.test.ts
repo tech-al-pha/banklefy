@@ -46,4 +46,34 @@ describe("transaction-sanitizer debit/credit repair", () => {
     expect(sanitized[2].credit).toBe(200);
     expect(reconcileBalances(sanitized).totalMismatches).toBe(0);
   });
+
+  it("keeps observed amounts intact when preserveAmounts is enabled for deterministic text PDFs", () => {
+    const rows = [
+      {
+        date: "2026-03-18",
+        description: "Cash withdrawal",
+        category: "Other",
+        debit: 47000,
+        credit: 0,
+        balance: 15.67,
+      },
+      {
+        date: "2026-03-19",
+        description: "Large deposit",
+        category: "Other",
+        debit: 0,
+        credit: 696967,
+        balance: 696967.01,
+      },
+    ];
+
+    const sanitized = sanitizeTransactions(rows, { preserveAmounts: true });
+
+    expect(sanitized).toHaveLength(2);
+    expect(sanitized[0].debit).toBe(47000);
+    expect(sanitized[0].credit).toBe(0);
+    expect(sanitized[1].debit).toBe(0);
+    expect(sanitized[1].credit).toBe(696967);
+    expect(sanitized[1].balance).toBe(696967.01);
+  });
 });

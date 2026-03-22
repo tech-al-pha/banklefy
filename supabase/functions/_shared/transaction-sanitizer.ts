@@ -102,6 +102,7 @@ type BalanceDirection = 'forward' | 'reverse';
 type SanitizerOptions = {
   openingBalance?: number;
   closingBalance?: number;
+  preserveAmounts?: boolean;
 };
 
 const hasFiniteBalance = (transaction: Transaction): boolean =>
@@ -497,6 +498,27 @@ const chooseBetterTransaction = (first: Transaction, second: Transaction): Trans
   return first;
 };
 
+const dedupeTransactions = (transactions: Transaction[]): Transaction[] => {
+  const deduped: Transaction[] = [];
+  const indexByKey = new Map<string, number>();
+
+  for (const transaction of transactions) {
+    const key = transactionKey(transaction);
+    const existingIndex = indexByKey.get(key);
+
+    if (existingIndex === undefined) {
+      indexByKey.set(key, deduped.length);
+      deduped.push(transaction);
+      continue;
+    }
+
+    const existing = deduped[existingIndex];
+    deduped[existingIndex] = chooseBetterTransaction(existing, transaction);
+  }
+
+  return deduped;
+};
+
 const maybeApplyBalanceOffset = (transactions: Transaction[], options?: SanitizerOptions): Transaction[] => {
   if (transactions.length === 0) return transactions;
 
@@ -563,6 +585,12 @@ export const sanitizeTransactions = (transactions: Transaction[], options?: Sani
     return true;
   });
   const statementOrdered = sortTransactionsForReconciliation(filtered);
+  const normalizedAmounts = statementOrdered.map((transaction) => normalizeSignedAmounts(transaction));
+
+  if (options?.preserveAmounts) {
+    return dedupeTransactions(normalizedAmounts);
+  }
+
   const directionCorrected = correctAmountDirection(statementOrdered);
   const offsetAligned = maybeApplyBalanceOffset(directionCorrected, options);
   const direction = inferBalanceDirection(offsetAligned);
@@ -574,24 +602,5 @@ export const sanitizeTransactions = (transactions: Transaction[], options?: Sani
   }
 
   const amountHarmonized = harmonizeAmountsWithRunningBalance(offsetAligned, direction);
-
-  // Remove OCR/AI duplicate rows that represent the same movement and balance.
-  const deduped: Transaction[] = [];
-  const indexByKey = new Map<string, number>();
-
-  for (const transaction of amountHarmonized) {
-    const key = transactionKey(transaction);
-    const existingIndex = indexByKey.get(key);
-
-    if (existingIndex === undefined) {
-      indexByKey.set(key, deduped.length);
-      deduped.push(transaction);
-      continue;
-    }
-
-    const existing = deduped[existingIndex];
-    deduped[existingIndex] = chooseBetterTransaction(existing, transaction);
-  }
-
-  return deduped;
+  return dedupeTransactions(amountHarmonized);
 };
