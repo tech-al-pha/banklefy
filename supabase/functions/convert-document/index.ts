@@ -1622,13 +1622,17 @@ const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 const toBase64FromBytes = (bytes: Uint8Array): string => {
   if (!bytes || bytes.length === 0) return '';
   // Chunked base64 encoding to avoid stack overflow for large files (50MB+)
-  const ENCODE_CHUNK = 32768;
-  let binary = '';
+  const ENCODE_CHUNK = 8192;
+  const parts: string[] = [];
   for (let offset = 0; offset < bytes.length; offset += ENCODE_CHUNK) {
-    const slice = bytes.subarray(offset, Math.min(offset + ENCODE_CHUNK, bytes.length));
-    binary += String.fromCharCode.apply(null, slice as unknown as number[]);
+    const end = Math.min(offset + ENCODE_CHUNK, bytes.length);
+    let chunk = '';
+    for (let i = offset; i < end; i++) {
+      chunk += String.fromCharCode(bytes[i]);
+    }
+    parts.push(chunk);
   }
-  return btoa(binary);
+  return btoa(parts.join(''));
 };
 
 const decodePdfSegment = (bytes: Uint8Array, maxBytes = 300_000): string => {
@@ -3487,8 +3491,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           code: 'PAGE_LIMIT_EXCEEDED',
-          message: 'Maximum 50 pages allowed per document.',
-          error: 'Maximum 50 pages allowed per document.',
+          message: `Maximum ${GLOBAL_PDF_PAGE_CAP} pages allowed per document.`,
+          error: `Maximum ${GLOBAL_PDF_PAGE_CAP} pages allowed per document.`,
         }),
         { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -3657,9 +3661,9 @@ Deno.serve(async (req) => {
     if (user) {
       const insertPayload: Record<string, unknown> = {
         user_id: user.id,
-        file_name: fileName,
+        original_filename: fileName,
+        file_path: storageFilePath || `inline/${fileName}`,
         status: 'processing',
-        processing_timings: storageFilePath ? { storage: { sourcePath: storageFilePath } } : null,
       };
 
       const { data: convData, error: convError } = await supabase
