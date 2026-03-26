@@ -12,7 +12,7 @@ import {
   type ExportMetadata,
   type XlsxBuilderContext,
 } from './export-builders.ts';
-import { parseStatementDateToIso } from '../../../src/lib/date-parsing.ts';
+import { parseStatementDateToIso } from './date-parsing.ts';
 
 const CRITICAL_FRAUD_FLAGS = new Set([
   'tampered_document',

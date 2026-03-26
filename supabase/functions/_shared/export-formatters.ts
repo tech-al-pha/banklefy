@@ -1,7 +1,7 @@
 import type { Transaction } from './financial-engine.ts';
 import type { BankMetadata } from './ocr-processor.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from './money.ts';
-import { parseStatementDateToIso } from '../../../src/lib/date-parsing.ts';
+import { parseStatementDateToIso } from './date-parsing.ts';
 
 type ExportSummary = {
   totalCredits?: number;
