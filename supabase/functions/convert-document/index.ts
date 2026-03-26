@@ -23,7 +23,7 @@ import {
   type RawTransaction,
   type BankMetadata,
 } from '../_shared/ocr-processor.ts';
-import { parseStatementDateToTimestamp } from '../../../src/lib/date-parsing.ts';
+import { parseStatementDateToTimestamp } from '../_shared/date-parsing.ts';
 import {
   CATEGORY_LIST,
   fallbackCategorize,

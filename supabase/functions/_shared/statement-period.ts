@@ -1,5 +1,5 @@
 import type { Transaction } from './financial-engine.ts';
-import { parseStatementDateToTimestamp } from '../../../src/lib/date-parsing.ts';
+import { parseStatementDateToTimestamp } from './date-parsing.ts';
 
 const MONTH_LOOKUP: Record<string, number> = {
   jan: 1,
