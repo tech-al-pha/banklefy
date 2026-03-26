@@ -1225,7 +1225,9 @@ const processStatement = async (params: {
     }
 
     const clientPdfParseAssessment = assessClientPdfParsedTransactions(clientParsedTransactions, pageCount);
-    const selectableTextDocument = structuralScan.hasSelectableText === true;
+    const deterministicTextDocument = isPdf && clientParsedTransactions.length > 0;
+    const selectableTextDocument =
+      isPdf && (structuralScan.hasSelectableText === true || deterministicTextDocument);
     const mustUseDeterministicClientPdf =
       isPdf && !hasPdfPageImages && clientParsedTransactions.length > 0;
     const forceOcrForDenseStatement = selectableTextDocument

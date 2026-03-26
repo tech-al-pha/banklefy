@@ -3799,7 +3799,9 @@ Deno.serve(async (req) => {
       clientParsedBankMetadata?.statementPeriod,
       pageCount,
     );
-    const selectableTextDocument = isPdf && structuralScan.hasSelectableText === true;
+    const deterministicTextDocument = isPdf && clientParsedTransactions.length > 0;
+    const selectableTextDocument =
+      isPdf && (structuralScan.hasSelectableText === true || deterministicTextDocument);
     const forceOcrForIncompleteTextExtraction =
       isPdf &&
       hasPdfPageImages &&
