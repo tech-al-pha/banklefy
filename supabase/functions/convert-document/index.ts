@@ -755,45 +755,17 @@ const loadPdfDocumentFromBytes = async (
   bytes: Uint8Array,
   password?: string,
 ): Promise<PdfDocumentProxy> => {
-  const isWorkerSrcFailure = (error: unknown): boolean => {
-    const message = error instanceof Error ? error.message : String(error ?? '');
-    return /globalworkeroptions\.workersrc/i.test(message);
-  };
-
-  const loadViaPdfjsDist = async (): Promise<PdfDocumentProxy> => {
-    const pdfjsLib = (await import('https://esm.sh/pdfjs-dist@4.0.379/legacy/build/pdf.mjs')) as PdfJsModule;
-    if (pdfjsLib.GlobalWorkerOptions) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        pdfjsLib.GlobalWorkerOptions.workerSrc ||
-        'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
-    }
-    const loadingTask = pdfjsLib.getDocument({
-      data: bytes,
-      password: password || undefined,
-      useWorkerFetch: false,
-      disableWorker: true,
-      worker: null,
-      isEvalSupported: false,
-      useSystemFonts: true,
-    });
-    return (await loadingTask.promise) as PdfDocumentProxy;
-  };
-
-  try {
-    return await loadViaPdfjsDist();
-  } catch (error) {
-    if (!isWorkerSrcFailure(error)) throw error;
-    console.warn('pdfjs-dist workerSrc resolution failed; retrying with pdfjs-serverless fallback');
-    const fallbackModule = await import('https://esm.sh/pdfjs-serverless');
-    const getDocument = (fallbackModule as { getDocument?: (options: Record<string, unknown>) => { promise: Promise<unknown> } }).getDocument;
-    if (!getDocument) throw error;
-    const fallbackLoadingTask = getDocument({
-      data: bytes,
-      password: password || undefined,
-      useSystemFonts: true,
-    });
-    return (await fallbackLoadingTask.promise) as PdfDocumentProxy;
+  const fallbackModule = await import('https://esm.sh/pdfjs-serverless');
+  const getDocument = (fallbackModule as { getDocument?: (options: Record<string, unknown>) => { promise: Promise<unknown> } }).getDocument;
+  if (!getDocument) {
+    throw new Error('pdfjs-serverless getDocument is unavailable');
   }
+  const loadingTask = getDocument({
+    data: bytes,
+    password: password || undefined,
+    useSystemFonts: true,
+  });
+  return (await loadingTask.promise) as PdfDocumentProxy;
 };
 
 const detectPdfTotalPagesFromBytes = async (
