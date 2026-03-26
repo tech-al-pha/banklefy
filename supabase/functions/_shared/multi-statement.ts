@@ -7,7 +7,7 @@ import {
   reconcileBalances,
 } from '../_shared/financial-engine.ts';
 import { fromMinorUnits, sumMinorUnits } from '../_shared/money.ts';
-import { parseStatementDateToTimestamp } from '../../../src/lib/date-parsing.ts';
+import { parseStatementDateToTimestamp } from '../_shared/date-parsing.ts';
 import type { BankMetadata } from '../_shared/ocr-processor.ts';
 import type { BankInfo } from '../_shared/excel-generator.ts';
 
