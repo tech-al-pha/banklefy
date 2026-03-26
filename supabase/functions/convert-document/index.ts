@@ -1527,7 +1527,7 @@ const CHUNK_SIZE = 25;
 const MAX_TEXT_PDF_BYTES = 100 * 1024 * 1024;
 const MAX_IMAGE_UPLOAD_BYTES = 50 * 1024 * 1024;
 const MAX_PDF_PAGE_IMAGES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES') ?? '250');
-const OCR_CONCURRENCY_BATCH_SIZE = 8; // Process OCR pages in parallel batches of 8
+const OCR_CONCURRENCY_BATCH_SIZE = 10; // Process OCR pages in parallel batches of 10 for speed
 const MAX_PDF_PAGE_IMAGE_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGE_BYTES') ?? `${3 * 1024 * 1024}`); // 3MB
 const MAX_PDF_PAGE_IMAGES_TOTAL_BYTES = Number(Deno.env.get('MAX_PDF_PAGE_IMAGES_TOTAL_BYTES') ?? `${20 * 1024 * 1024}`); // 20MB
 type DualOcrMode = 'off' | 'smart' | 'always';
@@ -1622,13 +1622,17 @@ const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
 const toBase64FromBytes = (bytes: Uint8Array): string => {
   if (!bytes || bytes.length === 0) return '';
   // Chunked base64 encoding to avoid stack overflow for large files (50MB+)
-  const ENCODE_CHUNK = 32768;
-  let binary = '';
+  const ENCODE_CHUNK = 8192;
+  const parts: string[] = [];
   for (let offset = 0; offset < bytes.length; offset += ENCODE_CHUNK) {
-    const slice = bytes.subarray(offset, Math.min(offset + ENCODE_CHUNK, bytes.length));
-    binary += String.fromCharCode.apply(null, slice as unknown as number[]);
+    const end = Math.min(offset + ENCODE_CHUNK, bytes.length);
+    let chunk = '';
+    for (let i = offset; i < end; i++) {
+      chunk += String.fromCharCode(bytes[i]);
+    }
+    parts.push(chunk);
   }
-  return btoa(binary);
+  return btoa(parts.join(''));
 };
 
 const decodePdfSegment = (bytes: Uint8Array, maxBytes = 300_000): string => {
@@ -3487,8 +3491,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           code: 'PAGE_LIMIT_EXCEEDED',
-          message: 'Maximum 50 pages allowed per document.',
-          error: 'Maximum 50 pages allowed per document.',
+          message: `Maximum ${GLOBAL_PDF_PAGE_CAP} pages allowed per document.`,
+          error: `Maximum ${GLOBAL_PDF_PAGE_CAP} pages allowed per document.`,
         }),
         { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -3657,9 +3661,9 @@ Deno.serve(async (req) => {
     if (user) {
       const insertPayload: Record<string, unknown> = {
         user_id: user.id,
-        file_name: fileName,
+        original_filename: fileName,
+        file_path: storageFilePath || `inline/${fileName}`,
         status: 'processing',
-        processing_timings: storageFilePath ? { storage: { sourcePath: storageFilePath } } : null,
       };
 
       const { data: convData, error: convError } = await supabase
