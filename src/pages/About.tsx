@@ -1,241 +1,128 @@
+import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Mail, MapPin, ArrowLeft, ShieldCheck, Zap, Award, MessageCircle, X, Linkedin } from "lucide-react";
 import Logo from "@/components/Logo";
-import { useLanguage } from "@/contexts/LanguageContext";
 import SupportContactDialog from "@/components/SupportContactDialog";
+import { aboutContacts, aboutHighlights, aboutPrinciples } from "@/content/footerPages";
 
 const AboutPage = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  const problemBullets = [
-    t('aboutPage.problemBullets.one'),
-    t('aboutPage.problemBullets.two'),
-    t('aboutPage.problemBullets.three'),
-    t('aboutPage.problemBullets.four'),
-  ];
-  const solutionBullets = [
-    t('aboutPage.solutionBullets.one'),
-    t('aboutPage.solutionBullets.two'),
-    t('aboutPage.solutionBullets.three'),
-    t('aboutPage.solutionBullets.four'),
-    t('aboutPage.solutionBullets.five'),
-  ];
-  const audienceBullets = [
-    t('aboutPage.audienceBullets.one'),
-    t('aboutPage.audienceBullets.two'),
-    t('aboutPage.audienceBullets.three'),
-    t('aboutPage.audienceBullets.four'),
-  ];
-  const principlesBullets = [
-    t('aboutPage.principlesBullets.one'),
-    t('aboutPage.principlesBullets.two'),
-    t('aboutPage.principlesBullets.three'),
-    t('aboutPage.principlesBullets.four'),
-  ];
-  const roadmapBullets = [
-    t('aboutPage.roadmapBullets.one'),
-    t('aboutPage.roadmapBullets.two'),
-    t('aboutPage.roadmapBullets.three'),
-    t('aboutPage.roadmapBullets.four'),
-  ];
 
   return (
-    <div className="min-h-screen bg-background text-white font-cormorant selection:bg-primary/30">
-      {/* Header Area */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
-        <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen bg-background text-foreground">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
+        <div className="container mx-auto px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/')} 
-            className="back-pill w-full sm:w-auto"
-          >
-            <ArrowLeft size={18} /> {t('common.backToHome')}
+          <Button variant="ghost" onClick={() => navigate("/")} className="back-pill w-full sm:w-auto">
+            <ArrowLeft size={18} /> Back to Home
           </Button>
         </div>
       </nav>
 
-      <main className="container mx-auto px-4 sm:px-6 pt-24 pb-12 sm:pt-28 sm:pb-16 max-w-5xl">
-        {/* About Section - Upgraded with Harvard/Cybersecurity details */}
-        <section className="space-y-8 mb-20 animate-in fade-in slide-in-from-bottom-5 duration-700">
-          <div className="space-y-2">
-            <h1 className="text-5xl md:text-7xl font-normal italic tracking-tighter text-primary uppercase">
-              {t('aboutPage.visionTitle')}
-            </h1>
-            <p className="text-xl md:text-2xl font-normal text-white/80 italic tracking-tight">
-              {t('aboutPage.visionSubtitle')}
-            </p>
-          </div>
-          
-          <div className="space-y-8 text-lg text-muted-foreground leading-relaxed italic">
-            <p>{t('aboutPage.visionP1')}</p>
-
-            <div className="p-8 bg-gradient-to-r from-primary/10 to-transparent border-l-4 border-primary rounded-r-[2rem] space-y-4">
-              <p className="text-white font-medium text-2xl not-italic">
-                {t('aboutPage.brainchildPrefix')}{" "}
-                <span className="text-primary underline decoration-2 underline-offset-4">Faizan Rizvi</span>
-              </p>
-              <p className="text-muted-foreground text-base md:text-lg leading-relaxed">
-                {t('aboutPage.brainchildP1')}
-              </p>
-              <p className="text-muted-foreground text-base md:text-lg leading-relaxed">
-                {t('aboutPage.brainchildP2')}
-              </p>
-            </div>
-          </div>
+      <main className="container mx-auto max-w-5xl px-6 pt-32 pb-16">
+        <section className="space-y-4 text-center">
+          <p className="inline-flex items-center rounded-full border border-primary/30 bg-card/60 px-4 py-2 text-sm text-foreground/80">
+            About Banklefy
+          </p>
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white">About Banklefy</h1>
+          <p className="mx-auto max-w-3xl text-lg text-muted-foreground">
+            Banklefy converts bank statements into structured exports for review, reconciliation, and
+            downstream accounting work. Text-based PDFs are parsed directly. Scanned or image-based
+            pages use OCR only where needed.
+          </p>
+          <p className="text-xs text-muted-foreground">Last updated: March 27, 2026</p>
         </section>
 
-        <section className="space-y-10 mb-20">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-2">
-              <ShieldCheck className="text-primary" size={32} />
-              <h3 className="font-normal text-white text-sm tracking-widest uppercase">{t('aboutPage.valueProps.cyberSafe.title')}</h3>
-              <p className="text-xs text-muted-foreground italic">{t('aboutPage.valueProps.cyberSafe.desc')}</p>
-            </div>
-            <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-2">
-              <Zap className="text-primary" size={32} />
-              <h3 className="font-normal text-white text-sm tracking-widest uppercase">{t('aboutPage.valueProps.instantFlux.title')}</h3>
-              <p className="text-xs text-muted-foreground italic">{t('aboutPage.valueProps.instantFlux.desc')}</p>
-            </div>
-            <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-2">
-              <Award className="text-primary" size={32} />
-              <h3 className="font-normal text-white text-sm tracking-widest uppercase">{t('aboutPage.valueProps.accuracy.title')}</h3>
-              <p className="text-xs text-muted-foreground italic">{t('aboutPage.valueProps.accuracy.desc')}</p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h2 className="text-2xl font-normal tracking-widest text-white">
-              {t('aboutPage.problemTitle')}
-            </h2>
-            <p className="text-sm text-muted-foreground italic">{t('aboutPage.problemIntro')}</p>
-            <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-2">
-              {problemBullets.map((bullet) => (
-                <li key={bullet}>{bullet}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-3">
-            <h2 className="text-2xl font-normal tracking-widest text-white">
-              {t('aboutPage.solutionTitle')}
-            </h2>
-            <p className="text-sm text-muted-foreground italic">{t('aboutPage.solutionIntro')}</p>
-            <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-2">
-              {solutionBullets.map((bullet) => (
-                <li key={bullet}>{bullet}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-3">
-            <h2 className="text-2xl font-normal tracking-widest text-white">
-              {t('aboutPage.audienceTitle')}
-            </h2>
-            <p className="text-sm text-muted-foreground italic">{t('aboutPage.audienceIntro')}</p>
-            <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-2">
-              {audienceBullets.map((bullet) => (
-                <li key={bullet}>{bullet}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-3">
-            <h2 className="text-2xl font-normal tracking-widest text-white">
-              {t('aboutPage.principlesTitle')}
-            </h2>
-            <p className="text-sm text-muted-foreground italic">{t('aboutPage.principlesIntro')}</p>
-            <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-2">
-              {principlesBullets.map((bullet) => (
-                <li key={bullet}>{bullet}</li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        <section className="space-y-4 mb-20">
-          <h2 className="text-2xl font-normal tracking-widest border-b border-white/10 pb-4">
-            {t('aboutPage.roadmapTitle')}
-          </h2>
-          <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-2">
-            {roadmapBullets.map((bullet) => (
-              <li key={bullet}>{bullet}</li>
-            ))}
-          </ul>
-        </section>
-
-        {/* Contact Grid - Clean Footer Info */}
-        <section className="space-y-10">
-          <h2 className="text-2xl font-normal tracking-widest border-b border-white/10 pb-4">
-            {t('aboutPage.connectTitle')}
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <a href="https://t.me/n3x4z" target="_blank" rel="noopener noreferrer" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
-              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><MessageCircle size={24} /></div>
-              <div>
-                <p className="text-xs font-normal text-muted-foreground tracking-widest">Telegram</p>
-                <p className="text-xl font-normal">@n3x4z</p>
-              </div>
-            </a>
-
-            <a
-              href="https://www.linkedin.com/in/faizan-rizvi-8589a93a8"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon"
-            >
-              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform">
-                <Linkedin size={24} />
-              </div>
-              <div>
-                <p className="text-xs font-normal text-muted-foreground tracking-widest">LinkedIn</p>
-                <p className="text-xl font-normal">Faizan Rizvi</p>
-              </div>
-            </a>
-
-            <a href="https://x.com/inspirexali" target="_blank" rel="noopener noreferrer" className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon">
-              <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform"><X size={24} /></div>
-              <div>
-                <p className="text-xs font-normal text-muted-foreground tracking-widest">X (Twitter)</p>
-                <p className="text-xl font-normal">@inspirexali</p>
-              </div>
-            </a>
-
-            <SupportContactDialog
-              source="about_page"
-              trigger={
-                <div className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 transition-all hover:border-primary hover:shadow-neon cursor-pointer">
-                  <div className="bg-primary/10 p-4 rounded-full text-primary group-hover:scale-110 transition-transform">
-                    <Mail size={24} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-normal text-muted-foreground tracking-widest">{t('aboutPage.contact.mail')}</p>
-                    <p className="text-xl font-normal">Contact Support</p>
-                  </div>
+        <section className="mt-10 grid gap-6 md:grid-cols-2">
+          {aboutHighlights.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article key={item.title} className="rounded-2xl border border-primary/20 bg-[#141414] p-6">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
                 </div>
-              }
-            />
-
-            <a
-              href="https://www.google.com/maps/search/?api=1&query=Prem%20Nagar%2C%20Kota%2C%20Rajasthan%2C%20India"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group p-8 glass-card border border-primary/20 rounded-[2rem] flex items-center gap-6 md:col-span-2 transition-all hover:border-primary hover:shadow-neon"
-            >
-              <div className="bg-primary/10 p-4 rounded-full text-primary"><MapPin size={24} /></div>
-              <div>
-                <p className="text-xs font-normal text-muted-foreground tracking-widest">{t('aboutPage.contact.hq')}</p>
-                <p className="text-xl font-normal italic text-white/80">{t('aboutPage.contact.hqValue')}</p>
-              </div>
-            </a>
-          </div>
-
+                <h2 className="mt-4 text-xl font-semibold text-white">{item.title}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.content}</p>
+              </article>
+            );
+          })}
         </section>
 
-        <footer className="mt-20 pt-8 border-t border-white/5 text-center text-xs text-muted-foreground tracking-[0.3em]">
-          {t('aboutPage.footer')}
+        <section className="mt-10 grid gap-6 md:grid-cols-2">
+          {aboutPrinciples.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article key={item.title} className="rounded-2xl border border-primary/20 bg-[#141414] p-6">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h2 className="mt-4 text-xl font-semibold text-white">{item.title}</h2>
+                <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+                  {item.items.map((bullet) => (
+                    <li key={bullet}>{bullet}</li>
+                  ))}
+                </ul>
+              </article>
+            );
+          })}
+        </section>
+
+        <section className="mt-10 grid gap-6 md:grid-cols-3">
+          {aboutContacts.map((item) => {
+            const Icon = item.icon;
+            const card = (
+              <article className="rounded-2xl border border-primary/20 bg-[#141414] p-6 h-full">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h2 className="mt-4 text-xl font-semibold text-white">{item.title}</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.content}</p>
+              </article>
+            );
+
+            if (item.title === "Support") {
+              return (
+                <div key={item.title} className="space-y-4">
+                  {card}
+                  <SupportContactDialog
+                    source="about_page"
+                    trigger={
+                      <Button className="w-full bg-primary text-primary-foreground shadow-neon">
+                        {item.actionLabel ?? "Contact Support"}
+                      </Button>
+                    }
+                  />
+                </div>
+              );
+            }
+
+            if (item.href) {
+              return (
+                <div key={item.title} className="space-y-4">
+                  {card}
+                  <Button asChild className="w-full bg-primary text-primary-foreground shadow-neon">
+                    <a
+                      href={item.href}
+                      target={item.external ? "_blank" : undefined}
+                      rel={item.external ? "noopener noreferrer" : undefined}
+                    >
+                      {item.actionLabel ?? "Open"}
+                    </a>
+                  </Button>
+                </div>
+              );
+            }
+
+            return (
+              <div key={item.title} className="space-y-4">
+                {card}
+              </div>
+            );
+          })}
+        </section>
+
+        <footer className="mt-12 border-t border-primary/10 pt-6 text-center text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Banklefy is a processing tool. Review every export before using it in accounting, lending, or tax work.
         </footer>
       </main>
     </div>

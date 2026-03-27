@@ -7,83 +7,74 @@ const posts = [
   {
     id: "multi-language",
     slug: "/blog/multi-language",
-    title: "Multi-Language Support: Use Banklefy in Your Preferred Language",
+    title: "Multi-Language Support",
     date: "Nov 15, 2025",
-    excerpt:
-      "Banklefy now supports Hindi, Marathi, Tamil, Telugu, and more — making bank statement conversion accessible across India.",
-    cta: "Read more",
+    summary:
+      "Banklefy supports Hindi, Marathi, Tamil, Telugu, and more. The goal is simple: keep the statement conversion flow usable for more users across India.",
   },
   {
     id: "password-pdf",
     slug: "/blog/password-pdf",
-    title: "Convert Password-Protected Bank Statement PDFs with Ease",
+    title: "Password-Protected PDFs",
     date: "Dec 5, 2025",
-    excerpt:
-      "Upload locked PDFs directly, enter the password, and convert in one step — no manual unlocking needed.",
-    cta: "Read more",
+    summary:
+      "Locked PDFs can be uploaded directly. Enter the password when prompted and the conversion continues from the same file.",
   },
   {
     id: "multi-format-export",
     slug: "/blog/multi-format-export",
-    title: "Multi-Format Export: Excel, CSV, JSON, XML & MT940",
+    title: "Multi-Format Export",
     date: "Jan 20, 2026",
-    excerpt:
-      "Export bank statements to five formats from a single upload — Excel, CSV, JSON, XML, and MT940 for ERP and treasury systems.",
-    cta: "Read more",
+    summary:
+      "Exports are available in Excel, CSV, JSON, XML, and MT940. That keeps the output useful for different accounting and treasury workflows.",
   },
   {
     id: "bulk-conversion",
     slug: "/blog/bulk-conversion",
-    title: "Bulk Bank Statement Conversion: Process Multiple Files at Once",
+    title: "Bulk Conversion",
     date: "Jan 28, 2026",
-    excerpt:
-      "Upload and convert multiple bank statements in one session. Text PDFs parse instantly, scanned files use selective AI OCR.",
-    cta: "Read more",
+    summary:
+      "Multiple statements can be processed in one session. Text PDFs use the deterministic path first; scanned files use OCR only where needed.",
   },
   {
     id: "privacy",
     slug: "/blog/privacy",
-    title: "Privacy by Default: Secure File Handling and Deletion Control",
+    title: "Privacy Handling",
     date: "Feb 7, 2026",
-    excerpt:
-      "A short overview of how Banklefy handles temporary files, saved conversions, and sensitive financial data.",
-    cta: "Read more",
+    summary:
+      "Temporary uploads, saved conversions, browser storage, and account history are handled separately so the data flow stays easier to understand.",
   },
   {
     id: "accuracy",
     slug: "/blog/accuracy",
-    title: "How We Improve OCR Accuracy on Low-Quality Scans",
+    title: "OCR Accuracy",
     date: "Feb 10, 2026",
-    excerpt:
-      "Learn practical tips for clearer results, plus the AI checks we run to reduce errors in transaction tables.",
-    cta: "Read more",
+    summary:
+      "Low-quality scans need cleaner input. The OCR path also checks balances and column alignment to reduce row shifts and missed values.",
   },
   {
     id: "launch",
     slug: "/blog/launch",
-    title: "Introducing Banklefy: Bank Statement to Excel in Minutes",
+    title: "Product Overview",
     date: "Feb 12, 2026",
-    excerpt:
-      "Banklefy converts bank statements into clean spreadsheets with AI OCR, built for speed, accuracy, and secure processing.",
-    cta: "Read more",
+    summary:
+      "Banklefy turns statement PDFs into structured exports for review, reconciliation, and accounting work.",
   },
   {
     id: "underwriting",
     slug: "/blog/underwriting",
-    title: "AI-Powered Underwriting & Risk Analysis from Bank Statements",
+    title: "Underwriting and Risk Analysis",
     date: "Feb 20, 2026",
-    excerpt:
-      "Get ADB, FOIR score, net cashflow, and balance dip analysis automatically from any converted bank statement.",
-    cta: "Read more",
+    summary:
+      "The app can surface ADB, FOIR, cashflow, and balance-dip signals from converted statements where the plan supports it.",
   },
   {
     id: "fraud-detection",
     slug: "/blog/fraud-detection",
-    title: "Detecting Tampered Bank Statements with AI-Driven Fraud Alerts",
+    title: "Fraud Checks",
     date: "Mar 1, 2026",
-    excerpt:
-      "Automated checks for balance continuity, duplicate entries, and formatting inconsistencies flag tampered statements early.",
-    cta: "Read more",
+    summary:
+      "Balance continuity, duplicate entries, and formatting inconsistencies are checked to flag suspicious statements early.",
   },
 ];
 
@@ -95,17 +86,13 @@ const Blog = () => {
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
-            className="back-pill w-full sm:w-auto"
-          >
+          <Button variant="ghost" onClick={() => navigate("/")} className="back-pill w-full sm:w-auto">
             <ArrowLeft size={18} /> Back to Home
           </Button>
         </div>
       </nav>
 
-      <main className="container mx-auto px-4 sm:px-6 pt-24 pb-16 sm:pt-28 sm:pb-20 max-w-5xl">
+      <main className="container mx-auto max-w-4xl px-4 sm:px-6 pt-24 pb-16 sm:pt-28 sm:pb-20">
         <section className="text-center mb-12">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-xs uppercase tracking-[0.3em] text-primary">
             <PenSquare className="h-4 w-4" />
@@ -115,36 +102,21 @@ const Blog = () => {
             Banklefy Blog
           </h1>
           <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
-            Updates, tutorials, and product announcements from the Banklefy team.
+            Short notes about supported formats, conversion behavior, exports, and product updates.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3 justify-center">
-            <Button className="bg-primary text-primary-foreground shadow-neon" onClick={() => navigate("/features")}>
-              Explore Features
-            </Button>
-            <Button variant="outline" className="border-primary/40 text-foreground" onClick={() => navigate("/pricing")}>
-              View Pricing
-            </Button>
-          </div>
         </section>
 
-        <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <section className="space-y-8">
           {posts.map((post) => (
-            <article
-              key={post.id}
-              className="glass-card border border-primary/20 rounded-2xl p-6 flex flex-col gap-4"
-            >
-              <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-                {post.date}
+            <article key={post.id} id={post.id} className="border-b border-primary/10 pb-8 last:border-b-0">
+              <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">{post.date}</div>
+              <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-white">{post.title}</h2>
+              <p className="mt-4 text-sm sm:text-base leading-relaxed text-muted-foreground">{post.summary}</p>
+              <div className="mt-5">
+                <Button variant="outline" className="border-primary/40 text-foreground" onClick={() => navigate(post.slug)}>
+                  Read post
+                </Button>
               </div>
-              <h2 className="text-xl font-bold text-white">{post.title}</h2>
-              <p className="text-sm text-muted-foreground">{post.excerpt}</p>
-              <Button
-                variant="outline"
-                className="border-primary/40 text-foreground w-fit mt-auto"
-                onClick={() => navigate(post.slug)}
-              >
-                {post.cta}
-              </Button>
             </article>
           ))}
         </section>

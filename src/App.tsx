@@ -25,13 +25,10 @@ const Settings = lazyWithRetry(() => import("./pages/Settings"));
 const PricingPage = lazyWithRetry(() => import("./pages/PricingPage"));
 const SampleReport = lazyWithRetry(() => import("./pages/SampleReport"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
-const Help = lazyWithRetry(() => import("./pages/Help"));
 const Blog = lazyWithRetry(() => import("./pages/Blog"));
 const HowItWorksPage = lazyWithRetry(() => import("./pages/HowItWorksPage"));
 const SecurityPage = lazyWithRetry(() => import("./pages/Security"));
 const ContactPage = lazyWithRetry(() => import("./pages/Contact"));
-const CookiePolicyPage = lazyWithRetry(() => import("./pages/CookiePolicy"));
-const DocumentationPage = lazyWithRetry(() => import("./pages/Documentation"));
 const FaqsPage = lazyWithRetry(() => import("./pages/Faqs"));
 const BlogLaunch = lazyWithRetry(() => import("./pages/blog/LaunchPost"));
 const BlogAccuracy = lazyWithRetry(() => import("./pages/blog/AccuracyPost"));
@@ -74,9 +71,9 @@ const META_BY_PATH: Record<string, RouteMeta> = {
       "Reduce manual work, speed reconciliation, and improve accuracy with AI bank statement conversion.",
   },
   "/about": {
-    title: "About Banklefy",
+    title: "About | Banklefy",
     description:
-      "Banklefy delivers secure, accurate bank statement conversion with AI OCR and modern financial workflows.",
+      "Product notes for Banklefy, including text-PDF parsing, OCR for scanned pages, saved conversions, and support channels.",
   },
   "/sample-report": {
     title: "Sample Report | Banklefy",
@@ -85,11 +82,11 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   },
   "/privacy": {
     title: "Privacy Policy | Banklefy",
-    description: "Learn how Banklefy handles data privacy and document security.",
+    description: "What Banklefy collects, how it stores saved conversions, and how deletion works.",
   },
   "/terms": {
     title: "Terms of Service | Banklefy",
-    description: "Review the terms of service for using Banklefy.",
+    description: "The operating terms for using Banklefy, including files, limits, payments, and review responsibilities.",
   },
   "/auth": {
     title: "Sign In | Banklefy",
@@ -108,9 +105,8 @@ const META_BY_PATH: Record<string, RouteMeta> = {
     description: "View your account details and recent page usage.",
   },
   "/help": {
-    title: "Help Center | Banklefy",
-    description:
-      "Get help with supported formats, password-protected PDFs, daily limits, and refund requests.",
+    title: "FAQs & Help | Banklefy",
+    description: "Direct help and FAQ notes for file types, passwords, limits, exports, and support.",
   },
   "/how-it-works": {
     title: "How It Works | Banklefy",
@@ -118,27 +114,19 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   },
   "/security": {
     title: "Security | Banklefy",
-    description: "Learn how Banklefy protects your data and conversions.",
+    description: "How Banklefy handles data, encryption, access control, retention, and third-party dependencies.",
   },
   "/contact": {
-    title: "Contact Us | Banklefy",
-    description: "Contact Banklefy support for help with billing or conversions.",
-  },
-  "/cookie-policy": {
-    title: "Cookie Policy | Banklefy",
-    description: "Understand how Banklefy uses cookies for sessions and security.",
-  },
-  "/documentation": {
-    title: "Documentation | Banklefy",
-    description: "Learn how to upload, convert, and export statements with Banklefy.",
+    title: "Contact | Banklefy",
+    description: "How to contact Banklefy support for conversion, billing, privacy, and account issues.",
   },
   "/faqs": {
-    title: "FAQs | Banklefy",
-    description: "Answers to common questions about conversions, limits, and refunds.",
+    title: "FAQs & Help | Banklefy",
+    description: "Direct answers and practical notes about file types, passwords, limits, retention, and exports.",
   },
   "/blog": {
     title: "Blog | Banklefy",
-    description: "Product updates, tutorials, and announcements from Banklefy.",
+    description: "Short notes about supported formats, conversion behavior, exports, and product updates.",
   },
   "/blog/launch": {
     title: "Introducing Banklefy: Bank Statement to Excel in Minutes",
@@ -178,7 +166,7 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   },
 };
 
-const NO_INDEX_PREFIXES = ["/dashboard", "/settings", "/profile", "/auth", "/chat"];
+const NO_INDEX_PREFIXES = ["/dashboard", "/settings", "/profile", "/auth", "/chat", "/help", "/documentation", "/cookie-policy"];
 
 const normalizePathname = (pathname: string) =>
   pathname !== "/" && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
@@ -261,37 +249,7 @@ const getStructuredDataByRoute = (
   }
 
   if (pathname === "/help") {
-    const faqSchema: JsonLd = {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      mainEntity: [
-        {
-          "@type": "Question",
-          name: "Which file formats are supported?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Banklefy supports PDF, JPG, and PNG statements including scans and photos.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "Do you support password-protected PDFs?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Yes. Enter the password in the unlock field before conversion.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "How long does conversion take?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Most statements convert quickly; large or scanned files can take longer.",
-          },
-        },
-      ],
-    };
-    schemas.push(...baseSchemas, faqSchema);
+    schemas.push(...baseSchemas);
     return schemas;
   }
 
@@ -302,10 +260,10 @@ const getStructuredDataByRoute = (
       mainEntity: [
         {
           "@type": "Question",
-          name: "Which statement formats are supported?",
+          name: "Which file formats are supported?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Banklefy supports PDF, JPG, and PNG bank statements, including scanned pages.",
+            text: "Banklefy supports PDF, JPG, and PNG files. Text PDFs are parsed directly; scanned pages use OCR only where needed.",
           },
         },
         {
@@ -313,31 +271,31 @@ const getStructuredDataByRoute = (
           name: "Do you support password-protected PDFs?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Yes. Enter the PDF password in the unlock field before conversion.",
+            text: "Yes. Enter the password in the unlock field before conversion. Password protection alone does not force OCR.",
           },
         },
         {
           "@type": "Question",
-          name: "How accurate are conversions?",
+          name: "How long does conversion take?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Text-based PDFs use deterministic parsing; scanned PDFs use OCR with balance checks for accuracy.",
+            text: "Timing depends on file size, page count, scan quality, and whether OCR is needed. Large files can still take time when they are text-based.",
           },
         },
         {
           "@type": "Question",
-          name: "Which export formats are available?",
+          name: "Do you store my files?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Exports include Excel, CSV, and additional premium formats depending on plan.",
+            text: "Saved conversions remain in your account history until you delete them. Temporary uploads may be cleaned up after processing or a failed run.",
           },
         },
         {
           "@type": "Question",
-          name: "Is my data stored?",
+          name: "How do refunds work?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Temporary files are available during your active session. Saved conversions remain in your account history until you delete them.",
+            text: "Refunds for eligible one-time packs are processed within 14 days. Refunds are not available if 35% or more of the usage has been consumed. The same terms are listed in the Privacy Policy and handled through support.",
           },
         },
       ],
@@ -501,12 +459,12 @@ const AppRoutes = () => {
           <Route path="/sample-report" element={<SampleReport />} />
           <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
           <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
-          <Route path="/help" element={<Help />} />
+          <Route path="/help" element={<Navigate to="/faqs#help" replace />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/security" element={<SecurityPage />} />
           <Route path="/contact" element={<ContactPage />} />
-          <Route path="/cookie-policy" element={<CookiePolicyPage />} />
-          <Route path="/documentation" element={<DocumentationPage />} />
+          <Route path="/cookie-policy" element={<Navigate to="/privacy" replace />} />
+          <Route path="/documentation" element={<Navigate to="/faqs#help" replace />} />
           <Route path="/faqs" element={<FaqsPage />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/launch" element={<BlogLaunch />} />

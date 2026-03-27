@@ -356,7 +356,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "chatAura.limitReached": "Chat limit reached",
     "chatAura.signUpForMore": "Sign up for unlimited conversations",
     "chatAura.signUp": "Sign Up",
-    "footer.helpCenter": "Help Center",
+    "footer.helpCenter": "FAQs & Help",
     "footer.blog": "Blog",
     "footer.refunds": "Refund Policy",
     "helpPage.title": "Help Center",

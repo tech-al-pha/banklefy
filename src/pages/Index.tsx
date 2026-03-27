@@ -353,14 +353,6 @@ const Index = () => {
                   </li>
                   <li>
                     <Link
-                      to="/help"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.helpCenter')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
                       to="/security"
                       className="text-glow-link text-left font-medium"
                     >
@@ -385,18 +377,10 @@ const Index = () => {
                 <ul className="space-y-3 text-sm text-muted-foreground">
                   <li>
                     <Link
-                      to="/documentation"
+                      to="/faqs#help"
                       className="text-glow-link text-left font-medium"
                     >
-                      {t('footer.docs')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/faqs"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.faqs')}
+                      {t('footer.helpCenter')}
                     </Link>
                   </li>
                   <li>
@@ -405,14 +389,6 @@ const Index = () => {
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.sampleReport')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/pricing#refunds"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.refunds')}
                     </Link>
                   </li>
                 </ul>
@@ -453,14 +429,6 @@ const Index = () => {
                       className="text-glow-link text-left font-medium"
                     >
                       {t('footer.terms')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/cookie-policy"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.cookiePolicy')}
                     </Link>
                   </li>
                 </ul>

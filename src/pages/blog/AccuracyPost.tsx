@@ -66,8 +66,8 @@ const AccuracyPost = () => {
           <Button className="bg-primary text-primary-foreground shadow-neon" onClick={() => navigate("/")}>
             Try with Your Statement
           </Button>
-          <Button variant="outline" className="border-primary/40 text-foreground" onClick={() => navigate("/help#upload-tips")}>
-            See Upload Tips
+          <Button variant="outline" className="border-primary/40 text-foreground" onClick={() => navigate("/faqs#upload-tips")}>
+            View FAQs & Help
           </Button>
         </section>
       </main>

@@ -62,8 +62,8 @@ const PasswordPdfPost = () => {
           <Button className="bg-primary text-primary-foreground shadow-neon" onClick={() => navigate("/")}>
             Upload Protected PDF
           </Button>
-          <Button variant="outline" className="border-primary/40 text-foreground" onClick={() => navigate("/help")}>
-            View Help Center
+          <Button variant="outline" className="border-primary/40 text-foreground" onClick={() => navigate("/faqs#password-pdfs")}>
+            View FAQs & Help
           </Button>
         </section>
       </main>
