@@ -5,72 +5,67 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { AiStatus } from "./uploadDemo/types";
 
 interface AIStatusPanelProps {
-  aiStatus?: {
-    groq?: { success: boolean; time?: number; error?: string };
-    groqVision?: { success: boolean; time?: number; error?: string };
-    groqText?: { success: boolean; time?: number; error?: string };
-    mistral?: { success: boolean; time?: number; error?: string };
-    patternFallback?: { success: boolean; time?: number; error?: string };
-  };
+  aiStatus?: AiStatus;
 }
 
 const serviceInfo = {
   groqVision: {
-    name: 'Groq Vision',
+    name: "Groq Vision",
     icon: Zap,
-    role: 'OCR & Data Extraction',
-    color: 'text-primary',
-    bgColor: 'bg-surface-elevated/20',
-    borderColor: 'border-border/40',
+    role: "OCR and data extraction",
+    color: "text-primary",
+    bgColor: "bg-surface-elevated/20",
+    borderColor: "border-border/40",
   },
   groqText: {
-    name: 'Groq Text',
+    name: "Groq Text",
     icon: Zap,
-    role: 'Text Extraction (Backup)',
-    color: 'text-primary',
-    bgColor: 'bg-surface-elevated/20',
-    borderColor: 'border-border/40',
+    role: "Text extraction fallback",
+    color: "text-primary",
+    bgColor: "bg-surface-elevated/20",
+    borderColor: "border-border/40",
   },
   mistral: {
-    name: 'Mistral AI',
+    name: "Mistral AI",
     icon: Brain,
-    role: 'Categorization',
-    color: 'text-primary',
-    bgColor: 'bg-surface-elevated/20',
-    borderColor: 'border-border/40',
+    role: "Categorization",
+    color: "text-primary",
+    bgColor: "bg-surface-elevated/20",
+    borderColor: "border-border/40",
   },
   patternFallback: {
-    name: 'Rule-Based',
+    name: "Rule-Based",
     icon: Bot,
-    role: 'Financial Analysis',
-    color: 'text-primary',
-    bgColor: 'bg-surface-elevated/20',
-    borderColor: 'border-border/40',
+    role: "Financial analysis",
+    color: "text-primary",
+    bgColor: "bg-surface-elevated/20",
+    borderColor: "border-border/40",
   },
 };
 
 export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
   if (!aiStatus) return null;
 
-  const activeServices = (['groqVision', 'groqText', 'mistral', 'patternFallback'] as const)
+  const activeServices = (["groqVision", "groqText", "mistral", "patternFallback"] as const)
     .filter((key) => aiStatus[key]);
-  
+
   if (activeServices.length === 0) return null;
 
   return (
     <Card className="p-4 bg-muted/20 border-border/50">
-      <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-        <Zap className="w-4 h-4 text-primary" />
-        Processing Pipeline
+      <h4 className="mb-3 flex items-center gap-2 text-sm font-medium">
+        <Zap className="h-4 w-4 text-primary" />
+        Used in this conversion
       </h4>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        {(['groqVision', 'groqText', 'mistral', 'patternFallback'] as const).map((key) => {
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        {(["groqVision", "groqText", "mistral", "patternFallback"] as const).map((key) => {
           const data = aiStatus[key];
           const info = serviceInfo[key];
           const Icon = info.icon;
-          
+
           if (!data) return null;
 
           return (
@@ -78,24 +73,28 @@ export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
               <TooltipTrigger
                 type="button"
                 aria-label={`${info.name} status`}
-                className={`w-full p-2 rounded-lg text-left ${data.success ? info.bgColor : 'bg-destructive/10'} border ${data.success ? info.borderColor : 'border-destructive/30'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#000000]`}
+                className={`w-full rounded-lg border p-2 text-left ${
+                  data.success ? info.bgColor : "bg-destructive/10"
+                } ${
+                  data.success ? info.borderColor : "border-destructive/30"
+                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#000000]`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Icon className={`w-4 h-4 ${data.success ? info.color : 'text-destructive'}`} aria-hidden="true" />
-                    <span className={`text-xs font-medium ${data.success ? info.color : 'text-destructive'}`}>
+                    <Icon className={`h-4 w-4 ${data.success ? info.color : "text-destructive"}`} aria-hidden="true" />
+                    <span className={`text-xs font-medium ${data.success ? info.color : "text-destructive"}`}>
                       {info.name}
                     </span>
                   </div>
                   {data.success ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
                   ) : (
-                    <XCircle className="w-3.5 h-3.5 text-destructive" aria-hidden="true" />
+                    <XCircle className="h-3.5 w-3.5 text-destructive" aria-hidden="true" />
                   )}
                 </div>
                 {data.time && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <Clock className="w-3 h-3 text-muted-foreground" aria-hidden="true" />
+                  <div className="mt-1 flex items-center gap-1">
+                    <Clock className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
                     <span className="text-xs text-muted-foreground">{(data.time / 1000).toFixed(1)}s</span>
                   </div>
                 )}
@@ -104,24 +103,20 @@ export const AIStatusPanel = ({ aiStatus }: AIStatusPanelProps) => {
                 <p className="font-medium">{info.name}</p>
                 <p className="text-sm text-muted-foreground">{info.role}</p>
                 {data.error && (
-                  <p className="text-xs text-destructive mt-1">Error: {data.error}</p>
+                  <p className="mt-1 text-xs text-destructive">Error: {data.error}</p>
                 )}
                 {data.time && (
-                  <p className="text-xs mt-1">Time: {(data.time / 1000).toFixed(2)}s</p>
+                  <p className="mt-1 text-xs">Time: {(data.time / 1000).toFixed(2)}s</p>
                 )}
               </TooltipContent>
             </Tooltip>
           );
         })}
       </div>
-      
-      {/* Pipeline Legend */}
-      <div className="mt-3 pt-3 border-t border-border/30">
+
+      <div className="mt-3 border-t border-border/30 pt-3">
         <p className="text-xs text-muted-foreground">
-          <span className="font-medium">Pipeline:</span> Groq (OCR) → Mistral (Categorize) → Rule-Based (FOIR/EMI)
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          ✓ Deterministic: FOIR, Salary & EMI use mathematical formulas (no AI)
+          These cards show the stages used in the current conversion report.
         </p>
       </div>
     </Card>
