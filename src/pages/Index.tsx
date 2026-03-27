@@ -345,14 +345,6 @@ const Index = () => {
                   </li>
                   <li>
                     <Link
-                      to="/features"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.features')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
                       to="/security"
                       className="text-glow-link text-left font-medium"
                     >

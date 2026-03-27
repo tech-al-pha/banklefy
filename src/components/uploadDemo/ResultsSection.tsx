@@ -383,7 +383,7 @@ export const ResultsSection = ({
         </Card>
       )}
 
-      {showPipeline && aiStatus && !conversionResult && <AIStatusPanel aiStatus={aiStatus} />}
+      {showPipeline && aiStatus && (conversionResult || batchResults.length > 0) && <AIStatusPanel aiStatus={aiStatus} />}
 
       {converting && (
         <Card className="p-4 bg-[#191919]/80 border border-white/10">
