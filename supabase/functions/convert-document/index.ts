@@ -67,6 +67,11 @@ import { isPdfPasswordError } from '../_shared/pdf-errors.ts';
 import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts';
 import { getTrackingKey } from '../_shared/client-id.ts';
 import { resolveEffectiveLimit, type LimitResolverDatabase, type SupabaseLike } from '../_shared/limit-resolver.ts';
+import {
+  detectPdfAmountColumnLayout,
+  extractAnchoredAmountsFromLayout,
+  type PdfAmountColumnLayout,
+} from '../_shared/pdf-column-layout.ts';
 import type { Database as AppDatabase } from '../../../src/integrations/supabase/types.ts';
 
 type ConversionRow = AppDatabase['public']['Tables']['conversions']['Row'];
@@ -219,7 +224,9 @@ const DATE_TOKEN_SOURCE =
 const DATE_TOKEN = new RegExp(DATE_TOKEN_SOURCE);
 const FLEXIBLE_PREFIX_SOURCE = '(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]+\\s+)?';
 const ROW_START_PATTERN = new RegExp(`^${FLEXIBLE_PREFIX_SOURCE}(${DATE_TOKEN_SOURCE})\\s+(${DATE_TOKEN_SOURCE})\\s+(.+)$`);
-const AMOUNT_TOKEN_SOURCE = '[+-]?(?:\\(?\\d{1,3}(?:,\\d{3})+\\)?|\\(?\\d{1,7}\\)?)(?:\\.\\d{1,4})?(?:\\s*(?:CR|DR))?';
+const GROUPED_AMOUNT_SOURCE = '(?:\\d{1,3}(?:,\\d{2,3})+|\\d{1,7})';
+const AMOUNT_NUMBER_SOURCE = `(?:${GROUPED_AMOUNT_SOURCE})(?:\\.\\d{1,4})?`;
+const AMOUNT_TOKEN_SOURCE = `[+-]?(?:\\(?${AMOUNT_NUMBER_SOURCE}\\)?)(?:\\s*(?:CR|DR))?`;
 const AMOUNT_PATTERN = new RegExp(AMOUNT_TOKEN_SOURCE, 'g');
 const AMOUNT_TOKEN_PATTERN = new RegExp(`^${AMOUNT_TOKEN_SOURCE}$`, 'i');
 const DATE_TOKEN_FLEX_PATTERN = new RegExp(`(${DATE_TOKEN_SOURCE})`);
@@ -422,63 +429,21 @@ const groupTokensIntoLines = (items: Array<Record<string, unknown>>): LineEntry[
 const linesFromTextItems = (items: Array<Record<string, unknown>>): string[] =>
   groupTokensIntoLines(items).map((entry) => entry.text);
 
-const detectAmountColumns = (lineEntries: LineEntry[]): number[] => {
-  const numericXs: number[] = [];
-  for (const entry of lineEntries) {
-    for (const token of entry.tokens) {
-      if (AMOUNT_TOKEN_PATTERN.test(token.text.replace(/[,:;]+$/g, '').trim())) {
-        numericXs.push(token.x);
-      }
-    }
-  }
-  if (numericXs.length < 3) return [];
-  numericXs.sort((a, b) => a - b);
-
-  const clusters: Array<{ center: number; count: number }> = [];
-  const threshold = 24;
-  for (const x of numericXs) {
-    const last = clusters[clusters.length - 1];
-    if (!last || Math.abs(x - last.center) > threshold) {
-      clusters.push({ center: x, count: 1 });
-    } else {
-      last.center = (last.center * last.count + x) / (last.count + 1);
-      last.count += 1;
-    }
-  }
-
-  if (clusters.length < 3) return [];
-  const sortedCenters = clusters.map((c) => c.center).sort((a, b) => a - b);
-  return sortedCenters.slice(-3);
-};
+const detectAmountColumns = (lineEntries: LineEntry[]): PdfAmountColumnLayout | null =>
+  detectPdfAmountColumnLayout(
+    lineEntries,
+    (value) => AMOUNT_TOKEN_PATTERN.test(value),
+  );
 
 const extractAnchoredAmounts = (
   entry: LineEntry,
-  centers: number[],
+  layout: PdfAmountColumnLayout | null,
 ): { debit: number; credit: number; balance: number } | null => {
-  if (centers.length < 3) return null;
-  const numericTokens = entry.tokens.filter((token) => AMOUNT_TOKEN_PATTERN.test(token.text.replace(/[,:;]+$/g, '').trim()));
-  if (numericTokens.length === 0) return null;
-
-  const nearest = centers.map((center) => {
-    let best: LineToken | null = null;
-    let bestDist = Infinity;
-    for (const token of numericTokens) {
-      const dist = Math.abs(token.x - center);
-      if (dist < bestDist) {
-        best = token;
-        bestDist = dist;
-      }
-    }
-    return bestDist <= 50 ? best : null;
+  return extractAnchoredAmountsFromLayout(entry, layout, {
+    inferSide: inferDebitCreditFromContext,
+    isAmountToken: (value) => AMOUNT_TOKEN_PATTERN.test(value),
+    parseAmount,
   });
-
-  const [debitToken, creditToken, balanceToken] = nearest;
-  if (!balanceToken) return null;
-  return {
-    debit: debitToken ? parseAmount(debitToken.text) : 0,
-    credit: creditToken ? parseAmount(creditToken.text) : 0,
-    balance: parseAmount(balanceToken.text),
-  };
 };
 
 const extractAmounts = (text: string): { textWithoutAmounts: string; debit: number; credit: number; balance: number } | null => {
@@ -505,7 +470,7 @@ const extractAmountsWithDashPlaceholders = (
   const cleaned = normalizeDashToken(text).trim();
   if (!cleaned) return null;
 
-  const amountPart = '(-?(?:\\d{1,3}(?:,\\d{3})+|\\d{1,7})(?:\\.\\d{1,4})?)';
+  const amountPart = `(-?(?:${AMOUNT_NUMBER_SOURCE}))`;
   const debitBlankPattern =
     new RegExp(`^(.*?)(?:\\s|^)([-\\u2013\\u2014]+)\\s+${amountPart}\\s+${amountPart}\\s*$`);
   const debitBlankMatch = cleaned.match(debitBlankPattern);
@@ -546,7 +511,7 @@ const extractTrailingAmounts = (
 
   const rawTokens = sanitized.split(/\s+/);
   const cleanedTokens = rawTokens.map((token) => token.replace(/[,:;]+$/g, '').trim());
-  const amountLikePattern = /^[+-]?(?:\(?\d{1,3}(?:,\d{3})*(?:\.\d{1,4})?\)?|\(?\d{1,7}(?:\.\d{1,4})?\)?)(?:\s*(?:CR|DR))?$/i;
+  const amountLikePattern = new RegExp(`^[+-]?(?:\\(?${AMOUNT_NUMBER_SOURCE}\\)?)(?:\\s*(?:CR|DR))?$`, 'i');
   const monthTokenPattern = /^(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)$/i;
 
   let tailStart = cleanedTokens.length;
@@ -629,7 +594,7 @@ const extractFlexibleAmounts = (
   if (strict) return strict;
 
   const normalizedText = normalizeDashToken(text);
-  const amountRegex = /([+-]?\(?\d{1,3}(?:,\d{3})+\)?(?:\.\d{1,4})?|\(?[+-]?\d{1,7}(?:\.\d{1,4})?\)?)(?:\s*(CR|DR))?/gi;
+  const amountRegex = new RegExp(`([+-]?\\(?${AMOUNT_NUMBER_SOURCE}\\)?)(?:\\s*(CR|DR))?`, 'gi');
   const matches: Array<{ raw: string; marker: string | null }> = [];
   let match: RegExpExecArray | null;
   while ((match = amountRegex.exec(normalizedText)) !== null) {
@@ -656,7 +621,7 @@ const extractFlexibleAmounts = (
 };
 
 const isStrictAmountToken = (value: string): boolean =>
-  /^-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?(?:\s*(?:CR|DR))?$/i.test(value);
+  new RegExp(`^${AMOUNT_TOKEN_SOURCE}$`, 'i').test(value);
 
 const findLeadingDateToken = (tokens: LineToken[]): { value: string; index: number } | null => {
   const maxIndex = Math.min(2, tokens.length - 1);
@@ -671,7 +636,7 @@ const findLeadingDateToken = (tokens: LineToken[]): { value: string; index: numb
 
 const buildTokenFallbackRows = (
   lineEntries: LineEntry[],
-  amountCenters: number[],
+  amountCenters: PdfAmountColumnLayout | null,
 ): RawTransaction[] => {
   const fallbackRows: RawTransaction[] = [];
   for (const entry of lineEntries) {
@@ -720,17 +685,17 @@ const buildTokenFallbackRows = (
 const hasLikelyAmountTail = (text: string): boolean => {
   if (extractFlexibleAmounts(text)) return true;
   const normalizedText = normalizeDashToken(text);
-  const matches = normalizedText.match(/-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?/g) || [];
+  const matches = normalizedText.match(new RegExp(`-?${AMOUNT_NUMBER_SOURCE}`, 'g')) || [];
   if (matches.length >= 2) return true;
   // Placeholder variants: amount + '-' + balance OR '-' + amount + balance
   const debitBlankTail = normalizedText.match(
-    /(?:^|\s)([-\u2013\u2014]+)\s+(-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?)\s+(-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?)\s*$/,
+    new RegExp(`(?:^|\\s)([-\\u2013\\u2014]+)\\s+${AMOUNT_NUMBER_SOURCE}\\s+${AMOUNT_NUMBER_SOURCE}\\s*$`),
   );
   if (debitBlankTail && DASH_PLACEHOLDER.test(debitBlankTail[1])) {
     return true;
   }
   const creditBlankTail = normalizedText.match(
-    /(-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?)\s+([-\u2013\u2014]+)\s+(-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?)\s*$/,
+    new RegExp(`(${AMOUNT_NUMBER_SOURCE})\\s+([-\\u2013\\u2014]+)\\s+(${AMOUNT_NUMBER_SOURCE})\\s*$`),
   );
   if (creditBlankTail && DASH_PLACEHOLDER.test(creditBlankTail[2])) {
     return true;
@@ -916,7 +881,7 @@ const extractPdfTextTransactionsFromBytes = async (
         continue;
       }
 
-      const singleAmountPattern = /^-?(?:\d{1,3}(?:,\d{3})+|\d{1,7})(?:\.\d{1,4})?(?:\s*(?:CR|DR))?$/i;
+  const singleAmountPattern = new RegExp(`^${AMOUNT_TOKEN_SOURCE}$`, 'i');
       const singleAmountToken = line.trim();
       if (
         current &&
@@ -1345,6 +1310,19 @@ const attemptGroqTextRescue = async (
   }
 };
 
+const getExpectedBalanceForOrder = (
+  rows: RawTransaction[],
+  index: number,
+  debit: number,
+  credit: number,
+  reverseOrder: boolean,
+): number => {
+  const prev = reverseOrder ? rows[index + 1] : rows[index - 1];
+  const prevBalance = Number(prev?.balance ?? NaN);
+  if (!Number.isFinite(prevBalance)) return Number.NaN;
+  return prevBalance + credit - debit;
+};
+
 const countDebitCreditMismatches = (rows: RawTransaction[], reverseOrder: boolean): number => {
   const resolveBalance = (value: unknown): number => {
     const direct = Number(value ?? NaN);
@@ -1360,14 +1338,15 @@ const countDebitCreditMismatches = (rows: RawTransaction[], reverseOrder: boolea
     const prev = reverseOrder ? rows[i + 1] : rows[i - 1];
     if (!prev) continue;
     const currentBalance = resolveBalance(current.balance);
-    const prevBalance = resolveBalance(prev.balance);
-    if (!Number.isFinite(currentBalance) || !Number.isFinite(prevBalance)) continue;
-    const delta = currentBalance - prevBalance;
-    if (Math.abs(delta) < 0.005) continue;
+    if (!Number.isFinite(currentBalance)) continue;
     const credit = Number(current.credit ?? 0);
     const debit = Number(current.debit ?? 0);
-    if (delta > 0 && credit <= 0 && debit > 0) mismatches += 1;
-    if (delta < 0 && debit <= 0 && credit > 0) mismatches += 1;
+    const asIsExpected = getExpectedBalanceForOrder(rows, i, debit, credit, reverseOrder);
+    const swappedExpected = getExpectedBalanceForOrder(rows, i, credit, debit, reverseOrder);
+    if (!Number.isFinite(asIsExpected) || !Number.isFinite(swappedExpected)) continue;
+    const asIsDiff = Math.abs(asIsExpected - currentBalance);
+    const swappedDiff = Math.abs(swappedExpected - currentBalance);
+    if (swappedDiff + 0.01 < asIsDiff) mismatches += 1;
   }
   return mismatches;
 };
@@ -1426,6 +1405,16 @@ const applyDebitCreditHardRule = (rows: RawTransaction[]): { rows: RawTransactio
     const credit = Number(current.credit ?? 0);
     const amount = credit > 0 ? credit : debit > 0 ? debit : 0;
     if (amount === 0) continue;
+    const asIsExpected = prevBalance + credit - debit;
+    const swappedExpected = prevBalance + debit - credit;
+    const asIsDiff = Math.abs(asIsExpected - currentBalance);
+    const swappedDiff = Math.abs(swappedExpected - currentBalance);
+    const amountTolerance = Math.max(0.02, amount * 0.002);
+    const canSwap =
+      swappedDiff + 0.01 < asIsDiff &&
+      asIsDiff - swappedDiff >= 0.02 &&
+      swappedDiff <= amountTolerance;
+    if (!canSwap) continue;
     if (delta > 0 && credit === 0 && debit > 0) {
       current.credit = amount;
       current.debit = 0;
@@ -1856,7 +1845,10 @@ const computeColumnAlignmentScore = (rows: RawTransaction[], text: string): numb
     return (debit > 0 && credit === 0) || (credit > 0 && debit === 0) || (debit === 0 && credit === 0);
   }).length / rows.length;
 
-  const amountTriples = (text.match(/(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})/g) || []).length;
+  const amountTriples = (text.match(new RegExp(
+    `(${AMOUNT_NUMBER_SOURCE})\\s+(${AMOUNT_NUMBER_SOURCE})\\s+(${AMOUNT_NUMBER_SOURCE})`,
+    'g',
+  )) || []).length;
   const layoutSignal = clamp01(amountTriples / Math.max(1, rows.length));
 
   return clamp01((sideIntegrity * 0.7) + (layoutSignal * 0.3));
@@ -1972,7 +1964,7 @@ const buildMinimalStructuredLines = (rawText: string): string => {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
-    .filter((line) => /\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/.test(line))
+    .filter((line) => new RegExp(`\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|${AMOUNT_NUMBER_SOURCE}`).test(line))
     .slice(0, 220);
   return lines.join('\n');
 };

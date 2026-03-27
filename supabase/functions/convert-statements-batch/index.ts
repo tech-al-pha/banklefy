@@ -63,6 +63,11 @@ import { fromMinorUnits, sumMinorUnits, toMinorUnits } from '../_shared/money.ts
 import { getTrackingKey } from '../_shared/client-id.ts';
 import { resolveEffectiveLimit, type LimitResolverDatabase, type SupabaseLike } from '../_shared/limit-resolver.ts';
 import { FULL_PAGE_OCR_COVERAGE_THRESHOLD, shouldUseFullPageOcrCoverage } from '../_shared/ocr-routing.ts';
+import {
+  detectPdfAmountColumnLayout,
+  extractAnchoredAmountsFromLayout,
+  type PdfAmountColumnLayout,
+} from '../_shared/pdf-column-layout.ts';
 import type { Database as AppDatabase } from '../../../src/integrations/supabase/types.ts';
 
 type LooseTable = {
@@ -118,7 +123,8 @@ const BATCH_ROW_START_PATTERN = new RegExp(
   `^(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]+\\s+)?(${BATCH_DATE_TOKEN_SOURCE})\\s+(.+)$`,
   'i',
 );
-const BATCH_AMOUNT_PATTERN = /([+-]?\(?\d{1,3}(?:,\d{3})*\.\d{2}\)?|[+-]?\(?\d+\.\d{2}\)?)(?:\s*(CR|DR))?/gi;
+const BATCH_AMOUNT_NUMBER_SOURCE = '(?:\\d{1,3}(?:,\\d{2,3})+|\\d{1,7})(?:\\.\\d{1,4})?';
+const BATCH_AMOUNT_PATTERN = new RegExp(`([+-]?\\(?${BATCH_AMOUNT_NUMBER_SOURCE}\\)?)(?:\\s*(CR|DR))?`, 'gi');
 const BATCH_MONTH_INDEX: Record<string, number> = {
   jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5,
   jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
@@ -126,6 +132,7 @@ const BATCH_MONTH_INDEX: Record<string, number> = {
 };
 
 type BatchLineToken = { x: number; y: number; text: string };
+type BatchLineEntry = { text: string; tokens: BatchLineToken[] };
 
 const normalizeBatchDate = (value: string): string => {
   const raw = value.trim().replace(/\s+/g, ' ');
@@ -193,7 +200,9 @@ const inferBatchDebitCredit = (line: string, amount: number): { debit: number; c
   return { debit: absAmount, credit: 0 };
 };
 
-const extractPdfPageLines = async (pdf: PdfDocumentProxy, pageNumber: number): Promise<string[]> => {
+const BATCH_AMOUNT_TOKEN_PATTERN = new RegExp(`^[+-]?(?:\\(?${BATCH_AMOUNT_NUMBER_SOURCE}\\)?)(?:\\s*(?:CR|DR))?$`, 'i');
+
+const extractPdfPageLineEntries = async (pdf: PdfDocumentProxy, pageNumber: number): Promise<BatchLineEntry[]> => {
   const page = await pdf.getPage(pageNumber);
   const textContent = await page.getTextContent?.();
   const items = Array.isArray(textContent?.items) ? textContent.items : [];
@@ -226,21 +235,25 @@ const extractPdfPageLines = async (pdf: PdfDocumentProxy, pageNumber: number): P
 
   return buckets
     .sort((a, b) => b.y - a.y)
-    .map((bucket) =>
-      bucket.tokens
-        .sort((a, b) => a.x - b.x)
-        .map((token) => token.text)
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim(),
-    )
-    .filter(Boolean);
+    .map((bucket) => {
+      const ordered = bucket.tokens.sort((left, right) => left.x - right.x);
+      return {
+        text: ordered.map((token) => token.text).join(' ').replace(/\s+/g, ' ').trim(),
+        tokens: ordered,
+      };
+    })
+    .filter((entry) => entry.text.length > 0);
 };
 
-const parseDeterministicRowsFromLines = (lines: string[]): RawTransaction[] => {
+const parseDeterministicRowsFromLineEntries = (lineEntries: BatchLineEntry[]): RawTransaction[] => {
   const rows: RawTransaction[] = [];
-  for (const rawLine of lines) {
-    const line = rawLine.trim().replace(/\s+/g, ' ');
+  const amountLayout: PdfAmountColumnLayout | null = detectPdfAmountColumnLayout(
+    lineEntries,
+    (value) => BATCH_AMOUNT_TOKEN_PATTERN.test(value),
+  );
+
+  for (const entry of lineEntries) {
+    const line = entry.text.trim().replace(/\s+/g, ' ');
     if (!line) continue;
     if (/^page\s*\d+/i.test(line)) continue;
     if (/statement of accounts|transaction date|value date|running balance|account statement|opening balance|closing balance/i.test(line)) continue;
@@ -250,26 +263,33 @@ const parseDeterministicRowsFromLines = (lines: string[]): RawTransaction[] => {
 
     const dateToken = rowMatch[1];
     const remainder = rowMatch[2] || '';
+    const anchored = extractAnchoredAmountsFromLayout(entry, amountLayout, {
+      inferSide: inferBatchDebitCredit,
+      isAmountToken: (value) => BATCH_AMOUNT_TOKEN_PATTERN.test(value),
+      parseAmount: parseBatchAmount,
+    });
     const matches: Array<{ raw: string; marker: string | null }> = [];
     let m: RegExpExecArray | null;
     while ((m = BATCH_AMOUNT_PATTERN.exec(remainder)) !== null) {
       matches.push({ raw: m[0], marker: m[2] ? m[2].toUpperCase() : null });
     }
     BATCH_AMOUNT_PATTERN.lastIndex = 0;
-    if (matches.length < 2) continue;
+    if (!anchored && matches.length < 2) continue;
 
-    const amountToken = matches[matches.length - 2];
-    const balanceToken = matches[matches.length - 1];
-    const amount = parseBatchAmount(amountToken.raw);
-    const balance = Math.abs(parseBatchAmount(balanceToken.raw));
+    const amountToken = matches.length >= 2 ? matches[matches.length - 2] : null;
+    const balanceToken = matches.length >= 1 ? matches[matches.length - 1] : null;
+    const amount = amountToken ? parseBatchAmount(amountToken.raw) : 0;
+    const balance = anchored?.balance ?? (balanceToken ? Math.abs(parseBatchAmount(balanceToken.raw)) : 0);
     if (!Number.isFinite(balance) || balance <= 0) continue;
 
-    const explicit = amountToken.marker;
-    const inferred = explicit === 'CR'
-      ? { debit: 0, credit: Math.abs(amount) }
-      : explicit === 'DR'
-        ? { debit: Math.abs(amount), credit: 0 }
-        : inferBatchDebitCredit(remainder, amount);
+    const explicit = amountToken?.marker;
+    const inferred = anchored ?? (
+      explicit === 'CR'
+        ? { debit: 0, credit: Math.abs(amount), balance }
+        : explicit === 'DR'
+          ? { debit: Math.abs(amount), credit: 0, balance }
+          : { ...inferBatchDebitCredit(remainder, amount), balance }
+    );
     if (inferred.debit <= 0 && inferred.credit <= 0) continue;
 
     const description = remainder
@@ -524,7 +544,7 @@ const buildSelectiveOcrPagePlan = async (params: {
       const pageText = await extractPdfPageText(params.pdfDocument, pageNumber);
       const charCount = pageText.replace(/\s+/g, '').length;
       const dateMatches = (pageText.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g) || []).length;
-      const amountMatches = (pageText.match(/-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g) || []).length;
+      const amountMatches = (pageText.match(new RegExp(BATCH_AMOUNT_NUMBER_SOURCE, 'g')) || []).length;
       const needsOcr = charCount < 80 || amountMatches < 2 || dateMatches < 1;
       return { pageNumber, needsOcr };
     }),
@@ -1208,11 +1228,11 @@ const processStatement = async (params: {
         const lines = (
           await Promise.all(
             Array.from({ length: Math.max(1, Math.min(pageCount, sharedPdf.numPages)) }, async (_, idx) =>
-              extractPdfPageLines(sharedPdf as PdfDocumentProxy, idx + 1),
+              extractPdfPageLineEntries(sharedPdf as PdfDocumentProxy, idx + 1),
             ),
           )
         ).flat();
-        const serverDeterministicRows = parseDeterministicRowsFromLines(lines);
+        const serverDeterministicRows = parseDeterministicRowsFromLineEntries(lines);
         if (serverDeterministicRows.length > 0) {
           clientParsedTransactions = serverDeterministicRows;
           console.log(

@@ -1,4 +1,4 @@
-import { getPdfWorkerSrc } from "@/lib/pdfWorker";
+﻿import { getPdfWorkerSrc } from "@/lib/pdfWorker";
 import { parseStatementDateToIso } from "@/lib/date-parsing";
 
 type PdfDocument = {
@@ -332,7 +332,7 @@ export const detectEditedPdf = async (
       if (creationDate && modDate) {
         const gapDays = (modDate.getTime() - creationDate.getTime()) / (1000 * 60 * 60 * 24);
         if (gapDays > 45) {
-          pushFlag(flags, "LARGE_DATE_GAP", `Large create→modify gap (${Math.round(gapDays)} days)`, Math.round(10 * scoreFactor), "low");
+          pushFlag(flags, "LARGE_DATE_GAP", `Large create?modify gap (${Math.round(gapDays)} days)`, Math.round(10 * scoreFactor), "low");
         }
       }
       if (creationDate && !modDate) {
@@ -556,7 +556,7 @@ export const detectPasswordProtectedPdf = async (file: File): Promise<boolean> =
 
 const DATE_TOKEN = /\d{2}[/-]\d{2}[/-]\d{4}/;
 const ROW_START_PATTERN = /^(\d{2}[/-]\d{2}[/-]\d{4})(?:\s+(\d{2}[/-]\d{2}[/-]\d{4}))?\s+(.+)$/;
-const AMOUNT_PATTERN = /-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2}/g;
+const AMOUNT_PATTERN = /-?(?:\d{1,3}(?:,\d{2,3})+|\d{1,7})(?:\.\d{1,4})?/g;
 const PERIOD_FROM_TO_PATTERN =
   /\bfrom\b\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s*(?:to|-)\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i;
 const IBAN_PATTERN = /\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b/;
@@ -597,6 +597,8 @@ const parseAmount = (value: string): number => {
   const amount = Number(normalized);
   return Number.isFinite(amount) ? amount : 0;
 };
+
+const AMOUNT_NUMBER_SOURCE = '(?:\\d{1,3}(?:,\\d{2,3})+|\\d{1,7})(?:\\.\\d{1,4})?';
 
 const inferDebitCreditFromContext = (
   text: string,
@@ -843,7 +845,7 @@ const extractAmountsWithDashPlaceholders = (
   if (!cleaned) return null;
 
   const debitBlankPattern =
-    /^(.*?)(?:\s|^)[-–—]\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/;
+    new RegExp(`^(.*?)(?:\\s|^)[-\\u2013\\u2014]\\s+(-?${AMOUNT_NUMBER_SOURCE})\\s+(-?${AMOUNT_NUMBER_SOURCE})\\s*$`);
   const debitBlankMatch = cleaned.match(debitBlankPattern);
   if (debitBlankMatch) {
     const [, prefix, creditToken, balanceToken] = debitBlankMatch;
@@ -856,7 +858,7 @@ const extractAmountsWithDashPlaceholders = (
   }
 
   const creditBlankPattern =
-    /^(.*?)(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s+[-–—]\s+(-?\d{1,3}(?:,\d{3})*\.\d{2}|-?\d+\.\d{2})\s*$/;
+    new RegExp(`^(.*?)(-?${AMOUNT_NUMBER_SOURCE})\\s+[-\\u2013\\u2014]\\s+(-?${AMOUNT_NUMBER_SOURCE})\\s*$`);
   const creditBlankMatch = cleaned.match(creditBlankPattern);
   if (creditBlankMatch) {
     const [, prefix, debitToken, balanceToken] = creditBlankMatch;
@@ -880,7 +882,7 @@ const extractFlexibleAmounts = (
   const normalizedText = text.replace(/\s+/g, " ").trim();
   if (!normalizedText) return null;
 
-  const amountRegex = /([+-]?\(?\d{1,3}(?:,\d{3})+\)?(?:\.\d{1,4})?|\(?[+-]?\d{1,7}(?:\.\d{1,4})?\)?)(?:\s*(CR|DR))?/gi;
+  const amountRegex = new RegExp(`([+-]?\\(?${AMOUNT_NUMBER_SOURCE}\\)?)(?:\\s*(CR|DR))?`, 'gi');
   const matches: Array<{ raw: string; marker: string | null }> = [];
   let match: RegExpExecArray | null;
   while ((match = amountRegex.exec(normalizedText)) !== null) {
@@ -1169,3 +1171,4 @@ export const pdfToPageImages = async (
   await pdf.destroy?.();
   return images;
 };
+

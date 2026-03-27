@@ -588,7 +588,8 @@ export const sanitizeTransactions = (transactions: Transaction[], options?: Sani
   const normalizedAmounts = statementOrdered.map((transaction) => normalizeSignedAmounts(transaction));
 
   if (options?.preserveAmounts) {
-    return dedupeTransactions(normalizedAmounts);
+    const directionCorrected = correctAmountDirection(statementOrdered);
+    return dedupeTransactions(directionCorrected);
   }
 
   const directionCorrected = correctAmountDirection(statementOrdered);
