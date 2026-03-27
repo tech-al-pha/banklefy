@@ -153,6 +153,7 @@ AMOUNT RULES:
 7. If a cell is "-" or blank in Debit/Credit, treat it as 0 (do NOT shift value to other column).
 8. If one amount appears in wrong side, verify against running balance change and correct side.
 9. Never output negative debit/credit; keep both as positive numbers.
+10. If a visible transaction row is missing the amount because the scan is noisy, still keep the row with debit/credit set to 0 rather than merging it into the next row.
 
 Return ONLY valid JSON. No markdown, no code blocks.`;
 
@@ -187,6 +188,7 @@ STRICT TABLE RULES:
 8) If both Transaction Date and Value Date exist, use Transaction Date.
 9) Never output negative debit or credit; output positive numbers.
 10. Only copy statementPeriod from an explicit statement header or date-range label. Do not infer it from transaction rows.
+11. If a transaction row is visible but the amount column is unreadable, still return the row with debit/credit as 0. Do not collapse it into a neighboring row.
 
 Reference number rule:
 - Populate refNumber only if there is a dedicated reference/ID column.
@@ -609,8 +611,8 @@ const normalizeOcrTransaction = (raw: Record<string, unknown>): RawTransaction |
     true,
   ) ?? 0;
   const balance = parseStrictOcrNumber(raw.balance ?? raw.bal ?? raw.runningBalance, false);
+  const amount = parseStrictOcrNumber(raw.amount, true) ?? 0;
   if (debit <= 0 && credit <= 0) {
-    const amount = parseStrictOcrNumber(raw.amount, true) ?? 0;
     const typeLower = (normalizedType || '').toLowerCase();
     if (amount > 0 && /\b(cr|credit)\b/.test(typeLower)) {
       credit = amount;
@@ -618,7 +620,8 @@ const normalizeOcrTransaction = (raw: Record<string, unknown>): RawTransaction |
       debit = amount;
     }
   }
-  if (debit <= 0 && credit <= 0) return null;
+  const hasBalance = Number.isFinite(balance as number);
+  if (debit <= 0 && credit <= 0 && !hasBalance && amount <= 0) return null;
 
   const typeLower = (normalizedType || '').toLowerCase();
   if (debit > 0 && credit > 0) {
@@ -631,7 +634,6 @@ const normalizeOcrTransaction = (raw: Record<string, unknown>): RawTransaction |
     }
   }
 
-  const hasBalance = Number.isFinite(balance as number);
   if (!hasBalance) typeTags.push('low_confidence');
 
   return {
@@ -641,7 +643,7 @@ const normalizeOcrTransaction = (raw: Record<string, unknown>): RawTransaction |
     debit: roundMoney2(debit),
     credit: roundMoney2(credit),
     balance: hasBalance ? roundMoney2(Number(balance)) : undefined,
-    amount: parseStrictOcrNumber(raw.amount, true),
+    amount: amount > 0 ? amount : undefined,
     type: typeTags.join('|') || undefined,
     refNumber: cleanedRef,
   };
@@ -651,6 +653,13 @@ const setLowConfidence = (row: RawTransaction): RawTransaction => {
   if (!row.type) return { ...row, type: 'low_confidence' };
   if (row.type.toLowerCase().includes('low_confidence')) return row;
   return { ...row, type: `${row.type}|low_confidence` };
+};
+
+const appendTypeTag = (row: RawTransaction, tag: string): RawTransaction => {
+  const current = String(row.type || '').trim();
+  if (!current) return { ...row, type: tag };
+  if (current.split('|').includes(tag)) return row;
+  return { ...row, type: `${current}|${tag}` };
 };
 
 const lockColumnsByBalanceDirection = (rows: RawTransaction[], strictMode: boolean): RawTransaction[] => {
@@ -814,6 +823,25 @@ const applyRowLevelBalanceValidation = (rows: RawTransaction[]): RawTransaction[
     const deltaAbs = roundMoney2(Math.abs(delta));
     if (deltaAbs <= 0) {
       normalized[i] = setLowConfidence({ ...normalized[i], debit, credit });
+      continue;
+    }
+
+    if (debit <= 0 && credit <= 0) {
+      if (delta > 0) {
+        credit = deltaAbs;
+      } else {
+        debit = deltaAbs;
+      }
+
+      const inferredExpectedBalance = roundMoney2(prevBalance + credit - debit);
+      const inferredDiff = roundMoney2(Math.abs(inferredExpectedBalance - currentBalance));
+      if (inferredDiff <= tolerance) {
+        normalized[i].debit = debit;
+        normalized[i].credit = credit;
+        normalized[i] = appendTypeTag(normalized[i], 'balance_inferred');
+      } else {
+        normalized[i] = setLowConfidence({ ...normalized[i], debit, credit });
+      }
       continue;
     }
 
@@ -1808,7 +1836,7 @@ const parseTransactionsFromMarkdownTables = (markdown: string): RawTransaction[]
       const balance = parseMoneyMaybe(headerMap.balanceIndex !== undefined ? cells[headerMap.balanceIndex] : undefined);
       const refNumber = headerMap.refIndex !== undefined ? normalizeReferenceToken(cells[headerMap.refIndex] || '') : '';
 
-      if ((debit <= 0 && credit <= 0) || !Number.isFinite(balance as number)) {
+      if (!Number.isFinite(balance as number)) {
         index += 1;
         continue;
       }

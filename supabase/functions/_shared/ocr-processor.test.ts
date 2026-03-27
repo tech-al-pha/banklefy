@@ -51,6 +51,46 @@ describe("ocr-processor numeric repair", () => {
     expect(scoreRunningBalanceFlow(rows).mismatchRatio).toBe(0);
   });
 
+  it("preserves OCR rows that are missing the amount and reconstructs them from balance flow", () => {
+    const rows = normalizeOcrRawTransactions([
+      {
+        date: "2024-01-01",
+        description: "Opening balance",
+        credit: 8015.67,
+        balance: 8015.67,
+      },
+      {
+        date: "2024-01-02",
+        description: "Salary credit",
+        credit: 39000,
+        balance: 47015.67,
+      },
+      {
+        date: "2024-01-03",
+        description: "Transfer",
+        debit: 47000,
+        balance: 15.67,
+      },
+      {
+        date: "2024-01-04",
+        description: "CashDep Chgs",
+        balance: 0.01,
+      },
+      {
+        date: "2024-01-05",
+        description: "IMPS credit",
+        balance: 696967.01,
+      },
+    ]);
+
+    expect(rows).toHaveLength(5);
+    expect(rows[3].debit).toBe(15.66);
+    expect(rows[3].credit).toBe(0);
+    expect(rows[4].credit).toBe(696967.0);
+    expect(rows[4].debit).toBe(0);
+    expect(scoreRunningBalanceFlow(rows).mismatchRatio).toBe(0);
+  });
+
   it("extracts the statement header period and ignores transaction-row date ranges", () => {
     const metadata = extractBankMetadataFromOcrText(
       [
