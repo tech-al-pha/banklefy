@@ -30,12 +30,11 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { AIStatusPanel } from "@/components/AIStatusPanel";
 import { UnderwritingPanel } from "@/components/UnderwritingPanel";
 import { FraudAlertPanel } from "@/components/FraudAlertPanel";
 import { categoryColors, supportedBanks } from "./constants";
+import { parseStatementDateToIso } from "@/lib/date-parsing";
 import type {
-  AiStatus,
   Analytics,
   MergeInfo,
   Transaction,
@@ -92,7 +91,6 @@ type ResultsSectionProps = {
   exportAsCSV: () => Promise<void>;
   handleTallyExport: () => Promise<boolean>;
   handlePremiumExport: (format: "json" | "mt940") => void;
-  aiStatus: AiStatus | null;
   converting: boolean;
   analytics: Analytics | null;
   currencyCode: string;
@@ -103,7 +101,6 @@ type ResultsSectionProps = {
   showEditDetectorSignals?: boolean;
   resultMode?: "standard" | "tally_only";
   editedPdfCheckResult?: { fileName: string; status: "clean" | "suspected"; reason: string } | null;
-  showPipeline?: boolean;
   showUnderwriting?: boolean;
   showFraudSignals?: boolean;
   conversionProgressPercent?: number;
@@ -129,7 +126,6 @@ export const ResultsSection = ({
   exportAsCSV,
   handleTallyExport,
   handlePremiumExport,
-  aiStatus,
   converting,
   analytics,
   currencyCode,
@@ -140,7 +136,6 @@ export const ResultsSection = ({
   showEditDetectorSignals = true,
   resultMode = "standard",
   editedPdfCheckResult = null,
-  showPipeline = true,
   showUnderwriting = true,
   showFraudSignals = true,
   conversionProgressPercent = 0,
@@ -152,6 +147,11 @@ export const ResultsSection = ({
   const creditTone: ToneName = analytics ? getCreditTone(analytics.totalCredits) : "good";
   const debitTone: ToneName = analytics ? getDebitTone(analytics.totalCredits, analytics.totalDebits) : "moderate";
   const netFlowTone: ToneName = analytics ? getNetFlowTone(analytics.netFlow, analytics.totalCredits) : "moderate";
+  const statementMonthCount = new Set(
+    transactions
+      .map((transaction) => parseStatementDateToIso(transaction.date)?.slice(0, 7))
+      .filter((month): month is string => Boolean(month)),
+  ).size;
   const lockedFormats: string[] = [];
   if (isTallyOnlyMode && !hasTallyAccess) lockedFormats.push("Tally XML");
   if (!isPaidUser) lockedFormats.push("JSON", "MT940");
@@ -383,8 +383,6 @@ export const ResultsSection = ({
         </Card>
       )}
 
-      {showPipeline && aiStatus && (conversionResult || batchResults.length > 0) && <AIStatusPanel aiStatus={aiStatus} />}
-
       {converting && (
         <Card className="p-4 bg-[#191919]/80 border border-white/10">
           <div className="space-y-2">
@@ -400,7 +398,11 @@ export const ResultsSection = ({
         </Card>
       )}
       {showUnderwriting && !converting && !isTallyOnlyMode && analytics?.underwriting && (
-        <UnderwritingPanel underwriting={analytics.underwriting} currencyCode={currencyCode} />
+        <UnderwritingPanel
+          underwriting={analytics.underwriting}
+          currencyCode={currencyCode}
+          statementMonthCount={statementMonthCount}
+        />
       )}
 
       {!isTallyOnlyMode && showFraudSignals && analytics?.riskAnalysis && (
@@ -621,7 +623,7 @@ export const ResultsSection = ({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Card className="rounded-xl border border-sky-500/15 bg-sky-500/[0.06] p-3 shadow-none">
+        <Card className="rounded-xl border border-white/20 bg-[#191919]/70 p-3 shadow-none">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-sky-300" />
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">

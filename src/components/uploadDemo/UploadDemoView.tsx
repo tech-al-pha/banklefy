@@ -9,7 +9,6 @@ import { UploadDemoErrorCard } from "./UploadDemoErrorCard";
 import { UploadDemoConvertActions } from "./UploadDemoConvertActions";
 import { UploadDemoDialogs } from "./UploadDemoDialogs";
 import type {
-  AiStatus,
   Analytics,
   MergeInfo,
   Transaction,
@@ -70,7 +69,6 @@ type UploadDemoViewProps = {
   exportAsCSV: () => Promise<void>;
   handleTallyExport: () => Promise<boolean>;
   handlePremiumExport: (format: "json" | "mt940") => void;
-  aiStatus: AiStatus | null;
   analytics: Analytics | null;
   currencyCode: string;
   showDuplicatesOnly: boolean;
@@ -158,7 +156,6 @@ export const UploadDemoView = ({
   exportAsCSV,
   handleTallyExport,
   handlePremiumExport,
-  aiStatus,
   analytics,
   currencyCode,
   showDuplicatesOnly,
@@ -295,7 +292,6 @@ export const UploadDemoView = ({
                   exportAsCSV={exportAsCSV}
                   handleTallyExport={handleTallyExport}
                   handlePremiumExport={handlePremiumExport}
-                  aiStatus={aiStatus}
                   converting={converting}
                   analytics={analytics}
                   currencyCode={currencyCode}
@@ -306,7 +302,6 @@ export const UploadDemoView = ({
                   showEditDetectorSignals={hasEditPdfDetectorAccess}
                   resultMode={resultMode}
                   editedPdfCheckResult={editedPdfCheckResult}
-                  showPipeline={true}
                   showUnderwriting={showUnderwriting}
                   showFraudSignals={showFraudSignals}
                   conversionProgressPercent={progressStep}
