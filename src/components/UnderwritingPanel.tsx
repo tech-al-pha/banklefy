@@ -83,6 +83,7 @@ interface UnderwritingAnalysis {
 interface UnderwritingPanelProps {
   underwriting: UnderwritingAnalysis;
   currencyCode?: string;
+  statementMonthCount?: number;
 }
 
 const statusConfig = {
@@ -135,7 +136,7 @@ const loanTypeIcons: Record<string, React.ReactNode> = {
   'Unknown': <CircleDollarSign className="w-4 h-4" />,
 };
 
-export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPanelProps) => {
+export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCount }: UnderwritingPanelProps) => {
   const resolveTier = (): 'basic' | 'pro' | 'advanced' => {
     if (underwriting?.tier === 'advanced' || underwriting?.tier === 'pro' || underwriting?.tier === 'basic') {
       return underwriting.tier;
@@ -173,8 +174,6 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
   const monthlyBreakdown = underwriting?.monthlyBreakdown ?? [];
   const advancedSignals = underwriting?.advancedSignals;
 
-  const StatusIcon = statusConfig[eligibility.status]?.icon ?? statusConfig.moderate.icon;
-  
   // Calculate FOIR progress (0-100, where lower is better)
   const foirScore = summary.foirScore ?? 0;
   const foirProgress = Math.min(100, foirScore);
@@ -182,22 +181,44 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
     foirScore <= 30 ? 'excellent' :
     foirScore <= 50 ? 'good' :
     foirScore <= 65 ? 'moderate' : 'ineligible';
-  const foirProgressColor =
-    foirScore <= 30 ? 'tone-excellent-fill' :
-    foirScore <= 50 ? 'tone-good-fill' :
-    foirScore <= 65 ? 'tone-moderate-fill' : 'tone-bad-fill';
-  const incomeTone =
-    (summary.avgMonthlyIncome ?? 0) <= 0
+  const formatAmount = (
+    value: number,
+    options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
+  ) => formatCurrencyValue(value ?? 0, currencyCode, { ...options, showSymbol: false });
+
+  const statementMonths = statementMonthCount ?? monthlyBreakdown.length;
+  const hasSalaryEvidence = summary.totalSalaryDetected > 0;
+  const hasEmiEvidence = summary.totalEMIDetected > 0;
+  const hasReliableFoirHistory = statementMonths >= 2 && hasSalaryEvidence && hasEmiEvidence;
+  const limitedDataMessage = !hasReliableFoirHistory
+    ? statementMonths < 2
+      ? statementMonths > 0
+        ? `This statement has only ${statementMonths} month${statementMonths === 1 ? '' : 's'} of usable history. We can still show the EMI and transaction evidence that is present, but FOIR and loan headroom are not reliable yet.`
+        : 'No usable statement history was detected. We can still show the report framework, but FOIR and loan headroom are not available.'
+      : 'Salary or EMI history is too sparse to trust a FOIR or loan estimate yet.'
+    : '';
+  const showLimitedDataNotice = !hasReliableFoirHistory;
+  const displayFoirScore = hasReliableFoirHistory ? `${foirScore.toFixed(1)}%` : 'N/A';
+  const displayLoanEligibility = hasReliableFoirHistory
+    ? formatAmount(eligibility.estimatedLoanEligibility ?? 0, { maximumFractionDigits: 0 })
+    : 'N/A';
+  const displayMaxNewEmi = hasReliableFoirHistory
+    ? formatAmount(eligibility.maxNewEMI ?? 0)
+    : 'N/A';
+  const incomeTone = hasReliableFoirHistory
+    ? (summary.avgMonthlyIncome ?? 0) <= 0
       ? 'ineligible'
       : (summary.avgMonthlyEMI ?? 0) <= 0
         ? 'excellent'
-        : foirTone;
-  const emiTone =
-    (summary.avgMonthlyEMI ?? 0) <= 0
+        : foirTone
+    : 'moderate';
+  const emiTone = hasReliableFoirHistory
+    ? (summary.avgMonthlyEMI ?? 0) <= 0
       ? 'excellent'
-      : foirTone;
-  const eligibilityTone =
-    eligibility.status === 'excellent'
+      : foirTone
+    : 'moderate';
+  const eligibilityTone = hasReliableFoirHistory
+    ? eligibility.status === 'excellent'
       ? 'excellent'
       : eligibility.status === 'good'
         ? 'good'
@@ -205,11 +226,9 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
           ? 'moderate'
           : eligibility.status === 'poor'
             ? 'poor'
-            : 'ineligible';
-  const formatAmount = (
-    value: number,
-    options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
-  ) => formatCurrencyValue(value ?? 0, currencyCode, { ...options, showSymbol: false });
+            : 'ineligible'
+    : 'moderate';
+  const StatusIcon = statusConfig[hasReliableFoirHistory ? eligibility.status : 'moderate']?.icon ?? statusConfig.moderate.icon;
 
   return (
     <div className="space-y-4">
@@ -223,21 +242,27 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
           <Badge variant="outline" className="uppercase tracking-wide border-primary/30 text-primary">
             {underwritingTierLabel}
           </Badge>
-          <Badge variant="outline" className={`${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border} ${statusConfig[eligibility.status].text}`}>
-            {eligibility.status.toUpperCase()}
-          </Badge>
+          {showLimitedDataNotice ? (
+            <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-200">
+              LIMITED DATA
+            </Badge>
+          ) : (
+            <Badge variant="outline" className={`${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border} ${statusConfig[eligibility.status].text}`}>
+              {eligibility.status.toUpperCase()}
+            </Badge>
+          )}
         </div>
       </div>
 
       {/* Eligibility Summary Card */}
-      <Card className={`p-4 !bg-[#191919] ${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border}`}>
+      <Card className={`p-4 !bg-[#191919] ${showLimitedDataNotice ? "border-amber-500/25" : `${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border}`}`}>
         <div className="flex items-start gap-3">
-          <StatusIcon className={`w-6 h-6 ${statusConfig[eligibility.status].text} flex-shrink-0 mt-0.5`} />
+          <StatusIcon className={`w-6 h-6 ${showLimitedDataNotice ? "text-amber-200" : statusConfig[eligibility.status].text} flex-shrink-0 mt-0.5`} />
           <div className="flex-1">
-            <p className={`font-medium ${statusConfig[eligibility.status].text}`}>
-              {eligibility.message}
+            <p className={`font-medium ${showLimitedDataNotice ? "text-amber-100" : statusConfig[eligibility.status].text}`}>
+              {showLimitedDataNotice ? limitedDataMessage : eligibility.message}
             </p>
-            {eligibility.factors.length > 0 && (
+            {!showLimitedDataNotice && eligibility.factors.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {eligibility.factors.map((factor, i) => (
                   <Badge key={i} variant="outline" className="text-xs">
@@ -250,10 +275,22 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
         </div>
       </Card>
 
+      {showLimitedDataNotice && (
+        <Card className="p-4 !bg-[#191919] border-amber-500/25">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-200 flex-shrink-0" />
+            <div className="space-y-1">
+              <p className="font-medium text-amber-100">Not enough statement history for reliable FOIR</p>
+              <p className="text-sm text-muted-foreground">{limitedDataMessage}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* FOIR Score */}
-        <Card className="p-3 !bg-[#191919] card-hover-glow">
+        <Card className={`p-3 !bg-[#191919] card-hover-glow ${showLimitedDataNotice ? "border-amber-500/20" : ""}`}>
           <Tooltip>
             <TooltipTrigger className="w-full text-left no-hover-glow">
               <div className="flex items-center gap-2 text-xs label-muted mb-2">
@@ -261,10 +298,14 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
                 FOIR Score
               </div>
               <div className="space-y-2">
-                <p className={`text-2xl font-bold ${foirColors[summary.foirStatus] ?? ''}`}>
-                  {(foirScore ?? 0).toFixed(1)}%
+                <p className={`text-2xl font-bold ${showLimitedDataNotice ? "text-muted-foreground" : foirColors[summary.foirStatus] ?? ""}`}>
+                  {displayFoirScore}
                 </p>
-                <Progress value={foirProgress} className="h-1.5" />
+                {showLimitedDataNotice ? (
+                  <p className="text-xs text-muted-foreground">Need at least 2 months with salary and EMI evidence.</p>
+                ) : (
+                  <Progress value={foirProgress} className="h-1.5" />
+                )}
               </div>
             </TooltipTrigger>
             <TooltipContent className="max-w-[280px]">
@@ -284,10 +325,10 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
             Avg Monthly Income
           </div>
           <p className={`text-lg font-bold ${statusConfig[incomeTone].text}`}>
-            {formatAmount(summary.avgMonthlyIncome ?? 0, { maximumFractionDigits: 0 })}
+            {hasSalaryEvidence ? formatAmount(summary.avgMonthlyIncome ?? 0, { maximumFractionDigits: 0 }) : "N/A"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {summary.totalSalaryDetected ?? 0} salary credit(s)
+            {hasSalaryEvidence ? `${summary.totalSalaryDetected ?? 0} salary credit(s)` : "No salary credits detected"}
           </p>
         </Card>
 
@@ -298,10 +339,10 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
             Avg Monthly EMI
           </div>
           <p className={`text-lg font-bold ${statusConfig[emiTone].text}`}>
-            {formatAmount(summary.avgMonthlyEMI ?? 0, { maximumFractionDigits: 0 })}
+            {hasEmiEvidence ? formatAmount(summary.avgMonthlyEMI ?? 0, { maximumFractionDigits: 0 }) : "N/A"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {summary.totalEMIDetected ?? 0} EMI debit(s)
+            {hasEmiEvidence ? `${summary.totalEMIDetected ?? 0} EMI debit(s)` : "No EMI debits detected"}
           </p>
         </Card>
 
@@ -312,10 +353,10 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
             Est. Loan Eligibility
           </div>
           <p className={`text-lg font-bold ${statusConfig[eligibilityTone].text}`}>
-            {formatAmount(eligibility.estimatedLoanEligibility ?? 0, { maximumFractionDigits: 0 })}
+            {displayLoanEligibility}
           </p>
           <p className="text-xs text-muted-foreground">
-            Max new EMI: {formatAmount(eligibility.maxNewEMI ?? 0)}
+            Max new EMI: {displayMaxNewEmi}
           </p>
         </Card>
       </div>
@@ -439,7 +480,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
         )}
       </Accordion>
 
-      {showAdvancedInsights && advancedSignals && (
+      {showAdvancedInsights && advancedSignals && hasReliableFoirHistory && (
         <Card className="p-4 !bg-[#191919] border-primary/20">
           <h4 className="font-medium mb-3 flex items-center gap-2">
             <Wallet className="w-4 h-4 text-muted-foreground" />
@@ -485,7 +526,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode }: UnderwritingPa
       )}
 
       {/* No Data Message */}
-      {showAdvancedInsights && salaryCredits.length === 0 && emiDebits.length === 0 && (
+      {showAdvancedInsights && !showLimitedDataNotice && salaryCredits.length === 0 && emiDebits.length === 0 && (
         <Card className="p-4 !bg-[#191919] tone-moderate-border">
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 tone-moderate-text" />
