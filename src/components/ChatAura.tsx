@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
 import { supabase } from "@/integrations/supabase/client";
-import { getConversionResultStoragePath } from "@/lib/conversion-history";
 import { getPdfWorkerSrc } from "@/lib/pdfWorker";
 
 interface Message {
@@ -26,13 +25,6 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-}
-
-interface RecentConversion {
-  id: string;
-  file_name: string | null;
-  created_at: string | null;
-  status: string | null;
 }
 
 interface ChatAuraProps {
@@ -136,8 +128,6 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [chatUsed, setChatUsed] = useState(getChatUsage());
-  const [recentConversions, setRecentConversions] = useState<RecentConversion[]>([]);
-  const [recentLoading, setRecentLoading] = useState(false);
   const [isPreparingPdf, setIsPreparingPdf] = useState(false);
   const [pdfUploadError, setPdfUploadError] = useState<string | null>(null);
   const [activePdfContext, setActivePdfContext] = useState<string | null>(
@@ -175,69 +165,6 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
     };
     setMessages([greeting]);
   }, [activeFileName, activePdfContext, t]);
-
-  useEffect(() => {
-    if (!user) {
-      setRecentConversions([]);
-      return;
-    }
-
-    let isMounted = true;
-
-    const loadRecent = async () => {
-      setRecentLoading(true);
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
-        .from("conversions")
-        .select("id, original_filename, created_at, status")
-        .eq("user_id", user.id)
-        .gte("created_at", since)
-        .order("created_at", { ascending: false });
-
-      if (!isMounted) return;
-
-      if (!error && data) {
-        setRecentConversions(data.map((d: Record<string, unknown>) => ({
-          id: String(d.id ?? ''),
-          file_name: String(d.original_filename ?? ''),
-          created_at: String(d.created_at ?? ''),
-          status: String(d.status ?? ''),
-        })));
-      }
-      setRecentLoading(false);
-    };
-
-    loadRecent();
-
-    const channel = supabase
-      .channel(`chat-aura-conversions-${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversions", filter: `user_id=eq.${user.id}` },
-        () => {
-          loadRecent();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      isMounted = false;
-      supabase.removeChannel(channel);
-    };
-  }, [user]);
-
-  const findConversionFromMessage = (message: string) => {
-    if (!recentConversions.length) return null;
-    const normalizedMessage = message.toLowerCase();
-    const normalize = (name: string) => name.toLowerCase().replace(/\.[^/.]+$/, "");
-    const candidates = [...recentConversions].sort(
-      (a, b) => (b.file_name?.length ?? 0) - (a.file_name?.length ?? 0),
-    );
-    return candidates.find((conv) =>
-      (conv.file_name ? normalizedMessage.includes(conv.file_name.toLowerCase()) : false) ||
-      (conv.file_name ? normalizedMessage.includes(normalize(conv.file_name)) : false),
-    ) || null;
-  };
 
   const appendAssistantMessage = (content: string) => {
     const message: Message = {
@@ -293,8 +220,6 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
       timestamp: new Date(),
     };
 
-    const matchedConversion = findConversionFromMessage(userMessage.content);
-
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setIsLoading(true);
@@ -316,22 +241,6 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
         body: {
           message: userMessage.content,
           pdfContext: activePdfContext || null,
-          recentConversions: recentConversions.map((conv) => ({
-            id: conv.id,
-            fileName: conv.file_name ?? "document",
-            createdAt: conv.created_at ?? "",
-            status: conv.status,
-            resultPath: user ? getConversionResultStoragePath(user.id, conv.id) : null,
-          })),
-          selectedConversion: matchedConversion
-            ? {
-                id: matchedConversion.id,
-                fileName: matchedConversion.file_name ?? "document",
-                createdAt: matchedConversion.created_at ?? "",
-                status: matchedConversion.status,
-                resultPath: user ? getConversionResultStoragePath(user.id, matchedConversion.id) : null,
-              }
-            : null,
           conversationHistory: messages.map((m) => ({ role: m.role, content: m.content })),
           recaptchaToken: sessionToken ? null : recaptchaToken,
         },
@@ -387,13 +296,6 @@ export const ChatAura = ({ pdfContext, pdfFileName }: ChatAuraProps) => {
             <div>
               <CardTitle className="text-lg font-semibold">Chat Aura</CardTitle>
               <p className="text-xs text-muted-foreground">{t("chatAura.subtitle")}</p>
-              {user && (
-                <p className="text-[11px] text-muted-foreground">
-                  {recentLoading
-                    ? "Syncing your recent activity..."
-                    : `${recentConversions.length} recent file${recentConversions.length === 1 ? "" : "s"} indexed.`}
-                </p>
-              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
