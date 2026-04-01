@@ -73,7 +73,7 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   "/about": {
     title: "About | Banklefy",
     description:
-      "Product notes for Banklefy, including text-PDF parsing, OCR for scanned pages, saved conversions, and support channels.",
+      "Product notes for Banklefy, including text-PDF parsing, OCR for scanned pages, session-only processing, and support channels.",
   },
   "/sample-report": {
     title: "Sample Report | Banklefy",
@@ -82,7 +82,7 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   },
   "/privacy": {
     title: "Privacy Policy | Banklefy",
-    description: "What Banklefy collects, how it stores saved conversions, and how deletion works.",
+    description: "What Banklefy collects, how session-only processing works, and how deletion works.",
   },
   "/terms": {
     title: "Terms of Service | Banklefy",
@@ -138,7 +138,7 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   },
   "/blog/privacy": {
     title: "Privacy by Default: Secure File Handling and Deletion Control",
-    description: "How Banklefy handles temporary uploads, saved conversions, and privacy.",
+    description: "How Banklefy handles temporary uploads, session-only processing, and privacy.",
   },
   "/blog/multi-format-export": {
     title: "Multi-Format Export: Excel, CSV, JSON, XML & MT940 | Banklefy",
@@ -287,7 +287,7 @@ const getStructuredDataByRoute = (
           name: "Do you store my files?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Saved conversions remain in your account history until you delete them. Temporary uploads may be cleaned up after processing or a failed run.",
+            text: "Files are processed for the active session only. Download what you need before refreshing or closing the session.",
           },
         },
         {
