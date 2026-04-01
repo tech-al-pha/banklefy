@@ -160,7 +160,6 @@ export const useUploadDemoController = () => {
     Map<string, { transactions?: BatchFilePayload["pdfParsedTransactions"]; bankMetadata?: BatchFilePayload["pdfParsedBankMetadata"] }>
   >(new Map());
   const preparedPdfImagesRef = useRef<Map<string, string[]>>(new Map());
-  const preparedUploadedFileIdRef = useRef<Map<string, string>>(new Map());
   const passwordAutoSubmitTimerRef = useRef<number | null>(null);
   const lastAutoSubmittedPasswordRef = useRef<string>("");
   const passwordUnlockingRef = useRef(false);
@@ -245,57 +244,6 @@ export const useUploadDemoController = () => {
       return `This PDF is too heavy for one run (${payload}). Please split into smaller PDFs (recommended 10-20 pages each).`;
     }
     return `Selected batch is too heavy for one run (${payload}). Please split files into smaller batches.`;
-  };
-  const isTransientStorageUploadError = (error: unknown): boolean => {
-    const message =
-      typeof error === "string"
-        ? error
-        : error instanceof Error
-          ? error.message
-          : typeof error === "object" && error && "message" in error
-            ? String((error as { message?: unknown }).message ?? "")
-            : "";
-    const normalized = message.toLowerCase();
-    return (
-      normalized.includes("failed to fetch") ||
-      normalized.includes("networkerror") ||
-      normalized.includes("network request failed") ||
-      normalized.includes("err_timed_out") ||
-      normalized.includes("timeout")
-    );
-  };
-  const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
-  const uploadSourceFileWithRetry = async (storagePath: string, file: File) => {
-    const maxAttempts = 3;
-    let lastError: unknown = null;
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      const { error: uploadError } = await supabase.storage
-        .from("bank-statements")
-        .upload(storagePath, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (!uploadError) {
-        return;
-      }
-
-      // If previous attempt succeeded but response was interrupted, retry can hit "already exists".
-      if (String(uploadError.message || "").toLowerCase().includes("already exists")) {
-        return;
-      }
-
-      lastError = uploadError;
-      if (!isTransientStorageUploadError(uploadError) || attempt === maxAttempts) {
-        throw uploadError;
-      }
-
-      await sleep(attempt * 1000);
-    }
-
-    if (lastError) {
-      throw lastError;
-    }
   };
   const AUTO_CHUNK_MAX_PDF_PAGES = 25;
   const AUTO_CHUNK_MAX_PDF_BYTES = 8 * 1024 * 1024;
@@ -905,20 +853,6 @@ export const useUploadDemoController = () => {
                 preparedPdfDataRef.current.delete(cacheKey);
               }
             }
-
-            if (user) {
-              setUploadPrepProgress(82);
-              setUploadPrepLabel(`Uploading ${file.name}...`);
-              try {
-                const sanitized = sanitizeFilename(file.name);
-                const stagedFilePath = `${Date.now()}_${fileIndex}_${sanitized}`;
-                await uploadSourceFileWithRetry(`${user.id}/${stagedFilePath}`, file);
-                preparedUploadedFileIdRef.current.set(cacheKey, stagedFilePath);
-              } catch (uploadError) {
-                if (import.meta.env.DEV) { console.error("Pre-upload failed for selected file, will retry at convert time:", uploadError); }
-                preparedUploadedFileIdRef.current.delete(cacheKey);
-              }
-            }
           }
         } catch {
           // Preparation failures should not block file selection.
@@ -1122,25 +1056,9 @@ export const useUploadDemoController = () => {
         }
       }
 
-      if (user) {
-        // Authenticated user - prefer pre-uploaded file from selection phase.
-        const cacheKey = getFileCacheKey(fileToConvert);
-        const stagedFileId = preparedUploadedFileIdRef.current.get(cacheKey);
-        if (stagedFileId) {
-          requestBody.fileId = stagedFileId;
-        } else {
-          const sanitized = sanitizeFilename(fileToConvert.name);
-          const filePath = `${Date.now()}_${sanitized}`;
-          await uploadSourceFileWithRetry(`${user.id}/${filePath}`, fileToConvert);
-          requestBody.fileId = filePath;
-          preparedUploadedFileIdRef.current.set(cacheKey, filePath);
-        }
-      } else {
-          // Anonymous user - always send the original file bytes so the backend
-          // can keep deterministic parsing and still fall back to OCR when needed.
-        const base64Data = await fileToBase64(fileToConvert);
-        requestBody.fileData = base64Data;
-      }
+      // Always send the original file bytes so conversion stays stateless.
+      const base64Data = await fileToBase64(fileToConvert);
+      requestBody.fileData = base64Data;
 
       setUploading(false);
       setConverting(true);
@@ -1363,7 +1281,6 @@ export const useUploadDemoController = () => {
         setSelectedFiles([]);
         preparedPdfDataRef.current.clear();
         preparedPdfImagesRef.current.clear();
-        preparedUploadedFileIdRef.current.clear();
         setShowPasswordInput(false);
         setPdfPassword('');
         setPasswordError(false);
@@ -1623,7 +1540,6 @@ Analytics Summary:
       setSelectedFiles([]);
       preparedPdfDataRef.current.clear();
       preparedPdfImagesRef.current.clear();
-      preparedUploadedFileIdRef.current.clear();
       setShowPasswordInput(false);
       setPdfPassword('');
       setPasswordError(false);
@@ -1671,15 +1587,6 @@ Analytics Summary:
           variant: "destructive",
           title: "Verification Failed",
           description: "Please try again.",
-        });
-      } else if (isTransientStorageUploadError(errorMessage)) {
-        const networkMessage =
-          "Network timeout while uploading PDF. Please retry. If this keeps happening, disable VPN/proxy and check internet stability.";
-        setLastError({ message: networkMessage, canRetry: true });
-        toast({
-          variant: "destructive",
-          title: "Network Timeout",
-          description: networkMessage,
         });
       } else {
         // General error - can retry
@@ -1822,27 +1729,13 @@ Analytics Summary:
           }
         }
 
-        if (user) {
-          const cacheKey = getFileCacheKey(file);
-          const stagedFileId = preparedUploadedFileIdRef.current.get(cacheKey);
-          if (stagedFileId) {
-            payload.fileId = stagedFileId;
-          } else {
-            const sanitized = sanitizeFilename(file.name);
-            const filePath = `${Date.now()}_${index}_${sanitized}`;
-            await uploadSourceFileWithRetry(`${user.id}/${filePath}`, file);
-            payload.fileId = filePath;
-            preparedUploadedFileIdRef.current.set(cacheKey, filePath);
-          }
-        } else {
-          payload.fileData = await fileToBase64(file);
-        }
+        payload.fileData = await fileToBase64(file);
 
         requestBody.files.push(payload);
       }
 
       toast({
-        title: user ? "Files uploaded" : "Processing files",
+        title: "Processing files",
         description: "Starting batch conversion...",
       });
 
@@ -1991,7 +1884,6 @@ Analytics Summary:
       setSelectedFile(null);
       preparedPdfDataRef.current.clear();
       preparedPdfImagesRef.current.clear();
-      preparedUploadedFileIdRef.current.clear();
       setShowPasswordInput(false);
       setPdfPassword('');
       setPasswordError(false);
@@ -2037,15 +1929,6 @@ Analytics Summary:
           title: "Verification Failed",
           description: "Please try again.",
         });
-      } else if (isTransientStorageUploadError(errorMessage)) {
-        const networkMessage =
-          "Batch upload timed out while sending files. Please retry. If it repeats, reduce batch size or disable VPN/proxy.";
-        setLastError({ message: networkMessage, canRetry: true });
-        toast({
-          variant: "destructive",
-          title: "Network Timeout",
-          description: networkMessage,
-        });
       } else {
         setLastError({ message: errorMessage, canRetry: true });
         toast({
@@ -2070,14 +1953,6 @@ Analytics Summary:
         bytes[i] = binaryString.charCodeAt(i);
       }
       return bytes.buffer;
-    }
-    if (payload.resultPath && user) {
-      const { data, error } = await supabase.storage
-        .from('bank-statements')
-        .download(payload.resultPath);
-
-      if (error) throw error;
-      return await data.arrayBuffer();
     }
     throw new Error('No download available');
   };
@@ -2189,38 +2064,28 @@ Analytics Summary:
       for (const result of batchResults) {
         if (result.status !== 'success') continue;
 
-        let blob: Blob | null = null;
-
-        if (result.data?.excelData) {
-          const binaryString = atob(result.data.excelData);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        } else if (result.data?.resultPath && user) {
-          const { data: fileData, error } = await supabase.storage
-            .from('bank-statements')
-            .download(result.data.resultPath);
-          if (error || !fileData) {
-            throw error || new Error('Failed to download file');
-          }
-          blob = fileData;
+        if (!result.data?.excelData) {
+          throw new Error('Missing Excel data for one of the batch files.');
         }
 
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = result.downloadFileName || buildExcelDownloadName(undefined, result.fileName);
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-
-          // Small delay between downloads
-          await new Promise(resolve => setTimeout(resolve, 500));
+        const binaryString = atob(result.data.excelData);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
         }
+
+        const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = result.downloadFileName || buildExcelDownloadName(undefined, result.fileName);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Small delay between downloads
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       const successCount = batchResults.filter((result) => result.status === "success").length;
@@ -2245,28 +2110,16 @@ Analytics Summary:
 
     setMergeDownloading(true);
     try {
-      let blob: Blob | null = null;
-
-      if (mergeResult.excelData) {
-        const binaryString = atob(mergeResult.excelData);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      } else if (mergeResult.resultPath && user) {
-        const { data: fileData, error } = await supabase.storage
-          .from('bank-statements')
-          .download(mergeResult.resultPath);
-        if (error || !fileData) {
-          throw error || new Error('Failed to download file');
-        }
-        blob = fileData;
-      }
-
-      if (!blob) {
+      if (!mergeResult.excelData) {
         throw new Error('No merged file available to download.');
       }
+
+      const binaryString = atob(mergeResult.excelData);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2541,7 +2394,6 @@ Analytics Summary:
       const cacheKey = getFileCacheKey(removedFile);
       preparedPdfDataRef.current.delete(cacheKey);
       preparedPdfImagesRef.current.delete(cacheKey);
-      preparedUploadedFileIdRef.current.delete(cacheKey);
     }
 
     setSelectedFiles(selectedFiles.filter((_, i) => i !== index));
@@ -2552,7 +2404,6 @@ Analytics Summary:
   const handleClearSelectedFiles = () => {
     preparedPdfDataRef.current.clear();
     preparedPdfImagesRef.current.clear();
-    preparedUploadedFileIdRef.current.clear();
     setSelectedFiles([]);
     setSelectedFile(null);
     setEditedPdfWarning(null);
