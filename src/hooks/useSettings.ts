@@ -167,22 +167,12 @@ export const useSettings = () => {
     }
   }, [toast]);
 
-  const exportUserData = useCallback(async (userId: string) => {
+  const exportUserData = useCallback(async (_userId: string) => {
     setSaving(true);
     try {
-      // Fetch user's conversions
-      const { data: conversions, error } = await supabase
-        .from('conversions')
-        .select('*')
-        .eq('user_id', userId);
-
-      if (error) throw error;
-
-      // Create export data
       const exportData = {
         exportedAt: new Date().toISOString(),
         settings,
-        conversions: conversions || [],
       };
 
       // Download as JSON
