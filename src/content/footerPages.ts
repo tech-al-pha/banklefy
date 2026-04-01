@@ -64,7 +64,7 @@ export const termsSections: InfoCard[] = [
     icon: Database,
     title: "File handling",
     content:
-      "Uploaded files are processed to generate conversions and analysis. Saved conversions remain in your account history until you delete them. Temporary or orphaned uploads may be cleaned up automatically.",
+      "Uploaded files are processed to generate conversions and analysis during your active session. Download what you need before refresh or sign-out.",
   },
   {
     icon: Clock,
@@ -103,7 +103,7 @@ export const privacySections: InfoCard[] = [
     icon: Database,
     title: "Data we collect",
     content:
-      "We collect account details such as email, uploaded files, file metadata, generated outputs, conversion history, usage counters, billing references, and support messages. We also collect basic technical data such as IP address, browser, device, and timestamps for security and troubleshooting.",
+      "We collect account details such as email, upload metadata, usage counters, billing references, and support messages. We also collect basic technical data such as IP address, browser, device, and timestamps for security and troubleshooting.",
   },
   {
     icon: Eye,
@@ -121,7 +121,7 @@ export const privacySections: InfoCard[] = [
     icon: Clock,
     title: "Storage and retention",
     content:
-      "Saved conversions remain in your account history until you delete them. Temporary uploads and orphaned files may be cleaned up after processing or after a failed conversion. Some preferences and session state are stored in your browser using localStorage, sessionStorage, or a first-party cookie.",
+      "Uploaded files are processed during your active session only. Some preferences and session state are stored in your browser using localStorage, sessionStorage, or a first-party cookie.",
   },
   {
     icon: Shield,
@@ -133,7 +133,7 @@ export const privacySections: InfoCard[] = [
     icon: LockOpen,
     title: "Your choices",
     content:
-      "You can delete saved conversions, sign out, clear browser storage, and ask support about account or data requests. If you do not want a file stored in your history, delete it after download.",
+      "You can sign out, clear browser storage, and ask support about account or data requests. If you do not want a file to remain accessible, refresh or close the session after download.",
   },
   {
     icon: Mail,
@@ -178,7 +178,7 @@ export const securitySections: InfoCard[] = [
     icon: Database,
     title: "Retention and deletion",
     content:
-      "Saved conversions remain until you delete them. Temporary uploads and orphaned files may be cleaned up after processing or after failed jobs. There is no claim of automatic permanent backup deletion beyond those application flows.",
+      "Files are intended for active-session processing only. Temporary uploads may be cleaned up after processing or after failed jobs.",
   },
   {
     icon: Globe,
@@ -234,7 +234,7 @@ export const faqSections: InfoCard[] = [
     icon: Database,
     title: "Do you store my files?",
     content:
-      "Saved conversions stay in your account history until you delete them. Temporary uploads may be cleaned up after processing or a failed run.",
+      "Files stay available only during the active session. Temporary uploads may be cleaned up after processing or a failed run.",
   },
   {
     icon: BadgeDollarSign,
@@ -376,7 +376,7 @@ export const aboutHighlights: InfoCard[] = [
     icon: Database,
     title: "What it stores",
     content:
-      "Saved conversions, usage history, and billing references can remain in your account until you delete them. Temporary files may be cleaned up after processing.",
+      "Usage history and billing references can remain in your account, but uploaded files and exports are intended for active-session access only.",
   },
   {
     icon: Scale,
