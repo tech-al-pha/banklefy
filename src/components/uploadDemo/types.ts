@@ -197,7 +197,6 @@ export interface ConversionResponse {
 
 export interface BatchFilePayload {
   fileName: string;
-  fileId?: string;
   fileData?: string;
   pdfPageImages?: string[];
   pdfParsedTransactions?: Array<{
