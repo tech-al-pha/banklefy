@@ -52,7 +52,7 @@ export const termsSections: InfoCard[] = [
     icon: FileText,
     title: "What the service does",
     content:
-      "Banklefy processes uploaded bank statements and returns structured exports such as Excel, CSV, JSON, MT940, and PDF analysis outputs. Text-based PDFs are parsed directly. Scanned or image-based pages may use OCR.",
+      "Banklefy processes uploaded bank statements and returns structured exports such as Excel, CSV, JSON, and MT940 outputs. Text-based PDFs are parsed directly. Scanned or image-based pages may use OCR.",
   },
   {
     icon: ShieldCheck,
