@@ -38,22 +38,22 @@ const PrivacyPost = () => {
         <article className="space-y-6 text-base sm:text-lg text-muted-foreground leading-relaxed">
           <p>
             We built Banklefy to handle sensitive financial data with care. Statements are processed to
-            generate your export, temporary files are tied to your active session, and saved conversions
-            remain in your account history until you delete them.
+            generate your export, temporary files are tied to your active session, and processed files do
+            not stay in account history after the session ends.
           </p>
 
           <h2 className="text-2xl font-bold text-white">How access works</h2>
           <ul className="list-disc pl-6 space-y-2">
             <li>Temporary files are available while your session is active.</li>
-            <li>Saved conversions remain in your account history until you delete them.</li>
+            <li>Refresh or close the session and the processed file is no longer available in the app.</li>
             <li>Exports are generated on-demand for your selected format.</li>
             <li>We do not sell or share your statement data.</li>
           </ul>
 
           <h2 className="text-2xl font-bold text-white">What you can do</h2>
           <p>
-            For high-sensitivity workflows, export the data you need, download it, and delete the saved
-            conversion when you are done. You stay in control of how long it remains available.
+            For high-sensitivity workflows, export the data you need, download it, and refresh or close the
+            session when you are done. You stay in control of how long it remains available.
           </p>
         </article>
 
