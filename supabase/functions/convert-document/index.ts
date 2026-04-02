@@ -11,7 +11,6 @@ import {
   classifyDocument,
   callGroqVisionOCR,
   callMistralVisionOCR,
-  callTesseractOcrWorker,
   correctMinorBalanceDrift,
   extractBankMetadataFromOcrText,
   mergeOcrTransactionsDeterministic,
@@ -3096,8 +3095,6 @@ Deno.serve(async (req) => {
   }
 
   let supabaseAdmin: DocumentSupabaseClient | null = null;
-  let shouldCleanupUploadedSource = false;
-  let uploadedSourcePath: string | null = null;
   let sharedPdf: PdfDocumentProxy | null = null;
   const totalStart = Date.now();
   const timing: Record<string, number> = {
@@ -3123,7 +3120,6 @@ Deno.serve(async (req) => {
   try {
     // Parse request
     const {
-      fileId,
       fileName,
       fileData: base64FileData,
       timezone,
@@ -3153,33 +3149,6 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     const supabaseAdminClient = supabaseAdmin!;
-    const conversionsTable = () => supabaseAdminClient.from('conversions') as unknown as {
-      select: (...args: unknown[]) => any;
-      update: (...args: unknown[]) => any;
-      insert: (...args: unknown[]) => any;
-      upsert: (...args: unknown[]) => any;
-    };
-
-    const readConversionTimings = async (conversionId: string): Promise<Record<string, unknown>> => {
-      const { data, error } = await conversionsTable()
-        .select('processing_timings')
-        .eq('id', conversionId)
-        .single();
-
-      if (error || !data) {
-        return {};
-      }
-
-      return getProcessingTimings((data as Record<string, unknown>).processing_timings);
-    };
-
-    const updateConversionTimings = async (conversionId: string, patch: Record<string, unknown>) => {
-      const existingTimings = await readConversionTimings(conversionId);
-      return conversionsTable()
-        .update({ processing_timings: mergeProcessingTimings(existingTimings, patch) })
-        .eq('id', conversionId);
-    };
-
     // ============= AUTHENTICATION CHECK =============
     // Detect authenticated users via Authorization: Bearer <token> header
     // Use supabaseAdmin.auth.getUser(token) to validate the token server-side
@@ -3262,25 +3231,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!user && !hasBase64FileData) {
+    if (!hasBase64FileData) {
       return new Response(
-        JSON.stringify({ error: 'File data required for anonymous users' }),
+        JSON.stringify({ error: 'File data required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    if (user && !fileId && !hasBase64FileData) {
-      return new Response(
-        JSON.stringify({ error: 'File ID or fileData required for authenticated users' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    const storageFilePath = user && typeof fileId === 'string' && fileId.length > 0
-      ? (fileId.startsWith(`${user.id}/`) ? fileId : `${user.id}/${fileId}`)
-      : null;
-    if (storageFilePath) {
-      uploadedSourcePath = storageFilePath;
-      shouldCleanupUploadedSource = true;
     }
 
     if (typeof fileName !== 'string' || fileName.length > 255 || fileName.includes('..') || fileName.includes('/')) {
@@ -3325,55 +3280,7 @@ Deno.serve(async (req) => {
     let bytes: Uint8Array;
     let fileSource: 'storage' | 'base64' | 'none' = 'none';
 
-    if (user && storageFilePath) {
-      let fileData: Blob | null = null;
-      let downloadError: { message?: string } | null = null;
-      for (let attempt = 1; attempt <= 3; attempt += 1) {
-        const response = await supabaseAdminClient.storage
-          .from('bank-statements')
-          .download(storageFilePath);
-        fileData = response.data ?? null;
-        downloadError = response.error ?? null;
-        if (fileData) break;
-        if (attempt < 3) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-      }
-
-        if (!downloadError && fileData) {
-          const buffer = await fileData.arrayBuffer();
-          bytes = new Uint8Array(buffer);
-          fileSource = 'storage';
-        } else if (hasBase64FileData) {
-        try {
-          const dataUrlMatch = rawBase64Input.match(/^data:[^;]+;base64,(.+)$/);
-          const base64Content = (dataUrlMatch?.[1] || rawBase64Input || '').replace(/\s+/g, '');
-          const binaryString = atob(base64Content);
-          bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          fileSource = 'base64';
-        } catch {
-          return new Response(
-            JSON.stringify({ error: 'Invalid file data' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        } else {
-          console.error('Storage file lookup failed:', {
-            storageFilePath,
-            error: downloadError?.message || 'unknown',
-          });
-          return new Response(
-          JSON.stringify({
-            error: 'Source file is not ready yet. Please retry in a moment.',
-            code: 'SOURCE_FILE_NOT_READY',
-          }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      } else {
+    {
       try {
         const dataUrlMatch = rawBase64Input.match(/^data:[^;]+;base64,(.+)$/);
         const base64Content = (dataUrlMatch?.[1] || rawBase64Input || '').replace(/\s+/g, '');
@@ -3417,7 +3324,7 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           code: 'PDF_BYTES_MISSING',
-          error: 'PDF bytes missing. Please upload with original file data (fileId or fileData).',
+          error: 'PDF bytes missing. Please upload with original file data.',
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
@@ -3620,29 +3527,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Create conversion record for authenticated users
-    let conversion = null;
-    if (user) {
-      const insertPayload: Record<string, unknown> = {
-        user_id: user.id,
-        original_filename: fileName,
-        file_path: storageFilePath || `inline/${fileName}`,
-        status: 'processing',
-      };
-
-      const { data: convData, error: convError } = await supabase
-        .from('conversions')
-        .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
-        .select()
-        .single();
-
-      if (convError) {
-        console.error('Failed to create conversion record:', convError);
-      } else {
-        conversion = convData;
-        shouldCleanupUploadedSource = false;
-      }
-    }
+    const conversion = null;
 
     // ============= LAYER 1: SMART DOCUMENT ROUTER =============
     console.log('Starting multi-layered AI conversion for:', fileName);
@@ -4173,26 +4058,7 @@ Deno.serve(async (req) => {
                   );
                 }
               } else {
-                let workerResult: OCRResult | null = null;
-                let workerFailureReason: string | null = null;
-                try {
-                  workerResult = await callTesseractOcrWorker(pageBase64, pageMime, fileName);
-                } catch (workerError) {
-                  workerFailureReason = workerError instanceof Error ? workerError.message : 'Tesseract OCR worker failed';
-                }
-
-                const workerHasRows = !!(
-                  workerResult &&
-                  workerResult.success &&
-                  workerResult.transactions &&
-                  workerResult.transactions.length > 0
-                );
-                if (workerHasRows && workerResult) {
-                  pageResult = groqHasRows && groqResult
-                    ? mergeProviderResults(groqResult, workerResult)
-                    : workerResult;
-                  console.log(`Tesseract OCR worker used for page ${pageEntry.pageNumber}.`);
-                } else if (groqHasRows && groqResult) {
+                if (groqHasRows && groqResult) {
                   pageResult = groqResult;
                   return { pageResult, error: null, strictUsed, dualUsed, providersFailed };
                 } else {
@@ -4200,7 +4066,6 @@ Deno.serve(async (req) => {
                   const failureParts = [
                     groqFailureReason || 'Groq returned empty OCR result',
                     mistralFailureReason || 'Mistral returned empty OCR result',
-                    workerFailureReason || workerResult?.error || 'Tesseract worker returned empty OCR result',
                   ];
                   return {
                     pageResult: null as OCRResult | null,
@@ -4709,6 +4574,54 @@ Deno.serve(async (req) => {
       processedVia = 'deterministic';
     }
 
+    if ((!rawTransactions || rawTransactions.length === 0) && extractedText.trim().length > 0) {
+      const zeroRowRescueReason = 'zero_row_text_rescue';
+      const minimalStructuredLines = buildMinimalStructuredLines(extractedText);
+      if (minimalStructuredLines.length >= AI_RESCUE_MIN_TEXT_CHARS) {
+        console.log(`AI rescue triggered (${zeroRowRescueReason}).`);
+        const rescueStart = Date.now();
+        extractionResult.status.groqText.used = true;
+        const rescueResult = await attemptGroqTextRescue(minimalStructuredLines);
+        const rescueDuration = Date.now() - rescueStart;
+        extractionResult.status.groqText.time = rescueDuration;
+        timing.ai_ms += rescueDuration;
+        aiUsed = true;
+
+        if (rescueResult.rows && rescueResult.rows.length > 0) {
+          rawTransactions = rescueResult.rows;
+          processedVia = 'ai_rescue';
+          pagesWithData = Math.max(1, pagesWithData);
+          finalConfidenceScore = computeConfidenceBreakdownTimed({
+            rows: rescueResult.rows,
+            sourceText: minimalStructuredLines,
+            bankId: selectedBankId,
+            headerConfidenceHint: bankDetection.detectionConfidence,
+          }).score;
+          extractionResult.status.groqText.success = true;
+          pipelineDiagnostics.aiRescue = {
+            ok: true,
+            used: true,
+            reason: zeroRowRescueReason,
+            tokenUsage: rescueResult.tokenUsage,
+            rescueConfidence: rescueResult.rescueConfidence,
+            finalConfidenceScore,
+          };
+          console.log(`AI rescue accepted (${rescueResult.rows.length} rows).`);
+        } else {
+          extractionResult.status.groqText.success = false;
+          extractionResult.status.groqText.error = 'AI rescue returned no rows';
+          pipelineDiagnostics.aiRescue = {
+            ok: false,
+            used: true,
+            reason: zeroRowRescueReason,
+            tokenUsage: rescueResult.tokenUsage,
+            rescueConfidence: rescueResult.rescueConfidence,
+            error: 'no_rows',
+          };
+        }
+      }
+    }
+
     if (!rawTransactions || rawTransactions.length === 0) {
       // Generate error report for debugging
       const errorDetails = [];
@@ -4716,6 +4629,9 @@ Deno.serve(async (req) => {
 
       if (status.groqVision.used && !status.groqVision.success) {
         errorDetails.push(`Groq Vision: ${status.groqVision.error}`);
+      }
+      if (status.mistral.used && !status.mistral.success) {
+        errorDetails.push(`Mistral: ${status.mistral.error}`);
       }
       if (status.groqText.used && !status.groqText.success) {
         errorDetails.push(`Groq Text: ${status.groqText.error}`);
@@ -4732,20 +4648,6 @@ Deno.serve(async (req) => {
         const remainingPages = Math.max(0, conversionsLimit - conversionsUsed);
         const periodLabel = isPerPagePlan ? 'pack' : 'plan';
         const errorMessage = `This file has data on ${pagesToCharge} page${pagesToCharge === 1 ? '' : 's'}, but only ${remainingPages} page${remainingPages === 1 ? '' : 's'} remain in your ${periodLabel}.`;
-
-        if (conversion) {
-          await updateConversionTimings(conversion.id, {
-            failure: {
-              message: errorMessage,
-              at: new Date().toISOString(),
-              reason: 'page_limit_exceeded',
-            },
-          });
-          await supabaseAdminClient
-            .from('conversions')
-            .update({ status: 'failed' })
-            .eq('id', conversion.id);
-        }
 
         return new Response(
           JSON.stringify({
@@ -4948,20 +4850,6 @@ Deno.serve(async (req) => {
     };
 
     const outputTier = processedVia === 'deterministic' ? 'fast' : 'safe';
-    if (conversion?.id) {
-      try {
-        const { error: updateError } = await updateConversionTimings(conversion.id, {
-          processedVia,
-          outputTier,
-        });
-        if (updateError) {
-          console.error('Failed to update conversion processing metadata:', updateError);
-        }
-      } catch (updateError) {
-        console.error('Conversion processing metadata update crashed:', updateError);
-      }
-    }
-
     const outputStart = Date.now();
     const bankInfo = mergeBankMetadata(
       clientParsedBankMetadata,
@@ -5020,80 +4908,14 @@ Deno.serve(async (req) => {
         netFlow,
       },
       includeCompatibilityBundle: false,
-      prepareDownload: async (artifact) => {
-        const fileSize = artifact.fileBuffer.byteLength;
-        if (!user || !conversion) {
-          return { downloadUrl: null, storagePath: null, fileSize };
-        }
-
-        const storagePath = `${user.id}/${conversion.id}/result.xlsx`;
-        const { error: uploadError } = await supabaseAdminClient.storage
-          .from('bank-statements')
-          .upload(storagePath, artifact.fileBuffer, {
-            upsert: true,
-            contentType: artifact.mimeType,
-          });
-
-        if (uploadError) {
-          console.error('Failed to persist XLSX export artifact:', uploadError);
-          return { downloadUrl: null, storagePath: null, fileSize };
-        }
-
-        return { downloadUrl: null, storagePath, fileSize };
-      },
+      prepareDownload: async (artifact) => ({
+        downloadUrl: null,
+        storagePath: null,
+        fileSize: artifact.fileBuffer.byteLength,
+      }),
       commitExportTransaction: async (payload) => {
         const currentRemaining = Math.max(0, conversionsLimit - conversionsUsed);
         const remainingAfterDebit = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
-
-        let existingAuditEntry: Record<string, unknown> | null = null;
-        let existingTimings: Record<string, unknown> = {};
-        if (user && conversion) {
-          const { data: conversionRow, error: conversionError } = await supabaseAdminClient
-            .from('conversions')
-            .select('processing_timings')
-            .eq('id', conversion.id)
-            .single();
-
-          if (conversionError) {
-            return {
-              ok: false,
-              creditsRemaining: currentRemaining,
-              error: `Failed to load export ledger: ${conversionError.message}`,
-            };
-          }
-
-          const rawTimings =
-            conversionRow && typeof conversionRow === 'object'
-              ? (conversionRow as Record<string, unknown>).processing_timings
-              : null;
-          existingTimings =
-            rawTimings && typeof rawTimings === 'object' && !Array.isArray(rawTimings)
-              ? { ...(rawTimings as Record<string, unknown>) }
-              : {};
-
-          const exportAudit =
-            existingTimings.export_audit && typeof existingTimings.export_audit === 'object' && !Array.isArray(existingTimings.export_audit)
-              ? (existingTimings.export_audit as Record<string, unknown>)
-              : {};
-
-          const already = exportAudit[payload.exportId];
-          if (already && typeof already === 'object' && !Array.isArray(already)) {
-            existingAuditEntry = already as Record<string, unknown>;
-            const status = String(existingAuditEntry.status ?? '').toLowerCase();
-            if (status === 'success') {
-              return {
-                ok: true,
-                alreadyProcessed: true,
-                creditsRemaining: Number(existingAuditEntry.creditsRemaining ?? currentRemaining),
-                previous: {
-                  downloadUrl: (existingAuditEntry.downloadUrl as string | null | undefined) ?? null,
-                  storagePath: (existingAuditEntry.storagePath as string | null | undefined) ?? null,
-                  fileSize: Number(existingAuditEntry.fileSize ?? payload.fileSize),
-                },
-              };
-            }
-          }
-        }
 
         const { error: incrementError } = await (supabaseAdminClient.rpc as any)('increment_usage_count', {
           p_ip_address: user ? undefined : trackingKey,
@@ -5106,49 +4928,6 @@ Deno.serve(async (req) => {
             creditsRemaining: currentRemaining,
             error: `Credit deduction failed: ${incrementError.message}`,
           };
-        }
-
-        if (user && conversion) {
-          const exportEntry = {
-            exportId: payload.exportId,
-            userId: user.id,
-            format: payload.format,
-            creditsUsed: payload.creditsUsed,
-            timestamp: payload.timestamp,
-            status: 'success',
-            rowCount: payload.rowCount,
-            fileSize: payload.fileSize,
-            downloadUrl: payload.downloadUrl,
-            storagePath: payload.storagePath,
-            planName: payload.planName,
-            creditsRemaining: remainingAfterDebit,
-            sessionId: payload.sessionId,
-          };
-
-          const currentAudit =
-            existingTimings.export_audit && typeof existingTimings.export_audit === 'object' && !Array.isArray(existingTimings.export_audit)
-              ? (existingTimings.export_audit as Record<string, unknown>)
-              : {};
-
-          const updatedTimings = {
-            ...existingTimings,
-            export_audit: {
-              ...currentAudit,
-              [payload.exportId]: exportEntry,
-            },
-          } as ConversionProcessingTimings;
-
-          const { error: ledgerError } = await conversionsTable()
-            .update({ processing_timings: updatedTimings })
-            .eq('id', conversion.id);
-
-          if (ledgerError) {
-            return {
-              ok: false,
-              creditsRemaining: remainingAfterDebit,
-              error: `Export audit commit failed: ${ledgerError.message}`,
-            };
-          }
         }
 
         return {
@@ -5210,23 +4989,6 @@ Deno.serve(async (req) => {
     }
 
     if (user && conversion) {
-      const storageTimings = {
-        storage: {
-          sourcePath: uploadedSourcePath,
-          resultPath,
-        },
-      };
-      await supabaseAdminClient
-        .from('conversions')
-        .update({
-          status: 'completed',
-          processing_timings: mergeProcessingTimings(
-            await readConversionTimings(conversion.id),
-            storageTimings,
-          ),
-        })
-        .eq('id', conversion.id);
-
       await supabaseAdminClient
         .from('risk_analysis')
         .upsert({
@@ -5305,22 +5067,6 @@ Deno.serve(async (req) => {
         `Timing exceeded expected target: ${timing.total_ms}ms (expected <= ${expectedTotal}ms, mode=${processedVia})`,
       );
     }
-    if (conversion?.id) {
-      try {
-        const { error: timingError } = await conversionsTable()
-          .update({
-            processing_timings: mergeProcessingTimings(await readConversionTimings(conversion.id), timing),
-            processing_total_ms: timing.total_ms,
-          })
-          .eq('id', conversion.id);
-        if (timingError && !/processing_timings|processing_total_ms/i.test(timingError.message || '')) {
-          console.error('Failed to update conversion timings:', timingError);
-        }
-      } catch (timingError) {
-        console.error('Conversion timing update crashed:', timingError);
-      }
-    }
-
     return new Response(
       JSON.stringify({
         success: true,
@@ -5387,20 +5133,6 @@ Deno.serve(async (req) => {
         console.error('Failed to destroy shared PDF document:', destroyError);
       } finally {
         sharedPdf = null;
-      }
-    }
-    if (shouldCleanupUploadedSource && uploadedSourcePath && supabaseAdmin) {
-      try {
-        const { error } = await supabaseAdmin.storage
-          .from('bank-statements')
-          .remove([uploadedSourcePath]);
-        if (error) {
-          console.error('Failed to cleanup orphan source upload:', uploadedSourcePath, error);
-        } else {
-          console.log('Cleaned orphan source upload:', uploadedSourcePath);
-        }
-      } catch (cleanupError) {
-        console.error('Unexpected cleanup failure for source upload:', uploadedSourcePath, cleanupError);
       }
     }
   }
