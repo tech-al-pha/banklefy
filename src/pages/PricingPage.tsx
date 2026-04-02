@@ -20,11 +20,24 @@ type Plan = {
   unit: string;
   description: string;
   statements: string;
+  statementsNote?: string;
   features: string[];
   editPdfDetector?: "Basic" | "Advanced";
   savings?: string;
   highlighted?: boolean;
   isFree?: boolean;
+};
+
+type ComparisonRow = {
+  label: string;
+  values: string[];
+};
+
+type ComparisonTable = {
+  title: string;
+  description: string;
+  columns: string[];
+  rows: ComparisonRow[];
 };
 
 const pricingPlans: Plan[] = [
@@ -35,7 +48,7 @@ const pricingPlans: Plan[] = [
     price: "₹0",
     amountInRupee: 0,
     unit: "forever",
-    description: "Guest access gets 2 pages/day; signed-in free users get 5 pages/day.",
+    description: "Free for guest and logged-in users.",
     statements: "2 Pages / day (Guest) | 5 Pages / day (Signed in)",
     features: ["Excel/CSV exports", "Basic parsing", "No AI-only features"],
     isFree: true,
@@ -44,29 +57,30 @@ const pricingPlans: Plan[] = [
     planId: "per_page_pack_basic",
     category: "perPage",
     name: "Basic Pack",
-    price: "₹1,899",
-    amountInRupee: 1899,
+    price: "₹1,999",
+    amountInRupee: 1999,
     unit: "one-time",
     description: "Best for occasional usage",
     statements: "1,000 Pages",
-    features: ["Excel/CSV exports", "Tally/MT940 available", "FOIR + EMI insights"],
+    statementsNote: "100 premium formats",
+    features: ["Excel with 3 basic formats", "Tally + premium formats", "FOIR + EMI insights"],
     highlighted: true,
   },
   {
     planId: "per_page_pack_pro",
     category: "perPage",
     name: "Pro Pack",
-    price: "₹18,999",
-    amountInRupee: 18999,
+    price: "₹19,999",
+    amountInRupee: 19999,
     unit: "one-time",
     description: "High-volume credits for teams",
     statements: "11,000 Pages",
+    statementsNote: "1000 premium formats",
     features: [
-      "Excel/CSV exports",
-      "Tally/MT940 available",
+      "Excel with 3 basic formats",
+      "Tally + premium formats",
       "FOIR + EMI insights",
       "Fraud + edited PDF checks",
-      "Priority processing",
     ],
   },
 ];
@@ -77,23 +91,23 @@ const perConversionPlans: Plan[] = [
     planId: "per_page_lite",
     category: "perPage",
     name: "Lite",
-    price: "₹89",
-    amountInRupee: 89,
+    price: "₹99",
+    amountInRupee: 99,
     unit: "/conversion",
     description: "Quick single conversion",
     statements: "10 Pages",
-    features: ["Analyzed PDF Report", "Download in 4 Formats"],
+    features: ["XLSX with 3 basic formats"],
   },
   {
     planId: "per_page_standard",
     category: "perPage",
     name: "Standard",
-    price: "₹179",
-    amountInRupee: 179,
+    price: "₹199",
+    amountInRupee: 199,
     unit: "/conversion",
     description: "Popular for small batches",
     statements: "25 Pages",
-    features: ["Analyzed PDF Report", "Download in 4 Formats"],
+    features: ["XLSX with 3 basic formats"],
     highlighted: true,
   },
   {
@@ -105,7 +119,44 @@ const perConversionPlans: Plan[] = [
     unit: "/conversion",
     description: "For larger batches",
     statements: "50 Pages",
-    features: ["Analyzed PDF Report", "Download in 4 Formats"],
+    features: ["XLSX with 3 basic formats"],
+  },
+];
+
+const comparisonTables: ComparisonTable[] = [
+  {
+    title: "Credit Pack Comparison",
+    description: "Compare recurring access and premium feature unlocks across Free, Basic Pack, and Pro Pack.",
+    columns: ["Feature", "Free", "Basic Pack", "Pro Pack"],
+    rows: [
+      { label: "Pages included", values: ["2/day guest, 5/day login", "1,000 pages", "11,000 pages"] },
+      { label: "XLSX", values: ["Yes", "Yes", "Yes"] },
+      { label: "CSV", values: ["Yes", "Yes", "Yes"] },
+      { label: "JSON", values: ["No", "Yes", "Yes"] },
+      { label: "MT940", values: ["No", "Yes", "Yes"] },
+      { label: "Tally XML", values: ["No", "Yes", "Yes"] },
+      { label: "Underwriting insights", values: ["No", "Yes", "Yes"] },
+      { label: "Fraud checks", values: ["No", "No", "Yes"] },
+      { label: "Edited PDF checks", values: ["No", "Basic", "Advanced"] },
+      { label: "Premium format quota", values: ["None", "100 formats", "1000 formats"] },
+    ],
+  },
+  {
+    title: "One-Time Conversion Comparison",
+    description: "See what each one-time conversion plan unlocks before you choose a single-run package.",
+    columns: ["Feature", "Lite", "Standard", "Power"],
+    rows: [
+      { label: "Pages per conversion", values: ["10", "25", "50"] },
+      { label: "XLSX", values: ["Yes", "Yes", "Yes"] },
+      { label: "CSV", values: ["Yes", "Yes", "Yes"] },
+      { label: "JSON", values: ["Yes", "Yes", "Yes"] },
+      { label: "MT940", values: ["Yes", "Yes", "Yes"] },
+      { label: "Tally XML", values: ["No", "No", "No"] },
+      { label: "Underwriting insights", values: ["No", "No", "No"] },
+      { label: "Fraud checks", values: ["No", "No", "No"] },
+      { label: "Edited PDF checks", values: ["No", "No", "No"] },
+      { label: "Best for", values: ["Quick single file", "Small batches", "Larger batches"] },
+    ],
   },
 ];
 
@@ -402,6 +453,9 @@ const PricingPage = () => {
           {plan.statements && (
             <div className="py-3 px-4 bg-primary/10 border border-primary/20 rounded-lg">
               <p className="text-sm font-semibold text-primary">{plan.statements}</p>
+              {plan.statementsNote && (
+                <p className="mt-1 text-xs font-medium text-primary/80">{plan.statementsNote}</p>
+              )}
             </div>
           )}
 
@@ -442,6 +496,45 @@ const PricingPage = () => {
     );
   };
 
+  const renderComparisonTable = (table: ComparisonTable) => (
+    <div key={table.title} className="space-y-4">
+      <div className="space-y-1">
+        <h3 className="text-lg md:text-xl font-bold text-white">{table.title}</h3>
+        <p className="text-sm text-muted-foreground">{table.description}</p>
+      </div>
+      <div className="overflow-x-auto rounded-2xl border border-primary/20 bg-[#161616]/75 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+        <table className="min-w-full border-collapse">
+          <thead>
+            <tr className="border-b border-primary/15">
+              {table.columns.map((column, index) => (
+                <th
+                  key={column}
+                  className={`px-4 py-4 text-left text-xs font-extrabold uppercase tracking-[0.2em] text-white ${
+                    index === 0 ? "min-w-[220px]" : "min-w-[170px]"
+                  }`}
+                >
+                  {column}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {table.rows.map((row) => (
+              <tr key={row.label} className="border-b border-primary/10 last:border-b-0">
+                <td className="px-4 py-4 text-sm font-bold text-white">{row.label}</td>
+                {row.values.map((value, index) => (
+                  <td key={`${row.label}-${index}`} className="px-4 py-4 text-sm font-semibold text-white/82">
+                    {value}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
@@ -469,9 +562,6 @@ const PricingPage = () => {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Simple one-time credit packs. Buy once and use credits anytime.
           </p>
-          <p className="text-sm font-medium text-yellow-300/90">
-            Analyzed PDF is a paid-only feature and is not available on free usage.
-          </p>
         </section>
 
         {/* Pricing cards */}
@@ -493,6 +583,20 @@ const PricingPage = () => {
           </p>
           <div className="grid md:grid-cols-3 gap-8">
             {perConversionPlans.map(renderPlanCard)}
+          </div>
+        </section>
+
+        <section className="mb-12">
+          <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6 sm:p-8 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
+            <div className="space-y-2">
+              <h2 className="text-xl md:text-2xl font-bold text-white">Plan comparison</h2>
+              <p className="text-sm text-muted-foreground">
+                Transparent feature matrix based on the current plan logic in the app.
+              </p>
+            </div>
+            <div className="mt-8 space-y-10">
+              {comparisonTables.map(renderComparisonTable)}
+            </div>
           </div>
         </section>
 
