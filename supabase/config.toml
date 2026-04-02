@@ -12,14 +12,7 @@ verify_jwt = false
 [functions.chat-aura]
 verify_jwt = true
 
-[functions.health-check]
-verify_jwt = true
 
-[functions.admin-dashboard]
-verify_jwt = true
-
-[functions.api-status]
-verify_jwt = true
 
 [functions.convert-statements-batch]
 verify_jwt = false
@@ -33,9 +26,5 @@ verify_jwt = false
 [functions.delete-account]
 verify_jwt = true
 
-[functions.delete-conversion]
-verify_jwt = true
 
-[functions.purge-expired-conversions]
-verify_jwt = true
 
