@@ -259,9 +259,16 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
         <div className="flex items-start gap-3">
           <StatusIcon className={`w-6 h-6 ${showLimitedDataNotice ? "text-amber-200" : statusConfig[eligibility.status].text} flex-shrink-0 mt-0.5`} />
           <div className="flex-1">
-            <p className={`font-medium ${showLimitedDataNotice ? "text-amber-100" : statusConfig[eligibility.status].text}`}>
-              {showLimitedDataNotice ? limitedDataMessage : eligibility.message}
-            </p>
+            {showLimitedDataNotice ? (
+              <div className="space-y-1">
+                <p className="font-medium text-amber-100">Not enough statement history for reliable FOIR</p>
+                <p className="text-sm text-amber-50/90">{limitedDataMessage}</p>
+              </div>
+            ) : (
+              <p className={`font-medium ${statusConfig[eligibility.status].text}`}>
+                {eligibility.message}
+              </p>
+            )}
             {!showLimitedDataNotice && eligibility.factors.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {eligibility.factors.map((factor, i) => (
@@ -274,18 +281,6 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
           </div>
         </div>
       </Card>
-
-      {showLimitedDataNotice && (
-        <Card className="p-4 !bg-[#191919] border-amber-500/25">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-200 flex-shrink-0" />
-            <div className="space-y-1">
-              <p className="font-medium text-amber-100">Not enough statement history for reliable FOIR</p>
-              <p className="text-sm text-muted-foreground">{limitedDataMessage}</p>
-            </div>
-          </div>
-        </Card>
-      )}
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
