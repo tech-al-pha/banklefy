@@ -48,11 +48,11 @@ type PlanPricing = {
 };
 
 const PLAN_PRICING: Record<string, PlanPricing> = {
-  per_page_lite: { amount: 89, currency: 'INR' },
-  per_page_standard: { amount: 179, currency: 'INR' },
+  per_page_lite: { amount: 99, currency: 'INR' },
+  per_page_standard: { amount: 199, currency: 'INR' },
   per_page_power: { amount: 299, currency: 'INR' },
-  per_page_pack_basic: { amount: 1899, currency: 'INR' },
-  per_page_pack_pro: { amount: 18999, currency: 'INR' },
+  per_page_pack_basic: { amount: 1999, currency: 'INR' },
+  per_page_pack_pro: { amount: 19999, currency: 'INR' },
 };
 
 const buildNotes = (planId: string, userId: string, extra?: Record<string, unknown>) => {
