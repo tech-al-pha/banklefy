@@ -42,7 +42,7 @@ const posts = [
     title: "Privacy Handling",
     date: "Feb 7, 2026",
     summary:
-      "Temporary uploads, saved conversions, browser storage, and account history are handled separately so the data flow stays easier to understand.",
+      "Temporary uploads, session-only processing, and browser storage are handled separately so the data flow stays easier to understand.",
   },
   {
     id: "accuracy",
