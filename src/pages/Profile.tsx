@@ -30,7 +30,6 @@ const Profile = () => {
   const [emailSaving, setEmailSaving] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const [totalConversions, setTotalConversions] = useState<number | null>(null);
   const authFlags = user as { email_confirmed_at?: string | null; confirmed_at?: string | null } | null;
   const isVerified = Boolean(authFlags?.email_confirmed_at || authFlags?.confirmed_at);
 
@@ -40,26 +39,6 @@ const Profile = () => {
       return;
     }
 
-    let isActive = true;
-    setTotalConversions(null);
-
-    const loadTotalConversions = async () => {
-      const { count, error } = await supabase
-        .from("conversions")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
-
-      if (!isActive) return;
-      if (!error && typeof count === "number") {
-        setTotalConversions(count);
-      }
-    };
-
-    loadTotalConversions();
-
-    return () => {
-      isActive = false;
-    };
   }, [navigate, user]);
 
   useEffect(() => {
@@ -277,9 +256,9 @@ const Profile = () => {
           <Card className="p-6 glass-card">
             <div className="flex flex-col gap-1 mb-5">
               <h2 className="text-xl font-semibold">Usage & Achievements</h2>
-              <p className="text-sm text-muted-foreground">Track your credits and lifetime conversions at a glance.</p>
+              <p className="text-sm text-muted-foreground">Track your credits and current usage at a glance.</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-primary/20 bg-[#121212] p-4">
                 <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Credits Remaining</p>
                 <p className="mt-2 text-3xl font-bold text-primary">{remaining}</p>
@@ -291,11 +270,6 @@ const Profile = () => {
                   {conversionsUsed}/{conversionsLimit}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Daily usage</p>
-              </div>
-              <div className="rounded-xl border border-primary/20 bg-[#121212] p-4">
-                <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Total Conversions</p>
-                <p className="mt-2 text-2xl font-semibold text-foreground">{totalConversions ?? 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">Lifetime statements processed</p>
               </div>
             </div>
           </Card>
