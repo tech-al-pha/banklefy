@@ -364,17 +364,39 @@ const inferDebitCreditFromContext = (
 const isNoiseLine = (line: string): boolean => {
   const lower = line.toLowerCase();
   if (!lower) return true;
+  const hasArabic = /[\u0600-\u06FF]/.test(line);
   if (lower.includes("account statement")) return true;
+  if (/^from\s+\d{1,2}\/\d{1,2}\/\d{2,4}\s+to\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b/i.test(line)) return true;
   if (lower.includes("total records")) return true;
   if (lower.includes("transaction date") && lower.includes("value date")) return true;
   if (lower.includes("running balance")) return true;
   if (lower.includes('opening balance')) return true;
   if (lower.includes('closing balance')) return true;
+  if (lower.includes('summary of accounts')) return true;
+  if (lower.includes('account holder name')) return true;
+  if (lower.includes('account type')) return true;
+  if (lower.includes('account opened')) return true;
+  if (lower.includes('amount balance')) return true;
+  if (lower.includes('date ref. number description')) return true;
+  if (lower.includes('(incl. vat)')) return true;
+  if (lower.includes('please review this account statement')) return true;
+  if (lower.includes('within 30 days. if no issues are reported')) return true;
+  if (lower.includes("correct (subject to the bank's right to correct errors)")) return true;
+  if (lower.includes('to raise a complaint, contact wio bank customer service')) return true;
+  if (lower.includes('this bank is regulated by cbuae')) return true;
   if (lower.includes('total debit')) return true;
   if (lower.includes('total credit')) return true;
   if (lower.includes('generated on')) return true;
   if (lower.includes('this is a system generated')) return true;
   if (/^page\s*\d+(\s*of\s*\d+)?$/i.test(line)) return true;
+  if (
+    hasArabic &&
+    !DATE_TOKEN.test(line) &&
+    !/\bP\d{6,}\b/i.test(line) &&
+    !hasLikelyAmountTail(line)
+  ) {
+    return true;
+  }
   return false;
 };
 
@@ -797,6 +819,7 @@ const extractPdfTextTransactionsFromBytes = async (
       const textContent = await page.getTextContent?.();
       const lineEntries = groupTokensIntoLines((textContent?.items || []) as Array<Record<string, unknown>>);
       allLineEntries.push(...lineEntries);
+      allLineEntries.push({ text: '__PAGE_BREAK__', tokens: [] });
       allLines.push(...lineEntries.map((entry) => entry.text));
     }
 
@@ -805,6 +828,10 @@ const extractPdfTextTransactionsFromBytes = async (
     for (const entry of allLineEntries) {
       currentLineNumber += 1;
       const line = entry.text;
+      if (line === '__PAGE_BREAK__') {
+        flushCurrent();
+        continue;
+      }
       if (isNoiseLine(line)) {
         console.log("[ROW_DROP]", {
           reason: "noise",
@@ -3761,11 +3788,18 @@ Deno.serve(async (req) => {
     const hardTextGateActive =
       isPdf &&
       selectableTextDocument &&
+      clientParsedTransactions.length > 0 &&
       !forceOcrForLargeDocument &&
       !forceOcrForIncompleteTextExtraction &&
       !forceOcrForDenseStatement;
+    const forceDeterministicForSelectableText =
+      isPdf &&
+      structuralScan.hasSelectableText === true &&
+      clientParsedTransactions.length >= Math.max(2, pageCount) &&
+      !forceOcrForLargeDocument &&
+      !forceOcrForIncompleteTextExtraction;
     let skipOCR = false;
-    if (hardTextGateActive) {
+    if (hardTextGateActive || forceDeterministicForSelectableText) {
       console.log('HARD TEXT GATE ACTIVATED - SKIPPING OCR');
       skipOCR = true;
     }
@@ -3803,7 +3837,8 @@ Deno.serve(async (req) => {
         ) &&
         !forceOcrForIncompleteTextExtraction &&
         !forceOcrForLargeDocument
-      );
+      ) ||
+      forceDeterministicForSelectableText;
     const ocrDecisionLineRef =
       "supabase/functions/convert-document/index.ts:3282 (if canUseDeterministicClientPdf) / :3301 (else if isPdf && hasPdfPageImages => OCR)";
     const ocrFailedConditions: string[] = [];
@@ -3847,6 +3882,7 @@ Deno.serve(async (req) => {
       confidenceScore: internalGateConfidence,
       threshold: DETERMINISTIC_CONFIDENCE_THRESHOLD,
       skipOcr: canUseDeterministicClientPdf,
+      forceDeterministicForSelectableText,
     };
 
     if (preferDeterministicFastPath && !clientPdfParseAssessment.useDeterministic) {
@@ -3919,7 +3955,7 @@ Deno.serve(async (req) => {
           groqText: { used: false, success: false },
           patternFallback: { used: false, success: false },
         },
-        extractedText: '',
+        extractedText,
       };
       processedVia = 'deterministic';
       pagesWithData = Math.max(1, pageCount);
