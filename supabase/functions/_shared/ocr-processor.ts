@@ -467,9 +467,6 @@ type OcrNormalizeOptions = {
 };
 
 const LOW_CONFIDENCE_THRESHOLD = 0.8;
-const OCR_WORKER_URL = (readEnv('OCR_WORKER_URL') ?? '').trim().replace(/\/+$/, '');
-const OCR_WORKER_API_KEY = (readEnv('OCR_WORKER_API_KEY') ?? '').trim();
-const OCR_WORKER_TIMEOUT_MS = Math.max(5000, Number(readEnv('OCR_WORKER_TIMEOUT_MS') ?? '45000'));
 const OCR_UNREADABLE_DESCRIPTION = 'UNREADABLE';
 
 const OCR_NOISE_ROW_PATTERN =
@@ -983,80 +980,6 @@ export const normalizeOcrRawTransactions = (
   const validated = applyRowLevelBalanceValidation(locked);
   return addOcrConfidence(validated);
 };
-
-export async function callTesseractOcrWorker(
-  imageBase64: string,
-  mimeType: string,
-  fileName?: string,
-): Promise<OCRResult> {
-  if (!OCR_WORKER_URL) {
-    return {
-      success: false,
-      error: 'Tesseract OCR worker not configured',
-    };
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), OCR_WORKER_TIMEOUT_MS);
-  try {
-    const response = await fetch(`${OCR_WORKER_URL}/ocr/page`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(OCR_WORKER_API_KEY ? { 'x-api-key': OCR_WORKER_API_KEY } : {}),
-      },
-      body: JSON.stringify({
-        imageBase64,
-        mimeType,
-        fileName,
-        debug: false,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      return {
-        success: false,
-        error: `Tesseract OCR worker error: ${response.status}${errorText ? ` ${errorText}` : ''}`,
-      };
-    }
-
-    const payload = await response.json() as {
-      success?: boolean;
-      text?: string;
-      transactions?: unknown[];
-      bankMetadata?: Record<string, unknown> | null;
-      error?: string;
-    };
-
-    if (!payload.success) {
-      return {
-        success: false,
-        error: payload.error || 'Tesseract OCR worker returned failure',
-      };
-    }
-
-    const normalizedTransactions = Array.isArray(payload.transactions)
-      ? normalizeOcrRawTransactions(payload.transactions, { strictColumnLock: true })
-      : [];
-
-    return {
-      success: normalizedTransactions.length > 0 || Boolean(payload.text),
-      transactions: normalizedTransactions,
-      bankMetadata: payload.bankMetadata ? normalizeBankMetadata(payload.bankMetadata) : undefined,
-      metadata: summarizeOcrMetadata(normalizedTransactions),
-      text: payload.text || '',
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Tesseract OCR worker request failed',
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
 
 type GroqVisionOcrOptions = {
   strictTableMode?: boolean;
