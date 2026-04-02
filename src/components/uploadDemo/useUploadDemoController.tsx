@@ -1566,6 +1566,7 @@ Analytics Summary:
           errorMessage.toLowerCase().includes('encrypted') ||
           errorMessage.toLowerCase().includes('protected')) {
         setPasswordError(true);
+        setShowPasswordInput(true);
         setLastError(null);
         toast({
           variant: "destructive",
