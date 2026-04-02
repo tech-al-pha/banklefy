@@ -52,9 +52,6 @@ const FeaturesPage = () => {
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
             {t('featuresPage.subtitle')}
           </p>
-          <p className="mt-3 text-sm font-medium text-yellow-300/90">
-            Analyzed PDF is available on paid plans only.
-          </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             {featureCategoryOrder.map((cat) => (
               <span 
