@@ -85,7 +85,7 @@ export const UploadDemoDialogs = ({
             <DialogDescription className="space-y-4 pt-4">
               <p>This export is available for paid users only.</p>
               <p className="text-sm text-muted-foreground">
-                Upgrade your plan to unlock JSON and MT940 exports for your financial data.
+                Upgrade your plan to unlock premium formats beyond XLSX and CSV.
               </p>
               <div className="flex flex-col sm:flex-row gap-2 pt-4">
                 <Button
