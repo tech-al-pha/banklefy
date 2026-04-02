@@ -8,7 +8,6 @@ import {
   assessClientPdfParsedTransactions,
   callGroqVisionOCR,
   callMistralVisionOCR,
-  callTesseractOcrWorker,
   correctMinorBalanceDrift,
   extractBankMetadataFromOcrText,
   mergeOcrTransactionsDeterministic,
@@ -973,7 +972,6 @@ const buildCategoryCorrections = async (supabaseAdmin: BatchSupabaseClient, user
 };
 
 type StatementPayload = {
-  fileId?: string;
   fileName: string;
   fileData?: string;
   pdfPageImages?: string[];
@@ -1397,31 +1395,12 @@ const processStatement = async (params: {
                 : (mistralResult as OCRResult);
               dualUsed = true;
             } else {
-              let workerResult: OCRResult | null = null;
-              let workerFailureReason: string | null = null;
-              try {
-                workerResult = await callTesseractOcrWorker(pageBase64, pageMime, params.fileName);
-              } catch (workerError) {
-                workerFailureReason = workerError instanceof Error ? workerError.message : 'Tesseract OCR worker failed';
-              }
-
-              const workerHasRows = !!(
-                workerResult &&
-                workerResult.success &&
-                workerResult.transactions &&
-                workerResult.transactions.length > 0
-              );
-              if (workerHasRows && workerResult) {
-                pageResult = groqHasRows && groqResult
-                  ? mergeProviderResults(groqResult, workerResult)
-                  : workerResult;
-              } else if (groqHasRows && groqResult) {
+              if (groqHasRows && groqResult) {
                 pageResult = groqResult;
               } else {
                 const failureParts = [
                   groqFailureReason || 'Groq returned empty OCR result',
                   mistralFailureReason || 'Mistral returned empty OCR result',
-                  workerFailureReason || workerResult?.error || 'Tesseract worker returned empty OCR result',
                 ];
                 return {
                   pageResult: null,
@@ -1771,7 +1750,6 @@ Deno.serve(async (req) => {
   }
 
   let supabaseAdmin: BatchSupabaseClient | null = null;
-  const pendingSourceCleanupPaths = new Set<string>();
 
   try {
     const { files, timezone, recaptchaToken, outputMode } = await req.json();
@@ -1791,32 +1769,6 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     const supabaseAdminClient = supabaseAdmin!;
-    const conversionsTable = () => supabaseAdminClient.from('conversions') as unknown as {
-      select: (...args: unknown[]) => any;
-      update: (...args: unknown[]) => any;
-      insert: (...args: unknown[]) => any;
-      upsert: (...args: unknown[]) => any;
-    };
-
-    const readConversionTimings = async (conversionId: string): Promise<ConversionProcessingTimings> => {
-      const { data, error } = await conversionsTable()
-        .select('processing_timings')
-        .eq('id', conversionId)
-        .single();
-
-      if (error || !data) {
-        return {};
-      }
-
-      return getProcessingTimings((data as Record<string, unknown>).processing_timings);
-    };
-
-    const updateConversionTimings = async (conversionId: string, patch: Record<string, unknown>) => {
-      const existingTimings = await readConversionTimings(conversionId);
-      return conversionsTable()
-        .update({ processing_timings: mergeProcessingTimings(existingTimings, patch) })
-        .eq('id', conversionId);
-    };
 
     const authHeader = req.headers.get('Authorization');
     let user = null;
@@ -1879,22 +1831,11 @@ Deno.serve(async (req) => {
         );
       }
 
-      if (!user && !file.fileData && !(Array.isArray(file.pdfPageImages) && file.pdfPageImages.length > 0)) {
+      if (!file.fileData && !(Array.isArray(file.pdfPageImages) && file.pdfPageImages.length > 0)) {
         return new Response(
-          JSON.stringify({ error: `File data required for anonymous users (${sanitizedName})` }),
+          JSON.stringify({ error: `File data required (${sanitizedName})` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
-      }
-
-      if (user && !file.fileId) {
-        return new Response(
-          JSON.stringify({ error: `File ID required for authenticated users (${sanitizedName})` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      if (user && typeof file.fileId === 'string' && file.fileId.length > 0) {
-        pendingSourceCleanupPaths.add(`${user.id}/${file.fileId}`);
       }
 
       if (Array.isArray(file.pdfPageImages) && file.pdfPageImages.length > 0) {
@@ -2034,8 +1975,6 @@ Deno.serve(async (req) => {
     for (const file of files as StatementPayload[]) {
       const sanitizedName = sanitizeFileName(file.fileName);
       const fileStartedAt = Date.now();
-      let conversionRecord: { id: string } | null = null;
-      const sourcePath: string | null = user && file.fileId ? `${user.id}/${file.fileId}` : null;
       const lowerName = sanitizedName.toLowerCase();
       const isPdf = lowerName.endsWith('.pdf');
       const hasPdfPageImages = Array.isArray(file.pdfPageImages) && file.pdfPageImages.length > 0;
@@ -2117,27 +2056,15 @@ Deno.serve(async (req) => {
 
         // Retrieve bytes (for validation and non-PDF extraction)
         let bytes = new Uint8Array();
-        if (user && file.fileId) {
-          const { data: fileData, error: downloadError } = await supabaseAdminClient.storage
-            .from('bank-statements')
-            .download(`${user.id}/${file.fileId}`);
-
-          if (downloadError || !fileData) {
-            throw new Error('File not found');
-          }
-          const buffer = await fileData.arrayBuffer();
-          bytes = new Uint8Array(buffer);
-        } else {
-          const rawBase64Input = typeof file.fileData === 'string' ? file.fileData.trim() : '';
-          const rawBase64PayloadLength = rawBase64Input
-            ? (rawBase64Input.match(/^data:[^;]+;base64,(.+)$/)?.[1] || rawBase64Input).replace(/\s+/g, '').length
-            : 0;
-          const estimatedBase64Bytes = Math.floor(rawBase64PayloadLength * 0.75);
-          if (estimatedBase64Bytes > 10 * 1024 * 1024) {
-            throw new Error('File exceeds 10MB limit');
-          }
-          bytes = bytesFromBase64(file.fileData) as Uint8Array<ArrayBuffer>;
+        const rawBase64Input = typeof file.fileData === 'string' ? file.fileData.trim() : '';
+        const rawBase64PayloadLength = rawBase64Input
+          ? (rawBase64Input.match(/^data:[^;]+;base64,(.+)$/)?.[1] || rawBase64Input).replace(/\s+/g, '').length
+          : 0;
+        const estimatedBase64Bytes = Math.floor(rawBase64PayloadLength * 0.75);
+        if (estimatedBase64Bytes > 10 * 1024 * 1024) {
+          throw new Error('File exceeds 10MB limit');
         }
+        bytes = bytesFromBase64(file.fileData) as Uint8Array<ArrayBuffer>;
 
         if (bytes.length > 0 && bytes.length > 10 * 1024 * 1024) {
           throw new Error('File exceeds 10MB limit');
@@ -2156,36 +2083,6 @@ Deno.serve(async (req) => {
             if (bytes[0] !== 0xFF || bytes[1] !== 0xD8 || bytes[2] !== 0xFF) {
               throw new Error('Invalid JPEG file format');
             }
-          }
-        }
-
-        // Create conversion record (authenticated only)
-        if (user && sourcePath) {
-          const insertPayload: Record<string, unknown> = {
-            user_id: user.id,
-            file_name: sanitizedName,
-            status: 'processing',
-            processing_timings: {
-              storage: {
-                sourcePath,
-              },
-              batch: {
-                pagesProcessed: filePageCount,
-              },
-            },
-          };
-
-          const { data: convData, error: convError } = await supabaseAdminClient
-            .from('conversions')
-            .insert(insertPayload as AppDatabase['public']['Tables']['conversions']['Insert'])
-            .select()
-            .single();
-
-          if (convError) {
-            console.error('Failed to create conversion record:', convError);
-          } else {
-            conversionRecord = convData;
-            pendingSourceCleanupPaths.delete(sourcePath);
           }
         }
 
@@ -2208,62 +2105,12 @@ Deno.serve(async (req) => {
             const message = `This file has data on ${pagesToCharge} page${pagesToCharge === 1 ? '' : 's'}, but only ${remainingPagesBeforeFile} page${remainingPagesBeforeFile === 1 ? '' : 's'} remain in your ${periodLabel}.`;
 
             failures.push({ fileName: sanitizedName, error: message });
-            if (conversionRecord) {
-              await updateConversionTimings(conversionRecord.id, {
-                storage: {
-                  sourcePath,
-                  resultPath: null,
-                },
-                failure: {
-                  message,
-                  at: new Date().toISOString(),
-                  reason: 'page_limit_exceeded',
-                },
-              });
-              await supabaseAdminClient
-                .from('conversions')
-                .update({
-                  status: 'failed',
-                  processing_total_ms: Date.now() - fileStartedAt,
-                })
-                .eq('id', conversionRecord.id);
-            }
             continue;
           }
           paidPagesConsumed += pagesToCharge;
         }
 
-        let resultPath: string | null = null;
-        if (user && conversionRecord) {
-          const storagePath = `${user.id}/${conversionRecord.id}/result.xlsx`;
-          const { error: uploadError } = await supabaseAdminClient.storage
-            .from('bank-statements')
-            .upload(storagePath, excelBuffer, {
-              upsert: true,
-              contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            });
-          if (uploadError) {
-            console.error('Failed to persist batch XLSX export artifact:', uploadError);
-          } else {
-            resultPath = storagePath;
-          }
-        }
-
-        if (user && conversionRecord) {
-          await updateConversionTimings(conversionRecord.id, {
-            storage: {
-              sourcePath,
-              resultPath,
-            },
-          });
-          await supabaseAdminClient
-            .from('conversions')
-            .update({
-              status: 'completed',
-              processing_total_ms: Date.now() - fileStartedAt,
-            })
-            .eq('id', conversionRecord.id);
-        }
+        const resultPath: string | null = null;
 
         const excelBase64 = bufferToBase64(excelBuffer);
 
@@ -2285,26 +2132,6 @@ Deno.serve(async (req) => {
       } catch (error) {
         const message = sanitizeError(error);
         failures.push({ fileName: sanitizedName, error: message });
-        if (conversionRecord) {
-          await updateConversionTimings(conversionRecord.id, {
-            storage: {
-              sourcePath,
-              resultPath: null,
-            },
-            failure: {
-              message,
-              at: new Date().toISOString(),
-              reason: 'processing_error',
-            },
-          });
-          await supabaseAdminClient
-            .from('conversions')
-            .update({
-              status: 'failed',
-              processing_total_ms: Date.now() - fileStartedAt,
-            })
-            .eq('id', conversionRecord.id);
-        }
       }
     }
 
@@ -2437,25 +2264,5 @@ Deno.serve(async (req) => {
       }),
       { status: 500, headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' } }
     );
-  } finally {
-    if (supabaseAdmin && pendingSourceCleanupPaths.size > 0) {
-      const pendingPaths = Array.from(pendingSourceCleanupPaths);
-      const chunkSize = 100;
-      for (let i = 0; i < pendingPaths.length; i += chunkSize) {
-        const chunk = pendingPaths.slice(i, i + chunkSize);
-        try {
-          const { error } = await supabaseAdmin.storage
-            .from('bank-statements')
-            .remove(chunk);
-          if (error) {
-            console.error('Failed to cleanup orphan batch source uploads:', chunk, error);
-          } else {
-            console.log(`Cleaned ${chunk.length} orphan batch source upload(s)`);
-          }
-        } catch (cleanupError) {
-          console.error('Unexpected cleanup failure for batch source uploads:', chunk, cleanupError);
-        }
-      }
-    }
   }
 });
