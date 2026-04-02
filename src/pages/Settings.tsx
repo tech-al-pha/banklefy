@@ -459,7 +459,7 @@ const Settings = () => {
     {
       id: "privacy-data",
       title: "Download my data",
-      description: "Export your conversions and settings.",
+      description: "Export your settings and account preferences.",
       category: "privacy",
       icon: <Download className="h-5 w-5" />,
       component: (
