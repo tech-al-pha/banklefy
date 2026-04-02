@@ -9,7 +9,6 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
-import { hasAdminAccess } from "@/lib/adminAccess";
 import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 
 const LandingPageContent = lazyWithRetry(() =>
@@ -24,20 +23,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const nextParam = searchParams.get("next");
-  const [isAdmin, setIsAdmin] = useState(false);
   const { t } = useLanguage();
-
-  useEffect(() => {
-    const checkAdmin = async () => {
-      if (user) {
-        const nextIsAdmin = await hasAdminAccess(user);
-        setIsAdmin(nextIsAdmin);
-      } else {
-        setIsAdmin(false);
-      }
-    };
-    checkAdmin();
-  }, [user]);
 
   useEffect(() => {
     if (nextParam !== "demo") return;
@@ -169,7 +155,7 @@ const Index = () => {
                 className="border-primary/50 bg-[#141414] text-foreground transition-colors btn-target-glow"
                 onClick={handleAuthClick}
               >
-                {user ? (isAdmin ? "Admin" : "Profile") : t('nav.signIn')}
+                {user ? "Profile" : t('nav.signIn')}
               </Button>
 
               <Button
@@ -285,7 +271,7 @@ const Index = () => {
                           className="border-primary/40 text-foreground"
                           onClick={handleAuthClick}
                         >
-                          {user ? (isAdmin ? "Admin" : "Profile") : t('nav.signIn')}
+                          {user ? "Profile" : t('nav.signIn')}
                         </Button>
                       </SheetClose>
 
