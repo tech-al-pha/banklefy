@@ -266,11 +266,13 @@ function buildTransactionRows(transactions: Transaction[], layout: ColumnLayout)
   });
 }
 
-function buildTotalsRow(layout: ColumnLayout): SheetRow {
+function buildTotalsRow(transactions: Transaction[], layout: ColumnLayout): SheetRow {
   const row: SheetRow = Array(layout.headers.length).fill('');
+  const totalDebit = transactions.reduce((sum, transaction) => sum + (Number(transaction.debit) || 0), 0);
+  const totalCredit = transactions.reduce((sum, transaction) => sum + (Number(transaction.credit) || 0), 0);
   row[layout.descriptionColumn] = 'TOTAL';
-  row[layout.debitColumn] = null;
-  row[layout.creditColumn] = null;
+  row[layout.debitColumn] = toMoneyCell(totalDebit);
+  row[layout.creditColumn] = toMoneyCell(totalCredit);
   return row;
 }
 
@@ -413,7 +415,7 @@ export async function generateProfessionalExcel(config: ExcelConfig): Promise<Ex
   rows.push(layout.headers);
   const txnRows = buildTransactionRows(config.transactions, layout);
   rows.push(...txnRows);
-  rows.push(buildTotalsRow(layout));
+  rows.push(buildTotalsRow(config.transactions, layout));
 
   const workbook = await buildWorkbook('Transactions', rows, layout);
   return workbook;
@@ -421,7 +423,7 @@ export async function generateProfessionalExcel(config: ExcelConfig): Promise<Ex
 
 export async function generateSimpleExcel(transactions: Transaction[]): Promise<ArrayBuffer> {
   const layout = buildColumnLayout(transactions);
-  const rows: SheetData = [layout.headers, ...buildTransactionRows(transactions, layout), buildTotalsRow(layout)];
+  const rows: SheetData = [layout.headers, ...buildTransactionRows(transactions, layout), buildTotalsRow(transactions, layout)];
   const workbook = await buildWorkbook('Transactions', rows, layout);
   return workbook.buffer;
 }
@@ -449,7 +451,7 @@ export async function generateMergedStatementsExcel(config: MergedExcelConfig): 
   rows.push(layout.headers);
   const txnRows = buildTransactionRows(config.transactions, layout);
   rows.push(...txnRows);
-  rows.push(buildTotalsRow(layout));
+  rows.push(buildTotalsRow(config.transactions, layout));
 
   const workbook = await buildWorkbook('Merged Statement', rows, layout);
   return workbook;
