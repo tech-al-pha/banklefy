@@ -4,20 +4,21 @@ import { Button } from "@/components/ui/button";
 import Logo from "@/components/Logo";
 import SupportContactDialog from "@/components/SupportContactDialog";
 import { contactCards } from "@/content/footerPages";
+import AutoHideHeader from "@/components/AutoHideHeader";
 
 const Contact = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
+      <AutoHideHeader as="nav" className="bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <Button variant="ghost" onClick={() => navigate("/")} className="back-pill w-full sm:w-auto">
             <ArrowLeft size={18} /> Back to Home
           </Button>
         </div>
-      </nav>
+      </AutoHideHeader>
 
       <main className="container mx-auto max-w-4xl px-6 pt-32 pb-16">
         <section className="text-center space-y-4">
