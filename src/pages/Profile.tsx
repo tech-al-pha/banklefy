@@ -16,6 +16,7 @@ import { formatPlanLabel } from "@/lib/planLabels";
 import { useToast } from "@/hooks/use-toast";
 import LoadingScreen from "@/components/LoadingScreen";
 import type { ChangeEvent } from "react";
+import AutoHideHeader from "@/components/AutoHideHeader";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -141,7 +142,7 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-surface-elevated/60 backdrop-blur-lg border-b border-primary/20">
+      <AutoHideHeader as="nav" className="bg-surface-elevated/60 backdrop-blur-lg border-b border-primary/20">
         <div className="container mx-auto px-4 sm:px-6 py-2 sm:py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Logo />
@@ -155,7 +156,7 @@ const Profile = () => {
             Back to Home
           </Button>
         </div>
-      </nav>
+      </AutoHideHeader>
 
       <main className="container mx-auto px-4 sm:px-6 pt-24 pb-16">
         <div className="max-w-4xl mx-auto space-y-6">
