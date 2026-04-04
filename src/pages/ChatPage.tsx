@@ -1,8 +1,9 @@
-﻿import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ChatAura } from "@/components/ChatAura";
 import banklefyLogo from "@/assets/banklefy-logo.svg";
+import AutoHideHeader from "@/components/AutoHideHeader";
 
 const ChatPage = () => {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ const ChatPage = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
+      <AutoHideHeader as="nav" className="bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
@@ -28,7 +29,7 @@ const ChatPage = () => {
             </Button>
           </div>
         </div>
-      </nav>
+      </AutoHideHeader>
 
       {/* Chat Container */}
       <div className="pt-28 pb-12 px-4 sm:px-6">
