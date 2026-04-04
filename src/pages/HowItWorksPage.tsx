@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/contexts/LanguageContext";
+import AutoHideHeader from "@/components/AutoHideHeader";
 
 const HowItWorksPage = () => {
   const navigate = useNavigate();
@@ -29,14 +30,14 @@ const HowItWorksPage = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
+      <AutoHideHeader as="nav" className="bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <Logo />
           <Button variant="ghost" onClick={() => navigate("/")} className="back-pill">
             <ArrowLeft size={18} /> {t("common.backToHome")}
           </Button>
         </div>
-      </nav>
+      </AutoHideHeader>
 
       <section className="pt-32 pb-14 px-6">
         <div className="container mx-auto max-w-4xl text-center space-y-4">
