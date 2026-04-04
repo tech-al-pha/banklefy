@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Logo from "@/components/Logo";
 import { useLanguage } from "@/contexts/LanguageContext";
+import AutoHideHeader from "@/components/AutoHideHeader";
 import {
   featureCategoryOrder,
   featureCategoryLabelKey,
@@ -30,7 +31,7 @@ const FeaturesPage = () => {
   return (
     <div className="min-h-screen bg-background text-white font-sans selection:bg-primary/30">
       {/* Header Area */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
+      <AutoHideHeader as="nav" className="border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <Button 
@@ -41,7 +42,7 @@ const FeaturesPage = () => {
             <ArrowLeft size={18} /> Back to Home
           </Button>
         </div>
-      </nav>
+      </AutoHideHeader>
 
       <main className="container mx-auto px-4 sm:px-6 pt-24 pb-12 sm:pt-28 sm:pb-16 max-w-6xl">
         {/* Header Section */}
