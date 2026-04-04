@@ -1,4 +1,4 @@
-﻿import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -10,6 +10,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
+import AutoHideHeader from "@/components/AutoHideHeader";
 
 const LandingPageContent = lazyWithRetry(() =>
   import("@/components/LandingPageContent").then((module) => ({ default: module.LandingPageContent })),
@@ -85,10 +86,7 @@ const Index = () => {
         Skip to content
       </a>
       {/* Navigation */}
-      <nav
-        className="fixed top-0 left-0 right-0 z-50 bg-surface-elevated/60 backdrop-blur-lg border-b border-primary/20"
-        aria-label="Primary"
-      >
+      <AutoHideHeader as="nav" className="bg-surface-elevated/60 backdrop-blur-lg border-b border-primary/20" aria-label="Primary">
           <div className="container mx-auto px-4 sm:px-6 py-1.5 sm:py-2.5">
             <div className="flex items-center justify-between">
             <div className="ml-1 sm:ml-0">
@@ -292,7 +290,7 @@ const Index = () => {
             </div>
           </div>
         </div>
-      </nav>
+      </AutoHideHeader>
 
       <main id="main-content" tabIndex={-1}>
         <Suspense
