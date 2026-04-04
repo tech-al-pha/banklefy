@@ -7,6 +7,7 @@ import { BadgeDollarSign, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import SupportContactDialog from "@/components/SupportContactDialog";
+import AutoHideHeader from "@/components/AutoHideHeader";
 
 const PURCHASE_TOAST_STORAGE_KEY = "banklefy:last-plan-purchase";
 const RAZORPAY_CHECKOUT_URL = "https://checkout.razorpay.com/v1/checkout.js";
@@ -523,7 +524,16 @@ const PricingPage = () => {
               <tr key={row.label} className="border-b border-primary/10 last:border-b-0">
                 <td className="px-4 py-4 text-sm font-bold text-white">{row.label}</td>
                 {row.values.map((value, index) => (
-                  <td key={`${row.label}-${index}`} className="px-4 py-4 text-sm font-semibold text-white/82">
+                  <td
+                    key={`${row.label}-${index}`}
+                    className={`px-4 py-4 text-sm font-semibold ${
+                      value === "Yes"
+                        ? "!text-[#7CFFA8]"
+                        : value === "No"
+                        ? "!text-[#FF4D4F]"
+                        : "text-white/82"
+                    }`}
+                  >
                     {value}
                   </td>
                 ))}
@@ -538,7 +548,7 @@ const PricingPage = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
+      <AutoHideHeader as="header" className="border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex items-center justify-start">
           <Button
             variant="ghost"
@@ -548,7 +558,7 @@ const PricingPage = () => {
             Back to Home
           </Button>
         </div>
-      </header>
+      </AutoHideHeader>
 
       <main className="container mx-auto px-4 sm:px-6 pt-24 pb-12 sm:pt-28 sm:pb-16 max-w-6xl">
         <section className="text-center mb-16 space-y-4">
