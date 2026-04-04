@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatPlanLabel } from "@/lib/planLabels";
+import AutoHideHeader from "@/components/AutoHideHeader";
 
 interface SettingItem {
   id: string;
@@ -615,7 +616,7 @@ const Settings = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
+      <AutoHideHeader as="header" className="bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
@@ -645,7 +646,7 @@ const Settings = () => {
             </div>
           </div>
         </div>
-      </header>
+      </AutoHideHeader>
 
       {/* Main Content */}
       <main className="container mx-auto px-6 pt-28 pb-16">
