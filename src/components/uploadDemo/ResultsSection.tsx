@@ -649,7 +649,7 @@ export const ResultsSection = ({
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-primary/20">
+        <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-white/80">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             <FileText className="w-4 h-4 text-primary" />
           </div>
