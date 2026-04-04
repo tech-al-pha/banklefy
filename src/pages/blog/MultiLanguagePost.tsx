@@ -2,20 +2,21 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Logo from "@/components/Logo";
+import AutoHideHeader from "@/components/AutoHideHeader";
 
 const MultiLanguagePost = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
+      <AutoHideHeader as="nav" className="border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
           <Button variant="ghost" onClick={() => navigate("/blog")} className="back-pill w-full sm:w-auto">
             <ArrowLeft size={18} /> Back to Blog
           </Button>
         </div>
-      </nav>
+      </AutoHideHeader>
 
       <main className="container mx-auto px-4 sm:px-6 pt-24 pb-16 sm:pt-28 sm:pb-20 max-w-3xl">
         <section className="text-center mb-10">
