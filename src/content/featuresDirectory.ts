@@ -6,6 +6,7 @@ import {
   FileSpreadsheet,
   Lock,
   Clock,
+  MessageCircle,
   Calculator,
   ShieldCheck,
   FileText,
@@ -28,6 +29,7 @@ export type FeatureCategoryId =
   | "core"
   | "financial"
   | "risk"
+  | "assistant"
   | "export"
   | "performance"
   | "security"
@@ -40,6 +42,7 @@ export const featureCategoryOrder: FeatureCategoryId[] = [
   "core",
   "financial",
   "risk",
+  "assistant",
   "export",
   "performance",
   "security",
@@ -53,6 +56,7 @@ export const featureCategoryLabelKey: Record<FeatureCategoryId, string> = {
   core: "featuresPage.categories.core",
   financial: "featuresPage.categories.financial",
   risk: "featuresPage.categories.risk",
+  assistant: "featuresPage.categories.assistant",
   export: "featuresPage.categories.export",
   performance: "featuresPage.categories.performance",
   security: "featuresPage.categories.security",

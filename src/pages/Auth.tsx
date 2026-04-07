@@ -7,64 +7,18 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ArrowLeft, Eye, EyeOff, Chrome } from 'lucide-react';
 import { z } from 'zod';
 import banklefyLogo from '@/assets/banklefy-logo.svg';
 import { useLanguage } from '@/contexts/LanguageContext';
-import AutoHideHeader from "@/components/AutoHideHeader";
 
 const emailSchema = z.string().email('Invalid email address').max(255);
 const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
 
 type AuthMode = 'login' | 'signup' | 'forgot' | 'reset';
-type SocialProviderId = 'google' | 'apple' | 'facebook' | 'linkedin' | 'instagram';
 
 // Key for storing remembered email
 const REMEMBERED_EMAIL_KEY = 'banklefy_remembered_email';
-
-function SocialIcon({ provider }: { provider: SocialProviderId }) {
-  if (provider === 'google') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 fill-none stroke-current">
-        <circle cx="12" cy="12" r="9" strokeWidth="1.7" />
-        <path d="M12 7.25a4.75 4.75 0 0 1 3.5 1.45" strokeWidth="1.7" strokeLinecap="round" />
-        <path d="M8.4 9.1A4.75 4.75 0 0 0 7.25 12c0 2.62 2.13 4.75 4.75 4.75 2.14 0 3.98-1.42 4.56-3.38H12" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-
-  if (provider === 'apple') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 fill-current">
-        <path d="M15.5 12.3c0-2.1 1.7-3.1 1.8-3.2-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.8-3.1.8-.6 0-1.6-.8-2.6-.8-1.3 0-2.6.8-3.2 1.9-1.4 2.3-.3 5.8 1 7.6.7.9 1.4 1.9 2.5 1.8 1-.1 1.4-.6 2.6-.6s1.5.6 2.6.6c1.1 0 1.8-.9 2.4-1.8.8-1 1.1-2 1.1-2.1-.1 0-2.1-.8-2.1-2.6ZM13.5 6.2c.5-.6.9-1.5.8-2.3-.8 0-1.7.5-2.3 1.1-.5.5-.9 1.4-.8 2.2.9.1 1.8-.4 2.3-1Z" />
-      </svg>
-    );
-  }
-
-  if (provider === 'facebook') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 fill-current">
-        <path d="M13.4 20v-7h2.4l.4-2.8h-2.8V8.5c0-.8.2-1.4 1.4-1.4h1.5V4.6c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v1.9H8v2.8h2.4v7h3Z" />
-      </svg>
-    );
-  }
-
-  if (provider === 'linkedin') {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 fill-current">
-        <path d="M6.3 8.2a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm-1.2 2h2.5V18H5.1v-7.8Zm4.1 0h2.4v1.1h.03c.33-.63 1.14-1.3 2.35-1.3 2.5 0 3 1.65 3 3.8V18h-2.5v-3.7c0-.88-.02-2-.1-2-.1 0-.3.16-.4.33-.22.34-.35.83-.35 1.37V18H9.2v-7.8Z" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-6 w-6 fill-none stroke-current">
-      <rect x="4.25" y="4.25" width="15.5" height="15.5" rx="4.2" strokeWidth="1.7" />
-      <circle cx="12" cy="12" r="3.25" strokeWidth="1.7" />
-      <circle cx="17.3" cy="6.8" r="0.9" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
 
 export default function Auth() {
   const { t } = useLanguage();
@@ -92,17 +46,6 @@ export default function Auth() {
     if (typeof error === 'string') return error;
     return fallback;
   };
-  const socialProviders: Array<{
-    id: SocialProviderId;
-    label: string;
-    status: 'live' | 'setup';
-  }> = [
-    { id: 'google', label: 'Google', status: 'live' },
-    { id: 'apple', label: 'Apple', status: 'setup' },
-    { id: 'facebook', label: 'Facebook', status: 'setup' },
-    { id: 'linkedin', label: 'LinkedIn', status: 'setup' },
-    { id: 'instagram', label: 'Instagram', status: 'setup' },
-  ];
 
   // Check for password reset mode from URL and handle recovery session
   useEffect(() => {
@@ -382,18 +325,6 @@ export default function Auth() {
     }
   };
 
-  const handleSocialAuth = async (provider: SocialProviderId) => {
-    if (provider === 'google') {
-      await handleGoogleAuth();
-      return;
-    }
-
-    toast({
-      title: `${socialProviders.find((item) => item.id === provider)?.label || provider} setup pending`,
-      description: 'Frontend ready hai. Ab Supabase dashboard aur provider app credentials connect karne honge.',
-    });
-  };
-
   const getCardDescription = () => {
     switch (mode) {
       case 'forgot':
@@ -409,7 +340,7 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6 pt-24 relative overflow-hidden">
-      <AutoHideHeader as="nav" className="border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
         <div className="container mx-auto flex items-center justify-start">
           <Button
             variant="ghost"
@@ -419,65 +350,24 @@ export default function Auth() {
             <ArrowLeft size={18} /> {t('common.backToHome')}
           </Button>
         </div>
-      </AutoHideHeader>
+      </nav>
 
-      <div className="relative z-10 w-full max-w-7xl">
-        <div className="grid gap-8 lg:grid-cols-[minmax(420px,0.92fr)_minmax(0,1.05fr)] lg:items-start">
-          <aside className="order-2 py-6 pr-1 lg:order-1 lg:pr-4 lg:pt-24 lg:pb-8">
-            <div className="mb-6 text-center lg:mb-8">
-              <h2 className="text-xl font-semibold tracking-[0.04em] text-[#e8d8bf] md:text-2xl">
-                Continue your way
-              </h2>
-              <p className="mt-2 text-sm text-[#cdbb9d]/78 md:text-[15px]">
-                Pick the sign-in provider that feels quickest and most familiar for you.
-              </p>
-            </div>
-            <div className="space-y-5">
-              {socialProviders.map((provider) => {
-                return (
-                  <Button
-                    key={provider.id}
-                    type="button"
-                    variant="outline"
-                    onClick={() => handleSocialAuth(provider.id)}
-                    className="h-12 w-full rounded-[1.25rem] border border-white/10 bg-[#171717] px-5 text-[#e8d8bf] hover:bg-[#1c1c1c] md:h-[3.15rem]"
-                    disabled={loading}
-                  >
-                    <span className="flex w-full items-center justify-center">
-                      <span className="flex w-full max-w-[20rem] items-center gap-4">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#1f1f1f] text-white">
-                          <span className="scale-[1.34]">
-                            <SocialIcon provider={provider.id} />
-                          </span>
-                        </span>
-                        <span className="text-left text-base font-medium leading-none">
-                          Continue with {provider.label}
-                        </span>
-                      </span>
-                    </span>
-                  </Button>
-                );
-              })}
-            </div>
-          </aside>
-
-          <div className="order-1 space-y-10 lg:order-2">
-            <section className="px-2 py-2 text-center md:px-6">
-              <div className="mb-3 flex justify-center">
-                <img src={banklefyLogo} alt="Banklefy" className="h-16 w-16 object-contain md:h-20 md:w-20 lg:h-24 lg:w-24" />
-              </div>
-              <div className="text-center text-xs uppercase tracking-[0.35em] text-muted-foreground">
-                {t('auth.secureAccess')}
-              </div>
-              <CardTitle className="font-noir mt-3 text-center text-[1.45rem] font-black uppercase tracking-[0.04em] bg-gradient-to-r from-[#FFFFFF] via-[#B5B5B5] to-[#717171] bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)] md:text-[1.8rem] lg:text-[2.1rem]">
-                Banklefy
-              </CardTitle>
-              <CardDescription className="mt-4 text-center text-sm text-muted-foreground/90 md:text-base">
-                {getCardDescription()}
-              </CardDescription>
-            </section>
-
-            <section className="px-2 pb-1 md:px-6 md:pt-1">
+      <div className="w-full max-w-md relative z-10">
+        <div className="space-y-2 pt-2">
+          <div className="flex justify-center mb-3">
+            <img src={banklefyLogo} alt="Banklefy" className="h-20 w-20 md:h-24 md:w-24 object-contain" />
+          </div>
+          <div className="text-center text-xs uppercase tracking-[0.35em] text-muted-foreground">
+            {t('auth.secureAccess')}
+          </div>
+          <CardTitle className="font-noir text-center text-[1.65rem] md:text-[2.1rem] font-black uppercase tracking-[0.04em] bg-gradient-to-r from-[#FFFFFF] via-[#B5B5B5] to-[#717171] bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
+            Banklefy
+          </CardTitle>
+          <CardDescription className="text-center text-muted-foreground/90">
+            {getCardDescription()}
+          </CardDescription>
+        </div>
+        <div className="pb-8 pt-6">
           {mode === 'forgot' && (
             <form onSubmit={handleForgotPassword} className="space-y-4" autoComplete="on">
               <div className="space-y-2">
@@ -714,6 +604,26 @@ export default function Auth() {
                 </Button>
               </form>
 
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-primary/20" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  <span className="bg-background px-2">or</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleGoogleAuth}
+                className="w-full border-primary/30 bg-[#141414] text-foreground"
+                disabled={loading}
+              >
+                <Chrome className="mr-2 h-4 w-4" />
+                Continue with Google
+              </Button>
+
               <div className="mt-4 text-center text-sm">
                 <button
                   type="button"
@@ -728,8 +638,6 @@ export default function Auth() {
               </div>
             </>
           )}
-            </section>
-          </div>
         </div>
       </div>
     </div>

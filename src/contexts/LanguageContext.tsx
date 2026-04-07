@@ -27,6 +27,7 @@ const isCorruptedTranslation = (value: string | undefined): boolean => {
 
 const PROTECTED_TERMS: Array<{ term: string; pattern: RegExp }> = [
   { term: "Banklefy", pattern: /\bbanklefy\b/gi },
+  { term: "Chat Aura", pattern: /\bchat\s+aura\b/gi },
   { term: "Tally", pattern: /\btally\b/gi },
   { term: "MT940", pattern: /\bmt\s*940\b/gi },
   { term: "FOIR", pattern: /\bfoir\b/gi },
@@ -99,5 +100,6 @@ export const useLanguage = () => {
 };
 
 export { languageNames };
+
 
 
