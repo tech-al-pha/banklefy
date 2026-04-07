@@ -17,6 +17,7 @@ const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const Index = lazyWithRetry(() => import("./pages/Index"));
 const Privacy = lazyWithRetry(() => import("./pages/Privacy"));
 const Terms = lazyWithRetry(() => import("./pages/Terms"));
+const ChatPage = lazyWithRetry(() => import("./pages/ChatPage"));
 const About = lazyWithRetry(() => import("./pages/About"));
 const FeaturesPage = lazyWithRetry(() => import("./pages/FeaturesPage"));
 const BenefitsPage = lazyWithRetry(() => import("./pages/BenefitsPage"));
@@ -46,9 +47,9 @@ type RouteMeta = { title: string; description: string; image?: string };
 type JsonLd = Record<string, unknown>;
 
 const DEFAULT_META: RouteMeta = {
-  title: "Bank Statement to Excel, CSV, MT940 & Tally in Seconds | Banklefy",
+  title: "Bank Statement Converter to Excel & CSV | Fast AI OCR | Banklefy",
   description:
-    "Convert bank statement PDFs into clean Excel, CSV, JSON, MT940 and Tally-ready exports with fast AI OCR and secure processing.",
+    "Convert bank statement PDFs to Excel or CSV in seconds. Accurate AI OCR, multi-bank support, secure processing, instant export.",
   image: "https://banklefy.vercel.app/og-banklefy.jpg",
 };
 
@@ -165,7 +166,7 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   },
 };
 
-const NO_INDEX_PREFIXES = ["/dashboard", "/settings", "/profile", "/auth", "/help", "/documentation", "/cookie-policy"];
+const NO_INDEX_PREFIXES = ["/dashboard", "/settings", "/profile", "/auth", "/chat", "/help", "/documentation", "/cookie-policy"];
 
 const normalizePathname = (pathname: string) =>
   pathname !== "/" && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
@@ -448,6 +449,7 @@ const AppRoutes = () => {
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<RequireAuth><Navigate to="/?next=demo" replace /></RequireAuth>} />
+          <Route path="/chat" element={<RequirePaid><ChatPage /></RequirePaid>} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/about" element={<About />} />
