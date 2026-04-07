@@ -1,4 +1,4 @@
-export type Language = 'en' | 'ar' | 'zh' | 'es' | 'hi';
+Ôªøexport type Language = 'en' | 'ar' | 'zh' | 'es' | 'hi';
 
 
 
@@ -10,7 +10,6 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "nav.demo": "Demo",
 
-    "nav.chatAura": "Chat Aura",
 
     "nav.settings": "Settings",
 
@@ -213,7 +212,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "footer.cta.btn": "Start Converting Now",
 
-    "footer.copyright": "© 2026 Banklefy. Created by Faizan Rizvi.",
+    "footer.copyright": "¬© 2026 Banklefy. Created by Faizan Rizvi.",
 
     "footer.recaptcha.prefix": "This site is protected by reCAPTCHA and the Google",
 
@@ -263,7 +262,6 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.categories.risk": "Risk Analysis",
 
-    "featuresPage.categories.assistant": "AI Assistant",
 
     "featuresPage.categories.export": "Export",
 
@@ -281,7 +279,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.aiOcr.title": "AI-POWERED OCR ENGINE",
 
-    "featuresPage.items.aiOcr.desc": "Extracts data from PDFs, scans, and photos. Recognizes transaction tables, dates, amounts, and descriptions with high accuracy ó even from low-quality documents.",
+    "featuresPage.items.aiOcr.desc": "Extracts data from PDFs, scans, and photos. Recognizes transaction tables, dates, amounts, and descriptions with high accuracy ‚Äî even from low-quality documents.",
 
     "featuresPage.items.excelCsv.title": "EXCEL & CSV EXPORT",
 
@@ -293,11 +291,11 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.foir.title": "FOIR CALCULATION",
 
-    "featuresPage.items.foir.desc": "Automatically calculates FOIR using rule-based analysis by detecting salary credits and EMI debits ó used in loan eligibility assessment.",
+    "featuresPage.items.foir.desc": "Automatically calculates FOIR using rule-based analysis by detecting salary credits and EMI debits ‚Äî used in loan eligibility assessment.",
 
     "featuresPage.items.emiDetection.title": "EMI DETECTION",
 
-    "featuresPage.items.emiDetection.desc": "Detects recurring EMIs via deterministic patterns (home/car/personal loans, credit card EMIs, BNPL). No guessing ó fully explainable.",
+    "featuresPage.items.emiDetection.desc": "Detects recurring EMIs via deterministic patterns (home/car/personal loans, credit card EMIs, BNPL). No guessing ‚Äî fully explainable.",
 
     "featuresPage.items.salaryAnalysis.title": "SALARY CREDIT ANALYSIS",
 
@@ -321,7 +319,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.underwritingPanel.title": "UNDERWRITING PANEL",
 
-    "featuresPage.items.underwritingPanel.desc": "All key metrics at a glance: income, EMI, FOIR, balance trends, and risk flags ó built for lending decisions.",
+    "featuresPage.items.underwritingPanel.desc": "All key metrics at a glance: income, EMI, FOIR, balance trends, and risk flags ‚Äî built for lending decisions.",
 
     "featuresPage.items.languages.title": "50+ LANGUAGE SUPPORT",
 
@@ -333,11 +331,9 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.batchProcessing.title": "BATCH PROCESSING",
 
-    "featuresPage.items.batchProcessing.desc": "Convert multiple statements in parallel ó great for accountants and bulk workflows.",
+    "featuresPage.items.batchProcessing.desc": "Convert multiple statements in parallel ‚Äî great for accountants and bulk workflows.",
 
-    "featuresPage.items.chatAura.title": "CHAT AURA AI ASSISTANT",
 
-    "featuresPage.items.chatAura.desc": "",
 
     "featuresPage.items.encryption.title": "ENCRYPTION IN TRANSIT",
 
@@ -357,7 +353,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.ruleBased.title": "RULE-BASED ACCURACY",
 
-    "featuresPage.items.ruleBased.desc": "Deterministic calculations: no hallucinations, no guessing ó every number is computed with precision and can be explained.",
+    "featuresPage.items.ruleBased.desc": "Deterministic calculations: no hallucinations, no guessing ‚Äî every number is computed with precision and can be explained.",
 
     "featuresPage.items.dailyLimits.title": "DAILY RESET LIMITS",
 
@@ -371,7 +367,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.cta.signUp": "Sign Up Free",
 
-    "featuresPage.footer": "© 2026 Banklefy | Engineered for Excellence",
+    "featuresPage.footer": "¬© 2026 Banklefy | Engineered for Excellence",
 
     "aboutPage.visionTitle": "Welcome to Banklefy",
 
@@ -383,7 +379,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.brainchildP1": "I'm a security-focused builder from Kota, Rajasthan. I started Banklefy to remove friction from statement processing while keeping sensitive data protected. I obsessively test real bank layouts to keep outputs clean and dependable.",
 
-    "aboutPage.brainchildP2": "I launched Banklefy in 2026, blending deterministic parsing and careful OCR to deliver trustworthy exports for real accounting workflows ó with a constant focus on accuracy, privacy, and audit readiness.",
+    "aboutPage.brainchildP2": "I launched Banklefy in 2026, blending deterministic parsing and careful OCR to deliver trustworthy exports for real accounting workflows ‚Äî with a constant focus on accuracy, privacy, and audit readiness.",
 
     "aboutPage.problemTitle": "The Problem We Solve",
 
@@ -393,7 +389,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.problemBullets.two": "Manual copy-paste wastes hours and introduces costly errors.",
 
-    "aboutPage.problemBullets.three": "Sensitive financial data shouldnít live in random spreadsheets.",
+    "aboutPage.problemBullets.three": "Sensitive financial data shouldn‚Äôt live in random spreadsheets.",
 
     "aboutPage.problemBullets.four": "Generic OCR struggles with dense Indian statements and narration.",
 
@@ -401,7 +397,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.solutionIntro": "A privacy-first conversion engine built for real accounting workflows.",
 
-    "aboutPage.solutionBullets.one": "Deterministic parsing for text PDFs ó OCR only when needed.",
+    "aboutPage.solutionBullets.one": "Deterministic parsing for text PDFs ‚Äî OCR only when needed.",
 
     "aboutPage.solutionBullets.two": "High-accuracy extraction tuned for Indian banks.",
 
@@ -447,7 +443,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.valueProps.accuracy.desc": "Accuracy-focused conversion for high-stakes financial data.",
 
-    "aboutPage.roadmapTitle": "Whatís Next",
+    "aboutPage.roadmapTitle": "What‚Äôs Next",
 
     "aboutPage.roadmapBullets.one": "Bulk processing and team workspaces.",
 
@@ -468,7 +464,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "aboutPage.contact.hq": "HQ",
 
     "aboutPage.contact.hqValue": "Prem Nagar, Kota, Rajasthan 324004",
-    "aboutPage.footer": "© 2026 Banklefy | Engineered for Excellence",
+    "aboutPage.footer": "¬© 2026 Banklefy | Engineered for Excellence",
 
     "privacyPage.badge": "Privacy and Transparency",
 
@@ -512,7 +508,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "privacyPage.whatItems.item2": "Maintains formatting, columns, and transaction clarity",
 
-    "privacyPage.whatItems.item3": "Works instantly ó no software installation required",
+    "privacyPage.whatItems.item3": "Works instantly ‚Äî no software installation required",
 
     "privacyPage.whatItems.item4": "Designed with data privacy and security at its core",
 
@@ -578,9 +574,9 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "contactPage.title": "Contact Us",
 
-    "contactPage.subtitle": "Questions, billing, or support ó weíre here to help.",
+    "contactPage.subtitle": "Questions, billing, or support ‚Äî we‚Äôre here to help.",
 
-    "contactPage.responseNote": "Typical response time: 24ñ48 hours.",
+    "contactPage.responseNote": "Typical response time: 24‚Äì48 hours.",
 
     "contactPage.support.title": "Support",
 
@@ -694,23 +690,14 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "settings.advanced.autoDownloadDesc": "Automatically download converted files",
 
-    "chatAura.greeting": "Hello! I'm Chat Aura, your financial assistant. How can I help you today?",
 
-    "chatAura.greetingWithPdf": "Hello! I've loaded your document ({fileName}). Ask me anything about it!",
 
-    "chatAura.subtitle": "Your AI Financial Assistant",
 
-    "chatAura.remaining": "chats left",
 
-    "chatAura.placeholder": "Ask about your statement...",
 
-    "chatAura.errorResponse": "I'm sorry, I encountered an error. Please try again.",
 
-    "chatAura.limitReached": "Chat limit reached",
 
-    "chatAura.signUpForMore": "Sign up for unlimited conversations",
 
-    "chatAura.signUp": "Sign Up",
 
     "footer.helpCenter": "FAQs & Help",
     "footer.blog": "Blog",
@@ -757,7 +744,6 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "nav.demo": "??????",
 
-    "nav.chatAura": "????? ????",
 
     "nav.settings": "???????",
 
@@ -960,7 +946,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "footer.cta.btn": "???? ??????? ????",
 
-    "footer.copyright": "© 2026 Banklefy. ?? ??????? ?????? ?????? ????.",
+    "footer.copyright": "¬© 2026 Banklefy. ?? ??????? ?????? ?????? ????.",
 
     "footer.recaptcha.prefix": "??? ?????? ???? ?????? reCAPTCHA ?Google",
 
@@ -1010,7 +996,6 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.categories.risk": "????? ???????",
 
-    "featuresPage.categories.assistant": "????? ?????? ?????????",
 
     "featuresPage.categories.export": "?????",
 
@@ -1082,9 +1067,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.batchProcessing.desc": "?? ?????? ?????? ?????? ???????? - ??? ??? ???? ????????? ????? ??? ????? ???????.",
 
-    "featuresPage.items.chatAura.title": "????? ??????? AURA AI",
 
-    "featuresPage.items.chatAura.desc": "",
 
     "featuresPage.items.encryption.title": "??????? ?? ??????",
 
@@ -1118,7 +1101,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.cta.signUp": "??????? ?????",
 
-    "featuresPage.footer": "© 2026 Banklefy | ????? ??????",
+    "featuresPage.footer": "¬© 2026 Banklefy | ????? ??????",
 
     "aboutPage.visionTitle": "?????? ?? ?? Banklefy",
 
@@ -1148,7 +1131,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.solutionIntro": "???? ????? ??? ???????? ????? ??????? ???????? ????????.",
 
-    "aboutPage.solutionBullets.one": "????? ???? ?????? ???? ó OCR ??? ?????? ???.",
+    "aboutPage.solutionBullets.one": "????? ???? ?????? ???? ‚Äî OCR ??? ?????? ???.",
 
     "aboutPage.solutionBullets.two": "??? ????? ??????? ?????? ???????.",
 
@@ -1215,7 +1198,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "aboutPage.contact.hq": "????? ???????",
 
     "aboutPage.contact.hqValue": "???? ?????? ????? ???????? 324004",
-    "aboutPage.footer": "© 2026 Banklefy | ????? ??????",
+    "aboutPage.footer": "¬© 2026 Banklefy | ????? ??????",
 
     "privacyPage.badge": "???????? ?????????",
 
@@ -1325,9 +1308,9 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "contactPage.title": "???? ???",
 
-    "contactPage.subtitle": "??????? ?? ??????? ?? ????? ó ??? ??? ????????.",
+    "contactPage.subtitle": "??????? ?? ??????? ?? ????? ‚Äî ??? ??? ????????.",
 
-    "contactPage.responseNote": "??? ????????? ???????: 24ñ48 ????.",
+    "contactPage.responseNote": "??? ????????? ???????: 24‚Äì48 ????.",
 
     "contactPage.support.title": "?????",
 
@@ -1441,23 +1424,14 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "settings.advanced.autoDownloadDesc": "????? ??????? ??????? ????????",
 
-    "chatAura.greeting": "??????! ??? ???? ????? ?????? ??????. ??? ?????? ??????? ??????",
 
-    "chatAura.greetingWithPdf": "??????! ??? ??? ?????? ?????? ({fileName}). ?????? ?? ??? ?? ???!",
 
-    "chatAura.subtitle": "?????? ?????? ??????? ?????????",
 
-    "chatAura.remaining": "???????? ??????",
 
-    "chatAura.placeholder": "???? ?? ??????...",
 
-    "chatAura.errorResponse": "??? ???? ??? ????? ???. ???? ???????? ??? ????.",
 
-    "chatAura.limitReached": "?? ?????? ??? ?? ???????",
 
-    "chatAura.signUpForMore": "????? ?? ??????? ??? ??????",
 
-    "chatAura.signUp": "??????",
 
     "footer.helpCenter": "???? ????????",
 
@@ -1505,7 +1479,6 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "nav.demo": "??",
 
-    "nav.chatAura": "????",
 
     "nav.settings": "??",
 
@@ -1708,7 +1681,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "footer.cta.btn": "??????",
 
-    "footer.copyright": "© 2026 Banklefy????∑??? (Faizan Rizvi) ???",
+    "footer.copyright": "¬© 2026 Banklefy????¬∑??? (Faizan Rizvi) ???",
 
     "footer.recaptcha.prefix": "???? reCAPTCHA ? Google ???",
 
@@ -1758,7 +1731,6 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.categories.risk": "????",
 
-    "featuresPage.categories.assistant": "??????",
 
     "featuresPage.categories.export": "??",
 
@@ -1792,7 +1764,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.emiDetection.title": "??????",
 
-    "featuresPage.items.emiDetection.desc": "?????????????? EMI(??/??/???????? EMI?BNPL)?????óó???????",
+    "featuresPage.items.emiDetection.desc": "?????????????? EMI(??/??/???????? EMI?BNPL)?????‚Äî‚Äî???????",
 
     "featuresPage.items.salaryAnalysis.title": "??????",
 
@@ -1830,9 +1802,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.batchProcessing.desc": "???????? - ???????????????",
 
-    "featuresPage.items.chatAura.title": "??AURA??????",
 
-    "featuresPage.items.chatAura.desc": "",
 
     "featuresPage.items.encryption.title": "??????",
 
@@ -1852,7 +1822,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.ruleBased.title": "????????",
 
-    "featuresPage.items.ruleBased.desc": "?????:????,????óó??????????????????",
+    "featuresPage.items.ruleBased.desc": "?????:????,????‚Äî‚Äî??????????????????",
 
     "featuresPage.items.dailyLimits.title": "??????",
 
@@ -1866,7 +1836,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.cta.signUp": "????",
 
-    "featuresPage.footer": "© 2026 Banklefy |???????",
+    "featuresPage.footer": "¬© 2026 Banklefy |???????",
 
     "aboutPage.visionTitle": "???? Banklefy",
 
@@ -1963,7 +1933,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "aboutPage.contact.hq": "??",
 
     "aboutPage.contact.hqValue": "Prem Nagar, ??, ????? 324004",
-    "aboutPage.footer": "© 2026 Banklefy |???????",
+    "aboutPage.footer": "¬© 2026 Banklefy |???????",
 
     "privacyPage.badge": "??????",
 
@@ -2007,7 +1977,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "privacyPage.whatItems.item2": "?????????????",
 
-    "privacyPage.whatItems.item3": "????óó??????",
+    "privacyPage.whatItems.item3": "????‚Äî‚Äî??????",
 
     "privacyPage.whatItems.item4": "?????????????",
 
@@ -2073,9 +2043,9 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "contactPage.title": "????",
 
-    "contactPage.subtitle": "???????? ó ???????",
+    "contactPage.subtitle": "???????? ‚Äî ???????",
 
-    "contactPage.responseNote": "??????:24ñ48 ???",
+    "contactPage.responseNote": "??????:24‚Äì48 ???",
 
     "contactPage.support.title": "??",
 
@@ -2189,23 +2159,14 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "settings.advanced.autoDownloadDesc": "??????????",
 
-    "chatAura.greeting": "??!?? Chat Aura,????????????????????",
 
-    "chatAura.greetingWithPdf": "??!???????? ({fileName})??????????!",
 
-    "chatAura.subtitle": "??????????",
 
-    "chatAura.remaining": "???????",
 
-    "chatAura.placeholder": "??????...",
 
-    "chatAura.errorResponse": "??,?????????????",
 
-    "chatAura.limitReached": "???????",
 
-    "chatAura.signUpForMore": "??????",
 
-    "chatAura.signUp": "??",
 
     "footer.helpCenter": "????",
 
@@ -2249,18 +2210,17 @@ export const translations: Record<Language, Record<string, string>> = {
 
   "es": {
 
-    "nav.features": "CaracterÌsticas",
+    "nav.features": "Caracter√≠sticas",
 
-    "nav.demo": "ManifestaciÛn",
+    "nav.demo": "Manifestaci√≥n",
 
-    "nav.chatAura": "Aura de charla",
 
     "nav.settings": "Ajustes",
 
 
     "nav.about": "Acerca de",
 
-    "nav.signIn": "Iniciar sesiÛn",
+    "nav.signIn": "Iniciar sesi√≥n",
 
     "nav.signOut": "Desconectar",
 
@@ -2270,7 +2230,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "nav.benefits": "Beneficios",
 
-    "nav.menu": "Men˙",
+    "nav.menu": "Men√∫",
 
     "hero.title": "Conversor de extractos bancarios con IA",
 
@@ -2278,45 +2238,45 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "hero.titleLine2": "Convertidor",
 
-    "hero.tagline": "Aspecto profesional | Con tecnologÌa OCR | Resultados instant·neos",
+    "hero.tagline": "Aspecto profesional | Con tecnolog√≠a OCR | Resultados instant√°neos",
 
-    "hero.subtitle": "AI OCR que convierte extractos bancarios en hojas de c·lculo limpias y estructuradas con procesamiento seguro, extracciÛn precisa y exportaciÛn multiformato.",
+    "hero.subtitle": "AI OCR que convierte extractos bancarios en hojas de c√°lculo limpias y estructuradas con procesamiento seguro, extracci√≥n precisa y exportaci√≥n multiformato.",
 
-    "hero.uploadBtn": "Cargue su declaraciÛn ahora",
+    "hero.uploadBtn": "Cargue su declaraci√≥n ahora",
 
     "hero.pricingBtn": "Ver precios",
 
     "hero.sampleReportBtn": "Informe de muestra",
 
-    "howItWorks.title": "CÛmo funciona",
+    "howItWorks.title": "C√≥mo funciona",
 
     "howItWorks.subtitle": "Transforma tus extractos bancarios a Excel en tres sencillos pasos",
 
     "howItWorks.step1.title": "Subir",
 
-    "howItWorks.step1.desc": "Cargue su extracto bancario en cualquier formato: PDF, imagen escaneada o fotografÌa. Admitimos documentos de cualquier banco del mundo.",
+    "howItWorks.step1.desc": "Cargue su extracto bancario en cualquier formato: PDF, imagen escaneada o fotograf√≠a. Admitimos documentos de cualquier banco del mundo.",
 
     "howItWorks.step2.title": "Procesamiento de IA",
 
-    "howItWorks.step2.desc": "Nuestro OCR basado en IA extrae y organiza instant·neamente datos de transacciones con alta precisiÛn. Admite m·s de 50 idiomas, incluidos hindi, ·rabe y mandarÌn.",
+    "howItWorks.step2.desc": "Nuestro OCR basado en IA extrae y organiza instant√°neamente datos de transacciones con alta precisi√≥n. Admite m√°s de 50 idiomas, incluidos hindi, √°rabe y mandar√≠n.",
 
     "howItWorks.step3.title": "Descargar Excel",
 
-    "howItWorks.step3.desc": "Reciba una hoja de c·lculo de Excel limpia y estructurada, lista para contabilidad, an·lisis o integraciÛn con sus herramientas financieras.",
+    "howItWorks.step3.desc": "Reciba una hoja de c√°lculo de Excel limpia y estructurada, lista para contabilidad, an√°lisis o integraci√≥n con sus herramientas financieras.",
 
-    "features.title": "CaracterÌsticas",
+    "features.title": "Caracter√≠sticas",
 
-    "features.accuracy": "Alta precisiÛn",
+    "features.accuracy": "Alta precisi√≥n",
 
-    "features.accuracyDesc": "La extracciÛn impulsada por IA est· diseÒada para reducir los errores.",
+    "features.accuracyDesc": "La extracci√≥n impulsada por IA est√° dise√±ada para reducir los errores.",
 
-    "features.fast": "Rayo r·pido",
+    "features.fast": "Rayo r√°pido",
 
     "features.fastDesc": "Convierta declaraciones en segundos",
 
     "features.secure": "Procesamiento seguro",
 
-    "features.secureDesc": "Cifrado en tr·nsito con almacenamiento de acceso controlado.",
+    "features.secureDesc": "Cifrado en tr√°nsito con almacenamiento de acceso controlado.",
 
     "pricing.title": "Precios",
 
@@ -2326,49 +2286,49 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "pricing.business": "Negocio",
 
-    "upload.limit.daily.title": "LÌmite diario alcanzado",
+    "upload.limit.daily.title": "L√≠mite diario alcanzado",
 
-    "upload.limit.daily.authFree": "Has utilizado todas las {limit} p·ginas de hoy. Tu lÌmite diario se reinicia a medianoche. Actualice para lÌmites m·s altos.",
+    "upload.limit.daily.authFree": "Has utilizado todas las {limit} p√°ginas de hoy. Tu l√≠mite diario se reinicia a medianoche. Actualice para l√≠mites m√°s altos.",
 
-    "upload.limit.daily.authPaid": "Ha utilizado todas las {limit} p·ginas para su plan actual. Actualice a un plan superior para continuar.",
+    "upload.limit.daily.authPaid": "Ha utilizado todas las {limit} p√°ginas para su plan actual. Actualice a un plan superior para continuar.",
 
-    "upload.limit.daily.anon": "Has utilizado todas las {limit} p·ginas gratuitas de hoy. Cree una cuenta gratuita para 5 p·ginas/dÌa o elija un plan para lÌmites m·s altos.",
+    "upload.limit.daily.anon": "Has utilizado todas las {limit} p√°ginas gratuitas de hoy. Cree una cuenta gratuita para 5 p√°ginas/d√≠a o elija un plan para l√≠mites m√°s altos.",
 
-    "upload.limit.page.title": "LÌmite de p·ginas",
+    "upload.limit.page.title": "L√≠mite de p√°ginas",
 
-    "upload.limit.page.auth": "Los archivos seleccionados tienen {total} p·ginas, pero hoy solo est·n disponibles {remaining} p·ginas (lÌmite diario {limit}). Elimina algunas p·ginas o actualiza tu plan.",
+    "upload.limit.page.auth": "Los archivos seleccionados tienen {total} p√°ginas, pero hoy solo est√°n disponibles {remaining} p√°ginas (l√≠mite diario {limit}). Elimina algunas p√°ginas o actualiza tu plan.",
 
-    "upload.limit.page.anon": "Los archivos seleccionados tienen {total} p·ginas, pero hoy solo est·n disponibles {remaining} p·ginas gratuitas (lÌmite diario {limit}). RegÌstrate para recibir 5 p·ginas/dÌa o elige un plan.",
+    "upload.limit.page.anon": "Los archivos seleccionados tienen {total} p√°ginas, pero hoy solo est√°n disponibles {remaining} p√°ginas gratuitas (l√≠mite diario {limit}). Reg√≠strate para recibir 5 p√°ginas/d√≠a o elige un plan.",
 
-    "upload.limit.usage.title": "LÌmite de uso alcanzado",
+    "upload.limit.usage.title": "L√≠mite de uso alcanzado",
 
-    "upload.limit.paid.pack": "Has usado las {limit} p·ginas de tu paquete actual. Compra otro plan para continuar.",
+    "upload.limit.paid.pack": "Has usado las {limit} p√°ginas de tu paquete actual. Compra otro plan para continuar.",
 
-    "upload.limit.paid.month": "Has usado las {limit} p·ginas de este mes. Tu uso se restablece al inicio del prÛximo mes.",
+    "upload.limit.paid.month": "Has usado las {limit} p√°ginas de este mes. Tu uso se restablece al inicio del pr√≥ximo mes.",
 
-    "upload.limit.paid.year": "Has usado las {limit} p·ginas de este aÒo. Tu uso se restablece al inicio del prÛximo aÒo.",
+    "upload.limit.paid.year": "Has usado las {limit} p√°ginas de este a√±o. Tu uso se restablece al inicio del pr√≥ximo a√±o.",
 
-    "upload.limit.paid.plan": "Has usado las {limit} p·ginas de tu plan. Actualiza tu plan para continuar.",
+    "upload.limit.paid.plan": "Has usado las {limit} p√°ginas de tu plan. Actualiza tu plan para continuar.",
 
-    "upload.limit.signupCta": "RegÌstrate para obtener 5 p·ginas gratis",
+    "upload.limit.signupCta": "Reg√≠strate para obtener 5 p√°ginas gratis",
 
     "upload.limit.upgradeCta": "Mejorar plan",
 
-    "upload.remaining.counterSuffix": "de {limit} p·ginas restantes",
+    "upload.remaining.counterSuffix": "de {limit} p√°ginas restantes",
 
-    "upload.remaining.signupMore": "RegÌstrate para m·s p·ginas",
+    "upload.remaining.signupMore": "Reg√≠strate para m√°s p√°ginas",
 
     "footer.product": "Producto",
 
-    "footer.features": "CaracterÌsticas",
+    "footer.features": "Caracter√≠sticas",
 
     "footer.pricing": "Precios",
 
-    "footer.howItWorks": "CÛmo funciona",
+    "footer.howItWorks": "C√≥mo funciona",
 
     "footer.resources": "Recursos",
 
-    "footer.docs": "DocumentaciÛn",
+    "footer.docs": "Documentaci√≥n",
 
     "footer.faqs": "Preguntas frecuentes",
 
@@ -2376,13 +2336,13 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "footer.security": "Seguridad",
 
-    "footer.contact": "Cont·ctanos",
+    "footer.contact": "Cont√°ctanos",
 
-    "footer.cookiePolicy": "PolÌtica de cookies",
+    "footer.cookiePolicy": "Pol√≠tica de cookies",
 
-    "docsPage.badge": "DocumentaciÛn",
+    "docsPage.badge": "Documentaci√≥n",
 
-    "docsPage.title": "DocumentaciÛn",
+    "docsPage.title": "Documentaci√≥n",
 
     "docsPage.subtitle": "Todo lo que necesitas para usar Banklefy con confianza.",
 
@@ -2392,13 +2352,13 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "docsPage.sections.formats.title": "Formatos compatibles",
 
-    "docsPage.sections.formats.desc": "Soporta PDF, JPG y PNG. Los PDF de texto son m·s r·pidos.",
+    "docsPage.sections.formats.desc": "Soporta PDF, JPG y PNG. Los PDF de texto son m√°s r√°pidos.",
 
-    "docsPage.sections.limits.title": "LÌmites de uso",
+    "docsPage.sections.limits.title": "L√≠mites de uso",
 
-    "docsPage.sections.limits.desc": "Usuarios gratis tienen p·ginas diarias; los packs pagados agregan m·s p·ginas y exportaciones premium.",
+    "docsPage.sections.limits.desc": "Usuarios gratis tienen p√°ginas diarias; los packs pagados agregan m√°s p√°ginas y exportaciones premium.",
 
-    "docsPage.sections.security.title": "Seguridad b·sica",
+    "docsPage.sections.security.title": "Seguridad b√°sica",
 
     "docsPage.sections.security.desc": "Tus datos se gestionan de forma segura y el acceso se limita a tu cuenta o sesi?n activa.",
 
@@ -2406,111 +2366,110 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "faqPage.title": "Preguntas frecuentes",
 
-    "faqPage.subtitle": "Respuestas r·pidas a dudas comunes.",
+    "faqPage.subtitle": "Respuestas r√°pidas a dudas comunes.",
 
-    "faqPage.items.formats.title": "øQuÈ formatos se admiten?",
+    "faqPage.items.formats.title": "¬øQu√© formatos se admiten?",
 
     "faqPage.items.formats.desc": "PDF, JPG y PNG para estados de cuenta de texto o escaneados.",
 
-    "faqPage.items.password.title": "øSoportan PDFs con contraseÒa?",
+    "faqPage.items.password.title": "¬øSoportan PDFs con contrase√±a?",
 
-    "faqPage.items.password.desc": "SÌ. Ingresa la contraseÒa en el campo de desbloqueo.",
+    "faqPage.items.password.desc": "S√≠. Ingresa la contrase√±a en el campo de desbloqueo.",
 
-    "faqPage.items.timing.title": "øCu·nto tarda la conversiÛn?",
+    "faqPage.items.timing.title": "¬øCu√°nto tarda la conversi√≥n?",
 
-    "faqPage.items.timing.desc": "Los PDFs de texto son r·pidos; los escaneados pueden tardar m·s.",
+    "faqPage.items.timing.desc": "Los PDFs de texto son r√°pidos; los escaneados pueden tardar m√°s.",
 
-    "faqPage.items.refund.title": "øDÛnde pido un reembolso?",
+    "faqPage.items.refund.title": "¬øD√≥nde pido un reembolso?",
 
-    "faqPage.items.refund.desc": "Los reembolsos se gestionan desde la p·gina de Precios.",
+    "faqPage.items.refund.desc": "Los reembolsos se gestionan desde la p√°gina de Precios.",
 
-    "faqPage.items.storage.title": "øGuardan mis archivos?",
+    "faqPage.items.storage.title": "¬øGuardan mis archivos?",
 
     "faqPage.items.storage.desc": "Los archivos temporales est?n disponibles durante tu sesi?n para descargar. Las conversiones guardadas permanecen en el historial de tu cuenta hasta que las elimines.",
 
     "footer.help.title": "Ayuda",
 
-    "footer.help.item1": "Archivos compatibles: PDF, JPG, PNG (escaneos y fotografÌas)",
+    "footer.help.item1": "Archivos compatibles: PDF, JPG, PNG (escaneos y fotograf√≠as)",
 
-    "footer.help.item2": "PDF protegidos con contraseÒa: ingrese la contraseÒa antes de convertir",
+    "footer.help.item2": "PDF protegidos con contrase√±a: ingrese la contrase√±a antes de convertir",
 
-    "footer.help.item3": "LÌmites diarios: 2 p·ginas anÛnimas/dÌa, 5 p·ginas/dÌa gratis, pago por plan",
+    "footer.help.item3": "L√≠mites diarios: 2 p√°ginas an√≥nimas/d√≠a, 5 p√°ginas/d√≠a gratis, pago por plan",
 
-    "footer.help.item4": "Consejos de precisiÛn: suba p·ginas completas, evite las im·genes borrosas",
+    "footer.help.item4": "Consejos de precisi√≥n: suba p√°ginas completas, evite las im√°genes borrosas",
 
-    "footer.help.item5": "øNecesitar ayuda? PÛngase en contacto con el soporte.",
+    "footer.help.item5": "¬øNecesitar ayuda? P√≥ngase en contacto con el soporte.",
 
-    "footer.company": "CompaÒÌa",
+    "footer.company": "Compa√±√≠a",
 
     "footer.about": "Acerca de",
 
-    "footer.privacy": "polÌtica de privacidad",
+    "footer.privacy": "pol√≠tica de privacidad",
 
-    "footer.terms": "TÈrminos y condiciones",
+    "footer.terms": "T√©rminos y condiciones",
 
     "footer.cta.title": "Listo para transformar tu",
 
-    "footer.cta.subtitle": "øFlujo de trabajo financiero?",
+    "footer.cta.subtitle": "¬øFlujo de trabajo financiero?",
 
-    "footer.cta.desc": "Creado para equipos e individuos que necesitan conversiones de extractos bancarios instant·neas y precisas.",
+    "footer.cta.desc": "Creado para equipos e individuos que necesitan conversiones de extractos bancarios instant√°neas y precisas.",
 
     "footer.cta.btn": "Comience a convertir ahora",
 
-    "footer.copyright": "© 2026 Banklefy. Creado por Faizan Rizvi.",
+    "footer.copyright": "¬© 2026 Banklefy. Creado por Faizan Rizvi.",
 
-    "footer.recaptcha.prefix": "Este sitio est· protegido por reCAPTCHA y Google",
+    "footer.recaptcha.prefix": "Este sitio est√° protegido por reCAPTCHA y Google",
 
-    "footer.recaptcha.privacy": "polÌtica de privacidad",
+    "footer.recaptcha.privacy": "pol√≠tica de privacidad",
 
     "footer.recaptcha.and": "y",
 
-    "footer.recaptcha.terms": "TÈrminos de servicio",
+    "footer.recaptcha.terms": "T√©rminos de servicio",
 
     "footer.recaptcha.suffix": "aplicar.",
 
-    "auth.welcome": "°Bienvenido de nuevo!",
+    "auth.welcome": "¬°Bienvenido de nuevo!",
 
-    "auth.signedIn": "Has iniciado sesiÛn correctamente.",
+    "auth.signedIn": "Has iniciado sesi√≥n correctamente.",
 
-    "auth.accountCreated": "°Cuenta creada!",
+    "auth.accountCreated": "¬°Cuenta creada!",
 
     "auth.canUse": "Ahora puedes empezar a utilizar Banklefy.",
 
-    "auth.email": "Correo electrÛnico",
+    "auth.email": "Correo electr√≥nico",
 
-    "auth.password": "ContraseÒa",
+    "auth.password": "Contrase√±a",
 
-    "auth.signIn": "Iniciar sesiÛn",
+    "auth.signIn": "Iniciar sesi√≥n",
 
     "auth.signUp": "Inscribirse",
 
-    "auth.forgotPassword": "øHas olvidado tu contraseÒa?",
+    "auth.forgotPassword": "¬øHas olvidado tu contrase√±a?",
 
-    "auth.noAccount": "øNo tienes una cuenta? Inscribirse",
+    "auth.noAccount": "¬øNo tienes una cuenta? Inscribirse",
 
-    "auth.hasAccount": "øYa tienes una cuenta? Iniciar sesiÛn",
+    "auth.hasAccount": "¬øYa tienes una cuenta? Iniciar sesi√≥n",
 
     "auth.secureAccess": "Acceso seguro",
 
-    "common.back": "Atr·s",
+    "common.back": "Atr√°s",
 
     "common.backToHome": "Volver a Inicio",
 
-    "featuresPage.title": "TODAS LAS CARACTERÕSTICAS",
+    "featuresPage.title": "TODAS LAS CARACTER√çSTICAS",
 
-    "featuresPage.subtitle": "Lista completa de la A a la Z de todo lo que ofrece Banklefy, desde OCR con tecnologÌa de inteligencia artificial hasta procesamiento que prioriza la privacidad. Creado para ofrecer precisiÛn, velocidad y an·lisis financieros claros.",
+    "featuresPage.subtitle": "Lista completa de la A a la Z de todo lo que ofrece Banklefy, desde OCR con tecnolog√≠a de inteligencia artificial hasta procesamiento que prioriza la privacidad. Creado para ofrecer precisi√≥n, velocidad y an√°lisis financieros claros.",
 
-    "featuresPage.categories.core": "TecnologÌa central",
+    "featuresPage.categories.core": "Tecnolog√≠a central",
 
-    "featuresPage.categories.financial": "An·lisis financiero",
+    "featuresPage.categories.financial": "An√°lisis financiero",
 
-    "featuresPage.categories.risk": "An·lisis de riesgos",
+    "featuresPage.categories.risk": "An√°lisis de riesgos",
 
-    "featuresPage.categories.assistant": "Asistente de IA",
 
     "featuresPage.categories.export": "Exportar",
 
-    "featuresPage.categories.performance": "ActuaciÛn",
+    "featuresPage.categories.performance": "Actuaci√≥n",
 
     "featuresPage.categories.security": "Seguridad",
 
@@ -2518,71 +2477,69 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.categories.accessibility": "Accesibilidad",
 
-    "featuresPage.categories.technology": "TecnologÌa",
+    "featuresPage.categories.technology": "Tecnolog√≠a",
 
     "featuresPage.categories.usage": "Uso",
 
     "featuresPage.items.aiOcr.title": "MOTOR OCR IMPULSADO POR IA",
 
-    "featuresPage.items.aiOcr.desc": "Extrae datos de archivos PDF, escaneos y fotografÌas. Reconoce tablas de transacciones, fechas, importes y descripciones con gran precisiÛn, incluso en documentos de baja calidad.",
+    "featuresPage.items.aiOcr.desc": "Extrae datos de archivos PDF, escaneos y fotograf√≠as. Reconoce tablas de transacciones, fechas, importes y descripciones con gran precisi√≥n, incluso en documentos de baja calidad.",
 
-    "featuresPage.items.excelCsv.title": "EXPORTACI”N EXCEL Y CSV",
+    "featuresPage.items.excelCsv.title": "EXPORTACI√ìN EXCEL Y CSV",
 
-    "featuresPage.items.excelCsv.desc": "Exporte Excel limpio (.xlsx) y CSV con las columnas adecuadas (Fecha, DescripciÛn, DÈbito, CrÈdito, Saldo, CategorÌa). Funciona con herramientas de contabilidad populares.",
+    "featuresPage.items.excelCsv.desc": "Exporte Excel limpio (.xlsx) y CSV con las columnas adecuadas (Fecha, Descripci√≥n, D√©bito, Cr√©dito, Saldo, Categor√≠a). Funciona con herramientas de contabilidad populares.",
 
-    "featuresPage.items.pdfReport.title": "GENERACI”N DE INFORMES PDF",
+    "featuresPage.items.pdfReport.title": "GENERACI√ìN DE INFORMES PDF",
 
-    "featuresPage.items.pdfReport.desc": "Crea un resumen PDF limpio a partir de las transacciones extraÌdas (totales, mÈtricas clave y puntos destacados) para auditorÌas y prÈstamos.",
+    "featuresPage.items.pdfReport.desc": "Crea un resumen PDF limpio a partir de las transacciones extra√≠das (totales, m√©tricas clave y puntos destacados) para auditor√≠as y pr√©stamos.",
 
-    "featuresPage.items.foir.title": "C¡LCULO FOIR",
+    "featuresPage.items.foir.title": "C√ÅLCULO FOIR",
 
-    "featuresPage.items.foir.desc": "Calcula autom·ticamente el FOIR mediante un an·lisis basado en reglas mediante la detecciÛn de crÈditos salariales y dÈbitos de EMI, que se utilizan en la evaluaciÛn de elegibilidad para prÈstamos.",
+    "featuresPage.items.foir.desc": "Calcula autom√°ticamente el FOIR mediante un an√°lisis basado en reglas mediante la detecci√≥n de cr√©ditos salariales y d√©bitos de EMI, que se utilizan en la evaluaci√≥n de elegibilidad para pr√©stamos.",
 
-    "featuresPage.items.emiDetection.title": "DETECCI”N EMI",
+    "featuresPage.items.emiDetection.title": "DETECCI√ìN EMI",
 
-    "featuresPage.items.emiDetection.desc": "Detecta EMI recurrentes a travÈs de patrones deterministas (prÈstamos para vivienda/automÛvil/personal, EMI de tarjetas de crÈdito, BNPL). Sin conjeturas, totalmente explicable.",
+    "featuresPage.items.emiDetection.desc": "Detecta EMI recurrentes a trav√©s de patrones deterministas (pr√©stamos para vivienda/autom√≥vil/personal, EMI de tarjetas de cr√©dito, BNPL). Sin conjeturas, totalmente explicable.",
 
-    "featuresPage.items.salaryAnalysis.title": "AN¡LISIS DE CR…DITO SALARIAL",
+    "featuresPage.items.salaryAnalysis.title": "AN√ÅLISIS DE CR√âDITO SALARIAL",
 
-    "featuresPage.items.salaryAnalysis.desc": "Encuentra crÈditos salariales utilizando patrones recurrentes y palabras clave del empleador para estimar el ingreso mensual promedio para la suscripciÛn.",
+    "featuresPage.items.salaryAnalysis.desc": "Encuentra cr√©ditos salariales utilizando patrones recurrentes y palabras clave del empleador para estimar el ingreso mensual promedio para la suscripci√≥n.",
 
-    "featuresPage.items.cashflow.title": "AN¡LISIS DE FLUJO DE CAJA",
+    "featuresPage.items.cashflow.title": "AN√ÅLISIS DE FLUJO DE CAJA",
 
-    "featuresPage.items.cashflow.desc": "Desglosa las entradas/salidas y el flujo de caja neto con res˙menes de categorÌas e informaciÛn sobre tendencias.",
+    "featuresPage.items.cashflow.desc": "Desglosa las entradas/salidas y el flujo de caja neto con res√∫menes de categor√≠as e informaci√≥n sobre tendencias.",
 
     "featuresPage.items.adbAmb.title": "SALDO PROMEDIO DIARIO",
 
-    "featuresPage.items.adbAmb.desc": "Calcula las mÈtricas ADB/AMB utilizadas por los bancos para verificar el saldo mÌnimo y evaluar los prÈstamos.",
+    "featuresPage.items.adbAmb.desc": "Calcula las m√©tricas ADB/AMB utilizadas por los bancos para verificar el saldo m√≠nimo y evaluar los pr√©stamos.",
 
-    "featuresPage.items.fraudDetection.title": "DETECCI”N DE FRAUDE",
+    "featuresPage.items.fraudDetection.title": "DETECCI√ìN DE FRAUDE",
 
-    "featuresPage.items.fraudDetection.desc": "SeÒala patrones sospechosos como transacciones de cifras redondas, anomalÌas de fin de semana, duplicados y desajustes de saldo.",
+    "featuresPage.items.fraudDetection.desc": "Se√±ala patrones sospechosos como transacciones de cifras redondas, anomal√≠as de fin de semana, duplicados y desajustes de saldo.",
 
-    "featuresPage.items.integrityScoring.title": "PUNTUACI”N DE INTEGRIDAD",
+    "featuresPage.items.integrityScoring.title": "PUNTUACI√ìN DE INTEGRIDAD",
 
     "featuresPage.items.integrityScoring.desc": "Valida la coherencia de los estados de cuenta entre fechas y saldos para ayudar a detectar manipulaciones y errores.",
 
-    "featuresPage.items.underwritingPanel.title": "PANEL DE SUSCRIPCI”N",
+    "featuresPage.items.underwritingPanel.title": "PANEL DE SUSCRIPCI√ìN",
 
-    "featuresPage.items.underwritingPanel.desc": "Todas las mÈtricas clave de un vistazo: ingresos, EMI, FOIR, tendencias de saldo e indicadores de riesgo, diseÒadas para decisiones crediticias.",
+    "featuresPage.items.underwritingPanel.desc": "Todas las m√©tricas clave de un vistazo: ingresos, EMI, FOIR, tendencias de saldo e indicadores de riesgo, dise√±adas para decisiones crediticias.",
 
-    "featuresPage.items.languages.title": "SOPORTE PARA M¡S DE 50 IDIOMAS",
+    "featuresPage.items.languages.title": "SOPORTE PARA M√ÅS DE 50 IDIOMAS",
 
-    "featuresPage.items.languages.desc": "Procese declaraciones en m·s de 50 idiomas. Maneja documentos multiling¸es y formatos bancarios internacionales.",
+    "featuresPage.items.languages.desc": "Procese declaraciones en m√°s de 50 idiomas. Maneja documentos multiling√ºes y formatos bancarios internacionales.",
 
-    "featuresPage.items.instantProcessing.title": "PROCESAMIENTO INSTANT¡NEO",
+    "featuresPage.items.instantProcessing.title": "PROCESAMIENTO INSTANT√ÅNEO",
 
-    "featuresPage.items.instantProcessing.desc": "Procesamiento r·pido para PDF con texto; los estados escaneados pueden tardar m·s.",
+    "featuresPage.items.instantProcessing.desc": "Procesamiento r√°pido para PDF con texto; los estados escaneados pueden tardar m√°s.",
 
     "featuresPage.items.batchProcessing.title": "PROCESAMIENTO POR LOTES",
 
     "featuresPage.items.batchProcessing.desc": "Convierta varios extractos en paralelo: ideal para contables y flujos de trabajo masivos.",
 
-    "featuresPage.items.chatAura.title": "ASISTENTE DE CHAT AURA AI",
 
-    "featuresPage.items.chatAura.desc": "",
 
-    "featuresPage.items.encryption.title": "CIFRADO EN TR¡NSITO",
+    "featuresPage.items.encryption.title": "CIFRADO EN TR√ÅNSITO",
 
     "featuresPage.items.encryption.desc": "Los datos se cifran durante la carga y la transferencia para proteger los datos financieros confidenciales.",
 
@@ -2590,43 +2547,43 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.zeroRetention.desc": "Las cargas temporales est?n disponibles durante tu sesi?n activa. Las conversiones guardadas permanecen en el historial de tu cuenta hasta que las elimines.",
 
-    "featuresPage.items.categorization.title": "CATEGORIZACI”N INTELIGENTE",
+    "featuresPage.items.categorization.title": "CATEGORIZACI√ìN INTELIGENTE",
 
-    "featuresPage.items.categorization.desc": "Clasifica autom·ticamente las transacciones en categorÌas (Salario, EMI, Servicios P˙blicos, Compras, Alimentos, etc.) con mapeo personalizable.",
+    "featuresPage.items.categorization.desc": "Clasifica autom√°ticamente las transacciones en categor√≠as (Salario, EMI, Servicios P√∫blicos, Compras, Alimentos, etc.) con mapeo personalizable.",
 
-    "featuresPage.items.exportFormats.title": "M⁄LTIPLES FORMATOS DE EXPORTACI”N",
+    "featuresPage.items.exportFormats.title": "M√öLTIPLES FORMATOS DE EXPORTACI√ìN",
 
-    "featuresPage.items.exportFormats.desc": "ExportaciÛn por plan: Excel/CSV para todos, y JSON/MT940 en planes pagos.",
+    "featuresPage.items.exportFormats.desc": "Exportaci√≥n por plan: Excel/CSV para todos, y JSON/MT940 en planes pagos.",
 
-    "featuresPage.items.ruleBased.title": "PRECISI”N BASADA EN REGLAS",
+    "featuresPage.items.ruleBased.title": "PRECISI√ìN BASADA EN REGLAS",
 
-    "featuresPage.items.ruleBased.desc": "C·lculos deterministas: sin alucinaciones ni conjeturas: cada n˙mero se calcula con precisiÛn y se puede explicar.",
+    "featuresPage.items.ruleBased.desc": "C√°lculos deterministas: sin alucinaciones ni conjeturas: cada n√∫mero se calcula con precisi√≥n y se puede explicar.",
 
-    "featuresPage.items.dailyLimits.title": "LÕMITES DE RESTABLECIMIENTO DIARIO",
+    "featuresPage.items.dailyLimits.title": "L√çMITES DE RESTABLECIMIENTO DIARIO",
 
-    "featuresPage.items.dailyLimits.desc": "Los lÌmites gratuitos se restablecen diariamente a la medianoche, hora local. Los usuarios anÛnimos obtienen 2 p·ginas al dÌa; los usuarios registrados obtienen 5 p·ginas al dÌa. Los planes pagos se reinician con su ciclo de facturaciÛn.",
+    "featuresPage.items.dailyLimits.desc": "Los l√≠mites gratuitos se restablecen diariamente a la medianoche, hora local. Los usuarios an√≥nimos obtienen 2 p√°ginas al d√≠a; los usuarios registrados obtienen 5 p√°ginas al d√≠a. Los planes pagos se reinician con su ciclo de facturaci√≥n.",
 
-    "featuresPage.cta.title": "øListo para experimentar todas las funciones?",
+    "featuresPage.cta.title": "¬øListo para experimentar todas las funciones?",
 
-    "featuresPage.cta.desc": "Comience con 2 p·ginas gratis por dÌa. RegÌstrate para recibir 5 p·ginas por dÌa y desbloquea todo el poder de Banklefy.",
+    "featuresPage.cta.desc": "Comience con 2 p√°ginas gratis por d√≠a. Reg√≠strate para recibir 5 p√°ginas por d√≠a y desbloquea todo el poder de Banklefy.",
 
-    "featuresPage.cta.tryDemo": "Pruebe la demostraciÛn ahora",
+    "featuresPage.cta.tryDemo": "Pruebe la demostraci√≥n ahora",
 
-    "featuresPage.cta.signUp": "RegÌstrate gratis",
+    "featuresPage.cta.signUp": "Reg√≠strate gratis",
 
-    "featuresPage.footer": "© 2026 Banklefy | DiseÒado para la excelencia",
+    "featuresPage.footer": "¬© 2026 Banklefy | Dise√±ado para la excelencia",
 
     "aboutPage.visionTitle": "Bienvenido a Banklefy",
 
-    "aboutPage.visionSubtitle": "ConversiÛn segura de estados de cuenta para finanzas modernas.",
+    "aboutPage.visionSubtitle": "Conversi√≥n segura de estados de cuenta para finanzas modernas.",
 
-    "aboutPage.visionP1": "Banklefy convierte PDFs, escaneos e im·genes en Excel/CSV limpios con precisiÛn y privacidad. Creado para contadores, equipos financieros y pequeÒas empresas sin copiar manualmente.",
+    "aboutPage.visionP1": "Banklefy convierte PDFs, escaneos e im√°genes en Excel/CSV limpios con precisi√≥n y privacidad. Creado para contadores, equipos financieros y peque√±as empresas sin copiar manualmente.",
 
     "aboutPage.brainchildPrefix": "Hola, soy",
 
-    "aboutPage.brainchildP1": "Soy un creador enfocado en la seguridad de Kota, Rajasthan. CreÈ Banklefy para simplificar el procesamiento de estados y proteger datos sensibles. Pruebo formatos reales para mantener resultados limpios y confiables.",
+    "aboutPage.brainchildP1": "Soy un creador enfocado en la seguridad de Kota, Rajasthan. Cre√© Banklefy para simplificar el procesamiento de estados y proteger datos sensibles. Pruebo formatos reales para mantener resultados limpios y confiables.",
 
-    "aboutPage.brainchildP2": "LancÈ Banklefy en 2026, combinando an·lisis determinista y OCR cuidadoso para entregar exportaciones confiables con foco constante en precisiÛn, privacidad y auditorÌa.",
+    "aboutPage.brainchildP2": "Lanc√© Banklefy en 2026, combinando an√°lisis determinista y OCR cuidadoso para entregar exportaciones confiables con foco constante en precisi√≥n, privacidad y auditor√≠a.",
 
     "aboutPage.problemTitle": "El problema que resolvemos",
 
@@ -2636,33 +2593,33 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.problemBullets.two": "El copiar/pegar consume horas y genera errores.",
 
-    "aboutPage.problemBullets.three": "Los datos sensibles no deberÌan quedar en hojas sueltas.",
+    "aboutPage.problemBullets.three": "Los datos sensibles no deber√≠an quedar en hojas sueltas.",
 
-    "aboutPage.problemBullets.four": "El OCR genÈrico falla con estados densos.",
+    "aboutPage.problemBullets.four": "El OCR gen√©rico falla con estados densos.",
 
-    "aboutPage.solutionTitle": "Por quÈ Banklefy",
+    "aboutPage.solutionTitle": "Por qu√© Banklefy",
 
-    "aboutPage.solutionIntro": "Motor de conversiÛn con privacidad primero para flujos contables reales.",
+    "aboutPage.solutionIntro": "Motor de conversi√≥n con privacidad primero para flujos contables reales.",
 
-    "aboutPage.solutionBullets.one": "Parseo determinista para PDFs de texto ó OCR solo si hace falta.",
+    "aboutPage.solutionBullets.one": "Parseo determinista para PDFs de texto ‚Äî OCR solo si hace falta.",
 
-    "aboutPage.solutionBullets.two": "Alta precisiÛn ajustada a bancos de India.",
+    "aboutPage.solutionBullets.two": "Alta precisi√≥n ajustada a bancos de India.",
 
     "aboutPage.solutionBullets.three": "Exportes listos para Excel, CSV y Tally.",
 
-    "aboutPage.solutionBullets.four": "RetenciÛn mÌnima con trazabilidad clara.",
+    "aboutPage.solutionBullets.four": "Retenci√≥n m√≠nima con trazabilidad clara.",
 
-    "aboutPage.solutionBullets.five": "DiseÒado para contadores, asesores fiscales y finanzas.",
+    "aboutPage.solutionBullets.five": "Dise√±ado para contadores, asesores fiscales y finanzas.",
 
-    "aboutPage.audienceTitle": "Para quiÈn es",
+    "aboutPage.audienceTitle": "Para qui√©n es",
 
     "aboutPage.audienceIntro": "Si trabajas con estados a diario, Banklefy es para ti.",
 
     "aboutPage.audienceBullets.one": "Contadores y consultores fiscales.",
 
-    "aboutPage.audienceBullets.two": "Equipos financieros con m˙ltiples cuentas.",
+    "aboutPage.audienceBullets.two": "Equipos financieros con m√∫ltiples cuentas.",
 
-    "aboutPage.audienceBullets.three": "Bookkeepers que necesitan exportes limpios r·pido.",
+    "aboutPage.audienceBullets.three": "Bookkeepers que necesitan exportes limpios r√°pido.",
 
     "aboutPage.audienceBullets.four": "Fundadores que quieren reportes confiables.",
 
@@ -2670,11 +2627,11 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.principlesIntro": "Priorizamos claridad, privacidad y resultados predecibles.",
 
-    "aboutPage.principlesBullets.one": "LÛgica determinista primero, OCR como respaldo.",
+    "aboutPage.principlesBullets.one": "L√≥gica determinista primero, OCR como respaldo.",
 
-    "aboutPage.principlesBullets.two": "ValidaciÛn por balance para reducir errores.",
+    "aboutPage.principlesBullets.two": "Validaci√≥n por balance para reducir errores.",
 
-    "aboutPage.principlesBullets.three": "MinimizaciÛn de datos y privacidad primero.",
+    "aboutPage.principlesBullets.three": "Minimizaci√≥n de datos y privacidad primero.",
 
     "aboutPage.principlesBullets.four": "Exportes claros y auditables.",
 
@@ -2682,27 +2639,27 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.valueProps.cyberSafe.desc": "Seguridad primero para flujos financieros sensibles.",
 
-    "aboutPage.valueProps.instantFlux.title": "Flujo instant·neo",
+    "aboutPage.valueProps.instantFlux.title": "Flujo instant√°neo",
 
     "aboutPage.valueProps.instantFlux.desc": "Convierta datos complejos sin entrada manual.",
 
-    "aboutPage.valueProps.accuracy.title": "Alta precisiÛn",
+    "aboutPage.valueProps.accuracy.title": "Alta precisi√≥n",
 
-    "aboutPage.valueProps.accuracy.desc": "ConversiÛn precisa para datos financieros crÌticos.",
+    "aboutPage.valueProps.accuracy.desc": "Conversi√≥n precisa para datos financieros cr√≠ticos.",
 
-    "aboutPage.roadmapTitle": "QuÈ sigue",
+    "aboutPage.roadmapTitle": "Qu√© sigue",
 
     "aboutPage.roadmapBullets.one": "Procesamiento masivo y espacios de equipo.",
 
     "aboutPage.roadmapBullets.two": "Integraciones con QuickBooks, Zoho Books y Xero.",
 
-    "aboutPage.roadmapBullets.three": "ClasificaciÛn m·s inteligente e insights de flujo de caja.",
+    "aboutPage.roadmapBullets.three": "Clasificaci√≥n m√°s inteligente e insights de flujo de caja.",
 
-    "aboutPage.roadmapBullets.four": "M·s soporte de idiomas regionales.",
+    "aboutPage.roadmapBullets.four": "M√°s soporte de idiomas regionales.",
 
-    "aboutPage.connectTitle": "ConÈctate con el Creador",
+    "aboutPage.connectTitle": "Con√©ctate con el Creador",
 
-    "aboutPage.contact.hotline": "LÌnea directa",
+    "aboutPage.contact.hotline": "L√≠nea directa",
 
     "aboutPage.contact.mail": "Correo directo",
 
@@ -2711,107 +2668,107 @@ export const translations: Record<Language, Record<string, string>> = {
     "aboutPage.contact.hq": "sede",
 
     "aboutPage.contact.hqValue": "Prem Nagar, Kota, Rajasthan 324004",
-    "aboutPage.footer": "© 2026 Banklefy | DiseÒado para la excelencia",
+    "aboutPage.footer": "¬© 2026 Banklefy | Dise√±ado para la excelencia",
 
     "privacyPage.badge": "Privacidad y transparencia",
 
-    "privacyPage.title": "polÌtica de privacidad",
+    "privacyPage.title": "pol√≠tica de privacidad",
 
     "privacyPage.subtitle": "Recopilamos solo lo que necesitamos para ejecutar y proteger el servicio.",
 
-    "privacyPage.lastUpdated": "⁄ltima actualizaciÛn: 7 de febrero de 2026",
+    "privacyPage.lastUpdated": "√öltima actualizaci√≥n: 7 de febrero de 2026",
 
-    "privacyPage.sections.zeroRetention.title": "Acceso por sesiÛn",
+    "privacyPage.sections.zeroRetention.title": "Acceso por sesi√≥n",
 
     "privacyPage.sections.zeroRetention.desc": "Los archivos cargados se procesan durante tu sesi?n activa. Las conversiones guardadas permanecen en el historial de tu cuenta hasta que las elimines.",
 
-    "privacyPage.sections.encryption.title": "Cifrado en tr·nsito",
+    "privacyPage.sections.encryption.title": "Cifrado en tr√°nsito",
 
-    "privacyPage.sections.encryption.desc": "Los datos se cifran durante la carga y la transferencia. Utilizamos proveedores acreditados y controles de seguridad est·ndar de la industria.",
+    "privacyPage.sections.encryption.desc": "Los datos se cifran durante la carga y la transferencia. Utilizamos proveedores acreditados y controles de seguridad est√°ndar de la industria.",
 
     "privacyPage.sections.noTracking.title": "Sin seguimiento de anuncios",
 
-    "privacyPage.sections.noTracking.desc": "No vendemos sus datos ni ejecutamos rastreadores de publicidad. Podemos utilizar herramientas anti-abuso como reCAPTCHA, que pueden recopilar seÒales del dispositivo y configurar cookies.",
+    "privacyPage.sections.noTracking.desc": "No vendemos sus datos ni ejecutamos rastreadores de publicidad. Podemos utilizar herramientas anti-abuso como reCAPTCHA, que pueden recopilar se√±ales del dispositivo y configurar cookies.",
 
     "privacyPage.sections.aiPowered.title": "Procesamiento automatizado",
 
-    "privacyPage.sections.aiPowered.desc": "El procesamiento es principalmente automatizado. El acceso a los datos est· limitado al personal autorizado por motivos legales o de soporte.",
+    "privacyPage.sections.aiPowered.desc": "El procesamiento es principalmente automatizado. El acceso a los datos est√° limitado al personal autorizado por motivos legales o de soporte.",
 
     "privacyPage.sections.compliance.title": "Pensado en la privacidad",
 
-    "privacyPage.sections.compliance.desc": "Nuestro objetivo es seguir los principios de privacidad y ser transparentes sobre cÛmo se utilizan los datos.",
+    "privacyPage.sections.compliance.desc": "Nuestro objetivo es seguir los principios de privacidad y ser transparentes sobre c√≥mo se utilizan los datos.",
 
     "privacyPage.aboutTitle": "Acerca de Banklefy",
 
-    "privacyPage.aboutP1": "Banklefy es una herramienta inteligente, r·pida y segura creada para convertir extractos bancarios de PDF a Excel con precisiÛn y facilidad.",
+    "privacyPage.aboutP1": "Banklefy es una herramienta inteligente, r√°pida y segura creada para convertir extractos bancarios de PDF a Excel con precisi√≥n y facilidad.",
 
     "privacyPage.aboutP2Prefix": "Esta plataforma fue creada por",
 
-    "privacyPage.aboutP2Suffix": ", con sede en Kota, Rajasthan, India. Banklefy se lanzÛ en 2026 para ayudar a personas y empresas a ahorrar tiempo y esfuerzo con datos financieros.",
+    "privacyPage.aboutP2Suffix": ", con sede en Kota, Rajasthan, India. Banklefy se lanz√≥ en 2026 para ayudar a personas y empresas a ahorrar tiempo y esfuerzo con datos financieros.",
 
-    "privacyPage.whatTitle": "øQuÈ hace Banklefy?",
+    "privacyPage.whatTitle": "¬øQu√© hace Banklefy?",
 
     "privacyPage.whatItems.item1": "Convierte archivos PDF complejos de extractos bancarios en hojas de Excel limpias y editables",
 
     "privacyPage.whatItems.item2": "Mantiene el formato, las columnas y la claridad de las transacciones.",
 
-    "privacyPage.whatItems.item3": "Funciona al instante: no requiere instalaciÛn de software",
+    "privacyPage.whatItems.item3": "Funciona al instante: no requiere instalaci√≥n de software",
 
-    "privacyPage.whatItems.item4": "DiseÒado teniendo en cuenta la privacidad y la seguridad de los datos",
+    "privacyPage.whatItems.item4": "Dise√±ado teniendo en cuenta la privacidad y la seguridad de los datos",
 
-    "privacyPage.contactTitle": "øPreguntas?",
+    "privacyPage.contactTitle": "¬øPreguntas?",
 
-    "privacyPage.contactDescPrefix": "Si tiene preguntas sobre privacidad, comunÌquese con el soporte.",
+    "privacyPage.contactDescPrefix": "Si tiene preguntas sobre privacidad, comun√≠quese con el soporte.",
 
-    "privacyPage.footer": "(c) 2026 AcrÛmeda. Reservados todos los derechos.",
+    "privacyPage.footer": "(c) 2026 Acr√≥meda. Reservados todos los derechos.",
 
     "securityPage.badge": "Seguridad y confianza",
 
     "securityPage.title": "Seguridad",
 
-    "securityPage.subtitle": "CÛmo Banklefy protege tus datos y conversiones.",
+    "securityPage.subtitle": "C√≥mo Banklefy protege tus datos y conversiones.",
 
-    "securityPage.lastUpdated": "⁄ltima actualizaciÛn: 17 de marzo de 2026",
+    "securityPage.lastUpdated": "√öltima actualizaci√≥n: 17 de marzo de 2026",
 
     "securityPage.sections.dataHandling.title": "Manejo de datos",
 
     "securityPage.sections.dataHandling.desc": "Los archivos se procesan para generar exportaciones. No vendemos datos y limitamos el acceso a tu cuenta o sesi?n activa.",
 
-    "securityPage.sections.encryption.title": "Cifrado en tr·nsito",
+    "securityPage.sections.encryption.title": "Cifrado en tr√°nsito",
 
-    "securityPage.sections.encryption.desc": "Todo el tr·fico usa HTTPS/TLS.",
+    "securityPage.sections.encryption.desc": "Todo el tr√°fico usa HTTPS/TLS.",
 
     "securityPage.sections.access.title": "Control de acceso",
 
     "securityPage.sections.access.desc": "Solo t? puedes acceder a tus archivos y exportaciones a trav?s de tu cuenta o sesi?n activa.",
 
-    "securityPage.sections.retention.title": "RetenciÛn y eliminaciÛn",
+    "securityPage.sections.retention.title": "Retenci√≥n y eliminaci√≥n",
 
     "securityPage.sections.retention.desc": "Las cargas temporales se limpian despu?s del procesamiento. Las conversiones guardadas permanecen en el historial de tu cuenta hasta que las elimines.",
 
     "securityPage.sections.incident.title": "Respuesta ante incidentes",
 
-    "securityPage.sections.incident.desc": "Si hay un incidente de seguridad, notificaremos a los usuarios seg˙n la ley.",
+    "securityPage.sections.incident.desc": "Si hay un incidente de seguridad, notificaremos a los usuarios seg√∫n la ley.",
 
     "cookiePage.badge": "Cookies",
 
-    "cookiePage.title": "PolÌtica de cookies",
+    "cookiePage.title": "Pol√≠tica de cookies",
 
-    "cookiePage.subtitle": "CÛmo usamos cookies para sesiones y seguridad.",
+    "cookiePage.subtitle": "C√≥mo usamos cookies para sesiones y seguridad.",
 
-    "cookiePage.lastUpdated": "⁄ltima actualizaciÛn: 17 de marzo de 2026",
+    "cookiePage.lastUpdated": "√öltima actualizaci√≥n: 17 de marzo de 2026",
 
     "cookiePage.sections.essential.title": "Cookies esenciales",
 
-    "cookiePage.sections.essential.desc": "Necesarias para mantener la sesiÛn y la seguridad.",
+    "cookiePage.sections.essential.desc": "Necesarias para mantener la sesi√≥n y la seguridad.",
 
-    "cookiePage.sections.security.title": "Seguridad y prevenciÛn de abuso",
+    "cookiePage.sections.security.title": "Seguridad y prevenci√≥n de abuso",
 
     "cookiePage.sections.security.desc": "reCAPTCHA y controles de seguridad pueden establecer cookies adicionales.",
 
-    "cookiePage.sections.analytics.title": "AnalÌtica de rendimiento",
+    "cookiePage.sections.analytics.title": "Anal√≠tica de rendimiento",
 
-    "cookiePage.sections.analytics.desc": "Podemos usar analÌtica mÌnima para mejorar el rendimiento.",
+    "cookiePage.sections.analytics.desc": "Podemos usar anal√≠tica m√≠nima para mejorar el rendimiento.",
 
     "cookiePage.sections.control.title": "Gestionar cookies",
 
@@ -2819,11 +2776,11 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "contactPage.badge": "Contacto",
 
-    "contactPage.title": "Cont·ctanos",
+    "contactPage.title": "Cont√°ctanos",
 
-    "contactPage.subtitle": "Preguntas, facturaciÛn o soporte ó estamos aquÌ para ayudar.",
+    "contactPage.subtitle": "Preguntas, facturaci√≥n o soporte ‚Äî estamos aqu√≠ para ayudar.",
 
-    "contactPage.responseNote": "Tiempo de respuesta tÌpico: 24ñ48 horas.",
+    "contactPage.responseNote": "Tiempo de respuesta t√≠pico: 24‚Äì48 horas.",
 
     "contactPage.support.title": "Soporte",
 
@@ -2831,21 +2788,21 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "contactPage.support.button": "Contactar soporte",
 
-    "contactPage.email.title": "Correo electrÛnico",
+    "contactPage.email.title": "Correo electr√≥nico",
 
-    "contactPage.email.desc": "øPrefieres correo? EscrÌbenos a",
+    "contactPage.email.desc": "¬øPrefieres correo? Escr√≠benos a",
 
     "settings.title": "Ajustes",
 
-    "settings.subtitle": "Administre su cuenta, preferencias y configuraciÛn de privacidad",
+    "settings.subtitle": "Administre su cuenta, preferencias y configuraci√≥n de privacidad",
 
-    "settings.searchPlaceholder": "ConfiguraciÛn de b˙squeda...",
+    "settings.searchPlaceholder": "Configuraci√≥n de b√∫squeda...",
 
     "settings.backToHome": "Volver a Inicio",
 
     "settings.verified": "Verificado",
 
-    "settings.noResults": "No se encontraron configuraciones que coincidan con su b˙squeda.",
+    "settings.noResults": "No se encontraron configuraciones que coincidan con su b√∫squeda.",
 
     "settings.categories.all": "Todo",
 
@@ -2861,27 +2818,27 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "settings.categories.advanced": "Avanzado",
 
-    "settings.profile.email": "DirecciÛn de correo electrÛnico",
+    "settings.profile.email": "Direcci√≥n de correo electr√≥nico",
 
-    "settings.profile.emailDesc": "La direcciÛn de correo electrÛnico de tu cuenta",
+    "settings.profile.emailDesc": "La direcci√≥n de correo electr√≥nico de tu cuenta",
 
     "settings.profile.name": "Nombre para mostrar",
 
-    "settings.profile.nameDesc": "Su nombre p˙blico",
+    "settings.profile.nameDesc": "Su nombre p√∫blico",
 
     "settings.profile.namePlaceholder": "Introduce tu nombre",
 
-    "settings.profile.password": "ContraseÒa",
+    "settings.profile.password": "Contrase√±a",
 
-    "settings.profile.passwordDesc": "Cambia la contraseÒa de tu cuenta",
+    "settings.profile.passwordDesc": "Cambia la contrase√±a de tu cuenta",
 
-    "settings.profile.changePassword": "Cambiar la contraseÒa",
+    "settings.profile.changePassword": "Cambiar la contrase√±a",
 
-    "settings.usage.stats": "EstadÌsticas de uso",
+    "settings.usage.stats": "Estad√≠sticas de uso",
 
-    "settings.usage.statsDesc": "Uso de tu p·gina",
+    "settings.usage.statsDesc": "Uso de tu p√°gina",
 
-    "settings.usage.conversionsToday": "p·ginas utilizadas",
+    "settings.usage.conversionsToday": "p√°ginas utilizadas",
 
     "settings.usage.remaining": "restante",
 
@@ -2891,13 +2848,13 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "settings.usage.freeTier": "Nivel gratuito",
 
-    "settings.usage.anonymous": "AnÛnimo",
+    "settings.usage.anonymous": "An√≥nimo",
 
     "settings.usage.upgrade": "Mejora",
 
-    "settings.notifications.email": "Notificaciones por correo electrÛnico",
+    "settings.notifications.email": "Notificaciones por correo electr√≥nico",
 
-    "settings.notifications.emailDesc": "Reciba actualizaciones por correo electrÛnico",
+    "settings.notifications.emailDesc": "Reciba actualizaciones por correo electr√≥nico",
 
     "settings.notifications.push": "Notificaciones push",
 
@@ -2917,7 +2874,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "settings.privacy.visibility": "Visibilidad del perfil",
 
-    "settings.privacy.visibilityDesc": "Controla quiÈn puede ver tu perfil",
+    "settings.privacy.visibilityDesc": "Controla qui√©n puede ver tu perfil",
 
     "settings.privacy.manage": "Administrar",
 
@@ -2933,45 +2890,36 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "settings.privacy.deleteAccount": "Eliminar cuenta",
 
-    "settings.advanced.autoDownload": "Descarga autom·tica",
+    "settings.advanced.autoDownload": "Descarga autom√°tica",
 
-    "settings.advanced.autoDownloadDesc": "Descargar autom·ticamente archivos convertidos",
+    "settings.advanced.autoDownloadDesc": "Descargar autom√°ticamente archivos convertidos",
 
-    "chatAura.greeting": "°Hola! Soy Chat Aura, tu asistente financiera. øCÛmo puedo ayudarte hoy?",
 
-    "chatAura.greetingWithPdf": "°Hola! He cargado su documento ({fileName}). °Preg˙ntame cualquier cosa al respecto!",
 
-    "chatAura.subtitle": "Su asistente financiero de IA",
 
-    "chatAura.remaining": "chats restantes",
 
-    "chatAura.placeholder": "Pregunta por tu declaraciÛn...",
 
-    "chatAura.errorResponse": "Lo siento, encontrÈ un error. Por favor intÈntalo de nuevo.",
 
-    "chatAura.limitReached": "LÌmite de chat alcanzado",
 
-    "chatAura.signUpForMore": "RegÌstrate para conversaciones ilimitadas",
 
-    "chatAura.signUp": "Inscribirse",
 
     "footer.helpCenter": "Centro de ayuda",
 
     "footer.blog": "Publicaciones",
 
-    "footer.refunds": "PolÌtica de reembolso",
+    "footer.refunds": "Pol√≠tica de reembolso",
 
     "helpPage.title": "Centro de ayuda",
 
-    "helpPage.subtitle": "Ayuda de la A a la Z para cada paso, desde la carga hasta la exportaciÛn.",
+    "helpPage.subtitle": "Ayuda de la A a la Z para cada paso, desde la carga hasta la exportaci√≥n.",
 
     "helpPage.sections.files.title": "Archivos compatibles",
 
-    "helpPage.sections.password.title": "Archivos PDF protegidos con contraseÒa",
+    "helpPage.sections.password.title": "Archivos PDF protegidos con contrase√±a",
 
-    "helpPage.sections.limits.title": "LÌmites diarios",
+    "helpPage.sections.limits.title": "L√≠mites diarios",
 
-    "helpPage.sections.accuracy.title": "Consejos de precisiÛn",
+    "helpPage.sections.accuracy.title": "Consejos de precisi√≥n",
 
     "helpPage.sections.refunds.title": "Reembolsos",
 
@@ -2979,19 +2927,19 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "helpPage.sections.contact.title": "Contactar con soporte",
 
-    "helpPage.sections.contact.desc": "øNecesitar ayuda? PÛngase en contacto con el soporte y comparta su ID de pedido si est· disponible.",
+    "helpPage.sections.contact.desc": "¬øNecesitar ayuda? P√≥ngase en contacto con el soporte y comparta su ID de pedido si est√° disponible.",
 
     "helpPage.cta.contact": "Contactar con soporte",
 
     "featuresPage.items.helpCenter.title": "CENTRO DE AYUDA",
 
-    "featuresPage.items.helpCenter.desc": "GuÌa paso a paso sobre formatos, lÌmites y soluciÛn de problemas para conversiones fluidas.",
+    "featuresPage.items.helpCenter.desc": "Gu√≠a paso a paso sobre formatos, l√≠mites y soluci√≥n de problemas para conversiones fluidas.",
 
-    "featuresPage.items.refunds.title": "POLÕTICA DE REEMBOLSO",
+    "featuresPage.items.refunds.title": "POL√çTICA DE REEMBOLSO",
 
-    "featuresPage.items.refunds.desc": "Reembolsos dentro de los 14 dÌas para planes elegibles. Consulte Precios para obtener m·s detalles.",
+    "featuresPage.items.refunds.desc": "Reembolsos dentro de los 14 d√≠as para planes elegibles. Consulte Precios para obtener m√°s detalles.",
 
-    "language": "InglÈs"
+    "language": "Ingl√©s"
 
   },
 
@@ -3001,7 +2949,6 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "nav.demo": "????",
 
-    "nav.chatAura": "??? ??? ????",
 
     "nav.settings": "????????",
 
@@ -3158,7 +3105,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "faqPage.items.formats.title": "??? ?? ???? ??????? ???????? ????",
 
-    "faqPage.items.formats.desc": "PDF, JPG ?? PNG ???????? ??? ó ??????? ?? ????? ????? ?? ????",
+    "faqPage.items.formats.desc": "PDF, JPG ?? PNG ???????? ??? ‚Äî ??????? ?? ????? ????? ?? ????",
 
     "faqPage.items.password.title": "???? ???????-??????????? PDF ?????? ???",
 
@@ -3204,7 +3151,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "footer.cta.btn": "??? ?????? ???? ??????? ????",
 
-    "footer.copyright": "© 2026 Banklefy? ??????? ?????? ?????? ????? ????",
+    "footer.copyright": "¬© 2026 Banklefy? ??????? ?????? ?????? ????? ????",
 
     "footer.recaptcha.prefix": "?? ???? reCAPTCHA ?? Google ?????? ???????? ??",
 
@@ -3254,7 +3201,6 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.categories.risk": "???? ????????",
 
-    "featuresPage.categories.assistant": "??? ?????",
 
     "featuresPage.categories.export": "???????",
 
@@ -3280,7 +3226,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.pdfReport.title": "?????? ??????? ??????",
 
-    "featuresPage.items.pdfReport.desc": "?????? ?? ?????????????? ?? ???? PDF ?????? ????? ?? (????, ????? ????????? ?? ?????????) ó ???? ?? ??? ???? ?? ????",
+    "featuresPage.items.pdfReport.desc": "?????? ?? ?????????????? ?? ???? PDF ?????? ????? ?? (????, ????? ????????? ?? ?????????) ‚Äî ???? ?? ??? ???? ?? ????",
 
     "featuresPage.items.foir.title": "??????? ????",
 
@@ -3326,9 +3272,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.batchProcessing.desc": "?????? ????? ?? ???????? ??? ????????? ???? - ????????? ?? ??? ??????????? ?? ??? ???????",
 
-    "featuresPage.items.chatAura.title": "??? ??? ??? ?????????",
 
-    "featuresPage.items.chatAura.desc": "",
 
     "featuresPage.items.encryption.title": "?????? ??? ???????????",
 
@@ -3362,19 +3306,19 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.cta.signUp": "??????? ???? ?? ????",
 
-    "featuresPage.footer": "© 2026 Banklefy | ?????????? ?? ??? ???????? ???? ???",
+    "featuresPage.footer": "¬© 2026 Banklefy | ?????????? ?? ??? ???????? ???? ???",
 
     "aboutPage.visionTitle": "Banklefy ??? ???? ?????? ??",
 
     "aboutPage.visionSubtitle": "?????? ????? ?? ??? ???????? ???? ????????? ??????????",
 
-    "aboutPage.visionP1": "Banklefy PDFs, ????? ?? ???? ?? ???? Excel/CSV ??? ????? ?? ó ?????? ?? ????????? ?? ???? ?? ???????????, ??????? ????? ?? ???? ????????? ?? ??? ????? ??? ?? ???? ???????? ????-????? ?? ??? ?? ????",
+    "aboutPage.visionP1": "Banklefy PDFs, ????? ?? ???? ?? ???? Excel/CSV ??? ????? ?? ‚Äî ?????? ?? ????????? ?? ???? ?? ???????????, ??????? ????? ?? ???? ????????? ?? ??? ????? ??? ?? ???? ???????? ????-????? ?? ??? ?? ????",
 
     "aboutPage.brainchildPrefix": "Hi, ??? ???",
 
     "aboutPage.brainchildP1": "??? ???? (????????) ?? ???????-???????? ?????? ???? ????? Banklefy ????? ????? ???? ????????? ?????????? ???? ?? ?? ????????? ???? ???????? ???? ??? ???? ???? ??????? ?? ?????? ????? ???? ??? ???? ?????? ???? ?? ???????? ????",
 
-    "aboutPage.brainchildP2": "????? 2026 ??? Banklefy ????? ???? ó deterministic parsing ?? ?????? OCR ?? ?????? ???????? ????????? ???? ?? ???, ???? ???? ??????, ????????? ?? ????-??????? ?? ???? ???",
+    "aboutPage.brainchildP2": "????? 2026 ??? Banklefy ????? ???? ‚Äî deterministic parsing ?? ?????? OCR ?? ?????? ???????? ????????? ???? ?? ???, ???? ???? ??????, ????????? ?? ????-??????? ?? ???? ???",
 
     "aboutPage.problemTitle": "?? ???-?? ?????? ?? ???? ???",
 
@@ -3392,7 +3336,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.solutionIntro": "???? ????????? ????????? ?? ??? ?????????-?????? ????????? ?????",
 
-    "aboutPage.solutionBullets.one": "??????? PDFs ?? ??? deterministic parsing ó ????? ?? ?? OCR?",
+    "aboutPage.solutionBullets.one": "??????? PDFs ?? ??? deterministic parsing ‚Äî ????? ?? ?? OCR?",
 
     "aboutPage.solutionBullets.two": "Indian banks ?? ??? ????? ?? ?? ??? ??????????",
 
@@ -3432,7 +3376,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.valueProps.instantFlux.title": "?????? ??????",
 
-    "aboutPage.valueProps.instantFlux.desc": "???? ???? ????? ?? ó ???? ???????? ???????",
+    "aboutPage.valueProps.instantFlux.desc": "???? ???? ????? ?? ‚Äî ???? ???????? ???????",
 
     "aboutPage.valueProps.accuracy.title": "???? ??????",
 
@@ -3459,7 +3403,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "aboutPage.contact.hq": "????????",
 
     "aboutPage.contact.hqValue": "????? ???, ????, ???????? 324004",
-    "aboutPage.footer": "© 2026 Banklefy | ?????????? ?? ??? ???????? ???? ???",
+    "aboutPage.footer": "¬© 2026 Banklefy | ?????????? ?? ??? ???????? ???? ???",
 
     "privacyPage.badge": "???????? ?? ??????????",
 
@@ -3569,9 +3513,9 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "contactPage.title": "?????? ????",
 
-    "contactPage.subtitle": "??????, ?????? ?? ?????? ó ?? ??? ?? ??? ????",
+    "contactPage.subtitle": "??????, ?????? ?? ?????? ‚Äî ?? ??? ?? ??? ????",
 
-    "contactPage.responseNote": "?? ??????????? ???: 24ñ48 ?????",
+    "contactPage.responseNote": "?? ??????????? ???: 24‚Äì48 ?????",
 
     "contactPage.support.title": "??????",
 
@@ -3685,23 +3629,14 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "settings.advanced.autoDownloadDesc": "????????? ??????? ???????? ??? ?? ??????? ????",
 
-    "chatAura.greeting": "??????! ??? ??? ???, ???? ??????? ????? ???? ?? ??? ???? ??? ???? ??? ???? ????? ????",
 
-    "chatAura.greetingWithPdf": "??????! ????? ???? ????????? ??? ?? ???? ?? ({fileName})? ???? ???? ??? ????? ??? ?? ?????!",
 
-    "chatAura.subtitle": "???? ??? ??????? ?????",
 
-    "chatAura.remaining": "??? ???? ???",
 
-    "chatAura.placeholder": "???? ???? ?? ???? ??? ?????...",
 
-    "chatAura.errorResponse": "???? ??? ??, ???? ?? ?????? ?? ????? ???? ????? ????? ???: ?????? ?????",
 
-    "chatAura.limitReached": "??? ?? ???? ???? ?? ??",
 
-    "chatAura.signUpForMore": "?????? ?????? ?? ??? ???? ?? ????",
 
-    "chatAura.signUp": "???? ?? ????",
 
     "footer.helpCenter": "?????? ??????",
 
@@ -3755,7 +3690,7 @@ export const languageNames: Record<Language, string> = {
 
   "zh": "??",
 
-  "es": "EspaÒol",
+  "es": "Espa√±ol",
 
   "hi": "??????"
 
