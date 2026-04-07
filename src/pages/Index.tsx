@@ -2,25 +2,21 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Settings, Menu, MessageCircle, Sparkles, CircleDollarSign, Gift, Lock } from "lucide-react";
+import { Settings, Menu, Sparkles, CircleDollarSign, Gift } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import Logo from "@/components/Logo";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
-import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 import AutoHideHeader from "@/components/AutoHideHeader";
 
 const LandingPageContent = lazyWithRetry(() =>
   import("@/components/LandingPageContent").then((module) => ({ default: module.LandingPageContent })),
 );
 
-const CHAT_AURA_TEMP_UNAVAILABLE = false;
-
 const Index = () => {
   const { user } = useAuth();
-  const { hasChatAuraAccess, loading: subscriptionLoading } = useSubscriptionTier();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const nextParam = searchParams.get("next");
@@ -62,19 +58,6 @@ const Index = () => {
     } else {
       navigate('/auth');
     }
-  };
-
-  const handleChatAuraClick = () => {
-    if (subscriptionLoading) return;
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    if (!hasChatAuraAccess) {
-      navigate('/pricing');
-      return;
-    }
-    navigate('/chat');
   };
 
   return (
@@ -120,19 +103,6 @@ const Index = () => {
                 <Sparkles className="h-3 w-3" />
                 <span>{t('nav.features')}</span>
               </Link>
-
-              {!CHAT_AURA_TEMP_UNAVAILABLE && (
-                <button
-                  type="button"
-                  onClick={handleChatAuraClick}
-                  disabled={subscriptionLoading}
-                  className="text-glow-link text-xs font-medium disabled:opacity-70"
-                >
-                  <MessageCircle className="h-3 w-3" />
-                  <span>{t('nav.chatAura')}</span>
-                  {(!user || !hasChatAuraAccess) && <Lock className="h-3 w-3" />}
-                </button>
-              )}
 
               {user && (
                 <Link
@@ -231,21 +201,6 @@ const Index = () => {
                         </Link>
                       </Button>
                     </SheetClose>
-
-                    {!CHAT_AURA_TEMP_UNAVAILABLE && (
-                      <SheetClose asChild>
-                        <Button
-                          variant="ghost"
-                          className="justify-start gap-2 text-muted-foreground"
-                          onClick={handleChatAuraClick}
-                          disabled={subscriptionLoading}
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                          {t('nav.chatAura')}
-                          {(!user || !hasChatAuraAccess) && <Lock className="h-4 w-4" />}
-                        </Button>
-                      </SheetClose>
-                    )}
 
                     {user && (
                       <SheetClose asChild>
