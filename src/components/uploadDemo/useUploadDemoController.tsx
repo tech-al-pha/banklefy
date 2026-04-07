@@ -6,6 +6,7 @@ import { validateFile, sanitizeFilename } from "@/lib/fileValidation";
 import { useNavigate } from "react-router-dom";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { useRecaptcha } from "@/hooks/useRecaptcha";
+import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 import { useSettings } from "@/hooks/useSettings";
 import {
   getEditPdfDetectorTier,
@@ -166,6 +167,7 @@ export const useUploadDemoController = () => {
   const passwordUnlockHandlerRef = useRef<() => void | Promise<void>>(() => {});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const { hasChatAuraAccess } = useSubscriptionTier();
   const { settings } = useSettings();
   const navigate = useNavigate();
   const editedPdfWarningTiming = settings.editedPdfWarningTiming ?? "convert";
@@ -1464,6 +1466,43 @@ export const useUploadDemoController = () => {
         setAiStatus(data.aiStatus);
       }
 
+      // Store extracted PDF context in sessionStorage for Chat Aura access
+      // This allows Chat Aura to provide context-aware responses about the PDF
+      if (data?.transactions && Array.isArray(data.transactions)) {
+        // Create a concise text representation of the extracted data
+        const extractedSummary = `Bank Statement Extracted Data:
+
+Total Transactions: ${data.transactions.length}
+
+Transactions:
+${data.transactions.map((t: Transaction, i: number) =>
+  i < 50 ? `${t.date} | ${t.description} | Category: ${t.category} | Debit: ${t.debit} | Credit: ${t.credit} | Balance: ${t.balance}` : ''
+).filter(Boolean).join('\n')}
+${data.transactions.length > 50 ? `\n... and ${data.transactions.length - 50} more transactions` : ''}
+
+${data.analytics ? `
+Analytics Summary:
+- Total Credits: ${formatCurrencyValue(truncateDecimals(data.analytics.totalCredits), responseCurrency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Total Debits: ${formatCurrencyValue(truncateDecimals(data.analytics.totalDebits), responseCurrency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+- Net Flow: ${formatCurrencyValue(truncateDecimals(data.analytics.netFlow), responseCurrency, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+` : ''}`;
+
+        try {
+          sessionStorage.setItem('chatAuraContext', extractedSummary);
+          sessionStorage.setItem('chatAuraFileName', selectedFile?.name || 'Bank Statement');
+        } catch {
+          // Ignore sessionStorage failures (privacy mode/quota)
+        }
+      }
+
+      if (data?.conversionId) {
+        try {
+          sessionStorage.setItem('chatAuraLastConversionId', data.conversionId);
+        } catch {
+          // Ignore sessionStorage failures (privacy mode/quota)
+        }
+      }
+
       const resolvedOutputMode: ConversionMode = data?.outputMode === "tally_only" ? "tally_only" : "standard";
       setConversionMode(resolvedOutputMode);
 
@@ -1491,6 +1530,7 @@ export const useUploadDemoController = () => {
             : [
                 `Extracted ${data?.transactions?.length || 0} transactions.`,
                 formatRemaining(data?.remaining),
+                hasChatAuraAccess ? "Chat Aura wants to say something. Open Chat Aura to view it." : null,
               ]
                 .filter(Boolean)
                 .join(" "),
@@ -1835,6 +1875,7 @@ export const useUploadDemoController = () => {
             : [
                 `${results.length} ${pluralize(results.length, "statement")} converted.`,
                 formatRemaining(data?.remaining),
+                hasChatAuraAccess ? "Chat Aura wants to say something. Open Chat Aura to view it." : null,
               ]
                 .filter(Boolean)
                 .join(" "),

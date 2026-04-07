@@ -9,6 +9,11 @@ verify_jwt = false
 [functions.warm-up]
 verify_jwt = false
 
+[functions.chat-aura]
+verify_jwt = true
+
+
+
 [functions.convert-statements-batch]
 verify_jwt = false
 

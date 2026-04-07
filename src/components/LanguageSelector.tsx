@@ -6,16 +6,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useLanguage, Language } from '@/contexts/LanguageContext';
+import { useLanguage, Language, languageNames } from '@/contexts/LanguageContext';
 
 const languages: Language[] = ['en', 'ar', 'zh', 'es', 'hi'];
-const languageLabels: Record<Language, string> = {
-  en: 'English',
-  ar: 'Arabic',
-  zh: 'Chinese',
-  es: 'Spanish',
-  hi: 'Hindi',
-};
 
 export const LanguageSelector = () => {
   const { language, setLanguage } = useLanguage();
@@ -28,7 +21,7 @@ export const LanguageSelector = () => {
           size="sm" 
           className="text-sm gap-1 text-muted-foreground transition-all duration-300"
         >
-          {languageLabels[language]}
+          {languageNames[language]}
           <ChevronDown className="h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
@@ -39,7 +32,7 @@ export const LanguageSelector = () => {
             onClick={() => setLanguage(lang)}
             className={`cursor-pointer ${language === lang ? 'text-primary font-semibold' : 'text-foreground'}`}
           >
-            {languageLabels[lang]}
+            {languageNames[lang]}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

@@ -54,6 +54,9 @@ export const isPaidPlan = ({ planType, conversionsLimit }: EntitlementInput): bo
 const resolvePlanForFeatures = (input: EntitlementInput): string =>
   resolveEffectivePlanType(input.planType, input.conversionsLimit);
 
+export const hasChatAuraAccess = (input: EntitlementInput): boolean =>
+  isPaidPlan(input);
+
 export const hasMt940Access = (input: EntitlementInput): boolean =>
   isPaidPlan(input);
 
