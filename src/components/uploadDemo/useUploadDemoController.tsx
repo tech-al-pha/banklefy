@@ -1027,9 +1027,6 @@ export const useUploadDemoController = () => {
         const cachedParsedPdf = preparedPdfDataRef.current.get(cacheKey);
         const parsedPdfTransactionsCount = cachedParsedPdf?.transactions?.length ?? 0;
         const isTextBasedPdf = parsedPdfTransactionsCount > 0;
-        if (parsedPdfTransactionsCount > 0) {
-          requestBody.pdfParsedTransactions = cachedParsedPdf?.transactions;
-        }
         if (cachedParsedPdf?.bankMetadata) {
           requestBody.pdfParsedBankMetadata = cachedParsedPdf.bankMetadata;
         }
@@ -1647,9 +1644,6 @@ export const useUploadDemoController = () => {
           const cachedParsedPdf = preparedPdfDataRef.current.get(cacheKey);
           const parsedPdfTransactionsCount = cachedParsedPdf?.transactions?.length ?? 0;
           const isTextBasedPdf = parsedPdfTransactionsCount > 0;
-          if (parsedPdfTransactionsCount > 0) {
-            payload.pdfParsedTransactions = cachedParsedPdf?.transactions;
-          }
           if (cachedParsedPdf?.bankMetadata) {
             payload.pdfParsedBankMetadata = cachedParsedPdf.bankMetadata;
           }
