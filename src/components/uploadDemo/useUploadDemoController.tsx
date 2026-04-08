@@ -819,12 +819,16 @@ export const useUploadDemoController = () => {
                   password: pdfPassword.trim() || undefined,
                   maxPdfRenderPages,
                 });
+                const parsedTxCount = parsedPdf.transactions?.length ?? 0;
+                const parsedPageCount = Math.max(1, parsedPdf.pageCount ?? 1);
+                const minimumExpectedRows = Math.max(12, Math.ceil(parsedPageCount * 4));
+                const localTextParseLooksReliable = parsedTxCount >= minimumExpectedRows;
                 preparedPdfDataRef.current.set(cacheKey, {
-                  transactions: parsedPdf.transactions,
+                  transactions: localTextParseLooksReliable ? parsedPdf.transactions : [],
                   bankMetadata: parsedPdf.bankMetadata,
                 });
 
-                const isTextBasedPdf = (parsedPdf.transactions?.length ?? 0) > 0;
+                const isTextBasedPdf = localTextParseLooksReliable;
                 if (!isTextBasedPdf) {
                   setUploadPrepProgress(65);
                   setUploadPrepLabel("Preparing OCR pages...");

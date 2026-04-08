@@ -62,6 +62,7 @@ export interface ParsedPdfBankMetadata {
 export interface ParsedPdfData {
   transactions: ParsedPdfTransaction[];
   bankMetadata?: ParsedPdfBankMetadata;
+  pageCount?: number;
 }
 
 const SUSPICIOUS_PRODUCER_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
@@ -953,7 +954,7 @@ export const extractPdfDataFromText = async (
   const maxPages = options?.maxPdfRenderPages ?? 120;
   if (pdf.numPages > maxPages) {
     await pdf.destroy?.();
-    return { transactions: [] };
+    return { transactions: [], pageCount: pdf.numPages };
   }
 
   const rows: ParsedPdfTransaction[] = [];
@@ -1036,7 +1037,7 @@ export const extractPdfDataFromText = async (
   const bankMetadata = extractBankMetadataFromLines(metadataLines);
 
   // Return only meaningful rows and keep original debit/credit/balance values.
-  return { transactions, bankMetadata };
+  return { transactions, bankMetadata, pageCount: pdf.numPages };
 };
 
 export const extractPdfTransactionsFromText = async (
