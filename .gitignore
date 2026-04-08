@@ -35,3 +35,5 @@ supabase/.temp/
 # Temporary Firebase CLI artifacts
 .firebase/
 .tmp/
+
+.vercel
