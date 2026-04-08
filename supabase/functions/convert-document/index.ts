@@ -703,6 +703,200 @@ const buildTokenFallbackRows = (
   return fallbackRows;
 };
 
+const MASHREQ_PREFIX_PATTERNS = [
+  'visa purchase',
+  'ipp transfer',
+  'inward remittance',
+  'acct to acct transfer',
+  'atm cash withdrawal',
+  'atm/ccdm cash deposit',
+  'atm usage fees',
+  'value added tax',
+  'monthly maintenance fee',
+  'dds payment',
+] as const;
+
+const isLikelyMashreqStatement = (lines: string[]): boolean => {
+  const text = lines.join('\n').toLowerCase();
+  return text.includes('mashreq') || text.includes('mashreqbank') || text.includes('mashreq neo');
+};
+
+const isMashreqNoiseLine = (line: string): boolean => {
+  const lower = line.toLowerCase().trim();
+  if (!lower) return true;
+  if (isNoiseLine(line)) return true;
+  if (lower.includes('verified. report any discrepancies')) return true;
+  if (lower.includes('of the statement date, otherwise the content will be assumed')) return true;
+  if (lower.includes('all charges, terms and conditions are subject to change')) return true;
+  if (lower.includes('please note that for foreign currency amounts')) return true;
+  if (lower.includes('full compliance with all applicable laws')) return true;
+  if (lower === 'accurate.') return true;
+  return false;
+};
+
+const isMashreqPrefixStart = (line: string): boolean => {
+  const lower = line.toLowerCase().trim();
+  return MASHREQ_PREFIX_PATTERNS.some((prefix) => lower.startsWith(prefix));
+};
+
+const getMashreqSameLineBalance = (entry: LineEntry, balanceCenter: number): number | null => {
+  const token =
+    entry.tokens
+      .filter((candidate) => candidate.x >= Math.max(460, balanceCenter - 45) && isStrictAmountToken(candidate.text))
+      .sort((left, right) => Math.abs(left.x - balanceCenter) - Math.abs(right.x - balanceCenter))[0] ?? null;
+  if (!token) return null;
+  const value = Math.abs(parseAmount(token.text));
+  return Number.isFinite(value) ? value : null;
+};
+
+const isMashreqBalanceOnlyLine = (entry: LineEntry, balanceCenter: number): boolean => {
+  if (entry.tokens.length !== 1) return false;
+  const token = entry.tokens[0];
+  if (token.x < Math.max(460, balanceCenter - 45)) return false;
+  return isStrictAmountToken(token.text);
+};
+
+const cleanMashreqDescriptionPart = (line: string): string => {
+  const compact = line.replace(/\s+/g, ' ').trim().replace(/^[\s-]+|[\s-]+$/g, '');
+  if (!compact) return '';
+  if (/^\d{6,}$/.test(compact)) return '';
+  if (/^(?:001|085|010)$/i.test(compact)) return '';
+  return compact;
+};
+
+const classifyMashreqCategory = (description: string, debit: number, credit: number): string => {
+  const lower = description.toLowerCase();
+  if (lower.includes('visa purchase')) return 'Card Purchase';
+  if (lower.includes('atm cash withdrawal')) return 'Cash Withdrawal';
+  if (lower.includes('atm/ccdm cash deposit')) return 'Cash Deposit';
+  if (lower.includes('monthly maintenance fee') || lower.includes('atm usage fees')) return 'Bank Fee';
+  if (lower.includes('value added tax')) return 'Tax';
+  if (lower.includes('dds payment')) return 'Payment';
+  if (lower.includes('inward remittance')) return 'Transfer In';
+  if (lower.includes('acct to acct transfer')) return credit > 0 ? 'Transfer In' : 'Transfer Out';
+  if (lower.includes('ipp transfer')) return credit > 0 ? 'Transfer In' : 'Transfer Out';
+  return credit > 0 ? 'Credit' : 'Debit';
+};
+
+const extractMashreqTransactions = (
+  lineEntries: LineEntry[],
+  amountCenters: PdfAmountColumnLayout | null,
+): RawTransaction[] => {
+  const debitCenter = amountCenters?.debitCenter ?? 335;
+  const creditCenter = amountCenters?.creditCenter ?? 412;
+  const balanceCenter = amountCenters?.balanceCenter ?? 500;
+  const rows: RawTransaction[] = [];
+  let pendingPrefix: string[] = [];
+  let current: {
+    date: string;
+    dateTokens: LineToken[];
+    prefixLines: string[];
+    bodyLines: string[];
+    tailLines: string[];
+    balance: number | null;
+  } | null = null;
+
+  const finalize = () => {
+    if (!current) return;
+    const amountTokens = current.dateTokens.filter((token) =>
+      token.x >= Math.min(debitCenter, creditCenter) - 20 &&
+      token.x < balanceCenter - 20 &&
+      isStrictAmountToken(token.text)
+    );
+    const amountToken =
+      amountTokens.sort((left, right) => {
+        const leftDist = Math.min(Math.abs(left.x - debitCenter), Math.abs(left.x - creditCenter));
+        const rightDist = Math.min(Math.abs(right.x - debitCenter), Math.abs(right.x - creditCenter));
+        return leftDist - rightDist;
+      })[0] ?? null;
+    const balance = current.balance;
+    if (!amountToken || !Number.isFinite(balance)) {
+      current = null;
+      return;
+    }
+
+    const amount = Math.abs(parseAmount(amountToken.text));
+    const debit = Math.abs(amountToken.x - debitCenter) <= Math.abs(amountToken.x - creditCenter) ? amount : 0;
+    const credit = debit === 0 ? amount : 0;
+    const refTokens = current.dateTokens
+      .filter((token) => token.x >= 90 && token.x < 320)
+      .map((token) => token.text);
+    const alphaNumericRefs = refTokens.filter((token) => /[A-Za-z]/.test(token) && /\d/.test(token));
+    const shortDigitRefs = refTokens.filter((token) => /^\d{4,8}$/.test(token));
+    const refNumber = [...shortDigitRefs, ...alphaNumericRefs].join(' ').trim();
+    const description = [...current.prefixLines, ...current.bodyLines, ...current.tailLines]
+      .map(cleanMashreqDescriptionPart)
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!description) {
+      current = null;
+      return;
+    }
+
+    rows.push({
+      date: current.date,
+      description,
+      debit,
+      credit,
+      balance,
+      refNumber,
+      category: classifyMashreqCategory(description, debit, credit),
+    });
+    current = null;
+  };
+
+  for (const entry of lineEntries) {
+    const line = entry.text.trim();
+    if (line === '__PAGE_BREAK__') continue;
+    if (isMashreqNoiseLine(line)) continue;
+
+    const firstToken = entry.tokens[0]?.text ?? '';
+    const isDateStart = (entry.tokens[0]?.x ?? 999) < 80 && /^\d{4}-\d{2}-\d{2}$/.test(firstToken);
+    if (isDateStart) {
+      finalize();
+      current = {
+        date: normalizeDate(firstToken),
+        dateTokens: entry.tokens,
+        prefixLines: pendingPrefix,
+        bodyLines: [],
+        tailLines: [],
+        balance: getMashreqSameLineBalance(entry, balanceCenter),
+      };
+      pendingPrefix = [];
+      continue;
+    }
+
+    if (!current) {
+      if (isMashreqPrefixStart(line)) {
+        pendingPrefix = [line];
+      }
+      continue;
+    }
+
+    if (!Number.isFinite(current.balance as number)) {
+      if (isMashreqBalanceOnlyLine(entry, balanceCenter)) {
+        current.balance = Math.abs(parseAmount(entry.tokens[0].text));
+      } else {
+        current.bodyLines.push(line);
+      }
+      continue;
+    }
+
+    if (isMashreqPrefixStart(line)) {
+      finalize();
+      pendingPrefix = [line];
+      continue;
+    }
+
+    current.tailLines.push(line);
+  }
+
+  finalize();
+  return rows;
+};
+
 const hasLikelyAmountTail = (text: string): boolean => {
   if (extractFlexibleAmounts(text)) return true;
   const normalizedText = normalizeDashToken(text);
@@ -824,6 +1018,17 @@ const extractPdfTextTransactionsFromBytes = async (
     }
 
     const amountCenters = detectAmountColumns(allLineEntries);
+    const mashreqLineEntries = allLineEntries.filter((entry) => entry.text !== '__PAGE_BREAK__');
+    if (isLikelyMashreqStatement(allLines)) {
+      const mashreqRows = extractMashreqTransactions(mashreqLineEntries, amountCenters);
+      if (mashreqRows.length >= Math.max(20, Math.ceil(pdf.numPages * 4))) {
+        console.log("[ROW_COUNT]", {
+          stage: "mashreq_specialized_parse",
+          totalAfter: mashreqRows.length,
+        });
+        return { transactions: mashreqRows, text: allLines.join('\n') };
+      }
+    }
 
     for (const entry of allLineEntries) {
       currentLineNumber += 1;
