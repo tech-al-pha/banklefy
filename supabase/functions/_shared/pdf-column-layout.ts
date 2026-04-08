@@ -25,6 +25,7 @@ const CREDIT_HEADER_PATTERN = /\b(?:credit|credits|deposit|deposits|cr)\b/i;
 const DEBIT_HEADER_PATTERN = /\b(?:debit|debits|withdrawal|withdrawals|dr)\b/i;
 const BALANCE_HEADER_PATTERN = /\b(?:balance|balances)\b/i;
 const TRAILING_PUNCTUATION_PATTERN = /[,:;]+$/g;
+const COLUMN_CAPTURE_RADIUS = 70;
 
 const sanitizeTokenText = (value: string): string =>
   String(value || '').replace(TRAILING_PUNCTUATION_PATTERN, '').trim();
@@ -95,6 +96,45 @@ const pickNearestUnusedToken = <T extends PdfAmountToken>(
   return best && bestDistance <= maxDistance ? best : null;
 };
 
+const pickNearestToken = <T extends PdfAmountToken>(
+  tokens: T[],
+  center: number,
+): T | null => {
+  let best: T | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (const token of tokens) {
+    const distance = Math.abs(token.x - center);
+    if (distance < bestDistance) {
+      best = token;
+      bestDistance = distance;
+    }
+  }
+
+  return best;
+};
+
+const isNearAnyAmountColumn = (x: number, layout: PdfAmountColumnLayout): boolean =>
+  Math.min(Math.abs(x - layout.debitCenter), Math.abs(x - layout.creditCenter)) <= COLUMN_CAPTURE_RADIUS;
+
+const isNearBalanceColumn = (x: number, layout: PdfAmountColumnLayout): boolean =>
+  Math.abs(x - layout.balanceCenter) <= COLUMN_CAPTURE_RADIUS;
+
+const inferAmountSideFromColumn = <T extends PdfAmountToken>(
+  token: T,
+  layout: PdfAmountColumnLayout,
+  amount: number,
+  inferSide: (text: string, amount: number) => { debit: number; credit: number },
+  text: string,
+): { debit: number; credit: number } => {
+  const debitDistance = Math.abs(token.x - layout.debitCenter);
+  const creditDistance = Math.abs(token.x - layout.creditCenter);
+
+  if (debitDistance < creditDistance) return { debit: Math.abs(amount), credit: 0 };
+  if (creditDistance < debitDistance) return { debit: 0, credit: Math.abs(amount) };
+  return inferSide(text, amount);
+};
+
 export const detectPdfAmountColumnLayout = <T extends PdfAmountToken>(
   lineEntries: PdfAmountLineEntry<T>[],
   isAmountToken: (text: string) => boolean,
@@ -133,23 +173,35 @@ export const extractAnchoredAmountsFromLayout = <T extends PdfAmountToken>(
   const numericTokens = entry.tokens.filter((token) => options.isAmountToken(sanitizeTokenText(token.text)));
   if (numericTokens.length === 0) return null;
 
+  const amountTokens = numericTokens.filter((token) => isNearAnyAmountColumn(token.x, layout));
+  const balanceTokens = numericTokens.filter((token) => isNearBalanceColumn(token.x, layout));
   const used = new Set<T>();
-  const balanceToken =
-    pickNearestUnusedToken(numericTokens, layout.balanceCenter, used, 70) ??
-    [...numericTokens].sort((left, right) => right.x - left.x)[0] ??
-    null;
+  const balanceToken = pickNearestUnusedToken(balanceTokens, layout.balanceCenter, used, COLUMN_CAPTURE_RADIUS);
 
-  if (!balanceToken) return null;
+  if (!balanceToken) {
+    const amountToken = pickNearestToken(amountTokens, Math.min(layout.debitCenter, layout.creditCenter));
+    if (!amountToken) return null;
+
+    const amount = options.parseAmount(amountToken.text);
+    if (!Number.isFinite(amount)) return null;
+
+    const inferred = inferAmountSideFromColumn(amountToken, layout, amount, options.inferSide, entry.text);
+    return {
+      debit: inferred.debit,
+      credit: inferred.credit,
+      balance: 0,
+    };
+  }
 
   used.add(balanceToken);
   const balance = Math.abs(options.parseAmount(balanceToken.text));
   if (!Number.isFinite(balance)) return null;
 
   if (numericTokens.length === 2) {
-    const amountToken = numericTokens.find((token) => token !== balanceToken) ?? null;
+    const amountToken = amountTokens.find((token) => token !== balanceToken) ?? null;
     if (!amountToken) return null;
     const amount = options.parseAmount(amountToken.text);
-    const inferred = options.inferSide(entry.text, amount);
+    const inferred = inferAmountSideFromColumn(amountToken, layout, amount, options.inferSide, entry.text);
     return {
       debit: inferred.debit,
       credit: inferred.credit,
@@ -157,40 +209,25 @@ export const extractAnchoredAmountsFromLayout = <T extends PdfAmountToken>(
     };
   }
 
-  const debitToken = pickNearestUnusedToken(numericTokens, layout.debitCenter, used, 70);
+  const debitToken = pickNearestUnusedToken(amountTokens, layout.debitCenter, used, COLUMN_CAPTURE_RADIUS);
   if (debitToken) used.add(debitToken);
 
-  const creditToken = pickNearestUnusedToken(numericTokens, layout.creditCenter, used, 70);
+  const creditToken = pickNearestUnusedToken(amountTokens, layout.creditCenter, used, COLUMN_CAPTURE_RADIUS);
   if (creditToken) used.add(creditToken);
 
   let debit = debitToken ? Math.abs(options.parseAmount(debitToken.text)) : 0;
   let credit = creditToken ? Math.abs(options.parseAmount(creditToken.text)) : 0;
 
   if (debit === 0 && credit === 0) {
-    const remainder = numericTokens.filter((token) => !used.has(token));
+    const remainder = amountTokens.filter((token) => !used.has(token));
     const singleToken = remainder.length === 1 ? remainder[0] : null;
-    const candidateToken = singleToken ?? [...numericTokens].find((token) => token !== balanceToken) ?? null;
+    const candidateToken = singleToken ?? amountTokens.find((token) => token !== balanceToken) ?? null;
 
     if (candidateToken) {
       const amount = options.parseAmount(candidateToken.text);
-      const midpoint = (layout.debitCenter + layout.creditCenter) / 2;
-      if (layout.creditCenter < layout.debitCenter) {
-        if (candidateToken.x <= midpoint) {
-          credit = Math.abs(amount);
-        } else {
-          debit = Math.abs(amount);
-        }
-      } else if (candidateToken.x >= midpoint) {
-        credit = Math.abs(amount);
-      } else {
-        debit = Math.abs(amount);
-      }
-
-      if (debit === 0 && credit === 0) {
-        const inferred = options.inferSide(entry.text, amount);
-        debit = inferred.debit;
-        credit = inferred.credit;
-      }
+      const inferred = inferAmountSideFromColumn(candidateToken, layout, amount, options.inferSide, entry.text);
+      debit = inferred.debit;
+      credit = inferred.credit;
     }
   }
 
