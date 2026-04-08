@@ -57,6 +57,7 @@ type ColumnLayout = {
   headers: string[];
   includeReferenceColumn: boolean;
   descriptionColumn: number;
+  referenceColumn: number | null;
   debitColumn: number;
   creditColumn: number;
   balanceColumn: number;
@@ -194,6 +195,7 @@ function buildColumnLayout(transactions: Transaction[]): ColumnLayout {
     headers,
     includeReferenceColumn,
     descriptionColumn,
+    referenceColumn: includeReferenceColumn ? 1 : null,
     debitColumn,
     creditColumn,
     balanceColumn,
@@ -276,9 +278,10 @@ function buildTotalsRow(transactions: Transaction[], layout: ColumnLayout): Shee
   return row;
 }
 
-function measureColumnWidths(rows: SheetData): Array<{ width: number }> {
+function measureColumnWidths(rows: SheetData, layout: ColumnLayout, headerRowIndex: number): Array<{ width: number }> {
   const maxColumns = rows.reduce((max, row) => Math.max(max, row.length), 0);
   const widths: Array<{ width: number }> = [];
+  const hasMetadataRows = headerRowIndex > 0;
 
   for (let column = 0; column < maxColumns; column += 1) {
     let maxLength = 8;
@@ -289,7 +292,31 @@ function measureColumnWidths(rows: SheetData): Array<{ width: number }> {
         maxLength = value.length;
       }
     }
-    widths.push({ width: Math.min(Math.max(maxLength + 2, 8), 70) });
+    let width = Math.min(Math.max(maxLength + 2, 8), 70);
+
+    if (hasMetadataRows && column === 0) {
+      width = Math.max(width, 22);
+    }
+    if (hasMetadataRows && column === 1) {
+      width = Math.max(width, 34);
+    }
+    if (column === 0 && headerRowIndex >= 0) {
+      width = Math.max(width, 14);
+    }
+    if (layout.referenceColumn === column) {
+      width = Math.max(width, 28);
+    }
+    if (layout.descriptionColumn === column) {
+      width = Math.max(width, 56);
+    }
+    if ([layout.debitColumn, layout.creditColumn, layout.balanceColumn].includes(column)) {
+      width = Math.max(width, 14);
+    }
+    if ([layout.pricingMismatchColumn, layout.duplicateFlagColumn].includes(column)) {
+      width = Math.max(width, 18);
+    }
+
+    widths.push({ width: Math.min(width, 80) });
   }
 
   return widths;
@@ -348,13 +375,45 @@ function applyWorksheetStyling(
       const cell = worksheet.getCell(rowIndex, columnIndex + 1);
       cell.numFmt = MONEY_FORMAT;
       cell.alignment = { horizontal: 'right' };
+
+      if (columnIndex === layout.debitColumn && typeof cell.value === 'number' && cell.value > 0) {
+        cell.font = { color: { argb: `FF${THEME.debitRed}` } };
+      }
+      if (columnIndex === layout.creditColumn && typeof cell.value === 'number' && cell.value > 0) {
+        cell.font = { color: { argb: `FF${THEME.creditGreen}` } };
+      }
     }
+
+    const dateCell = worksheet.getCell(rowIndex, 1);
+    dateCell.alignment = { horizontal: 'left' };
+
+    if (layout.referenceColumn != null) {
+      worksheet.getCell(rowIndex, layout.referenceColumn + 1).alignment = {
+        horizontal: 'left',
+        vertical: 'top',
+        wrapText: true,
+      };
+    }
+
+    worksheet.getCell(rowIndex, layout.descriptionColumn + 1).alignment = {
+      horizontal: 'left',
+      vertical: 'top',
+      wrapText: true,
+    };
   }
 
   debitCell.numFmt = MONEY_FORMAT;
   creditCell.numFmt = MONEY_FORMAT;
 
-  worksheet.columns = measureColumnWidths(rows);
+  for (let rowIndex = 1; rowIndex < headerRowIndex + 1; rowIndex += 1) {
+    const labelCell = worksheet.getCell(rowIndex, 1);
+    const valueCell = worksheet.getCell(rowIndex, 2);
+    labelCell.font = { bold: true };
+    labelCell.alignment = { horizontal: 'left' };
+    valueCell.alignment = { horizontal: 'left', wrapText: true };
+  }
+
+  worksheet.columns = measureColumnWidths(rows, layout, headerRowIndex);
   worksheet.views = [{ state: 'frozen', ySplit: headerRowIndex + 1 }];
 }
 

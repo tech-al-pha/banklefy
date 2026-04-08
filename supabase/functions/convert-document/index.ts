@@ -725,11 +725,18 @@ const isMashreqNoiseLine = (line: string): boolean => {
   const lower = line.toLowerCase().trim();
   if (!lower) return true;
   if (isNoiseLine(line)) return true;
+  if (/[\u0600-\u06FF]/.test(line)) return true;
+  if (lower.startsWith('dear customer')) return true;
+  if (lower.includes('the items and balance shown on this statement')) return true;
+  if (lower.includes('report any discrepancies')) return true;
   if (lower.includes('verified. report any discrepancies')) return true;
   if (lower.includes('of the statement date, otherwise the content will be assumed')) return true;
   if (lower.includes('all charges, terms and conditions are subject to change')) return true;
   if (lower.includes('please note that for foreign currency amounts')) return true;
   if (lower.includes('full compliance with all applicable laws')) return true;
+  if (lower.includes('transactions related to sudan are restricted')) return true;
+  if (lower.includes('mashreqbank psc is regulated')) return true;
+  if (/^page\s*\d+\s*of\s*\d+$/i.test(lower)) return true;
   if (lower === 'accurate.') return true;
   return false;
 };
@@ -757,11 +764,81 @@ const isMashreqBalanceOnlyLine = (entry: LineEntry, balanceCenter: number): bool
 };
 
 const cleanMashreqDescriptionPart = (line: string): string => {
-  const compact = line.replace(/\s+/g, ' ').trim().replace(/^[\s-]+|[\s-]+$/g, '');
+  const compact = line
+    .replace(/the items and balance shown on this statement of account should be.*/i, '')
+    .replace(/verified\. report any discrepancies.*/i, '')
+    .replace(/all charges, terms and conditions are subject to change\.?/i, '')
+    .replace(/please note that for foreign currency amounts.*$/i, '')
+    .replace(/mashreqbank psc is regulated.*$/i, '')
+    .replace(/^page\s*\d+\s*of\s*\d+$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[\s-]+|[\s-]+$/g, '');
   if (!compact) return '';
   if (/^\d{6,}$/.test(compact)) return '';
   if (/^(?:001|085|010)$/i.test(compact)) return '';
   return compact;
+};
+
+const extractMashreqMetadataFromText = (text: string): BankMetadata | undefined => {
+  if (!text || !isLikelyMashreqStatement(text.split(/\r?\n/))) return undefined;
+
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  const metadata: BankMetadata = {
+    bankName: 'Mashreq NEO',
+    accountNumber: '',
+    accountHolder: '',
+    currency: '',
+  };
+
+  const statementPeriodMatch = text.match(/Statement for period\s+(.+?)\s+to\s+(.+?)(?:\r?\n|$)/i);
+  if (statementPeriodMatch) {
+    metadata.statementPeriod = `${statementPeriodMatch[1].trim()} - ${statementPeriodMatch[2].trim()}`;
+  }
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+
+    const branchMatch = line.match(/^Branch:\s*(.+)$/i);
+    if (branchMatch && !metadata.bankName) {
+      metadata.bankName = branchMatch[1].trim();
+      continue;
+    }
+
+    if (/^Account Number\b/i.test(line)) {
+      const inlineAccountMatch = line.match(/^Account Number\s*[:\-]?\s*([A-Z0-9]{6,})$/i);
+      if (inlineAccountMatch) {
+        metadata.accountNumber = inlineAccountMatch[1].trim();
+        continue;
+      }
+
+      const nextLine = lines[index + 1] ?? '';
+      const nextAccountMatch = nextLine.match(/([A-Z0-9]{8,})/i);
+      if (nextAccountMatch) {
+        metadata.accountNumber = nextAccountMatch[1].trim();
+      }
+      continue;
+    }
+
+    const accountCurrencyMatch = line.match(/^(.+?)\s+Account Currency\s+([A-Z]{3})$/i);
+    if (accountCurrencyMatch) {
+      metadata.accountHolder = accountCurrencyMatch[1].trim();
+      metadata.currency = accountCurrencyMatch[2].trim().toUpperCase();
+      continue;
+    }
+
+    const ibanMatch = line.match(/^IBAN\s+([A-Z]{2}\d{2}[A-Z0-9\s]{10,})$/i);
+    if (ibanMatch) {
+      metadata.iban = ibanMatch[1].replace(/\s+/g, '').toUpperCase();
+      continue;
+    }
+  }
+
+  return mergeBankMetadata(metadata);
 };
 
 const classifyMashreqCategory = (description: string, debit: number, credit: number): string => {
@@ -5092,11 +5169,15 @@ Deno.serve(async (req) => {
 
     const outputTier = processedVia === 'deterministic' ? 'fast' : 'safe';
     const outputStart = Date.now();
+    const inferredMashreqBankInfo = extractMashreqMetadataFromText(
+      extractionResult.extractedText || extractedText || '',
+    );
     const bankInfo = mergeBankMetadata(
       clientParsedBankMetadata,
       ocrTextBankMetadata,
       collectedBankMetadata,
       extractionResult.bankMetadata,
+      inferredMashreqBankInfo,
     );
     if (bankInfo) {
       bankInfo.currency = normalizeCurrencyCode(bankInfo.currency);
