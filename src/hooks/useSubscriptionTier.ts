@@ -39,7 +39,7 @@ export const useSubscriptionTier = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from("subscriptions")
-        .select("tier, conversions_limit")
+        .select("tier, plan_type, conversions_limit")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -52,8 +52,10 @@ export const useSubscriptionTier = () => {
       } else {
         const row = data as Record<string, unknown> | null;
         const nextPlanType = resolveEffectivePlanType(
-          typeof row?.tier === "string"
-            ? row.tier
+          typeof row?.plan_type === "string"
+            ? row.plan_type
+            : typeof row?.tier === "string"
+              ? row.tier
             : null,
           typeof row?.conversions_limit === "number" ? row.conversions_limit : null,
         );

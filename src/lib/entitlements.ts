@@ -40,6 +40,18 @@ export const resolveEffectivePlanType = (
 
   if (normalizedPlan.startsWith("per_page")) return normalizedPlan;
 
+  if (normalizedPlan === "business" || normalizedPlan === "paid") {
+    return currentPackFromLimit ?? "free";
+  }
+
+  if (normalizedPlan === "pro") {
+    return currentPackFromLimit ?? "per_page_pack_pro";
+  }
+
+  if (normalizedPlan === "basic") {
+    return currentPackFromLimit ?? "per_page_pack_basic";
+  }
+
   return normalizedPlan;
 };
 

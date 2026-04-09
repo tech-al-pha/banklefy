@@ -13,6 +13,7 @@ import {
   hasFraudDetectorAccess,
   hasMt940Access,
   hasTallyXmlAccess,
+  resolveEffectivePlanType,
 } from "@/lib/entitlements";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -533,7 +534,8 @@ export const useUploadDemoController = () => {
     }
   }, [refreshUsageLimit, toast]);
 
-  const normalizedPlanType = (planType ?? "free").toLowerCase();
+  const resolvedPlanType = resolveEffectivePlanType(planType, conversionsLimit);
+  const normalizedPlanType = resolvedPlanType.toLowerCase();
   const isUnlimitedUsagePlan =
     normalizedPlanType === "unlimited" &&
     Number.isFinite(conversionsLimit) &&
@@ -542,7 +544,7 @@ export const useUploadDemoController = () => {
   const isKnownPaidUsagePlan = isPerPageUsagePlan || isUnlimitedUsagePlan;
   const isFreeUsageMode = !isKnownPaidUsagePlan;
   const entitlementInput = {
-    planType,
+    planType: resolvedPlanType,
     conversionsLimit,
     isAuthenticated,
   };
@@ -561,7 +563,7 @@ export const useUploadDemoController = () => {
     finalizingLabel,
   } = useUploadDemoViewModel({
     selectedFiles,
-    planType,
+    planType: resolvedPlanType,
     conversionsLimit,
     isAuthenticated,
     currencyCode,
@@ -2136,7 +2138,7 @@ export const useUploadDemoController = () => {
       setShowUpgradeDialog(true);
       return null;
     }
-    const normalized = (planType ?? "free").toLowerCase();
+    const normalized = resolvedPlanType;
     const { limit, remaining, storageKey } = getTallyUsage(normalized);
 
     if (!limit) {
