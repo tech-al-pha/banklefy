@@ -1859,6 +1859,7 @@ type ParseMode = 'deterministic' | 'ocr' | 'ai_rescue';
 type StructuralScanResult = {
   pdfType: 'TEXT' | 'IMAGE' | 'HYBRID' | 'UNKNOWN';
   hasSelectableText: boolean;
+  hasStrongSelectableText: boolean;
   isDigitallyGenerated: boolean;
   pageCount: number;
   rawMetadata: {
@@ -1937,14 +1938,19 @@ const runStructuralScan = ({
   const modifiedDate = isPdf ? extractPdfInfoString(payload, 'ModDate') : null;
   const creationDate = isPdf ? extractPdfInfoString(payload, 'CreationDate') : null;
   const selectableTextChars = (extractedText || '').replace(/\s+/g, '').length;
+  const normalizedPageCount = Number.isFinite(pageCount) ? Math.max(1, Math.floor(pageCount)) : 1;
+  const selectableCharsPerPage = selectableTextChars / normalizedPageCount;
   const hasSelectableText = selectableTextChars > 0;
+  const hasStrongSelectableText = selectableCharsPerPage >= 80;
   const isDigitallyGenerated = isPdf && hasSelectableText;
 
   let pdfType: StructuralScanResult['pdfType'] = 'UNKNOWN';
   if (!isPdf) {
     pdfType = 'IMAGE';
-  } else if (hasSelectableText) {
+  } else if (hasStrongSelectableText) {
     pdfType = 'TEXT';
+  } else if (hasSelectableText) {
+    pdfType = 'HYBRID';
   } else {
     pdfType = 'IMAGE';
   }
@@ -1966,6 +1972,7 @@ const runStructuralScan = ({
   return {
     pdfType,
     hasSelectableText,
+    hasStrongSelectableText,
     isDigitallyGenerated,
     pageCount,
     rawMetadata: {
@@ -3988,15 +3995,22 @@ Deno.serve(async (req) => {
     const deterministicTextDocument = isPdf && clientParsedTransactions.length > 0;
     const selectableTextDocument =
       isPdf && (structuralScan.hasSelectableText === true || deterministicTextDocument);
+    const strongTextPdf =
+      isPdf &&
+      (
+        structuralScan.pdfType === 'TEXT' ||
+        structuralScan.hasStrongSelectableText === true
+      );
     const forceOcrForIncompleteTextExtraction =
       isPdf &&
       hasPdfPageImages &&
       deterministicCoverageGap.hasGap &&
+      !strongTextPdf &&
       !selectableTextDocument;
     timing.deterministic_parse_ms = Date.now() - deterministicStart;
     const mustUseDeterministicClientPdf =
       isPdf && !hasPdfPageImages && clientParsedTransactions.length > 0;
-    const forceOcrForDenseStatement = selectableTextDocument
+    const forceOcrForDenseStatement = selectableTextDocument || strongTextPdf
       ? false
       : shouldForceOcrForDenseStatement(
         lowerFileName,
@@ -4066,22 +4080,26 @@ Deno.serve(async (req) => {
     const forceOcrForLargeDocument =
       isPdf &&
       pageCount >= FULL_PAGE_OCR_COVERAGE_THRESHOLD &&
+      !strongTextPdf &&
       !selectableTextDocument;
     const hardTextGateActive =
       isPdf &&
-      selectableTextDocument &&
+      (selectableTextDocument || strongTextPdf) &&
       clientParsedTransactions.length > 0 &&
       !forceOcrForLargeDocument &&
       !forceOcrForIncompleteTextExtraction &&
       !forceOcrForDenseStatement;
     const forceDeterministicForSelectableText =
       isPdf &&
-      structuralScan.hasSelectableText === true &&
-      clientParsedTransactions.length >= Math.max(2, pageCount) &&
+      (structuralScan.hasSelectableText === true || strongTextPdf) &&
+      clientParsedTransactions.length > 0 &&
       !forceOcrForLargeDocument &&
       !forceOcrForIncompleteTextExtraction;
+    const disallowOcrForTextPdf =
+      isPdf &&
+      (strongTextPdf || (structuralScan.hasSelectableText === true && clientParsedTransactions.length > 0));
     let skipOCR = false;
-    if (hardTextGateActive || forceDeterministicForSelectableText) {
+    if (hardTextGateActive || forceDeterministicForSelectableText || disallowOcrForTextPdf) {
       console.log('HARD TEXT GATE ACTIVATED - SKIPPING OCR');
       skipOCR = true;
     }
@@ -4120,7 +4138,8 @@ Deno.serve(async (req) => {
         !forceOcrForIncompleteTextExtraction &&
         !forceOcrForLargeDocument
       ) ||
-      forceDeterministicForSelectableText;
+      forceDeterministicForSelectableText ||
+      disallowOcrForTextPdf;
     const ocrDecisionLineRef =
       "supabase/functions/convert-document/index.ts:3282 (if canUseDeterministicClientPdf) / :3301 (else if isPdf && hasPdfPageImages => OCR)";
     const ocrFailedConditions: string[] = [];
@@ -4165,6 +4184,7 @@ Deno.serve(async (req) => {
       threshold: DETERMINISTIC_CONFIDENCE_THRESHOLD,
       skipOcr: canUseDeterministicClientPdf,
       forceDeterministicForSelectableText,
+      disallowOcrForTextPdf,
     };
 
     if (preferDeterministicFastPath && !clientPdfParseAssessment.useDeterministic) {
@@ -4246,7 +4266,7 @@ Deno.serve(async (req) => {
         skipped: true,
         reason: 'deterministic_confidence_high',
       };
-    } else if (isPdf && hasPdfPageImages) {
+    } else if (isPdf && hasPdfPageImages && !disallowOcrForTextPdf) {
       console.log("OCR TRIGGERED BECAUSE:", ocrTriggerReason);
       traceLog('ocr_trigger_detail', {
         reason: ocrTriggerReason,
@@ -4538,6 +4558,26 @@ Deno.serve(async (req) => {
         lowerFileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
       if (isPdf) {
+        if (disallowOcrForTextPdf) {
+          extractionResult = {
+            transactions: clientParsedTransactions,
+            status: {
+              groqVision: { used: false, success: false },
+              mistral: { used: false, success: false },
+              groqText: { used: false, success: false },
+              patternFallback: { used: false, success: false },
+            },
+            extractedText,
+            bankMetadata: collectedBankMetadata,
+          };
+          processedVia = 'deterministic';
+          pagesWithData = Math.max(1, pageCount);
+          pipelineDiagnostics.ocrStage = {
+            ok: true,
+            skipped: true,
+            reason: 'text_pdf_ocr_disabled',
+          };
+        } else {
         pipelineDiagnostics.ocrStage = {
           ok: false,
           skipped: false,
@@ -4553,18 +4593,21 @@ Deno.serve(async (req) => {
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+        }
       }
 
-      const ocrStart = Date.now();
-      extractionResult = await performExtraction(base64Data, mimeType, extractedText);
-      timing.ocr_ms += Date.now() - ocrStart;
-      ocrDataset = (extractionResult.transactions || []).map((row) => ({ ...row }));
-      pipelineDiagnostics.ocrStage = {
-        ok: true,
-        skipped: false,
-        pagesWithData: ocrDataset.length > 0 ? 1 : 0,
-        extractedRows: ocrDataset.length,
-      };
+      if (!isPdf) {
+        const ocrStart = Date.now();
+        extractionResult = await performExtraction(base64Data, mimeType, extractedText);
+        timing.ocr_ms += Date.now() - ocrStart;
+        ocrDataset = (extractionResult.transactions || []).map((row) => ({ ...row }));
+        pipelineDiagnostics.ocrStage = {
+          ok: true,
+          skipped: false,
+          pagesWithData: ocrDataset.length > 0 ? 1 : 0,
+          extractedRows: ocrDataset.length,
+        };
+      }
     }
 
     // Stage 6b: auto reprocess low-confidence rows (strict OCR) only when needed.
