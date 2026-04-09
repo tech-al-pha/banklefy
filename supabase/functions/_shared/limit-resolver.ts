@@ -357,7 +357,8 @@ const resolveAdminRole = async (supabaseAdmin: SupabaseLike, userId: string): Pr
   });
 
   if (roleError) {
-    throw new Error(`resolveEffectiveLimit: failed to resolve admin role (${roleError.message})`);
+    console.warn(`resolveEffectiveLimit: admin role lookup failed, defaulting to non-admin (${roleError.message})`);
+    return false;
   }
 
   return !!roleData;

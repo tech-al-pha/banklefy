@@ -512,13 +512,17 @@ Deno.serve(async (req) => {
       });
     } catch (limitError) {
       console.error('Failed to resolve effective limit:', limitError);
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to resolve effective limit',
-          code: 'LIMIT_RESOLUTION_FAILED',
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      effectiveLimit = {
+        conversionsUsed: 0,
+        conversionsLimit: user ? 5 : 2,
+        remaining: user ? 5 : 2,
+        limitReached: false,
+        isAuthenticated: !!user,
+        planType: 'free',
+        isAdmin: false,
+        isOwner: false,
+        isUnlimited: false,
+      };
     }
 
     console.log('Usage check result:', {

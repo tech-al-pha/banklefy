@@ -1595,7 +1595,7 @@ export const useUploadDemoController = () => {
           title: "Password Required",
           description: "This PDF is password-protected. Please enter the correct password.",
         });
-      } else if (errorMessage.toLowerCase().includes('limit')) {
+      } else if (errorMessage.toLowerCase().includes('limit') && !errorMessage.toLowerCase().includes('resolve effective limit')) {
         // Limit reached - cannot retry
         setLastError({ message: errorMessage, canRetry: false });
         toast({
@@ -1949,7 +1949,7 @@ export const useUploadDemoController = () => {
           title: "Password Required",
           description: "This PDF is password-protected. Please enter the correct password.",
         });
-      } else if (errorMessage.toLowerCase().includes('limit')) {
+      } else if (errorMessage.toLowerCase().includes('limit') && !errorMessage.toLowerCase().includes('resolve effective limit')) {
         setLastError({ message: errorMessage, canRetry: false });
         toast({
           variant: "destructive",
