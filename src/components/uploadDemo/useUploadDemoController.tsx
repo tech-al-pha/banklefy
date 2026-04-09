@@ -145,12 +145,14 @@ export const useUploadDemoController = () => {
   });
   const [passwordUnlocking, setPasswordUnlocking] = useState(false);
   type ConversionMode = "standard" | "tally_only";
+  type PremiumFormat = "tally" | "quickbooks" | "xero" | "zoho";
   type EditedPdfCheckResult = {
     fileName: string;
     status: "clean" | "suspected";
     reason: string;
   };
   const [conversionMode, setConversionMode] = useState<ConversionMode>("standard");
+  const [selectedPremiumFormat, setSelectedPremiumFormat] = useState<PremiumFormat | null>(null);
   const [editedPdfCheckResult, setEditedPdfCheckResult] = useState<EditedPdfCheckResult | null>(null);
   const [uploadPrepActive, setUploadPrepActive] = useState(false);
   const [uploadPrepProgress, setUploadPrepProgress] = useState(0);
@@ -163,7 +165,7 @@ export const useUploadDemoController = () => {
   const passwordAutoSubmitTimerRef = useRef<number | null>(null);
   const lastAutoSubmittedPasswordRef = useRef<string>("");
   const passwordUnlockingRef = useRef(false);
-  const runSelectedConversionRef = useRef<(mode: ConversionMode) => void>(() => {});
+  const runSelectedConversionRef = useRef<(mode: ConversionMode, premiumFormat?: PremiumFormat | null) => void>(() => {});
   const passwordUnlockHandlerRef = useRef<() => void | Promise<void>>(() => {});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
@@ -1456,7 +1458,7 @@ export const useUploadDemoController = () => {
       });
       setSingleDownloadFileName(buildExcelDownloadName(data?.bankInfo?.bankName, fileToConvert.name));
 
-      if (settings.autoDownload && data?.outputMode !== "tally_only") {
+      if (selectedPremiumFormat == null && settings.autoDownload && data?.outputMode !== "tally_only") {
         try {
           const autoFormat = settings.defaultExportFormat ?? "xlsx";
           const autoDownloadName = buildDownloadName(
@@ -1515,7 +1517,9 @@ export const useUploadDemoController = () => {
       // Refresh usage limit after successful conversion
       refreshUsageLimit();
 
-      if (resolvedOutputMode === "tally_only") {
+      if (selectedPremiumFormat) {
+        await handlePremiumExport(selectedPremiumFormat);
+      } else if (resolvedOutputMode === "tally_only") {
         const tallyDownloaded = await handleTallyExport();
         if (!tallyDownloaded) {
           throw new Error("Tally export could not be generated.");
@@ -1523,9 +1527,22 @@ export const useUploadDemoController = () => {
       }
 
       toast({
-        title: resolvedOutputMode === "tally_only" ? "Tally conversion complete!" : "Conversion complete!",
+        title:
+          selectedPremiumFormat
+            ? `${selectedPremiumFormat === "quickbooks" ? "QuickBooks" : selectedPremiumFormat === "xero" ? "Xero" : selectedPremiumFormat === "zoho" ? "Zoho" : "Tally"} conversion complete!`
+            : resolvedOutputMode === "tally_only"
+              ? "Tally conversion complete!"
+              : "Conversion complete!",
         description:
-          resolvedOutputMode === "tally_only"
+          selectedPremiumFormat
+            ? [
+                `Extracted ${data?.transactions?.length || 0} transactions.`,
+                `${selectedPremiumFormat === "quickbooks" ? "QuickBooks" : selectedPremiumFormat === "xero" ? "Xero" : selectedPremiumFormat === "zoho" ? "Zoho" : "Tally"} file downloaded.`,
+                formatRemaining(data?.remaining),
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : resolvedOutputMode === "tally_only"
             ? [
                 `Extracted ${data?.transactions?.length || 0} transactions.`,
                 "Tally XML downloaded.",
@@ -1856,7 +1873,9 @@ export const useUploadDemoController = () => {
 
       refreshUsageLimit();
 
-      if (resolvedOutputMode === "tally_only") {
+      if (selectedPremiumFormat) {
+        await handlePremiumExport(selectedPremiumFormat);
+      } else if (resolvedOutputMode === "tally_only") {
         const tallyDownloaded = await handleTallyExport();
         if (!tallyDownloaded) {
           throw new Error("Tally export could not be generated.");
@@ -1864,9 +1883,22 @@ export const useUploadDemoController = () => {
       }
 
       toast({
-        title: resolvedOutputMode === "tally_only" ? "Batch Tally conversion complete!" : "Batch conversion complete!",
+        title:
+          selectedPremiumFormat
+            ? `Batch ${selectedPremiumFormat === "quickbooks" ? "QuickBooks" : selectedPremiumFormat === "xero" ? "Xero" : selectedPremiumFormat === "zoho" ? "Zoho" : "Tally"} conversion complete!`
+            : resolvedOutputMode === "tally_only"
+              ? "Batch Tally conversion complete!"
+              : "Batch conversion complete!",
         description:
-          resolvedOutputMode === "tally_only"
+          selectedPremiumFormat
+            ? [
+                `${results.length} ${pluralize(results.length, "statement")} converted.`,
+                `${selectedPremiumFormat === "quickbooks" ? "QuickBooks" : selectedPremiumFormat === "xero" ? "Xero" : selectedPremiumFormat === "zoho" ? "Zoho" : "Tally"} file downloaded.`,
+                formatRemaining(data?.remaining),
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : resolvedOutputMode === "tally_only"
             ? [
                 `${results.length} ${pluralize(results.length, "statement")} converted.`,
                 "Tally XML downloaded.",
@@ -2153,6 +2185,7 @@ export const useUploadDemoController = () => {
   // Plan-based feature access
   const hasPremiumExportAccess = hasMt940Access(entitlementInput);
   const hasTallyAccess = hasTallyXmlAccess(entitlementInput);
+  const hasPremiumFormatsAccess = hasTallyAccess;
   const hasFoirAccess = hasFoirDashboardAccess(entitlementInput);
   const hasFraudAccess = hasFraudDetectorAccess(entitlementInput);
 
@@ -2242,10 +2275,15 @@ export const useUploadDemoController = () => {
     if (format === 'zoho') return void exportAsZoho();
   };
 
-  const runSelectedConversion = (mode: ConversionMode) => {
+  const runSelectedConversion = (mode: ConversionMode, premiumFormat?: PremiumFormat | null) => {
     if (mode === "tally_only" && !ensureTallyExportAllowed()) {
       return;
     }
+    if (premiumFormat && !hasPremiumFormatsAccess) {
+      setShowUpgradeDialog(true);
+      return;
+    }
+    setSelectedPremiumFormat(premiumFormat ?? null);
     setConversionMode(mode);
     setShowProgress(true);
     setProgressStep(0);
@@ -2502,8 +2540,9 @@ export const useUploadDemoController = () => {
     lastError,
     handleRetryLastConversion,
     hasTallyAccess,
-    handleRunStandardConversion: () => runSelectedConversion('standard'),
-    handleRunTallyConversion: () => runSelectedConversion('tally_only'),
+    hasPremiumFormatsAccess,
+    handleRunStandardConversion: () => runSelectedConversion('standard', null),
+    handleRunPremiumConversion: (format: PremiumFormat) => runSelectedConversion('standard', format),
     pluralize,
     batchResults,
     batchDownloading,
@@ -2537,6 +2576,7 @@ export const useUploadDemoController = () => {
     finalizingLabel,
     conversionProgressDetail,
     showImageProcessingHint,
+    selectedPremiumFormat,
     showLimitDialog,
     setShowLimitDialog,
     limitDialogTitle,

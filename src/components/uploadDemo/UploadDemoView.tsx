@@ -16,6 +16,7 @@ import type {
 import type { ChangeEventHandler, RefObject } from "react";
 
 type ConversionMode = "standard" | "tally_only";
+type PremiumFormat = "tally" | "quickbooks" | "xero" | "zoho";
 
 type UploadDemoViewProps = {
   remaining?: number;
@@ -51,8 +52,9 @@ type UploadDemoViewProps = {
   lastError: { message: string; canRetry: boolean } | null;
   handleRetryLastConversion: () => void;
   hasTallyAccess: boolean;
+  hasPremiumFormatsAccess: boolean;
   handleRunStandardConversion: () => void;
-  handleRunTallyConversion: () => void;
+  handleRunPremiumConversion: (format: PremiumFormat) => void;
   pluralize: (count: number, singular: string, plural?: string) => string;
   batchResults: Array<{ status: "success" | "error" }>;
   batchDownloading: boolean;
@@ -92,6 +94,7 @@ type UploadDemoViewProps = {
   finalizingLabel: string;
   conversionProgressDetail: string;
   showImageProcessingHint: boolean;
+  selectedPremiumFormat: PremiumFormat | null;
   showLimitDialog: boolean;
   setShowLimitDialog: (value: boolean) => void;
   limitDialogTitle: string;
@@ -138,8 +141,9 @@ export const UploadDemoView = ({
   lastError,
   handleRetryLastConversion,
   hasTallyAccess,
+  hasPremiumFormatsAccess,
   handleRunStandardConversion,
-  handleRunTallyConversion,
+  handleRunPremiumConversion,
   pluralize,
   batchResults,
   batchDownloading,
@@ -172,6 +176,7 @@ export const UploadDemoView = ({
   finalizingLabel,
   conversionProgressDetail,
   showImageProcessingHint,
+  selectedPremiumFormat,
   showLimitDialog,
   setShowLimitDialog,
   limitDialogTitle,
@@ -267,11 +272,11 @@ export const UploadDemoView = ({
                   converting={converting}
                   uploadPrepActive={uploadPrepActive}
                   limitReached={limitReached}
-                  hasTallyAccess={hasTallyAccess}
+                  hasPremiumFormatsAccess={hasPremiumFormatsAccess}
                   editedPdfWarningActive={Boolean(editedPdfWarning)}
                   lastErrorActive={Boolean(lastError)}
                   onConvertStandard={handleRunStandardConversion}
-                  onConvertTally={handleRunTallyConversion}
+                  onConvertPremium={handleRunPremiumConversion}
                   pluralize={pluralize}
                 />
 
@@ -314,6 +319,7 @@ export const UploadDemoView = ({
                   }
                   conversionProgressSubLabel={conversionProgressDetail}
                   showImageProcessingHint={showImageProcessingHint}
+                  selectedPremiumFormat={selectedPremiumFormat}
                 />
               </div>
             </div>
