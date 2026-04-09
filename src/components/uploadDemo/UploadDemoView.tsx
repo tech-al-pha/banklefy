@@ -68,7 +68,7 @@ type UploadDemoViewProps = {
   isPaidUser: boolean;
   exportAsCSV: () => Promise<void>;
   handleTallyExport: () => Promise<boolean>;
-  handlePremiumExport: (format: "json" | "mt940") => void;
+  handlePremiumExport: (format: "json" | "mt940" | "quickbooks" | "xero" | "zoho" | "tally") => void;
   analytics: Analytics | null;
   currencyCode: string;
   showDuplicatesOnly: boolean;

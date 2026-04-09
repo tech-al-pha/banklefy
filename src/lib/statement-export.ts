@@ -52,6 +52,12 @@ type Mt940ExportArgs = {
   statementReference?: string;
 };
 
+type AccountingCsvArgs = {
+  transactions: StatementExportTransaction[];
+  bankInfo?: StatementExportBankInfo | null;
+  currencyCode?: string;
+};
+
 const toNumber = (value: unknown): number => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -243,6 +249,23 @@ const formatCsvAmount = (value: unknown): string => {
   return amount.toFixed(2);
 };
 
+const formatIsoDate = (value: unknown): string => parseStatementDateToIso(value) ?? sanitizeText(value, "", 40);
+
+const getSignedAmount = (transaction: StatementExportTransaction): number =>
+  roundMoney(toNumber(transaction.credit) - toNumber(transaction.debit));
+
+const getReference = (transaction: StatementExportTransaction): string =>
+  sanitizeText(transaction.refNumber, "", 80);
+
+const getTransactionMemo = (transaction: StatementExportTransaction): string => {
+  const parts = [
+    sanitizeText(transaction.description, "", 250),
+    transaction.category ? `Category: ${sanitizeText(transaction.category, "Other", 80)}` : "",
+    transaction.refNumber ? `Ref: ${getReference(transaction)}` : "",
+  ].filter(Boolean);
+  return sanitizeText(parts.join(" | "), "", 250);
+};
+
 export const buildStatementCsv = (
   archiveOrTransactions: StatementArchive | StatementExportTransaction[],
 ): string => {
@@ -265,6 +288,57 @@ export const buildStatementCsv = (
   const totalRow = ["", "TOTAL", "", totalDebit.toFixed(2), totalCredit.toFixed(2), "", ""];
 
   return [header, ...rows, totalRow].map((row) => row.map(csvEscape).join(",")).join("\n");
+};
+
+export const buildQuickBooksCsv = ({
+  transactions,
+}: AccountingCsvArgs): string => {
+  const header = ["Date", "Description", "Credit", "Debit"];
+  const rows = transactions.map((transaction) => ([
+    formatIsoDate(transaction.date),
+    sanitizeText(transaction.description, "", 250),
+    formatCsvAmount(transaction.credit),
+    formatCsvAmount(transaction.debit),
+  ]));
+
+  return [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+};
+
+export const buildXeroCsv = ({
+  transactions,
+  bankInfo,
+  currencyCode,
+}: AccountingCsvArgs): string => {
+  const accountCode = sanitizeText(bankInfo?.accountNumber || bankInfo?.iban, "", 80);
+  const currency = normalizeCurrency(bankInfo?.currency || currencyCode);
+  const header = ["Date", "Amount", "Payee", "Description", "Reference", "Currency", "Account Code"];
+  const rows = transactions.map((transaction) => ([
+    formatIsoDate(transaction.date),
+    getSignedAmount(transaction).toFixed(2),
+    sanitizeText(transaction.description, "", 120),
+    getTransactionMemo(transaction),
+    getReference(transaction),
+    currency,
+    accountCode,
+  ]));
+
+  return [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+};
+
+export const buildZohoCsv = ({
+  transactions,
+}: AccountingCsvArgs): string => {
+  const header = ["Date", "Description", "Reference Number", "Deposit", "Withdrawal", "Balance"];
+  const rows = transactions.map((transaction) => ([
+    formatIsoDate(transaction.date),
+    sanitizeText(transaction.description, "", 250),
+    getReference(transaction),
+    formatCsvAmount(transaction.credit),
+    formatCsvAmount(transaction.debit),
+    formatCsvAmount(transaction.balance),
+  ]));
+
+  return [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
 };
 
 export const buildStatementJson = ({

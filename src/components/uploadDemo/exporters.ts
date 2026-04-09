@@ -1,7 +1,10 @@
 import {
+  buildQuickBooksCsv,
   buildMt940,
   buildStatementCsv,
   buildStatementJson,
+  buildXeroCsv,
+  buildZohoCsv,
   downloadTextFile,
 } from "@/lib/statement-export";
 import type { Transaction, Analytics, BankInfo } from "./types";
@@ -53,6 +56,99 @@ export const exportAsCSV = ({ transactions, exportBaseName, toast }: ExportConte
     title: 'CSV Downloaded',
     description: 'Your transaction data has been exported to CSV.',
   });
+};
+
+export const exportAsQuickBooksCsv = async ({
+  transactions,
+  bankInfo,
+  currencyCode,
+  exportBaseName,
+  toast,
+  getErrorMessage,
+}: ExportContext) => {
+  if (transactions.length === 0) return;
+
+  try {
+    const content = buildQuickBooksCsv({ transactions, bankInfo, currencyCode });
+    downloadTextFile(
+      content,
+      `${getExportBaseName(exportBaseName)}-quickbooks.csv`,
+      'text/csv;charset=utf-8',
+    );
+    toast({
+      title: 'QuickBooks CSV Downloaded',
+      description: 'Your transactions have been exported in QuickBooks-friendly CSV format.',
+    });
+  } catch (error: unknown) {
+    if (import.meta.env.DEV) { console.error('QuickBooks export error:', error); }
+    toast({
+      variant: 'destructive',
+      title: 'QuickBooks export failed',
+      description: getErrorMessage(error, 'Failed to export QuickBooks CSV.'),
+    });
+  }
+};
+
+export const exportAsXeroCsv = async ({
+  transactions,
+  bankInfo,
+  currencyCode,
+  exportBaseName,
+  toast,
+  getErrorMessage,
+}: ExportContext) => {
+  if (transactions.length === 0) return;
+
+  try {
+    const content = buildXeroCsv({ transactions, bankInfo, currencyCode });
+    downloadTextFile(
+      content,
+      `${getExportBaseName(exportBaseName)}-xero.csv`,
+      'text/csv;charset=utf-8',
+    );
+    toast({
+      title: 'Xero CSV Downloaded',
+      description: 'Your transactions have been exported in Xero-friendly CSV format.',
+    });
+  } catch (error: unknown) {
+    if (import.meta.env.DEV) { console.error('Xero export error:', error); }
+    toast({
+      variant: 'destructive',
+      title: 'Xero export failed',
+      description: getErrorMessage(error, 'Failed to export Xero CSV.'),
+    });
+  }
+};
+
+export const exportAsZohoCsv = async ({
+  transactions,
+  bankInfo,
+  currencyCode,
+  exportBaseName,
+  toast,
+  getErrorMessage,
+}: ExportContext) => {
+  if (transactions.length === 0) return;
+
+  try {
+    const content = buildZohoCsv({ transactions, bankInfo, currencyCode });
+    downloadTextFile(
+      content,
+      `${getExportBaseName(exportBaseName)}-zoho.csv`,
+      'text/csv;charset=utf-8',
+    );
+    toast({
+      title: 'Zoho CSV Downloaded',
+      description: 'Your transactions have been exported in Zoho-friendly CSV format.',
+    });
+  } catch (error: unknown) {
+    if (import.meta.env.DEV) { console.error('Zoho export error:', error); }
+    toast({
+      variant: 'destructive',
+      title: 'Zoho export failed',
+      description: getErrorMessage(error, 'Failed to export Zoho CSV.'),
+    });
+  }
 };
 
 export const exportAsJSON = async ({

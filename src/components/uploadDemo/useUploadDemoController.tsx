@@ -457,6 +457,48 @@ export const useUploadDemoController = () => {
       truncateDecimals,
     });
   };
+  const exportAsQuickBooks = async () => {
+    const { exportAsQuickBooksCsv: exportQuickBooksCsv } = await loadExporters();
+    return exportQuickBooksCsv({
+      transactions,
+      analytics,
+      bankInfo,
+      currencyCode,
+      exportBaseName: getExportBaseName(),
+      toast,
+      getErrorMessage,
+      sumMoney,
+      truncateDecimals,
+    });
+  };
+  const exportAsXero = async () => {
+    const { exportAsXeroCsv: exportXeroCsv } = await loadExporters();
+    return exportXeroCsv({
+      transactions,
+      analytics,
+      bankInfo,
+      currencyCode,
+      exportBaseName: getExportBaseName(),
+      toast,
+      getErrorMessage,
+      sumMoney,
+      truncateDecimals,
+    });
+  };
+  const exportAsZoho = async () => {
+    const { exportAsZohoCsv: exportZohoCsv } = await loadExporters();
+    return exportZohoCsv({
+      transactions,
+      analytics,
+      bankInfo,
+      currencyCode,
+      exportBaseName: getExportBaseName(),
+      toast,
+      getErrorMessage,
+      sumMoney,
+      truncateDecimals,
+    });
+  };
   const sanitizeFileBaseName = (value?: string | null, fallback = "bank-statement") => {
     const source = (value ?? "").trim();
     const noExtension = source.replace(/\.[^/.\\]+$/, "");
@@ -2182,16 +2224,22 @@ export const useUploadDemoController = () => {
     return true;
   };
 
-  const handlePremiumExport = (format: 'json' | 'mt940') => {
+  const handlePremiumExport = async (format: 'json' | 'mt940' | 'quickbooks' | 'xero' | 'zoho' | 'tally') => {
+    if (format === 'tally') {
+      await handleTallyExport();
+      return;
+    }
+
     if (!hasPremiumExportAccess) {
       setShowUpgradeDialog(true);
       return;
     }
-    if (format === 'json') {
-      exportAsJSON();
-    } else {
-      exportAsMT940();
-    }
+
+    if (format === 'json') return void exportAsJSON();
+    if (format === 'mt940') return void exportAsMT940();
+    if (format === 'quickbooks') return void exportAsQuickBooks();
+    if (format === 'xero') return void exportAsXero();
+    if (format === 'zoho') return void exportAsZoho();
   };
 
   const runSelectedConversion = (mode: ConversionMode) => {

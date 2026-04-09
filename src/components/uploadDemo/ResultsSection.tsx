@@ -91,7 +91,7 @@ type ResultsSectionProps = {
   hasTallyAccess: boolean;
   exportAsCSV: () => Promise<void>;
   handleTallyExport: () => Promise<boolean>;
-  handlePremiumExport: (format: "json" | "mt940") => void;
+  handlePremiumExport: (format: "json" | "mt940" | "quickbooks" | "xero" | "zoho" | "tally") => void;
   converting: boolean;
   analytics: Analytics | null;
   currencyCode: string;
@@ -164,30 +164,33 @@ export const ResultsSection = ({
       key: "tally",
       label: "Tally",
       status: "live" as const,
-      onClick: () => void handleTallyExport(),
+      onClick: () => void handlePremiumExport("tally"),
       className:
         "border-[#6a5b3a]/70 bg-[#211b12] text-[#ead8a7] hover:border-[#8a7650] hover:bg-[#282015]",
     },
     {
       key: "quickbooks",
       label: "QuickBooks",
-      status: "soon" as const,
+      status: "live" as const,
+      onClick: () => void handlePremiumExport("quickbooks"),
       className:
-        "border-[#395947]/70 bg-[#16211b] text-[#c7ddcf]",
+        "border-[#395947]/70 bg-[#16211b] text-[#c7ddcf] hover:border-[#4b735b] hover:bg-[#1a2821]",
     },
     {
       key: "xero",
       label: "Xero",
-      status: "soon" as const,
+      status: "live" as const,
+      onClick: () => void handlePremiumExport("xero"),
       className:
-        "border-[#365566]/70 bg-[#131f27] text-[#c5d8e4]",
+        "border-[#365566]/70 bg-[#131f27] text-[#c5d8e4] hover:border-[#496d81] hover:bg-[#182630]",
     },
     {
       key: "zoho",
       label: "Zoho",
-      status: "soon" as const,
+      status: "live" as const,
+      onClick: () => void handlePremiumExport("zoho"),
       className:
-        "border-[#6c5148]/70 bg-[#221815] text-[#e2cbc3]",
+        "border-[#6c5148]/70 bg-[#221815] text-[#e2cbc3] hover:border-[#866258] hover:bg-[#2a1d19]",
     },
   ];
 
@@ -216,7 +219,7 @@ export const ResultsSection = ({
               key={format.key}
               size="sm"
               variant="outline"
-              onClick={format.status === "live" ? format.onClick : undefined}
+              onClick={format.onClick}
               disabled={format.status !== "live"}
               className={`min-w-[122px] border backdrop-blur-sm ${format.className}`}
             >
