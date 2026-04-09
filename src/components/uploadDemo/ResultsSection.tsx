@@ -30,6 +30,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
+import { useState } from "react";
 import { UnderwritingPanel } from "@/components/UnderwritingPanel";
 import { FraudAlertPanel } from "@/components/FraudAlertPanel";
 import { categoryColors, supportedBanks } from "./constants";
@@ -143,7 +144,9 @@ export const ResultsSection = ({
   conversionProgressSubLabel = "Preparing document...",
   showImageProcessingHint = false,
 }: ResultsSectionProps) => {
+  const [showPremiumFormats, setShowPremiumFormats] = useState(false);
   const isTallyOnlyMode = resultMode === "tally_only";
+  const hasPremiumFormatAccess = isPaidUser || hasTallyAccess;
   const creditTone: ToneName = analytics ? getCreditTone(analytics.totalCredits) : "good";
   const debitTone: ToneName = analytics ? getDebitTone(analytics.totalCredits, analytics.totalDebits) : "moderate";
   const netFlowTone: ToneName = analytics ? getNetFlowTone(analytics.netFlow, analytics.totalCredits) : "moderate";
@@ -155,6 +158,81 @@ export const ResultsSection = ({
   const lockedFormats: string[] = [];
   if (isTallyOnlyMode && !hasTallyAccess) lockedFormats.push("Tally XML");
   if (!isPaidUser) lockedFormats.push("JSON", "MT940");
+
+  const premiumFormatCards = [
+    {
+      key: "tally",
+      label: "Tally",
+      status: "live" as const,
+      onClick: () => void handleTallyExport(),
+      className:
+        "border-[#6a5b3a]/70 bg-[#211b12] text-[#ead8a7] hover:border-[#8a7650] hover:bg-[#282015]",
+    },
+    {
+      key: "quickbooks",
+      label: "QuickBooks",
+      status: "soon" as const,
+      className:
+        "border-[#395947]/70 bg-[#16211b] text-[#c7ddcf]",
+    },
+    {
+      key: "xero",
+      label: "Xero",
+      status: "soon" as const,
+      className:
+        "border-[#365566]/70 bg-[#131f27] text-[#c5d8e4]",
+    },
+    {
+      key: "zoho",
+      label: "Zoho",
+      status: "soon" as const,
+      className:
+        "border-[#6c5148]/70 bg-[#221815] text-[#e2cbc3]",
+    },
+  ];
+
+  const renderPremiumFormatsLauncher = () => (
+    <div className="flex flex-col items-center gap-3">
+      <Button
+        size="lg"
+        variant="outline"
+        onClick={() => hasPremiumFormatAccess && setShowPremiumFormats((current) => !current)}
+        disabled={transactions.length === 0}
+        className={`min-w-[240px] text-white transition-all ${
+          hasPremiumFormatAccess
+            ? "border-white/15 bg-[#161616] hover:border-white/25 hover:bg-[#1b1b1b]"
+            : "border-sky-300/35 bg-sky-500/10 text-sky-100 hover:border-sky-200/60 hover:bg-sky-500/20"
+        }`}
+      >
+        <FileText className="mr-2 h-5 w-5" />
+        Premium Formats
+        {!hasPremiumFormatAccess && <Lock className="ml-2 h-4 w-4" />}
+      </Button>
+
+      {hasPremiumFormatAccess && showPremiumFormats && (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {premiumFormatCards.map((format) => (
+            <Button
+              key={format.key}
+              size="sm"
+              variant="outline"
+              onClick={format.status === "live" ? format.onClick : undefined}
+              disabled={format.status !== "live"}
+              className={`min-w-[122px] border backdrop-blur-sm ${format.className}`}
+            >
+              {format.label}
+              {format.status !== "live" && (
+                <span className="ml-2 rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-white/65">
+                  Soon
+                </span>
+              )}
+            </Button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
       {batchResults.length > 0 && (
@@ -167,23 +245,7 @@ export const ResultsSection = ({
           </div>
           <p className="text-sm font-medium text-muted-foreground">Download options:</p>
           {isTallyOnlyMode ? (
-            <div className="flex justify-center">
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={handleTallyExport}
-                disabled={transactions.length === 0}
-                className={`text-white ${
-                  !hasTallyAccess
-                    ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
-                    : ""
-                }`}
-              >
-                <FileText className="mr-2 h-5 w-5" />
-                Download Tally XML
-                {!hasTallyAccess && <Lock className="ml-1 h-4 w-4" />}
-              </Button>
-            </div>
+            renderPremiumFormatsLauncher()
           ) : (
             <>
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
@@ -288,23 +350,7 @@ export const ResultsSection = ({
           </div>
           <p className="text-sm font-medium text-muted-foreground">Download your file:</p>
           {isTallyOnlyMode ? (
-            <div className="flex justify-center">
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={handleTallyExport}
-                disabled={transactions.length === 0}
-                className={`text-white ${
-                  !hasTallyAccess
-                    ? "border-sky-300/40 bg-sky-500/10 text-sky-100 backdrop-blur-md hover:border-sky-200/60 hover:bg-sky-500/20"
-                    : ""
-                }`}
-              >
-                <FileText className="mr-2 h-5 w-5" />
-                Download Tally XML
-                {!hasTallyAccess && <Lock className="ml-1 h-4 w-4" />}
-              </Button>
-            </div>
+            renderPremiumFormatsLauncher()
           ) : (
             <>
               <div className="flex flex-col sm:flex-row gap-2 justify-center">
