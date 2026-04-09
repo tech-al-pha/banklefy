@@ -466,6 +466,7 @@ export const useUploadDemoController = () => {
       analytics,
       bankInfo,
       currencyCode,
+      jsonData,
       exportBaseName: getExportBaseName(),
       toast,
       getErrorMessage,
@@ -480,6 +481,7 @@ export const useUploadDemoController = () => {
       analytics,
       bankInfo,
       currencyCode,
+      jsonData,
       exportBaseName: getExportBaseName(),
       toast,
       getErrorMessage,
@@ -494,6 +496,7 @@ export const useUploadDemoController = () => {
       analytics,
       bankInfo,
       currencyCode,
+      jsonData,
       exportBaseName: getExportBaseName(),
       toast,
       getErrorMessage,
@@ -2189,32 +2192,32 @@ export const useUploadDemoController = () => {
   const hasFoirAccess = hasFoirDashboardAccess(entitlementInput);
   const hasFraudAccess = hasFraudDetectorAccess(entitlementInput);
 
-  const getTallyLimit = (normalizedPlan: string): number | null => {
+  const getPremiumFormatLimit = (normalizedPlan: string): number | null => {
     if (normalizedPlan === "per_page_pack_basic") return 25;
     if (normalizedPlan === "per_page_pack_pro") return 300;
     return null;
   };
 
-  const getTallyPeriodKey = (): string => {
+  const getPremiumFormatPeriodKey = (): string => {
     return "lifetime";
   };
 
-  const getTallyUsage = (normalizedPlan: string) => {
-    const limit = getTallyLimit(normalizedPlan);
-    const periodKey = getTallyPeriodKey();
-    const storageKey = `banklefy:tally:${normalizedPlan}:${periodKey}`;
+  const getPremiumFormatUsage = (normalizedPlan: string) => {
+    const limit = getPremiumFormatLimit(normalizedPlan);
+    const periodKey = getPremiumFormatPeriodKey();
+    const storageKey = `banklefy:premium-format:${normalizedPlan}:${periodKey}`;
     const used = Number.parseInt(localStorage.getItem(storageKey) ?? "0", 10) || 0;
     const remaining = limit ? Math.max(0, limit - used) : 0;
     return { limit, used, remaining, storageKey, periodKey };
   };
 
-  const ensureTallyExportAllowed = () => {
-    if (!hasTallyAccess) {
+  const ensurePremiumFormatExportAllowed = () => {
+    if (!hasPremiumFormatsAccess) {
       setShowUpgradeDialog(true);
       return null;
     }
     const normalized = resolvedPlanType;
-    const { limit, remaining, storageKey } = getTallyUsage(normalized);
+    const { limit, remaining, storageKey } = getPremiumFormatUsage(normalized);
 
     if (!limit) {
       setShowUpgradeDialog(true);
@@ -2224,8 +2227,8 @@ export const useUploadDemoController = () => {
     if (remaining <= 0) {
       toast({
         variant: "destructive",
-        title: "Tally export limit reached",
-        description: "You have used all Tally exports for this pack.",
+        title: "Premium format limit reached",
+        description: "You have used all premium format exports for this pack.",
       });
       setShowUpgradeDialog(true);
       return null;
@@ -2247,7 +2250,7 @@ export const useUploadDemoController = () => {
       return false;
     }
 
-    const usageContext = ensureTallyExportAllowed();
+    const usageContext = ensurePremiumFormatExportAllowed();
     if (!usageContext) return false;
 
     const { remaining, storageKey } = usageContext;
@@ -2255,7 +2258,7 @@ export const useUploadDemoController = () => {
     localStorage.setItem(storageKey, String((Number.parseInt(localStorage.getItem(storageKey) ?? "0", 10) || 0) + 1));
     toast({
       title: "Tally export ready",
-      description: `Remaining exports this period: ${Math.max(0, remaining - 1)}`,
+      description: `Remaining premium exports this period: ${Math.max(0, remaining - 1)}`,
     });
     return true;
   };
@@ -2266,6 +2269,27 @@ export const useUploadDemoController = () => {
       return;
     }
 
+    if (format === 'quickbooks' || format === 'xero' || format === 'zoho') {
+      const usageContext = ensurePremiumFormatExportAllowed();
+      if (!usageContext) return;
+
+      if (format === 'quickbooks') {
+        await exportAsQuickBooks();
+      } else if (format === 'xero') {
+        await exportAsXero();
+      } else {
+        await exportAsZoho();
+      }
+
+      const { remaining, storageKey } = usageContext;
+      localStorage.setItem(storageKey, String((Number.parseInt(localStorage.getItem(storageKey) ?? "0", 10) || 0) + 1));
+      toast({
+        title: `${format === "quickbooks" ? "QuickBooks" : format === "xero" ? "Xero" : "Zoho"} export ready`,
+        description: `Remaining premium exports this period: ${Math.max(0, remaining - 1)}`,
+      });
+      return;
+    }
+
     if (!hasPremiumExportAccess) {
       setShowUpgradeDialog(true);
       return;
@@ -2273,13 +2297,10 @@ export const useUploadDemoController = () => {
 
     if (format === 'json') return void exportAsJSON();
     if (format === 'mt940') return void exportAsMT940();
-    if (format === 'quickbooks') return void exportAsQuickBooks();
-    if (format === 'xero') return void exportAsXero();
-    if (format === 'zoho') return void exportAsZoho();
   };
 
   const runSelectedConversion = (mode: ConversionMode, premiumFormat?: PremiumFormat | null) => {
-    if (mode === "tally_only" && !ensureTallyExportAllowed()) {
+    if (mode === "tally_only" && !ensurePremiumFormatExportAllowed()) {
       return;
     }
     if (premiumFormat && !hasPremiumFormatsAccess) {

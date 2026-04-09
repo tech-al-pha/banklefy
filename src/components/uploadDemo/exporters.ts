@@ -6,6 +6,7 @@ import {
   buildXeroCsv,
   buildZohoCsv,
   downloadTextFile,
+  parseStatementArchive,
 } from "@/lib/statement-export";
 import type { Transaction, Analytics, BankInfo } from "./types";
 
@@ -38,6 +39,28 @@ const getExportBaseName = (value?: string): string => {
   return safe || 'bank-statement';
 };
 
+const resolveCanonicalStatementData = ({
+  transactions,
+  bankInfo,
+  currencyCode,
+  jsonData,
+}: Pick<ExportContext, "transactions" | "bankInfo" | "currencyCode" | "jsonData">) => {
+  const archive = parseStatementArchive(jsonData);
+  if (!archive) {
+    return {
+      transactions,
+      bankInfo: bankInfo ?? undefined,
+      currencyCode,
+    };
+  }
+
+  return {
+    transactions: archive.transactions && archive.transactions.length > 0 ? archive.transactions : transactions,
+    bankInfo: archive.bankInfo ?? bankInfo ?? undefined,
+    currencyCode: archive.currency ?? archive.bankInfo?.currency ?? currencyCode,
+  };
+};
+
 export const exportAsCSV = ({ transactions, exportBaseName, toast }: ExportContext) => {
   if (transactions.length === 0) return;
 
@@ -62,6 +85,7 @@ export const exportAsQuickBooksCsv = async ({
   transactions,
   bankInfo,
   currencyCode,
+  jsonData,
   exportBaseName,
   toast,
   getErrorMessage,
@@ -69,7 +93,8 @@ export const exportAsQuickBooksCsv = async ({
   if (transactions.length === 0) return;
 
   try {
-    const content = buildQuickBooksCsv({ transactions, bankInfo, currencyCode });
+    const statementData = resolveCanonicalStatementData({ transactions, bankInfo, currencyCode, jsonData });
+    const content = buildQuickBooksCsv(statementData);
     downloadTextFile(
       content,
       `${getExportBaseName(exportBaseName)}-quickbooks.csv`,
@@ -93,6 +118,7 @@ export const exportAsXeroCsv = async ({
   transactions,
   bankInfo,
   currencyCode,
+  jsonData,
   exportBaseName,
   toast,
   getErrorMessage,
@@ -100,7 +126,8 @@ export const exportAsXeroCsv = async ({
   if (transactions.length === 0) return;
 
   try {
-    const content = buildXeroCsv({ transactions, bankInfo, currencyCode });
+    const statementData = resolveCanonicalStatementData({ transactions, bankInfo, currencyCode, jsonData });
+    const content = buildXeroCsv(statementData);
     downloadTextFile(
       content,
       `${getExportBaseName(exportBaseName)}-xero.csv`,
@@ -124,6 +151,7 @@ export const exportAsZohoCsv = async ({
   transactions,
   bankInfo,
   currencyCode,
+  jsonData,
   exportBaseName,
   toast,
   getErrorMessage,
@@ -131,7 +159,8 @@ export const exportAsZohoCsv = async ({
   if (transactions.length === 0) return;
 
   try {
-    const content = buildZohoCsv({ transactions, bankInfo, currencyCode });
+    const statementData = resolveCanonicalStatementData({ transactions, bankInfo, currencyCode, jsonData });
+    const content = buildZohoCsv(statementData);
     downloadTextFile(
       content,
       `${getExportBaseName(exportBaseName)}-zoho.csv`,
