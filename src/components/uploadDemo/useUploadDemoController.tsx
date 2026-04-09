@@ -2235,11 +2235,14 @@ export const useUploadDemoController = () => {
   };
 
   const handleTallyExport = async (): Promise<boolean> => {
-    if (conversionMode !== "tally_only") {
+    const canUseTallyExport =
+      conversionMode === "tally_only" || selectedPremiumFormat === "tally";
+
+    if (!canUseTallyExport) {
       toast({
         variant: "destructive",
         title: "Tally export unavailable",
-        description: "Use 'Convert to Tally XML' first.",
+        description: "Select Tally from Premium Formats or use Tally-only conversion first.",
       });
       return false;
     }
