@@ -1,21 +1,52 @@
 import { Button } from "@/components/ui/button";
 import { Upload } from "lucide-react"; 
 import { useNavigate } from "react-router-dom"; 
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, type Language } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
 
 export const Hero = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const titleLine2 = t("hero.titleLine2");
   const titleLine2Chars = Array.from(titleLine2.replace(/\s+/g, ""));
-  const heroHighlights = [
-    "PDF to Excel, CSV, JSON, and MT940.",
-    "Edited PDF detector with integrity checks.",
-    "Accurate debit, credit, and balance mapping.",
-    "FOIR, EMI load, and risk insights.",
-    "Secure processing with user-controlled access.",
-  ];
+  const heroHighlightsByLanguage: Record<Language, string[]> = {
+    en: [
+      "PDF to Excel, CSV, JSON, and MT940.",
+      "Edited PDF detector with integrity checks.",
+      "Accurate debit, credit, and balance mapping.",
+      "FOIR, EMI load, and risk insights.",
+      "Secure processing with user-controlled access.",
+    ],
+    ar: [
+      "تحويل PDF إلى Excel وCSV وJSON وMT940.",
+      "كشف PDF المعدل مع فحوصات السلامة.",
+      "تعيين دقيق للخصم والائتمان والرصيد.",
+      "رؤى FOIR وعبء EMI والمخاطر.",
+      "معالجة آمنة مع تحكم كامل للمستخدم.",
+    ],
+    zh: [
+      "PDF 转 Excel、CSV、JSON 和 MT940。",
+      "编辑版 PDF 检测与完整性校验。",
+      "借记、贷记与余额映射更准确。",
+      "FOIR、EMI 负担与风险洞察。",
+      "安全处理，访问权限由用户控制。",
+    ],
+    es: [
+      "PDF a Excel, CSV, JSON y MT940.",
+      "Detector de PDF editado con comprobaciones de integridad.",
+      "Mapeo preciso de débito, crédito y saldo.",
+      "Información de FOIR, carga EMI y riesgo.",
+      "Procesamiento seguro con acceso controlado por el usuario.",
+    ],
+    hi: [
+      "PDF से Excel, CSV, JSON और MT940.",
+      "इंटीग्रिटी चेक्स के साथ Edited PDF detector.",
+      "Debit, credit और balance की accurate mapping.",
+      "FOIR, EMI load और risk insights.",
+      "यूज़र-कंट्रोल्ड एक्सेस के साथ secure processing.",
+    ],
+  };
+  const heroHighlights = heroHighlightsByLanguage[language] ?? heroHighlightsByLanguage.en;
 
   return (
     <section className="relative min-h-[70vh] flex items-center justify-center pt-8 pb-10 bg-transparent">

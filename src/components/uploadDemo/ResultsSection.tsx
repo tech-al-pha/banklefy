@@ -31,6 +31,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useState } from "react";
+import { useLanguage, type Language } from "@/contexts/LanguageContext";
 import { UnderwritingPanel } from "@/components/UnderwritingPanel";
 import { FraudAlertPanel } from "@/components/FraudAlertPanel";
 import { categoryColors, supportedBanks } from "./constants";
@@ -147,6 +148,96 @@ export const ResultsSection = ({
   showImageProcessingHint = false,
   selectedPremiumFormat = null,
 }: ResultsSectionProps) => {
+  const { language } = useLanguage();
+  const localizedCopyByLanguage: Record<
+    Language,
+    {
+      textBasedTitle: string;
+      textBasedDesc: string;
+      scannedTitle: string;
+      scannedDesc: string;
+      step1Title: string;
+      step1Desc: string;
+      step2Title: string;
+      step2Desc: string;
+      step3Title: string;
+      step3Desc: string;
+      banksCompatible: string;
+      manyMore: string;
+    }
+  > = {
+    en: {
+      textBasedTitle: "Text-based PDFs",
+      textBasedDesc: "Usually finish faster through deterministic parsing, but very large files still need more validation.",
+      scannedTitle: "Scanned / image-based PDFs",
+      scannedDesc: "We run deeper OCR checks for cleaner extraction, so these usually take longer.",
+      step1Title: "1. Upload",
+      step1Desc: "Drag & drop your statement",
+      step2Title: "2. AI Processing",
+      step2Desc: "Our AI extracts data",
+      step3Title: "3. Download",
+      step3Desc: "Get your Excel file",
+      banksCompatible: "Compatible with most major banks worldwide",
+      manyMore: "Many more...",
+    },
+    ar: {
+      textBasedTitle: "ملفات PDF النصية",
+      textBasedDesc: "تنتهي عادةً أسرع عبر التحليل الحتمي، لكن الملفات الكبيرة جدًا تحتاج تحققًا إضافيًا.",
+      scannedTitle: "ملفات PDF الممسوحة / المعتمدة على الصور",
+      scannedDesc: "نُجري فحوصات OCR أعمق لاستخراج أنظف، لذلك تستغرق هذه عادةً وقتًا أطول.",
+      step1Title: "1. الرفع",
+      step1Desc: "اسحب وأفلت كشف الحساب",
+      step2Title: "2. المعالجة بالذكاء الاصطناعي",
+      step2Desc: "الذكاء الاصطناعي يستخرج البيانات",
+      step3Title: "3. التنزيل",
+      step3Desc: "احصل على ملف Excel",
+      banksCompatible: "متوافق مع أغلب البنوك الرئيسية عالميًا",
+      manyMore: "والمزيد...",
+    },
+    zh: {
+      textBasedTitle: "文本型 PDF",
+      textBasedDesc: "通常通过确定性解析更快完成，但超大文件仍需要更多校验。",
+      scannedTitle: "扫描 / 图像型 PDF",
+      scannedDesc: "我们会执行更深入的 OCR 检查以获得更干净的提取结果，因此通常更慢。",
+      step1Title: "1. 上传",
+      step1Desc: "拖拽上传你的流水",
+      step2Title: "2. AI 处理",
+      step2Desc: "AI 自动提取数据",
+      step3Title: "3. 下载",
+      step3Desc: "获取你的 Excel 文件",
+      banksCompatible: "兼容全球大多数主流银行",
+      manyMore: "更多银行持续支持中...",
+    },
+    es: {
+      textBasedTitle: "PDF basados en texto",
+      textBasedDesc: "Suelen terminar más rápido con análisis determinista, pero los archivos muy grandes aún requieren más validación.",
+      scannedTitle: "PDF escaneados / basados en imagen",
+      scannedDesc: "Ejecutamos comprobaciones OCR más profundas para una extracción más limpia, por eso suelen tardar más.",
+      step1Title: "1. Subir",
+      step1Desc: "Arrastra y suelta tu extracto",
+      step2Title: "2. Procesamiento con IA",
+      step2Desc: "Nuestra IA extrae los datos",
+      step3Title: "3. Descargar",
+      step3Desc: "Obtén tu archivo Excel",
+      banksCompatible: "Compatible con la mayoría de bancos importantes del mundo",
+      manyMore: "Muchos más...",
+    },
+    hi: {
+      textBasedTitle: "Text-based PDFs",
+      textBasedDesc: "Deterministic parsing से ये आमतौर पर जल्दी खत्म होते हैं, लेकिन बहुत बड़ी फाइलों में extra validation लगता है.",
+      scannedTitle: "Scanned / image-based PDFs",
+      scannedDesc: "Cleaner extraction के लिए हम deeper OCR checks चलाते हैं, इसलिए इनमें थोड़ा ज्यादा समय लगता है.",
+      step1Title: "1. Upload",
+      step1Desc: "अपना स्टेटमेंट drag & drop करें",
+      step2Title: "2. AI Processing",
+      step2Desc: "हमारा AI data extract करता है",
+      step3Title: "3. Download",
+      step3Desc: "अपनी Excel फाइल पाएं",
+      banksCompatible: "दुनिया के अधिकांश बड़े बैंकों के साथ compatible",
+      manyMore: "और भी बहुत सारे...",
+    },
+  };
+  const localizedCopy = localizedCopyByLanguage[language] ?? localizedCopyByLanguage.en;
   const [showPremiumFormats, setShowPremiumFormats] = useState(false);
   const isTallyOnlyMode = resultMode === "tally_only";
   const hasPremiumFormatAccess = hasTallyAccess;
@@ -708,11 +799,11 @@ export const ResultsSection = ({
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-sky-300" />
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">
-              Text-based PDFs
+              {localizedCopy.textBasedTitle}
             </p>
           </div>
           <p className="mt-2 text-xs leading-5 text-sky-50/75">
-            Usually finish faster through deterministic parsing, but very large files still need more validation.
+            {localizedCopy.textBasedDesc}
           </p>
         </Card>
 
@@ -720,11 +811,11 @@ export const ResultsSection = ({
           <div className="flex items-center gap-2">
             <ScanSearch className="h-4 w-4 text-sky-300" />
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">
-              Scanned / image-based PDFs
+              {localizedCopy.scannedTitle}
             </p>
           </div>
           <p className="mt-2 text-xs leading-5 text-sky-50/75">
-            We run deeper OCR checks for cleaner extraction, so these usually take longer.
+            {localizedCopy.scannedDesc}
           </p>
         </Card>
       </div>
@@ -735,8 +826,8 @@ export const ResultsSection = ({
             <FileText className="w-4 h-4 text-primary" />
           </div>
           <div className="space-y-1">
-            <p className="font-semibold text-sm">1. Upload</p>
-            <p className="text-xs text-muted-foreground">Drag & drop your statement</p>
+            <p className="font-semibold text-sm">{localizedCopy.step1Title}</p>
+            <p className="text-xs text-muted-foreground">{localizedCopy.step1Desc}</p>
           </div>
         </div>
 
@@ -745,8 +836,8 @@ export const ResultsSection = ({
             <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
           </div>
           <div className="space-y-1">
-            <p className="font-semibold text-sm">2. AI Processing</p>
-            <p className="text-xs text-muted-foreground">Our AI extracts data</p>
+            <p className="font-semibold text-sm">{localizedCopy.step2Title}</p>
+            <p className="text-xs text-muted-foreground">{localizedCopy.step2Desc}</p>
           </div>
         </div>
 
@@ -755,15 +846,15 @@ export const ResultsSection = ({
             <CheckCircle className="w-4 h-4 tone-excellent-text" />
           </div>
           <div className="space-y-1">
-            <p className="font-semibold text-sm">3. Download</p>
-            <p className="text-xs text-muted-foreground">Get your Excel file</p>
+            <p className="font-semibold text-sm">{localizedCopy.step3Title}</p>
+            <p className="text-xs text-muted-foreground">{localizedCopy.step3Desc}</p>
           </div>
         </div>
       </div>
 
       <div className="text-center pt-8 border-t border-muted">
         <p className="text-sm text-muted-foreground mb-4">
-          Compatible with most major banks worldwide
+          {localizedCopy.banksCompatible}
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           {supportedBanks.map((bank) => (
@@ -776,7 +867,7 @@ export const ResultsSection = ({
           ))}
         </div>
         <p className="mt-4 text-xs uppercase tracking-[0.2em] text-muted-foreground/80">
-          Many more...
+          {localizedCopy.manyMore}
         </p>
       </div>
     </>

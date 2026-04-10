@@ -3,7 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Crown, User, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { formatPlanLabel } from "@/lib/planLabels";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, type Language } from "@/contexts/LanguageContext";
 
 interface UsageLimitBannerProps {
   remaining: number;
@@ -27,7 +27,72 @@ export const UsageLimitBanner = ({
   planType = 'free',
 }: UsageLimitBannerProps) => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const localizedCounterByLanguage: Record<
+    Language,
+    {
+      conversionSingular: string;
+      conversionPlural: string;
+      pageSingular: string;
+      pagePlural: string;
+      unlimited: string;
+      freeRemaining: (limit: number) => string;
+      packRemaining: (limit: number) => string;
+      planRemaining: (limit: number) => string;
+    }
+  > = {
+    en: {
+      conversionSingular: "conversion",
+      conversionPlural: "conversions",
+      pageSingular: "page",
+      pagePlural: "pages",
+      unlimited: "Unlimited pages remaining.",
+      freeRemaining: (limit) => `of ${limit} conversions remaining today`,
+      packRemaining: (limit) => `of ${limit} pages remaining in your one-time pack`,
+      planRemaining: (limit) => `of ${limit} pages remaining in your plan`,
+    },
+    ar: {
+      conversionSingular: "تحويل",
+      conversionPlural: "تحويلات",
+      pageSingular: "صفحة",
+      pagePlural: "صفحات",
+      unlimited: "صفحات غير محدودة متبقية.",
+      freeRemaining: (limit) => `من أصل ${limit} تحويل متبقٍ اليوم`,
+      packRemaining: (limit) => `من أصل ${limit} صفحة متبقية في باقتك لمرة واحدة`,
+      planRemaining: (limit) => `من أصل ${limit} صفحة متبقية في خطتك`,
+    },
+    zh: {
+      conversionSingular: "次转换",
+      conversionPlural: "次转换",
+      pageSingular: "页",
+      pagePlural: "页",
+      unlimited: "剩余页数不限。",
+      freeRemaining: (limit) => `今日剩余 ${limit} 次转换`,
+      packRemaining: (limit) => `一次性套餐剩余 ${limit} 页`,
+      planRemaining: (limit) => `当前套餐剩余 ${limit} 页`,
+    },
+    es: {
+      conversionSingular: "conversión",
+      conversionPlural: "conversiones",
+      pageSingular: "página",
+      pagePlural: "páginas",
+      unlimited: "Páginas ilimitadas restantes.",
+      freeRemaining: (limit) => `de ${limit} conversiones restantes hoy`,
+      packRemaining: (limit) => `de ${limit} páginas restantes en tu paquete único`,
+      planRemaining: (limit) => `de ${limit} páginas restantes en tu plan`,
+    },
+    hi: {
+      conversionSingular: "conversion",
+      conversionPlural: "conversions",
+      pageSingular: "page",
+      pagePlural: "pages",
+      unlimited: "Unlimited pages remaining.",
+      freeRemaining: (limit) => `आज ${limit} conversions में से remaining`,
+      packRemaining: (limit) => `आपके one-time pack में ${limit} pages remaining`,
+      planRemaining: (limit) => `आपके plan में ${limit} pages remaining`,
+    },
+  };
+  const localizedCounter = localizedCounterByLanguage[language] ?? localizedCounterByLanguage.en;
   const planLabel = formatPlanLabel(planType);
   const normalizedPlan = (planType || "free").toLowerCase();
   const isUnlimitedPlan = normalizedPlan === "unlimited" && Number.isFinite(limit) && limit >= 900000;
@@ -35,8 +100,8 @@ export const UsageLimitBanner = ({
   const isKnownPaidPlan = isPerPagePlan || isUnlimitedPlan;
   const isFreeMode = !isKnownPaidPlan;
   const isPaidPlan = !isFreeMode;
-  const conversionLabel = remaining === 1 ? "conversion" : "conversions";
-  const pageLabel = remaining === 1 ? "page" : "pages";
+  const conversionLabel = remaining === 1 ? localizedCounter.conversionSingular : localizedCounter.conversionPlural;
+  const pageLabel = remaining === 1 ? localizedCounter.pageSingular : localizedCounter.pagePlural;
 
   const formatTemplate = (templateKey: string, values: Record<string, string | number>) =>
     t(templateKey).replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? ""));
@@ -108,15 +173,15 @@ export const UsageLimitBanner = ({
         <Crown className="h-4 w-4 text-primary" />
         <span>
           {isUnlimitedPlan ? (
-            "Unlimited pages remaining."
+            localizedCounter.unlimited
           ) : (
             <>
               <strong className="text-primary">{remaining}</strong>{" "}
               {isFreeMode
-                ? `of ${limit} ${conversionLabel} remaining today`
+                ? localizedCounter.freeRemaining(limit).replace("conversions", conversionLabel)
                 : isPerPagePlan
-                  ? `of ${limit} ${pageLabel} remaining in your one-time pack`
-                  : `of ${limit} ${pageLabel} remaining in your plan`}
+                  ? localizedCounter.packRemaining(limit).replace("pages", pageLabel)
+                  : localizedCounter.planRemaining(limit).replace("pages", pageLabel)}
             </>
           )}
           {planLabel && planLabel !== "Free" ? ` - ${planLabel}` : ""}
