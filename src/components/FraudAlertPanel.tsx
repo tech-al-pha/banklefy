@@ -69,11 +69,7 @@ interface FraudAlertPanelProps {
   riskAnalysis: RiskAnalysis;
   currencyCode?: string;
   showEditDetectorSignals?: boolean;
-  extractionConfidence?: {
-    score: number;
-    label: string;
-    reasons: string[];
-  };
+  editedPdfCheckResult?: { fileName: string; status: "clean" | "suspected"; reason: string } | null;
 }
 
 const EDIT_DETECTOR_ALERT_TYPES = new Set([
@@ -155,16 +151,18 @@ export const FraudAlertPanel = ({
   riskAnalysis,
   currencyCode,
   showEditDetectorSignals = true,
-  extractionConfidence,
+  editedPdfCheckResult = null,
 }: FraudAlertPanelProps) => {
   const { integrityScore, fraudAlerts, balanceMismatches, averageDailyBalance, maxDip, riskFlags } = riskAnalysis;
   const visibleAlerts = showEditDetectorSignals
     ? fraudAlerts
     : fraudAlerts.filter((alert) => !EDIT_DETECTOR_ALERT_TYPES.has(alert.type));
+  const documentAlerts = visibleAlerts.filter((alert) => EDIT_DETECTOR_ALERT_TYPES.has(alert.type));
+  const transactionAlerts = visibleAlerts.filter((alert) => !EDIT_DETECTOR_ALERT_TYPES.has(alert.type));
 
-  const criticalAlerts = visibleAlerts.filter(a => a.severity === 'critical');
-  const highAlerts = visibleAlerts.filter(a => a.severity === 'high');
-  const otherAlerts = visibleAlerts.filter(a => a.severity !== 'critical' && a.severity !== 'high');
+  const criticalAlerts = transactionAlerts.filter(a => a.severity === 'critical');
+  const highAlerts = transactionAlerts.filter(a => a.severity === 'high');
+  const otherAlerts = transactionAlerts.filter(a => a.severity !== 'critical' && a.severity !== 'high');
   const totalRiskFlags = riskFlags.reduce((sum, r) => sum + r.count, 0);
 
   const toneText = {
@@ -198,6 +196,160 @@ export const FraudAlertPanel = ({
     value: number,
     options?: { minimumFractionDigits?: number; maximumFractionDigits?: number; signDisplay?: 'auto' | 'always' | 'never' },
   ) => formatCurrencyValue(value ?? 0, currencyCode, { ...options, showSymbol: false });
+  const mainFindings = [
+    balanceMismatches > 0
+      ? `${balanceMismatches} transaction${balanceMismatches === 1 ? "" : "s"} failed mathematical balance reconciliation.`
+      : "Balance reconciliation checks passed.",
+    transactionAlerts.length > 0
+      ? `${transactionAlerts.length} statement-level issue${transactionAlerts.length === 1 ? "" : "s"} detected inside the extracted data.`
+      : "No major statement-level fraud or inconsistency signals were raised.",
+    editedPdfCheckResult?.status === "suspected"
+      ? editedPdfCheckResult.reason
+      : showEditDetectorSignals
+        ? documentAlerts.length > 0
+          ? `${documentAlerts.length} PDF origin/edit signal${documentAlerts.length === 1 ? "" : "s"} detected from document properties.`
+          : "No suspicious PDF editing or producer signatures were detected."
+        : null,
+  ].filter((item): item is string => Boolean(item));
+
+  const renderAlertAccordion = (alerts: FraudAlert[]) => (
+    <Accordion type="multiple" className="space-y-2">
+      {alerts.filter((alert) => alert.severity === "critical").map((alert, index) => (
+        <AccordionItem
+          key={`critical-${index}`}
+          value={`critical-${index}`}
+          className={`border rounded-lg px-4 card-hover-glow ${severityConfig.critical.bg} ${severityConfig.critical.border}`}
+        >
+          <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
+            <div className="flex items-center gap-3 text-left">
+              <span className={severityConfig.critical.text}>
+                {alertTypeIcons[alert.type] || <AlertTriangle className="w-5 h-5" />}
+              </span>
+              <div>
+                <p className={`font-medium ${severityConfig.critical.text}`}>{alert.description}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className={severityConfig.critical.badge}>CRITICAL</Badge>
+                  <span className="text-xs text-muted-foreground">{alert.affectedRows.length} row(s) affected</span>
+                </div>
+              </div>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="pt-2 pb-4">
+            <div className="text-sm space-y-2">
+              {alert.metadata.details && (
+                <div>
+                  <p className="text-muted-foreground mb-1">Affected Transactions:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    {alert.metadata.details.slice(0, 5).map((d, i) => {
+                      const expected = d.expected == null ? 'N/A' : formatAmount(d.expected, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      const actual = d.actual == null ? 'N/A' : formatAmount(d.actual, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      const diff = d.difference == null ? 'N/A' : formatAmount(d.difference, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      return <li key={i} className="text-xs">Row {d.rowIndex + 1}: Expected {expected} but found {actual} (Diff: {diff})</li>;
+                    })}
+                  </ul>
+                </div>
+              )}
+              {alert.metadata.transactions && (
+                <div>
+                  <p className="text-muted-foreground mb-1">Flagged Transactions:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    {alert.metadata.transactions.slice(0, 5).map((t, i) => {
+                      const amount = t.amount == null ? 'N/A' : formatAmount(t.amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      return <li key={i} className="text-xs">{t.date}: {t.description} - {amount}</li>;
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      ))}
+
+      {alerts.filter((alert) => alert.severity === "high").map((alert, index) => (
+        <AccordionItem
+          key={`high-${index}`}
+          value={`high-${index}`}
+          className={`border rounded-lg px-4 card-hover-glow ${severityConfig.high.bg} ${severityConfig.high.border}`}
+        >
+          <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
+            <div className="flex items-center gap-3 text-left">
+              <span className={severityConfig.high.text}>
+                {alertTypeIcons[alert.type] || <AlertTriangle className="w-5 h-5" />}
+              </span>
+              <div>
+                <p className={`font-medium ${severityConfig.high.text}`}>{alert.description}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className={severityConfig.high.badge}>HIGH</Badge>
+                  <span className="text-xs text-muted-foreground">{alert.affectedRows.length} row(s) affected</span>
+                </div>
+              </div>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="pt-2 pb-4">
+            <div className="text-sm space-y-2">
+              {alert.metadata.details && (
+                <div>
+                  <p className="text-muted-foreground mb-1">Balance Mismatches:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    {alert.metadata.details.slice(0, 5).map((d, i) => {
+                      const expected = d.expected == null ? 'N/A' : formatAmount(d.expected, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      const actual = d.actual == null ? 'N/A' : formatAmount(d.actual, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      return <li key={i} className="text-xs">Row {d.rowIndex + 1}: Expected {expected}, Found {actual}</li>;
+                    })}
+                  </ul>
+                </div>
+              )}
+              {alert.metadata.transactions && (
+                <div>
+                  <p className="text-muted-foreground mb-1">Detected Activity:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    {alert.metadata.transactions.slice(0, 5).map((t, i) => {
+                      const amount = t.amount == null ? 'N/A' : formatAmount(t.amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      return <li key={i} className="text-xs">{t.date}: {t.description} - {amount}</li>;
+                    })}
+                  </ul>
+                </div>
+              )}
+              {alert.metadata.transferCount && (
+                <p className="text-xs text-muted-foreground">
+                  Pattern: {alert.metadata.pattern} | Total: {alert.metadata.totalAmount == null ? 'N/A' : formatAmount(alert.metadata.totalAmount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      ))}
+
+      {alerts.filter((alert) => alert.severity !== "critical" && alert.severity !== "high").map((alert, index) => (
+        <AccordionItem
+          key={`other-${index}`}
+          value={`other-${index}`}
+          className={`border rounded-lg px-4 card-hover-glow ${severityConfig[alert.severity].bg} ${severityConfig[alert.severity].border}`}
+        >
+          <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
+            <div className="flex items-center gap-3 text-left">
+              <span className={severityConfig[alert.severity].text}>
+                {alertTypeIcons[alert.type] || <AlertTriangle className="w-5 h-5" />}
+              </span>
+              <div>
+                <p className={`font-medium ${severityConfig[alert.severity].text}`}>{alert.description}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className={severityConfig[alert.severity].badge}>{alert.severity.toUpperCase()}</Badge>
+                  <span className="text-xs text-muted-foreground">{alert.affectedRows.length} row(s) affected</span>
+                </div>
+              </div>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="pt-2 pb-4">
+            <p className="text-sm text-muted-foreground">
+              {alert.description}
+              {alert.affectedRows.length > 0 ? ` Affected row indices: ${alert.affectedRows.slice(0, 10).join(', ')}` : ""}
+            </p>
+          </AccordionContent>
+        </AccordionItem>
+      ))}
+    </Accordion>
+  );
 
   return (
     <div className="space-y-4">
@@ -230,37 +382,28 @@ export const FraudAlertPanel = ({
         </Tooltip>
       </div>
 
-      {extractionConfidence && (
-        <Card className="p-4 !bg-[#191919] border-primary/20">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="border-white/15 bg-white/5 text-white">
-                  {extractionConfidence.label}
-                </Badge>
-                <span className="text-sm text-muted-foreground">Extraction trust signal</span>
-              </div>
-              <p className="text-3xl font-bold text-white">{extractionConfidence.score}/100</p>
-              <p className="text-sm text-muted-foreground">
-                This score blends balance math, low-confidence rows, duplicate signals, and date quality.
-              </p>
-            </div>
-
-            <div className="grid gap-2 text-sm text-muted-foreground md:max-w-[420px]">
-              {extractionConfidence.reasons.slice(0, 4).map((reason) => (
-                <div key={reason} className="flex items-start gap-2">
-                  {reason.includes("No ") || reason.includes("look consistent") || reason.includes("All extracted") ? (
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 tone-excellent-text" />
-                  ) : (
-                    <AlertTriangle className="mt-0.5 h-4 w-4 tone-moderate-text" />
-                  )}
-                  <span>{reason}</span>
-                </div>
-              ))}
-            </div>
+      <Card className="p-4 !bg-[#191919] border-primary/20">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="border-white/15 bg-white/5 text-white">
+              Main Findings
+            </Badge>
+            <span className="text-sm text-muted-foreground">What matters most in this report</span>
           </div>
-        </Card>
-      )}
+          <div className="grid gap-2 text-sm text-muted-foreground">
+            {mainFindings.map((reason) => (
+              <div key={reason} className="flex items-start gap-2">
+                {reason.includes("passed") || reason.includes("No suspicious") || reason.includes("No major") ? (
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 tone-excellent-text" />
+                ) : (
+                  <AlertTriangle className="mt-0.5 h-4 w-4 tone-moderate-text" />
+                )}
+                <span>{reason}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -312,210 +455,16 @@ export const FraudAlertPanel = ({
         </Card>
       </div>
 
-      {/* Fraud Alerts */}
-      {visibleAlerts.length > 0 ? (
+      {/* Statement Data Issues */}
+      {transactionAlerts.length > 0 ? (
         <Card className="p-4 !bg-[#191919] border-border/50">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className={`w-5 h-5 ${toneText[alertHeaderTone]}`} />
             <h4 className={`font-semibold ${toneText[alertHeaderTone]}`}>
-              {visibleAlerts.length} Alert{visibleAlerts.length !== 1 ? 's' : ''} Detected
+              Statement Data Issues
             </h4>
           </div>
-
-          <Accordion type="multiple" className="space-y-2">
-            {/* Critical alerts first */}
-            {criticalAlerts.map((alert, index) => (
-              <AccordionItem 
-                key={`critical-${index}`} 
-                value={`critical-${index}`}
-                className={`border rounded-lg px-4 card-hover-glow ${severityConfig.critical.bg} ${severityConfig.critical.border}`}
-              >
-                <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
-                  <div className="flex items-center gap-3 text-left">
-                    <span className={severityConfig.critical.text}>
-                      {alertTypeIcons[alert.type] || <AlertTriangle className="w-5 h-5" />}
-                    </span>
-                    <div>
-                      <p className={`font-medium ${severityConfig.critical.text}`}>
-                        {alert.description}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={severityConfig.critical.badge}>
-                          CRITICAL
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {alert.affectedRows.length} row(s) affected
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-2 pb-4">
-                  <div className="text-sm space-y-2">
-                    {alert.metadata.details && (
-                      <div>
-                        <p className="text-muted-foreground mb-1">Affected Transactions:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                          {alert.metadata.details.slice(0, 5).map((d, i) => {
-                            const expected =
-                              d.expected == null
-                                ? 'N/A'
-                                : formatAmount(d.expected, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                            const actual =
-                              d.actual == null
-                                ? 'N/A'
-                                : formatAmount(d.actual, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                            const diff =
-                              d.difference == null
-                                ? 'N/A'
-                                : formatAmount(d.difference, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                            return (
-                              <li key={i} className="text-xs">
-                                Row {d.rowIndex + 1}: Expected {expected} but found {actual} (Diff: {diff})
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    )}
-                    {alert.metadata.transactions && (
-                      <div>
-                        <p className="text-muted-foreground mb-1">Flagged Transactions:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                          {alert.metadata.transactions.slice(0, 5).map((t, i) => {
-                            const amount =
-                              t.amount == null
-                                ? 'N/A'
-                                : formatAmount(t.amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                            return (
-                              <li key={i} className="text-xs">
-                                {t.date}: {t.description} - {amount}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-
-            {/* High alerts */}
-            {highAlerts.map((alert, index) => (
-              <AccordionItem 
-                key={`high-${index}`} 
-                value={`high-${index}`}
-                className={`border rounded-lg px-4 card-hover-glow ${severityConfig.high.bg} ${severityConfig.high.border}`}
-              >
-                <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
-                  <div className="flex items-center gap-3 text-left">
-                    <span className={severityConfig.high.text}>
-                      {alertTypeIcons[alert.type] || <AlertTriangle className="w-5 h-5" />}
-                    </span>
-                    <div>
-                      <p className={`font-medium ${severityConfig.high.text}`}>
-                        {alert.description}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={severityConfig.high.badge}>
-                          HIGH
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {alert.affectedRows.length} row(s) affected
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-2 pb-4">
-                  <div className="text-sm space-y-2">
-                    {alert.metadata.details && (
-                      <div>
-                        <p className="text-muted-foreground mb-1">Balance Mismatches:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                          {alert.metadata.details.slice(0, 5).map((d, i) => {
-                            const expected =
-                              d.expected == null
-                                ? 'N/A'
-                                : formatAmount(d.expected, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                            const actual =
-                              d.actual == null
-                                ? 'N/A'
-                                : formatAmount(d.actual, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                            return (
-                              <li key={i} className="text-xs">
-                                Row {d.rowIndex + 1}: Expected {expected}, Found {actual}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    )}
-                    {alert.metadata.transactions && (
-                      <div>
-                        <p className="text-muted-foreground mb-1">Detected Activity:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                          {alert.metadata.transactions.slice(0, 5).map((t, i) => {
-                            const amount =
-                              t.amount == null
-                                ? 'N/A'
-                                : formatAmount(t.amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                            return (
-                              <li key={i} className="text-xs">
-                                {t.date}: {t.description} - {amount}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    )}
-                    {alert.metadata.transferCount && (
-                      <p className="text-xs text-muted-foreground">
-                        Pattern: {alert.metadata.pattern} | Total: {alert.metadata.totalAmount == null ? 'N/A' : formatAmount(alert.metadata.totalAmount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </p>
-                    )}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-
-            {/* Other alerts */}
-            {otherAlerts.map((alert, index) => (
-              <AccordionItem 
-                key={`other-${index}`} 
-                value={`other-${index}`}
-                className={`border rounded-lg px-4 card-hover-glow ${severityConfig[alert.severity].bg} ${severityConfig[alert.severity].border}`}
-              >
-                <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
-                  <div className="flex items-center gap-3 text-left">
-                    <span className={severityConfig[alert.severity].text}>
-                      {alertTypeIcons[alert.type] || <AlertTriangle className="w-5 h-5" />}
-                    </span>
-                    <div>
-                      <p className={`font-medium ${severityConfig[alert.severity].text}`}>
-                        {alert.description}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className={severityConfig[alert.severity].badge}>
-                          {alert.severity.toUpperCase()}
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {alert.affectedRows.length} row(s) affected
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-2 pb-4">
-                  <p className="text-sm text-muted-foreground">
-                    Affected row indices: {alert.affectedRows.slice(0, 10).join(', ')}
-                    {alert.affectedRows.length > 10 && ` and ${alert.affectedRows.length - 10} more...`}
-                  </p>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+          {renderAlertAccordion(transactionAlerts)}
         </Card>
       ) : (
         <Card className="p-4 !bg-[#191919] border-border/40">
@@ -527,6 +476,47 @@ export const FraudAlertPanel = ({
                 No suspicious financial activity found in this statement.
               </p>
             </div>
+          </div>
+        </Card>
+      )}
+
+      {showEditDetectorSignals && (
+        <Card className="p-4 !bg-[#191919] border-border/50">
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldAlert className="w-5 h-5 tone-moderate-text" />
+            <h4 className="font-semibold tone-moderate-text">PDF Origin & Edit Signals</h4>
+          </div>
+          <div className="space-y-3">
+            {editedPdfCheckResult ? (
+              <div className={`rounded-lg border p-3 ${editedPdfCheckResult.status === "suspected" ? "tone-moderate-bg tone-moderate-border" : "tone-excellent-bg tone-excellent-border"}`}>
+                <p className={`font-medium ${editedPdfCheckResult.status === "suspected" ? "tone-moderate-text" : "tone-excellent-text"}`}>
+                  {editedPdfCheckResult.status === "suspected" ? "Possible edited or non-bank-generated PDF detected" : "No obvious edit signal detected"}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">{editedPdfCheckResult.reason}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No document-property result was recorded for this file.</p>
+            )}
+
+            {documentAlerts.length > 0 ? (
+              <div className="space-y-2">
+                {documentAlerts.map((alert, index) => (
+                  <div key={`${alert.type}-${index}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={severityConfig[alert.severity].badge}>
+                        {alert.severity.toUpperCase()}
+                      </Badge>
+                      <p className={`font-medium ${severityConfig[alert.severity].text}`}>{alert.description}</p>
+                    </div>
+                    {alert.metadata.pattern && (
+                      <p className="mt-1 text-sm text-muted-foreground">Signal: {alert.metadata.pattern}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No extra PDF producer or edit-property anomalies were surfaced.</p>
+            )}
           </div>
         </Card>
       )}

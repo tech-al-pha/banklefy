@@ -44,8 +44,6 @@ import type {
 type PremiumFormat = "tally" | "quickbooks" | "xero" | "zoho";
 
 type ToneName = "excellent" | "good" | "moderate" | "bad";
-type ConfidenceLevel = "high" | "medium" | "low";
-
 const toneClasses: Record<ToneName, { border: string; text: string }> = {
   excellent: { border: "border-[hsl(var(--tone-excellent-border))]", text: "tone-excellent-text" },
   good: { border: "border-[hsl(var(--tone-good-border))]", text: "tone-good-text" },
@@ -67,37 +65,6 @@ const getNetFlowTone = (netFlow: number, totalCredits: number): ToneName => {
   if (netFlow === 0) return "moderate";
   if (totalCredits > 0 && Math.abs(netFlow) / totalCredits <= 0.2) return "moderate";
   return "bad";
-};
-
-const getConfidenceLevel = (score: number, blockers: { balanceMismatches: number; unknownDates: number; lowConfidence: number }): ConfidenceLevel => {
-  if (score >= 88 && blockers.balanceMismatches === 0 && blockers.unknownDates === 0 && blockers.lowConfidence <= 1) {
-    return "high";
-  }
-  if (score >= 68 && blockers.balanceMismatches <= 2) {
-    return "medium";
-  }
-  return "low";
-};
-
-const confidenceTheme: Record<ConfidenceLevel, { card: string; badge: string; text: string; label: string }> = {
-  high: {
-    card: "border-emerald-500/30 bg-emerald-500/[0.08]",
-    badge: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-    text: "text-emerald-200",
-    label: "High Confidence",
-  },
-  medium: {
-    card: "border-amber-500/30 bg-amber-500/[0.08]",
-    badge: "border-amber-400/30 bg-amber-400/10 text-amber-200",
-    text: "text-amber-200",
-    label: "Needs Review",
-  },
-  low: {
-    card: "border-red-500/30 bg-red-500/[0.08]",
-    badge: "border-red-400/30 bg-red-400/10 text-red-200",
-    text: "text-red-200",
-    label: "Low Confidence",
-  },
 };
 
 type FormatAmountFn = (
@@ -195,53 +162,6 @@ export const ResultsSection = ({
   const lockedFormats: string[] = [];
   if (isTallyOnlyMode && !hasTallyAccess) lockedFormats.push("Tally XML");
   if (!isPaidUser) lockedFormats.push("JSON", "MT940");
-  const unknownDateCount = transactions.filter((transaction) => {
-    const normalizedDate = String(transaction.date ?? "").trim().toUpperCase();
-    return !normalizedDate || normalizedDate === "UNKNOWN";
-  }).length;
-  const lowConfidenceCount = analytics?.confidenceSummary?.lowConfidenceCount
-    ?? transactions.filter((transaction) =>
-      transaction.lowConfidence ||
-      (typeof transaction.confidenceScore === "number" && transaction.confidenceScore < 70) ||
-      (Array.isArray(transaction.confidenceReasons) && transaction.confidenceReasons.length > 0),
-    ).length;
-  const balanceMismatchCount = analytics?.riskAnalysis?.balanceMismatches
-    ?? transactions.filter((transaction) => transaction.balanceMismatch).length;
-  const riskFlaggedCount = transactions.filter((transaction) => Boolean(transaction.riskFlag)).length;
-  const confidenceScoreRaw = analytics?.confidenceSummary?.averageScore
-    ?? (transactions.length > 0
-      ? transactions.reduce((sum, transaction) => {
-          const score = typeof transaction.confidenceScore === "number"
-            ? transaction.confidenceScore <= 1
-              ? transaction.confidenceScore * 100
-              : transaction.confidenceScore
-            : 85;
-          return sum + score;
-        }, 0) / transactions.length
-      : 0);
-  const confidenceScore = Math.max(0, Math.min(100, Math.round(confidenceScoreRaw)));
-  const confidenceLevel = getConfidenceLevel(confidenceScore, {
-    balanceMismatches: balanceMismatchCount,
-    unknownDates: unknownDateCount,
-    lowConfidence: lowConfidenceCount,
-  });
-  const confidenceReasons = [
-    balanceMismatchCount === 0
-      ? "Running balance checks look consistent."
-      : `${balanceMismatchCount} row${balanceMismatchCount === 1 ? "" : "s"} failed balance reconciliation.`,
-    unknownDateCount === 0
-      ? "All extracted rows have usable dates."
-      : `${unknownDateCount} row${unknownDateCount === 1 ? "" : "s"} still need date review.`,
-    lowConfidenceCount === 0
-      ? "No low-confidence rows were flagged."
-      : `${lowConfidenceCount} row${lowConfidenceCount === 1 ? "" : "s"} were marked low-confidence.`,
-    analytics?.duplicateCount
-      ? `${analytics.duplicateCount} potential duplicate row${analytics.duplicateCount === 1 ? "" : "s"} detected.`
-      : "No duplicate transactions were detected.",
-    riskFlaggedCount > 0
-      ? `${riskFlaggedCount} row${riskFlaggedCount === 1 ? "" : "s"} carry extra risk signals.`
-      : "No extra row-level risk flags were raised.",
-  ];
 
   const premiumFormatCards = [
     {
@@ -570,11 +490,7 @@ export const ResultsSection = ({
           riskAnalysis={analytics.riskAnalysis}
           currencyCode={currencyCode}
           showEditDetectorSignals={showEditDetectorSignals}
-          extractionConfidence={{
-            score: confidenceScore,
-            label: confidenceTheme[confidenceLevel].label,
-            reasons: confidenceReasons,
-          }}
+          editedPdfCheckResult={editedPdfCheckResult}
         />
       )}
 
