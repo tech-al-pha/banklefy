@@ -44,6 +44,7 @@ import type {
 type PremiumFormat = "tally" | "quickbooks" | "xero" | "zoho";
 
 type ToneName = "excellent" | "good" | "moderate" | "bad";
+type ConfidenceLevel = "high" | "medium" | "low";
 
 const toneClasses: Record<ToneName, { border: string; text: string }> = {
   excellent: { border: "border-[hsl(var(--tone-excellent-border))]", text: "tone-excellent-text" },
@@ -66,6 +67,37 @@ const getNetFlowTone = (netFlow: number, totalCredits: number): ToneName => {
   if (netFlow === 0) return "moderate";
   if (totalCredits > 0 && Math.abs(netFlow) / totalCredits <= 0.2) return "moderate";
   return "bad";
+};
+
+const getConfidenceLevel = (score: number, blockers: { balanceMismatches: number; unknownDates: number; lowConfidence: number }): ConfidenceLevel => {
+  if (score >= 88 && blockers.balanceMismatches === 0 && blockers.unknownDates === 0 && blockers.lowConfidence <= 1) {
+    return "high";
+  }
+  if (score >= 68 && blockers.balanceMismatches <= 2) {
+    return "medium";
+  }
+  return "low";
+};
+
+const confidenceTheme: Record<ConfidenceLevel, { card: string; badge: string; text: string; label: string }> = {
+  high: {
+    card: "border-emerald-500/30 bg-emerald-500/[0.08]",
+    badge: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+    text: "text-emerald-200",
+    label: "High Confidence",
+  },
+  medium: {
+    card: "border-amber-500/30 bg-amber-500/[0.08]",
+    badge: "border-amber-400/30 bg-amber-400/10 text-amber-200",
+    text: "text-amber-200",
+    label: "Needs Review",
+  },
+  low: {
+    card: "border-red-500/30 bg-red-500/[0.08]",
+    badge: "border-red-400/30 bg-red-400/10 text-red-200",
+    text: "text-red-200",
+    label: "Low Confidence",
+  },
 };
 
 type FormatAmountFn = (
@@ -163,6 +195,53 @@ export const ResultsSection = ({
   const lockedFormats: string[] = [];
   if (isTallyOnlyMode && !hasTallyAccess) lockedFormats.push("Tally XML");
   if (!isPaidUser) lockedFormats.push("JSON", "MT940");
+  const unknownDateCount = transactions.filter((transaction) => {
+    const normalizedDate = String(transaction.date ?? "").trim().toUpperCase();
+    return !normalizedDate || normalizedDate === "UNKNOWN";
+  }).length;
+  const lowConfidenceCount = analytics?.confidenceSummary?.lowConfidenceCount
+    ?? transactions.filter((transaction) =>
+      transaction.lowConfidence ||
+      (typeof transaction.confidenceScore === "number" && transaction.confidenceScore < 70) ||
+      (Array.isArray(transaction.confidenceReasons) && transaction.confidenceReasons.length > 0),
+    ).length;
+  const balanceMismatchCount = analytics?.riskAnalysis?.balanceMismatches
+    ?? transactions.filter((transaction) => transaction.balanceMismatch).length;
+  const riskFlaggedCount = transactions.filter((transaction) => Boolean(transaction.riskFlag)).length;
+  const confidenceScoreRaw = analytics?.confidenceSummary?.averageScore
+    ?? (transactions.length > 0
+      ? transactions.reduce((sum, transaction) => {
+          const score = typeof transaction.confidenceScore === "number"
+            ? transaction.confidenceScore <= 1
+              ? transaction.confidenceScore * 100
+              : transaction.confidenceScore
+            : 85;
+          return sum + score;
+        }, 0) / transactions.length
+      : 0);
+  const confidenceScore = Math.max(0, Math.min(100, Math.round(confidenceScoreRaw)));
+  const confidenceLevel = getConfidenceLevel(confidenceScore, {
+    balanceMismatches: balanceMismatchCount,
+    unknownDates: unknownDateCount,
+    lowConfidence: lowConfidenceCount,
+  });
+  const confidenceReasons = [
+    balanceMismatchCount === 0
+      ? "Running balance checks look consistent."
+      : `${balanceMismatchCount} row${balanceMismatchCount === 1 ? "" : "s"} failed balance reconciliation.`,
+    unknownDateCount === 0
+      ? "All extracted rows have usable dates."
+      : `${unknownDateCount} row${unknownDateCount === 1 ? "" : "s"} still need date review.`,
+    lowConfidenceCount === 0
+      ? "No low-confidence rows were flagged."
+      : `${lowConfidenceCount} row${lowConfidenceCount === 1 ? "" : "s"} were marked low-confidence.`,
+    analytics?.duplicateCount
+      ? `${analytics.duplicateCount} potential duplicate row${analytics.duplicateCount === 1 ? "" : "s"} detected.`
+      : "No duplicate transactions were detected.",
+    riskFlaggedCount > 0
+      ? `${riskFlaggedCount} row${riskFlaggedCount === 1 ? "" : "s"} carry extra risk signals.`
+      : "No extra row-level risk flags were raised.",
+  ];
 
   const premiumFormatCards = [
     {
@@ -500,6 +579,36 @@ export const ResultsSection = ({
             <PieChart className="w-5 h-5 text-primary" />
             Financial Analytics
           </h3>
+
+          <Card className={`p-4 ${confidenceTheme[confidenceLevel].card}`}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={confidenceTheme[confidenceLevel].badge}>
+                    {confidenceTheme[confidenceLevel].label}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">Extraction trust signal</span>
+                </div>
+                <p className={`text-3xl font-bold ${confidenceTheme[confidenceLevel].text}`}>{confidenceScore}/100</p>
+                <p className="text-sm text-muted-foreground">
+                  This score is based on balance math, low-confidence rows, duplicate signals, and date quality.
+                </p>
+              </div>
+
+              <div className="grid gap-2 text-sm text-muted-foreground md:max-w-[420px]">
+                {confidenceReasons.slice(0, 4).map((reason) => (
+                  <div key={reason} className="flex items-start gap-2">
+                    {reason.includes("No ") || reason.includes("look consistent") || reason.includes("All extracted") ? (
+                      <CheckCircle className="mt-0.5 h-4 w-4 text-emerald-300" />
+                    ) : (
+                      <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-300" />
+                    )}
+                    <span>{reason}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card className={`p-4 !bg-[#191919] ${toneClasses[creditTone].border}`}>
