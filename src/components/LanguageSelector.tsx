@@ -6,9 +6,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useLanguage, Language, languageNames } from '@/contexts/LanguageContext';
-
-const languages: Language[] = ['en', 'ar', 'zh', 'es', 'hi'];
+import { useLanguage, languageNames } from '@/contexts/LanguageContext';
+import { activeLanguages } from '@/contexts/languageData';
 
 export const LanguageSelector = () => {
   const { language, setLanguage } = useLanguage();
@@ -26,7 +25,7 @@ export const LanguageSelector = () => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-lg border-primary/20">
-        {languages.map((lang) => (
+        {activeLanguages.map((lang) => (
           <DropdownMenuItem
             key={lang}
             onClick={() => setLanguage(lang)}

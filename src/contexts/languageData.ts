@@ -1,5 +1,7 @@
 ﻿export type Language = 'en' | 'ar' | 'zh' | 'es' | 'hi';
 
+export const activeLanguages: Language[] = ['en', 'es'];
+
 
 
 export const translations: Record<Language, Record<string, string>> = {
@@ -3686,13 +3688,13 @@ export const languageNames: Record<Language, string> = {
 
   "en": "English",
 
-  "ar": "???????",
+  "ar": "Arabic (Coming Soon)",
 
-  "zh": "??",
+  "zh": "Chinese (Coming Soon)",
 
   "es": "Español",
 
-  "hi": "??????"
+  "hi": "Hindi (Coming Soon)"
 
 };
 

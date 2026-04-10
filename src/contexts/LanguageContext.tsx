@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'; // Banklefy Language System
-import { languageNames, translations, type Language } from "./languageData";
+import { activeLanguages, languageNames, translations, type Language } from "./languageData";
 export type { Language } from "./languageData";
 
 interface LanguageContextType {
@@ -9,7 +9,7 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
-const supportedLanguages = new Set<Language>(Object.keys(translations) as Language[]);
+const supportedLanguages = new Set<Language>(activeLanguages);
 
 const isSupportedLanguage = (value: string | null): value is Language => {
   if (!value) return false;
