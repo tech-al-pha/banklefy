@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useLanguage, languageNames } from '@/contexts/LanguageContext';
-import { activeLanguages, availableLanguages } from '@/contexts/languageData';
+import { availableLanguages } from '@/contexts/languageData';
 
 export const LanguageSelector = () => {
   const { language, setLanguage } = useLanguage();
@@ -25,24 +25,15 @@ export const LanguageSelector = () => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-lg border-primary/20">
-        {availableLanguages.map((lang) => {
-          const isActive = activeLanguages.includes(lang);
-          return (
+        {availableLanguages.map((lang) => (
           <DropdownMenuItem
             key={lang}
-            onClick={() => isActive && setLanguage(lang)}
-            disabled={!isActive}
-            className={`cursor-pointer ${language === lang ? 'text-primary font-semibold' : 'text-foreground'} ${!isActive ? 'opacity-60' : ''}`}
+            onClick={() => setLanguage(lang)}
+            className={`cursor-pointer ${language === lang ? 'text-primary font-semibold' : 'text-foreground'}`}
           >
-            <div className="flex w-full items-center justify-between gap-3">
-              <span>{languageNames[lang]}</span>
-              {!isActive && (
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Coming Soon</span>
-              )}
-            </div>
+            {languageNames[lang]}
           </DropdownMenuItem>
-          );
-        })}
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
