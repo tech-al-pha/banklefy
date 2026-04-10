@@ -282,6 +282,8 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
         </div>
       </Card>
 
+      {!showLimitedDataNotice && (
+        <>
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* FOIR Score */}
@@ -533,6 +535,8 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
             </div>
           </div>
         </Card>
+      )}
+        </>
       )}
     </div>
   );
