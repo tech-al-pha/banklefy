@@ -278,6 +278,35 @@
       0 24px 48px -28px rgba(0, 0, 0, 0.85);
   }
 
+  .ultra-glass-panel {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
+      rgba(20, 20, 20, 0.78) !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    backdrop-filter: blur(18px) saturate(112%);
+    -webkit-backdrop-filter: blur(18px) saturate(112%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 0 0 1px rgba(255, 255, 255, 0.03),
+      0 18px 42px -30px rgba(0, 0, 0, 0.92) !important;
+  }
+
+  .ultra-glass-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 24%);
+    opacity: 0.75;
+  }
+
+  .ultra-glass-panel > * {
+    position: relative;
+    z-index: 1;
+  }
+
   .chip-muted {
     color: #676767;
     border: 1px solid rgba(103, 103, 103, 0.55);
@@ -374,7 +403,7 @@
   .card-hover-glow:hover {
     box-shadow:
       0 0 0 1px rgba(255, 255, 255, 0.12),
-      0 0 22px rgba(255, 255, 255, 0.2),
+      0 0 14px rgba(255, 255, 255, 0.12),
       0 24px 48px -28px rgba(0, 0, 0, 0.85) !important;
   }
 

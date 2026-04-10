@@ -218,7 +218,7 @@ export const FraudAlertPanel = ({
         <AccordionItem
           key={`critical-${index}`}
           value={`critical-${index}`}
-          className={`border rounded-lg px-4 card-hover-glow ${severityConfig.critical.bg} ${severityConfig.critical.border}`}
+          className={`border rounded-lg px-4 card-hover-glow ultra-glass-panel ${severityConfig.critical.bg} ${severityConfig.critical.border}`}
         >
           <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
             <div className="flex items-center gap-3 text-left">
@@ -269,7 +269,7 @@ export const FraudAlertPanel = ({
         <AccordionItem
           key={`high-${index}`}
           value={`high-${index}`}
-          className={`border rounded-lg px-4 card-hover-glow ${severityConfig.high.bg} ${severityConfig.high.border}`}
+          className={`border rounded-lg px-4 card-hover-glow ultra-glass-panel ${severityConfig.high.bg} ${severityConfig.high.border}`}
         >
           <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
             <div className="flex items-center gap-3 text-left">
@@ -324,7 +324,7 @@ export const FraudAlertPanel = ({
         <AccordionItem
           key={`other-${index}`}
           value={`other-${index}`}
-          className={`border rounded-lg px-4 card-hover-glow ${severityConfig[alert.severity].bg} ${severityConfig[alert.severity].border}`}
+          className={`border rounded-lg px-4 card-hover-glow ultra-glass-panel ${severityConfig[alert.severity].bg} ${severityConfig[alert.severity].border}`}
         >
           <AccordionTrigger className="hover:no-underline py-3 no-hover-glow text-hover-glow">
             <div className="flex items-center gap-3 text-left">
@@ -382,7 +382,7 @@ export const FraudAlertPanel = ({
         </Tooltip>
       </div>
 
-      <Card className="p-4 !bg-[#191919] border-primary/20">
+      <Card className="ultra-glass-panel p-4 !bg-[#191919] border-primary/20">
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Badge variant="outline" className="border-white/15 bg-white/5 text-white">
@@ -407,7 +407,7 @@ export const FraudAlertPanel = ({
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className={`p-3 !bg-[#191919] ${balanceMismatches > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
+        <Card className={`ultra-glass-panel p-3 !bg-[#191919] ${balanceMismatches > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
           <div className="flex items-center gap-2 text-xs label-muted mb-1">
             {balanceMismatches > 0 ? (
               <XCircle className={`w-3 h-3 ${toneText[balanceTone]}`} />
@@ -421,7 +421,7 @@ export const FraudAlertPanel = ({
           </p>
         </Card>
 
-        <Card className="p-3 !bg-[#191919] border-primary/20">
+        <Card className="ultra-glass-panel p-3 !bg-[#191919] border-primary/20">
           <div className="flex items-center gap-2 text-xs label-muted mb-1">
             <TrendingDown className={`w-3 h-3 ${toneText[avgBalanceTone]}`} />
             Avg Daily Balance
@@ -431,7 +431,7 @@ export const FraudAlertPanel = ({
           </p>
         </Card>
 
-        <Card className={`p-3 !bg-[#191919] ${maxDip.amount <= 0 ? 'bg-ink/60 border-border/60' : 'bg-muted/30 border-border/30'}`}>
+        <Card className={`ultra-glass-panel p-3 !bg-[#191919] ${maxDip.amount <= 0 ? 'bg-ink/60 border-border/60' : 'bg-muted/30 border-border/30'}`}>
           <div className="flex items-center gap-2 text-xs label-muted mb-1">
             <TrendingDown className={`w-3 h-3 ${toneText[lowestBalanceTone]}`} />
             Lowest Balance
@@ -444,7 +444,7 @@ export const FraudAlertPanel = ({
           )}
         </Card>
 
-        <Card className={`p-3 !bg-[#191919] ${riskFlags.length > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
+        <Card className={`ultra-glass-panel p-3 !bg-[#191919] ${riskFlags.length > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
           <div className="flex items-center gap-2 text-xs label-muted mb-1">
             <AlertTriangle className={`w-3 h-3 ${toneText[riskTone]}`} />
             Risk Flags
@@ -457,7 +457,7 @@ export const FraudAlertPanel = ({
 
       {/* Statement Data Issues */}
       {transactionAlerts.length > 0 ? (
-        <Card className="p-4 !bg-[#191919] border-border/50">
+        <Card className="ultra-glass-panel p-4 !bg-[#191919] border-border/50">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className={`w-5 h-5 ${toneText[alertHeaderTone]}`} />
             <h4 className={`font-semibold ${toneText[alertHeaderTone]}`}>
@@ -467,7 +467,7 @@ export const FraudAlertPanel = ({
           {renderAlertAccordion(transactionAlerts)}
         </Card>
       ) : (
-        <Card className="p-4 !bg-[#191919] border-border/40">
+        <Card className="ultra-glass-panel p-4 !bg-[#191919] border-border/40">
           <div className="flex items-center gap-3">
             <ShieldCheck className="w-6 h-6 tone-excellent-text" />
             <div>
@@ -481,14 +481,14 @@ export const FraudAlertPanel = ({
       )}
 
       {showEditDetectorSignals && (
-        <Card className="p-4 !bg-[#191919] border-border/50">
+        <Card className="ultra-glass-panel p-4 !bg-[#191919] border-border/50">
           <div className="flex items-center gap-2 mb-4">
             <ShieldAlert className="w-5 h-5 tone-moderate-text" />
             <h4 className="font-semibold tone-moderate-text">PDF Origin & Edit Signals</h4>
           </div>
           <div className="space-y-3">
             {editedPdfCheckResult ? (
-              <div className={`rounded-lg border p-3 ${editedPdfCheckResult.status === "suspected" ? "tone-moderate-bg tone-moderate-border" : "tone-excellent-bg tone-excellent-border"}`}>
+              <div className={`ultra-glass-panel rounded-lg border p-3 ${editedPdfCheckResult.status === "suspected" ? "tone-moderate-bg tone-moderate-border" : "tone-excellent-bg tone-excellent-border"}`}>
                 <p className={`font-medium ${editedPdfCheckResult.status === "suspected" ? "tone-moderate-text" : "tone-excellent-text"}`}>
                   {editedPdfCheckResult.status === "suspected" ? "Possible edited or non-bank-generated PDF detected" : "No obvious edit signal detected"}
                 </p>
@@ -501,7 +501,7 @@ export const FraudAlertPanel = ({
             {documentAlerts.length > 0 ? (
               <div className="space-y-2">
                 {documentAlerts.map((alert, index) => (
-                  <div key={`${alert.type}-${index}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                  <div key={`${alert.type}-${index}`} className="ultra-glass-panel rounded-lg border border-white/10 bg-white/[0.03] p-3">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className={severityConfig[alert.severity].badge}>
                         {alert.severity.toUpperCase()}
