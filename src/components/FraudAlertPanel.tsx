@@ -69,6 +69,11 @@ interface FraudAlertPanelProps {
   riskAnalysis: RiskAnalysis;
   currencyCode?: string;
   showEditDetectorSignals?: boolean;
+  extractionConfidence?: {
+    score: number;
+    label: string;
+    reasons: string[];
+  };
 }
 
 const EDIT_DETECTOR_ALERT_TYPES = new Set([
@@ -150,6 +155,7 @@ export const FraudAlertPanel = ({
   riskAnalysis,
   currencyCode,
   showEditDetectorSignals = true,
+  extractionConfidence,
 }: FraudAlertPanelProps) => {
   const { integrityScore, fraudAlerts, balanceMismatches, averageDailyBalance, maxDip, riskFlags } = riskAnalysis;
   const visibleAlerts = showEditDetectorSignals
@@ -223,6 +229,38 @@ export const FraudAlertPanel = ({
           </TooltipContent>
         </Tooltip>
       </div>
+
+      {extractionConfidence && (
+        <Card className="p-4 !bg-[#191919] border-primary/20">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="border-white/15 bg-white/5 text-white">
+                  {extractionConfidence.label}
+                </Badge>
+                <span className="text-sm text-muted-foreground">Extraction trust signal</span>
+              </div>
+              <p className="text-3xl font-bold text-white">{extractionConfidence.score}/100</p>
+              <p className="text-sm text-muted-foreground">
+                This score blends balance math, low-confidence rows, duplicate signals, and date quality.
+              </p>
+            </div>
+
+            <div className="grid gap-2 text-sm text-muted-foreground md:max-w-[420px]">
+              {extractionConfidence.reasons.slice(0, 4).map((reason) => (
+                <div key={reason} className="flex items-start gap-2">
+                  {reason.includes("No ") || reason.includes("look consistent") || reason.includes("All extracted") ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 tone-excellent-text" />
+                  ) : (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 tone-moderate-text" />
+                  )}
+                  <span>{reason}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -570,6 +570,11 @@ export const ResultsSection = ({
           riskAnalysis={analytics.riskAnalysis}
           currencyCode={currencyCode}
           showEditDetectorSignals={showEditDetectorSignals}
+          extractionConfidence={{
+            score: confidenceScore,
+            label: confidenceTheme[confidenceLevel].label,
+            reasons: confidenceReasons,
+          }}
         />
       )}
 
@@ -579,36 +584,6 @@ export const ResultsSection = ({
             <PieChart className="w-5 h-5 text-primary" />
             Financial Analytics
           </h3>
-
-          <Card className={`p-4 ${confidenceTheme[confidenceLevel].card}`}>
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className={confidenceTheme[confidenceLevel].badge}>
-                    {confidenceTheme[confidenceLevel].label}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">Extraction trust signal</span>
-                </div>
-                <p className={`text-3xl font-bold ${confidenceTheme[confidenceLevel].text}`}>{confidenceScore}/100</p>
-                <p className="text-sm text-muted-foreground">
-                  This score is based on balance math, low-confidence rows, duplicate signals, and date quality.
-                </p>
-              </div>
-
-              <div className="grid gap-2 text-sm text-muted-foreground md:max-w-[420px]">
-                {confidenceReasons.slice(0, 4).map((reason) => (
-                  <div key={reason} className="flex items-start gap-2">
-                    {reason.includes("No ") || reason.includes("look consistent") || reason.includes("All extracted") ? (
-                      <CheckCircle className="mt-0.5 h-4 w-4 text-emerald-300" />
-                    ) : (
-                      <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-300" />
-                    )}
-                    <span>{reason}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card className={`p-4 !bg-[#191919] ${toneClasses[creditTone].border}`}>
