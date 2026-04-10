@@ -1,5 +1,6 @@
 ﻿export type Language = 'en' | 'ar' | 'zh' | 'es' | 'hi';
 
+export const availableLanguages: Language[] = ['en', 'ar', 'zh', 'es', 'hi'];
 export const activeLanguages: Language[] = ['en', 'es'];
 
 
