@@ -16,7 +16,7 @@ import {
   resolveEffectivePlanType,
 } from "@/lib/entitlements";
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage, type Language } from "@/contexts/LanguageContext";
 import { buildStatementCsv, parseStatementArchive } from "@/lib/statement-export";
 const loadPdfUtils = () => import("./pdfUtils");
 const loadExporters = () => import("./exporters");
@@ -39,7 +39,168 @@ const EDITED_WARNING_BYPASS_KEY = "banklefy:edited-warning-bypass-all";
 
 export const useUploadDemoController = () => {
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const uploadUiCopyByLanguage: Record<
+    Language,
+    {
+      readingDoc: string;
+      detectAmounts: string;
+      preparingOcr: string;
+      categorizingData: string;
+      invalidFile: string;
+      pdfTooLarge: string;
+      freeTierFileLimit: string;
+      filesSelected: string;
+      filesAddedReady: (count: number) => string;
+      noFileSelected: string;
+      selectStatementPrompt: string;
+      processingFiles: string;
+      startingBatch: string;
+      limitReached: string;
+      downloaded: string;
+      downloadFailed: string;
+      excelDownloaded: string;
+      csvDownloaded: string;
+      mergedDownloaded: string;
+      fileDownloadedCount: (count: number) => string;
+      downloadCsvFailed: string;
+      downloadFileFailed: string;
+      downloadFilesFailed: string;
+      downloadMergedFailed: string;
+    }
+  > = {
+    en: {
+      readingDoc: "Reading document...",
+      detectAmounts: "Detecting amounts...",
+      preparingOcr: "Preparing OCR pages...",
+      categorizingData: "Categorizing data...",
+      invalidFile: "Invalid file",
+      pdfTooLarge: "PDF too large",
+      freeTierFileLimit: "Free tier file limit",
+      filesSelected: "Files Selected",
+      filesAddedReady: (count) => `${count} file(s) added - Ready to convert`,
+      noFileSelected: "No File Selected",
+      selectStatementPrompt: "Please select a bank statement to convert",
+      processingFiles: "Processing files",
+      startingBatch: "Starting batch conversion...",
+      limitReached: "Limit Reached",
+      downloaded: "Downloaded!",
+      downloadFailed: "Download failed",
+      excelDownloaded: "Your Excel file has been downloaded.",
+      csvDownloaded: "Your CSV file has been downloaded.",
+      mergedDownloaded: "Your merged Excel file has been downloaded.",
+      fileDownloadedCount: (count) => `${count} file(s) downloaded.`,
+      downloadCsvFailed: "Failed to download CSV.",
+      downloadFileFailed: "Failed to download the file.",
+      downloadFilesFailed: "Failed to download the files.",
+      downloadMergedFailed: "Failed to download the merged file.",
+    },
+    ar: {
+      readingDoc: "جارٍ قراءة المستند...",
+      detectAmounts: "جارٍ اكتشاف المبالغ...",
+      preparingOcr: "جارٍ تجهيز صفحات OCR...",
+      categorizingData: "جارٍ تصنيف البيانات...",
+      invalidFile: "ملف غير صالح",
+      pdfTooLarge: "ملف PDF كبير جدًا",
+      freeTierFileLimit: "حد الملف في الخطة المجانية",
+      filesSelected: "تم اختيار الملفات",
+      filesAddedReady: (count) => `تمت إضافة ${count} ملف - جاهز للتحويل`,
+      noFileSelected: "لم يتم اختيار ملف",
+      selectStatementPrompt: "يرجى اختيار كشف حساب للتحويل",
+      processingFiles: "جارٍ معالجة الملفات",
+      startingBatch: "جارٍ بدء التحويل الدفعي...",
+      limitReached: "تم بلوغ الحد",
+      downloaded: "تم التنزيل!",
+      downloadFailed: "فشل التنزيل",
+      excelDownloaded: "تم تنزيل ملف Excel.",
+      csvDownloaded: "تم تنزيل ملف CSV.",
+      mergedDownloaded: "تم تنزيل ملف Excel المدمج.",
+      fileDownloadedCount: (count) => `تم تنزيل ${count} ملف.`,
+      downloadCsvFailed: "فشل تنزيل CSV.",
+      downloadFileFailed: "فشل تنزيل الملف.",
+      downloadFilesFailed: "فشل تنزيل الملفات.",
+      downloadMergedFailed: "فشل تنزيل الملف المدمج.",
+    },
+    zh: {
+      readingDoc: "正在读取文档...",
+      detectAmounts: "正在识别金额...",
+      preparingOcr: "正在准备 OCR 页面...",
+      categorizingData: "正在分类数据...",
+      invalidFile: "文件无效",
+      pdfTooLarge: "PDF 文件过大",
+      freeTierFileLimit: "免费套餐文件限制",
+      filesSelected: "文件已选择",
+      filesAddedReady: (count) => `已添加 ${count} 个文件，准备转换`,
+      noFileSelected: "未选择文件",
+      selectStatementPrompt: "请选择要转换的银行流水",
+      processingFiles: "正在处理文件",
+      startingBatch: "正在开始批量转换...",
+      limitReached: "已达上限",
+      downloaded: "已下载！",
+      downloadFailed: "下载失败",
+      excelDownloaded: "Excel 文件已下载。",
+      csvDownloaded: "CSV 文件已下载。",
+      mergedDownloaded: "合并后的 Excel 文件已下载。",
+      fileDownloadedCount: (count) => `已下载 ${count} 个文件。`,
+      downloadCsvFailed: "下载 CSV 失败。",
+      downloadFileFailed: "下载文件失败。",
+      downloadFilesFailed: "下载多个文件失败。",
+      downloadMergedFailed: "下载合并文件失败。",
+    },
+    es: {
+      readingDoc: "Leyendo documento...",
+      detectAmounts: "Detectando importes...",
+      preparingOcr: "Preparando páginas OCR...",
+      categorizingData: "Categorizando datos...",
+      invalidFile: "Archivo inválido",
+      pdfTooLarge: "PDF demasiado grande",
+      freeTierFileLimit: "Límite de archivo en plan gratis",
+      filesSelected: "Archivos seleccionados",
+      filesAddedReady: (count) => `${count} archivo(s) agregado(s) - Listo para convertir`,
+      noFileSelected: "Ningún archivo seleccionado",
+      selectStatementPrompt: "Selecciona un extracto bancario para convertir",
+      processingFiles: "Procesando archivos",
+      startingBatch: "Iniciando conversión por lotes...",
+      limitReached: "Límite alcanzado",
+      downloaded: "¡Descargado!",
+      downloadFailed: "Descarga fallida",
+      excelDownloaded: "Tu archivo Excel se descargó correctamente.",
+      csvDownloaded: "Tu archivo CSV se descargó correctamente.",
+      mergedDownloaded: "Tu archivo Excel combinado se descargó correctamente.",
+      fileDownloadedCount: (count) => `${count} archivo(s) descargado(s).`,
+      downloadCsvFailed: "No se pudo descargar el CSV.",
+      downloadFileFailed: "No se pudo descargar el archivo.",
+      downloadFilesFailed: "No se pudieron descargar los archivos.",
+      downloadMergedFailed: "No se pudo descargar el archivo combinado.",
+    },
+    hi: {
+      readingDoc: "डॉक्यूमेंट पढ़ा जा रहा है...",
+      detectAmounts: "अमाउंट डिटेक्ट किए जा रहे हैं...",
+      preparingOcr: "OCR पेज तैयार किए जा रहे हैं...",
+      categorizingData: "डेटा कैटेगराइज़ किया जा रहा है...",
+      invalidFile: "अमान्य फ़ाइल",
+      pdfTooLarge: "PDF बहुत बड़ी है",
+      freeTierFileLimit: "फ्री प्लान फ़ाइल लिमिट",
+      filesSelected: "फ़ाइलें चुनी गईं",
+      filesAddedReady: (count) => `${count} फ़ाइल जोड़ी गई - कन्वर्ट के लिए तैयार`,
+      noFileSelected: "कोई फ़ाइल नहीं चुनी गई",
+      selectStatementPrompt: "कन्वर्ट करने के लिए बैंक स्टेटमेंट चुनें",
+      processingFiles: "फ़ाइलें प्रोसेस हो रही हैं",
+      startingBatch: "बैच कन्वर्ज़न शुरू हो रहा है...",
+      limitReached: "लिमिट पूरी हो गई",
+      downloaded: "डाउनलोड हो गया!",
+      downloadFailed: "डाउनलोड फेल हुआ",
+      excelDownloaded: "आपकी Excel फ़ाइल डाउनलोड हो गई है।",
+      csvDownloaded: "आपकी CSV फ़ाइल डाउनलोड हो गई है।",
+      mergedDownloaded: "आपकी merged Excel फ़ाइल डाउनलोड हो गई है।",
+      fileDownloadedCount: (count) => `${count} फ़ाइल डाउनलोड हुई।`,
+      downloadCsvFailed: "CSV डाउनलोड नहीं हो सकी।",
+      downloadFileFailed: "फ़ाइल डाउनलोड नहीं हो सकी।",
+      downloadFilesFailed: "फ़ाइलें डाउनलोड नहीं हो सकीं।",
+      downloadMergedFailed: "Merged फ़ाइल डाउनलोड नहीं हो सकी।",
+    },
+  };
+  const uploadUiCopy = uploadUiCopyByLanguage[language] ?? uploadUiCopyByLanguage.en;
   const [state, dispatch] = useReducer(uploadDemoReducer, initialUploadState);
   const {
     selectedFiles,
@@ -156,7 +317,7 @@ export const useUploadDemoController = () => {
   const [editedPdfCheckResult, setEditedPdfCheckResult] = useState<EditedPdfCheckResult | null>(null);
   const [uploadPrepActive, setUploadPrepActive] = useState(false);
   const [uploadPrepProgress, setUploadPrepProgress] = useState(0);
-  const [uploadPrepLabel, setUploadPrepLabel] = useState("Reading document...");
+  const [uploadPrepLabel, setUploadPrepLabel] = useState(uploadUiCopy.readingDoc);
   const [uploadPrepFileName, setUploadPrepFileName] = useState<string | null>(null);
   const preparedPdfDataRef = useRef<
     Map<string, { transactions?: BatchFilePayload["pdfParsedTransactions"]; bankMetadata?: BatchFilePayload["pdfParsedBankMetadata"] }>
@@ -789,7 +950,7 @@ export const useUploadDemoController = () => {
       if (!validation.success) {
         toast({
           variant: "destructive",
-          title: "Invalid file",
+          title: uploadUiCopy.invalidFile,
           description: `${file.name}: ${validation.error}`,
         });
         continue;
@@ -802,7 +963,7 @@ export const useUploadDemoController = () => {
       setUploadPrepActive(true);
       setUploadPrepProgress(0);
       setUploadPrepFileName(newFiles[0]?.name ?? null);
-      setUploadPrepLabel("Reading document...");
+      setUploadPrepLabel(uploadUiCopy.readingDoc);
       try {
         setUploadPrepProgress(12);
         if (limitReached) {
@@ -824,7 +985,7 @@ export const useUploadDemoController = () => {
           if (overCap) {
             toast({
               variant: "destructive",
-              title: "PDF too large",
+              title: uploadUiCopy.pdfTooLarge,
               description: `This PDF has ${maxSingle} pages. The current maximum supported per file is ${MAX_PDF_RENDER_PAGES} pages. Please split the PDF and try again.`,
             });
             if (fileInputRef.current) {
@@ -836,7 +997,7 @@ export const useUploadDemoController = () => {
           if (!unknown && isFreeUsageMode && maxSingle > FREE_MAX_PDF_PAGES_PER_FILE) {
             toast({
               variant: "destructive",
-              title: "Free tier file limit",
+              title: uploadUiCopy.freeTierFileLimit,
               description: `Free tier allows up to ${FREE_MAX_PDF_PAGES_PER_FILE} pages per PDF. One selected file has ${maxSingle} pages.`,
             });
             if (fileInputRef.current) {
@@ -857,7 +1018,7 @@ export const useUploadDemoController = () => {
         }
 
         setUploadPrepProgress(40);
-        setUploadPrepLabel("Detecting amounts...");
+        setUploadPrepLabel(uploadUiCopy.detectAmounts);
         try {
           const { extractPdfDataFromText, pdfToPageImages } = await loadPdfUtils();
           for (const [fileIndex, file] of newFiles.entries()) {
@@ -880,7 +1041,7 @@ export const useUploadDemoController = () => {
                 const isTextBasedPdf = localTextParseLooksReliable;
                 if (!isTextBasedPdf) {
                   setUploadPrepProgress(65);
-                  setUploadPrepLabel("Preparing OCR pages...");
+                  setUploadPrepLabel(uploadUiCopy.preparingOcr);
                   try {
                     const renderedPdfPageImages = await pdfToPageImages(file, {
                       password: pdfPassword.trim() || undefined,
@@ -910,7 +1071,7 @@ export const useUploadDemoController = () => {
         }
 
         setUploadPrepProgress(75);
-        setUploadPrepLabel("Categorizing data...");
+        setUploadPrepLabel(uploadUiCopy.categorizingData);
         await new Promise((resolve) => setTimeout(resolve, 120));
         setUploadPrepProgress(100);
         await new Promise((resolve) => setTimeout(resolve, 120));
@@ -933,14 +1094,14 @@ export const useUploadDemoController = () => {
         }
 
         toast({
-          title: "Files Selected",
-          description: `${newFiles.length} ${pluralize(newFiles.length, "file")} added - Ready to convert`,
+          title: uploadUiCopy.filesSelected,
+          description: uploadUiCopy.filesAddedReady(newFiles.length),
         });
       } finally {
         setUploadPrepActive(false);
         setUploadPrepProgress(0);
         setUploadPrepFileName(null);
-        setUploadPrepLabel("Reading document...");
+        setUploadPrepLabel(uploadUiCopy.readingDoc);
       }
     }
   };
@@ -1020,8 +1181,8 @@ export const useUploadDemoController = () => {
 
     if (!fileToConvert) {
       toast({
-        title: "No File Selected",
-        description: "Please select a bank statement to convert",
+        title: uploadUiCopy.noFileSelected,
+        description: uploadUiCopy.selectStatementPrompt,
         variant: "destructive",
       });
       return;
@@ -1603,7 +1764,7 @@ export const useUploadDemoController = () => {
         setLastError({ message: errorMessage, canRetry: false });
         toast({
           variant: "destructive",
-          title: "Limit Reached",
+          title: uploadUiCopy.limitReached,
           description: errorMessage,
         });
       } else if (errorMessage.toLowerCase().includes('captcha') || errorMessage.toLowerCase().includes('verification')) {
@@ -1635,8 +1796,8 @@ export const useUploadDemoController = () => {
 
     if (selectedFiles.length === 0) {
       toast({
-        title: "No Files Selected",
-        description: "Please select bank statements to convert",
+        title: uploadUiCopy.noFileSelected,
+        description: uploadUiCopy.selectStatementPrompt,
         variant: "destructive",
       });
       return;
@@ -1758,8 +1919,8 @@ export const useUploadDemoController = () => {
       }
 
       toast({
-        title: "Processing files",
-        description: "Starting batch conversion...",
+        title: uploadUiCopy.processingFiles,
+        description: uploadUiCopy.startingBatch,
       });
 
       setUploading(false);
@@ -1956,7 +2117,7 @@ export const useUploadDemoController = () => {
         setLastError({ message: errorMessage, canRetry: false });
         toast({
           variant: "destructive",
-          title: "Limit Reached",
+          title: uploadUiCopy.limitReached,
           description: errorMessage,
         });
       } else if (errorMessage.toLowerCase().includes('captcha') || errorMessage.toLowerCase().includes('verification')) {
@@ -2015,8 +2176,8 @@ export const useUploadDemoController = () => {
 
       if (!silent) {
         toast({
-          title: "Downloaded!",
-          description: "Your Excel file has been downloaded.",
+          title: uploadUiCopy.downloaded,
+          description: uploadUiCopy.excelDownloaded,
         });
       }
     };
@@ -2057,8 +2218,8 @@ export const useUploadDemoController = () => {
 
       if (!silent) {
         toast({
-          title: "Downloaded!",
-          description: "Your CSV file has been downloaded.",
+          title: uploadUiCopy.downloaded,
+          description: uploadUiCopy.csvDownloaded,
         });
       }
     } catch (error: unknown) {
@@ -2066,8 +2227,8 @@ export const useUploadDemoController = () => {
       if (!silent) {
         toast({
           variant: "destructive",
-          title: "Download failed",
-          description: getErrorMessage(error, "Failed to download CSV."),
+          title: uploadUiCopy.downloadFailed,
+          description: getErrorMessage(error, uploadUiCopy.downloadCsvFailed),
         });
       }
       throw error;
@@ -2084,8 +2245,8 @@ export const useUploadDemoController = () => {
       if (import.meta.env.DEV) { console.error('Download error:', error); }
       toast({
         variant: "destructive",
-        title: "Download failed",
-        description: getErrorMessage(error, "Failed to download the file."),
+        title: uploadUiCopy.downloadFailed,
+        description: getErrorMessage(error, uploadUiCopy.downloadFileFailed),
       });
     } finally {
       setDownloading(false);
@@ -2127,15 +2288,15 @@ export const useUploadDemoController = () => {
 
       const successCount = batchResults.filter((result) => result.status === "success").length;
       toast({
-        title: "Downloaded!",
-        description: `${successCount} ${pluralize(successCount, "file")} downloaded.`,
+        title: uploadUiCopy.downloaded,
+        description: uploadUiCopy.fileDownloadedCount(successCount),
       });
     } catch (error: unknown) {
       if (import.meta.env.DEV) { console.error('Batch download error:', error); }
       toast({
         variant: "destructive",
-        title: "Download failed",
-        description: getErrorMessage(error, "Failed to download the files."),
+        title: uploadUiCopy.downloadFailed,
+        description: getErrorMessage(error, uploadUiCopy.downloadFilesFailed),
       });
     } finally {
       setBatchDownloading(false);
@@ -2168,15 +2329,15 @@ export const useUploadDemoController = () => {
       URL.revokeObjectURL(url);
 
       toast({
-        title: "Downloaded!",
-        description: "Your merged Excel file has been downloaded.",
+        title: uploadUiCopy.downloaded,
+        description: uploadUiCopy.mergedDownloaded,
       });
     } catch (error: unknown) {
       if (import.meta.env.DEV) { console.error('Merge download error:', error); }
       toast({
         variant: "destructive",
-        title: "Download failed",
-        description: getErrorMessage(error, "Failed to download the merged file."),
+        title: uploadUiCopy.downloadFailed,
+        description: getErrorMessage(error, uploadUiCopy.downloadMergedFailed),
       });
     } finally {
       setMergeDownloading(false);
@@ -2576,6 +2737,7 @@ export const useUploadDemoController = () => {
     handleBatchDownload,
     handleMergedDownload,
     conversionResult,
+    singleDownloadFileName,
     downloading,
     handleDownload,
     transactions,

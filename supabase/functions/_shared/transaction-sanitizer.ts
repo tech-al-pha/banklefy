@@ -584,7 +584,9 @@ export const sanitizeTransactions = (transactions: Transaction[], options?: Sani
     if (debit === 0 && credit === 0) return false;
     return true;
   });
-  const statementOrdered = sortTransactionsForReconciliation(filtered);
+  // Preserve statement row order exactly as extracted.
+  // Re-sorting by date can move rows (e.g. 20 -> 25 -> 20) and break user-visible sequence.
+  const statementOrdered = filtered;
   const normalizedAmounts = statementOrdered.map((transaction) => normalizeSignedAmounts(transaction));
 
   if (options?.preserveAmounts) {

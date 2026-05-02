@@ -64,6 +64,7 @@ type UploadDemoViewProps = {
   handleBatchDownload: () => Promise<void>;
   handleMergedDownload: () => Promise<void>;
   conversionResult: { id: string | null; resultPath: string | null; excelData?: string } | null;
+  singleDownloadFileName: string;
   downloading: boolean;
   handleDownload: () => Promise<void>;
   transactions: Transaction[];
@@ -153,6 +154,7 @@ export const UploadDemoView = ({
   handleBatchDownload,
   handleMergedDownload,
   conversionResult,
+  singleDownloadFileName,
   downloading,
   handleDownload,
   transactions,
@@ -289,6 +291,7 @@ export const UploadDemoView = ({
                   handleBatchDownload={handleBatchDownload}
                   handleMergedDownload={handleMergedDownload}
                   conversionResult={conversionResult}
+                  singleDownloadFileName={singleDownloadFileName}
                   downloading={downloading}
                   handleDownload={handleDownload}
                   transactions={transactions}

@@ -86,6 +86,7 @@ type ResultsSectionProps = {
   handleBatchDownload: () => Promise<void>;
   handleMergedDownload: () => Promise<void>;
   conversionResult: { id: string | null; resultPath: string | null; excelData?: string } | null;
+  singleDownloadFileName?: string;
   downloading: boolean;
   handleDownload: () => Promise<void>;
   transactions: Transaction[];
@@ -122,6 +123,7 @@ export const ResultsSection = ({
   handleBatchDownload,
   handleMergedDownload,
   conversionResult,
+  singleDownloadFileName = "",
   downloading,
   handleDownload,
   transactions,
@@ -143,8 +145,8 @@ export const ResultsSection = ({
   showUnderwriting = true,
   showFraudSignals = true,
   conversionProgressPercent = 0,
-  conversionProgressLabel = "Processing conversion...",
-  conversionProgressSubLabel = "Preparing document...",
+  conversionProgressLabel = "",
+  conversionProgressSubLabel = "",
   showImageProcessingHint = false,
   selectedPremiumFormat = null,
 }: ResultsSectionProps) => {
@@ -238,6 +240,301 @@ export const ResultsSection = ({
     },
   };
   const localizedCopy = localizedCopyByLanguage[language] ?? localizedCopyByLanguage.en;
+  const actionCopyByLanguage: Record<
+    Language,
+    {
+      downloadOptions: string;
+      downloading: string;
+      preparing: string;
+      mergeDisabled: string;
+      conditionsNotMet: string;
+      convertedSummary: string;
+      conversionComplete: string;
+      batchConversionComplete: string;
+      tallyConversionComplete: string;
+      batchTallyConversionComplete: string;
+      downloadYourFile: string;
+      downloadExcel: string;
+      lockedFormatsSuffixSingle: string;
+      lockedFormatsSuffixPlural: string;
+      planGatedFormats: string;
+      editPdfCheck: string;
+      possibleEditDetected: string;
+      noEditSignalDetected: string;
+      processingConversion: string;
+      preparingDocument: string;
+      premiumFormats: string;
+      soon: string;
+      downloadPrefix: string;
+      separateExcel: string;
+      mergeExcel: string;
+      financialAnalytics: string;
+      totalCredits: string;
+      totalDebits: string;
+      netFlow: string;
+      duplicatesFound: string;
+      categoryBreakdown: string;
+      extractedTransactions: string;
+      showAll: string;
+      showDuplicates: (count: number) => string;
+      transactionsFound: (count: number) => string;
+      date: string;
+      description: string;
+      category: string;
+      debit: string;
+      credit: string;
+      balance: string;
+      balanceMismatchExpected: string;
+      riskFlag: string;
+      potentialDuplicate: string;
+      expected: string;
+      na: string;
+    }
+  > = {
+    en: {
+      downloadOptions: "Download options:",
+      downloading: "Downloading...",
+      preparing: "Preparing...",
+      mergeDisabled: "Merge disabled:",
+      conditionsNotMet: "Conditions not met",
+      convertedSummary: "Successfully converted:",
+      conversionComplete: "Conversion Complete!",
+      batchConversionComplete: "Batch Conversion Complete!",
+      tallyConversionComplete: "Tally Conversion Complete!",
+      batchTallyConversionComplete: "Batch Tally Conversion Complete!",
+      downloadYourFile: "Download your file:",
+      downloadExcel: "Download Excel",
+      lockedFormatsSuffixSingle: "is",
+      lockedFormatsSuffixPlural: "are",
+      planGatedFormats: "plan-gated formats",
+      editPdfCheck: "Edit PDF Check:",
+      possibleEditDetected: "Possible edit detected",
+      noEditSignalDetected: "No edit signal detected",
+      processingConversion: "Processing conversion...",
+      preparingDocument: "Preparing document...",
+      premiumFormats: "Premium Formats",
+      soon: "Soon",
+      downloadPrefix: "Download",
+      separateExcel: "Separate Excel",
+      mergeExcel: "Merge Excel",
+      financialAnalytics: "Financial Analytics",
+      totalCredits: "Total Credits",
+      totalDebits: "Total Debits",
+      netFlow: "Net Flow",
+      duplicatesFound: "Duplicates Found",
+      categoryBreakdown: "Category Breakdown",
+      extractedTransactions: "Extracted Transactions",
+      showAll: "Show All",
+      showDuplicates: (count) => `Show Duplicates (${count})`,
+      transactionsFound: (count) => `${count} transaction${count !== 1 ? "s" : ""} found`,
+      date: "Date",
+      description: "Description",
+      category: "Category",
+      debit: "Debit",
+      credit: "Credit",
+      balance: "Balance",
+      balanceMismatchExpected: "Balance mismatch! Expected:",
+      riskFlag: "Risk Flag:",
+      potentialDuplicate: "Potential duplicate",
+      expected: "Expected:",
+      na: "N/A",
+    },
+    ar: {
+      downloadOptions: "خيارات التنزيل:",
+      downloading: "جارٍ التنزيل...",
+      preparing: "جارٍ التحضير...",
+      mergeDisabled: "الدمج معطل:",
+      conditionsNotMet: "الشروط غير مستوفاة",
+      convertedSummary: "تم التحويل بنجاح:",
+      conversionComplete: "اكتمل التحويل!",
+      batchConversionComplete: "اكتمل تحويل الدفعة!",
+      tallyConversionComplete: "اكتمل تحويل Tally!",
+      batchTallyConversionComplete: "اكتمل تحويل الدفعة إلى Tally!",
+      downloadYourFile: "نزّل ملفك:",
+      downloadExcel: "تنزيل Excel",
+      lockedFormatsSuffixSingle: "تنسيق",
+      lockedFormatsSuffixPlural: "تنسيقات",
+      planGatedFormats: "مقيدة بالخطة",
+      editPdfCheck: "فحص تعديل PDF:",
+      possibleEditDetected: "تم رصد تعديل محتمل",
+      noEditSignalDetected: "لم يتم رصد إشارة تعديل",
+      processingConversion: "جارٍ معالجة التحويل...",
+      preparingDocument: "جارٍ تجهيز المستند...",
+      premiumFormats: "صيغ مميزة",
+      soon: "قريبًا",
+      downloadPrefix: "تنزيل",
+      separateExcel: "Excel منفصل",
+      mergeExcel: "دمج Excel",
+      financialAnalytics: "تحليلات مالية",
+      totalCredits: "إجمالي الدائن",
+      totalDebits: "إجمالي المدين",
+      netFlow: "صافي التدفق",
+      duplicatesFound: "تكرارات مكتشفة",
+      categoryBreakdown: "توزيع الفئات",
+      extractedTransactions: "المعاملات المستخرجة",
+      showAll: "عرض الكل",
+      showDuplicates: (count) => `عرض التكرارات (${count})`,
+      transactionsFound: (count) => `تم العثور على ${count} معاملة`,
+      date: "التاريخ",
+      description: "الوصف",
+      category: "الفئة",
+      debit: "مدين",
+      credit: "دائن",
+      balance: "الرصيد",
+      balanceMismatchExpected: "عدم تطابق الرصيد! المتوقع:",
+      riskFlag: "إشارة المخاطر:",
+      potentialDuplicate: "تكرار محتمل",
+      expected: "المتوقع:",
+      na: "غير متاح",
+    },
+    zh: {
+      downloadOptions: "下载选项：",
+      downloading: "正在下载...",
+      preparing: "正在准备...",
+      mergeDisabled: "合并不可用：",
+      conditionsNotMet: "条件不满足",
+      convertedSummary: "成功转换：",
+      conversionComplete: "转换完成！",
+      batchConversionComplete: "批量转换完成！",
+      tallyConversionComplete: "Tally 转换完成！",
+      batchTallyConversionComplete: "批量 Tally 转换完成！",
+      downloadYourFile: "下载你的文件：",
+      downloadExcel: "下载 Excel",
+      lockedFormatsSuffixSingle: "为",
+      lockedFormatsSuffixPlural: "为",
+      planGatedFormats: "方案受限格式",
+      editPdfCheck: "PDF 编辑检查：",
+      possibleEditDetected: "检测到可能编辑",
+      noEditSignalDetected: "未检测到编辑信号",
+      processingConversion: "正在处理转换...",
+      preparingDocument: "正在准备文档...",
+      premiumFormats: "高级格式",
+      soon: "即将推出",
+      downloadPrefix: "下载",
+      separateExcel: "分别下载 Excel",
+      mergeExcel: "合并 Excel",
+      financialAnalytics: "财务分析",
+      totalCredits: "总收入",
+      totalDebits: "总支出",
+      netFlow: "净现金流",
+      duplicatesFound: "发现重复项",
+      categoryBreakdown: "分类明细",
+      extractedTransactions: "提取的交易",
+      showAll: "显示全部",
+      showDuplicates: (count) => `仅看重复 (${count})`,
+      transactionsFound: (count) => `找到 ${count} 笔交易`,
+      date: "日期",
+      description: "描述",
+      category: "分类",
+      debit: "支出",
+      credit: "收入",
+      balance: "余额",
+      balanceMismatchExpected: "余额不匹配！应为：",
+      riskFlag: "风险标记：",
+      potentialDuplicate: "可能重复",
+      expected: "应为：",
+      na: "无",
+    },
+    es: {
+      downloadOptions: "Opciones de descarga:",
+      downloading: "Descargando...",
+      preparing: "Preparando...",
+      mergeDisabled: "Combinación deshabilitada:",
+      conditionsNotMet: "No se cumplen las condiciones",
+      convertedSummary: "Convertido correctamente:",
+      conversionComplete: "¡Conversión completada!",
+      batchConversionComplete: "¡Conversión por lotes completada!",
+      tallyConversionComplete: "¡Conversión a Tally completada!",
+      batchTallyConversionComplete: "¡Conversión por lotes a Tally completada!",
+      downloadYourFile: "Descarga tu archivo:",
+      downloadExcel: "Descargar Excel",
+      lockedFormatsSuffixSingle: "está",
+      lockedFormatsSuffixPlural: "están",
+      planGatedFormats: "bloqueados por plan",
+      editPdfCheck: "Revisión de edición PDF:",
+      possibleEditDetected: "Posible edición detectada",
+      noEditSignalDetected: "No se detectó señal de edición",
+      processingConversion: "Procesando conversión...",
+      preparingDocument: "Preparando documento...",
+      premiumFormats: "Formatos premium",
+      soon: "Pronto",
+      downloadPrefix: "Descargar",
+      separateExcel: "Excel por separado",
+      mergeExcel: "Combinar Excel",
+      financialAnalytics: "Analítica financiera",
+      totalCredits: "Créditos totales",
+      totalDebits: "Débitos totales",
+      netFlow: "Flujo neto",
+      duplicatesFound: "Duplicados encontrados",
+      categoryBreakdown: "Desglose por categoría",
+      extractedTransactions: "Transacciones extraídas",
+      showAll: "Mostrar todo",
+      showDuplicates: (count) => `Mostrar duplicados (${count})`,
+      transactionsFound: (count) => `${count} transacción(es) encontrada(s)`,
+      date: "Fecha",
+      description: "Descripción",
+      category: "Categoría",
+      debit: "Débito",
+      credit: "Crédito",
+      balance: "Saldo",
+      balanceMismatchExpected: "¡Descuadre de saldo! Esperado:",
+      riskFlag: "Bandera de riesgo:",
+      potentialDuplicate: "Posible duplicado",
+      expected: "Esperado:",
+      na: "N/D",
+    },
+    hi: {
+      downloadOptions: "डाउनलोड विकल्प:",
+      downloading: "डाउनलोड हो रहा है...",
+      preparing: "तैयार किया जा रहा है...",
+      mergeDisabled: "मर्ज उपलब्ध नहीं:",
+      conditionsNotMet: "शर्तें पूरी नहीं हुईं",
+      convertedSummary: "सफलतापूर्वक कन्वर्ट:",
+      conversionComplete: "कन्वर्ज़न पूरा हुआ!",
+      batchConversionComplete: "बैच कन्वर्ज़न पूरा हुआ!",
+      tallyConversionComplete: "Tally कन्वर्ज़न पूरा हुआ!",
+      batchTallyConversionComplete: "बैच Tally कन्वर्ज़न पूरा हुआ!",
+      downloadYourFile: "अपनी फ़ाइल डाउनलोड करें:",
+      downloadExcel: "Excel डाउनलोड करें",
+      lockedFormatsSuffixSingle: "है",
+      lockedFormatsSuffixPlural: "हैं",
+      planGatedFormats: "प्लान-गेटेड फ़ॉर्मैट",
+      editPdfCheck: "PDF एडिट चेक:",
+      possibleEditDetected: "संभावित एडिट मिला",
+      noEditSignalDetected: "कोई एडिट सिग्नल नहीं मिला",
+      processingConversion: "कन्वर्ज़न प्रोसेस हो रहा है...",
+      preparingDocument: "डॉक्यूमेंट तैयार हो रहा है...",
+      premiumFormats: "प्रीमियम फ़ॉर्मैट",
+      soon: "जल्द",
+      downloadPrefix: "डाउनलोड",
+      separateExcel: "अलग Excel",
+      mergeExcel: "मर्ज Excel",
+      financialAnalytics: "फाइनेंशियल एनालिटिक्स",
+      totalCredits: "कुल क्रेडिट",
+      totalDebits: "कुल डेबिट",
+      netFlow: "नेट फ्लो",
+      duplicatesFound: "डुप्लिकेट मिले",
+      categoryBreakdown: "कैटेगरी ब्रेकडाउन",
+      extractedTransactions: "निकाली गई ट्रांज़ैक्शन्स",
+      showAll: "सब दिखाएँ",
+      showDuplicates: (count) => `डुप्लिकेट दिखाएँ (${count})`,
+      transactionsFound: (count) => `${count} ट्रांज़ैक्शन मिले`,
+      date: "तारीख",
+      description: "विवरण",
+      category: "कैटेगरी",
+      debit: "डेबिट",
+      credit: "क्रेडिट",
+      balance: "बैलेंस",
+      balanceMismatchExpected: "बैलेंस मिसमैच! अपेक्षित:",
+      riskFlag: "रिस्क फ़्लैग:",
+      potentialDuplicate: "संभावित डुप्लिकेट",
+      expected: "अपेक्षित:",
+      na: "N/A",
+    },
+  };
+  const actionCopy = actionCopyByLanguage[language] ?? actionCopyByLanguage.en;
+  const conversionProgressTitle = conversionProgressLabel || actionCopy.processingConversion;
+  const conversionProgressDetail = conversionProgressSubLabel || actionCopy.preparingDocument;
   const [showPremiumFormats, setShowPremiumFormats] = useState(false);
   const isTallyOnlyMode = resultMode === "tally_only";
   const hasPremiumFormatAccess = hasTallyAccess;
@@ -304,7 +601,7 @@ export const ResultsSection = ({
         }`}
       >
         <FileText className="mr-2 h-5 w-5" />
-        Premium Formats
+        {actionCopy.premiumFormats}
         {!hasPremiumFormatAccess && <Lock className="ml-2 h-4 w-4" />}
       </Button>
 
@@ -321,9 +618,9 @@ export const ResultsSection = ({
             >
               {format.label}
               {format.status !== "live" && (
-                <span className="ml-2 rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-white/65">
-                  Soon
-                </span>
+                  <span className="ml-2 rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-white/65">
+                  {actionCopy.soon}
+                  </span>
               )}
             </Button>
           ))}
@@ -339,10 +636,10 @@ export const ResultsSection = ({
           <div className="flex items-center justify-center gap-2 tone-excellent-text">
             <CheckCircle className="h-5 w-5" />
             <span className="font-medium">
-              {isTallyOnlyMode ? "Batch Tally Conversion Complete!" : "Batch Conversion Complete!"}
+              {isTallyOnlyMode ? actionCopy.batchTallyConversionComplete : actionCopy.batchConversionComplete}
             </span>
           </div>
-          <p className="text-sm font-medium text-muted-foreground">Download options:</p>
+          <p className="text-sm font-medium text-muted-foreground">{actionCopy.downloadOptions}</p>
           {isPremiumSelectedFlow ? (
             <div className="flex justify-center">
               <Button
@@ -353,7 +650,7 @@ export const ResultsSection = ({
                 className="border-white/15 bg-[#161616] text-white hover:border-white/25 hover:bg-[#1b1b1b]"
               >
                 <FileText className="mr-2 h-5 w-5" />
-                Download {selectedPremiumLabel}
+                {actionCopy.downloadPrefix} {selectedPremiumLabel}
               </Button>
             </div>
           ) : isTallyOnlyMode ? (
@@ -370,12 +667,12 @@ export const ResultsSection = ({
                   {batchDownloading ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Downloading...
+                      {actionCopy.downloading}
                     </>
                   ) : (
                     <>
                       <FileSpreadsheet className="mr-2 h-5 w-5" />
-                      Separate Excel
+                      {actionCopy.separateExcel}
                     </>
                   )}
                 </Button>
@@ -389,12 +686,12 @@ export const ResultsSection = ({
                     {mergeDownloading ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Preparing...
+                        {actionCopy.preparing}
                       </>
                     ) : (
                       <>
                         <FileSpreadsheet className="mr-2 h-5 w-5" />
-                        Merge Excel
+                        {actionCopy.mergeExcel}
                       </>
                     )}
                   </Button>
@@ -402,13 +699,13 @@ export const ResultsSection = ({
               </div>
               {mergeInfo && !mergeInfo.available && (
                 <p className="text-xs text-muted-foreground">
-                  Merge disabled: {mergeInfo.reasons?.join("; ") || "Conditions not met"}
+                  {actionCopy.mergeDisabled} {mergeInfo.reasons?.join("; ") || actionCopy.conditionsNotMet}
                 </p>
               )}
             </>
           )}
           <p className="text-xs text-muted-foreground">
-            Successfully converted: {batchResults.filter((r) => r.status === "success").length}/{batchResults.length}
+            {actionCopy.convertedSummary} {batchResults.filter((r) => r.status === "success").length}/{batchResults.length}
           </p>
 
           {!isTallyOnlyMode && (
@@ -444,7 +741,7 @@ export const ResultsSection = ({
               {lockedFormats.length > 0 && (
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                   <Crown className="h-3 w-3 text-amber-500" />
-                  {lockedFormats.join(", ")} {lockedFormats.length === 1 ? "is" : "are"} plan-gated formats
+                  {lockedFormats.join(", ")} {lockedFormats.length === 1 ? actionCopy.lockedFormatsSuffixSingle : actionCopy.lockedFormatsSuffixPlural} {actionCopy.planGatedFormats}
                 </p>
               )}
             </>
@@ -457,10 +754,12 @@ export const ResultsSection = ({
           <div className="flex items-center justify-center gap-2 tone-excellent-text">
             <CheckCircle className="h-5 w-5" />
             <span className="font-medium">
-              {isTallyOnlyMode ? "Tally Conversion Complete!" : "Conversion Complete!"}
+              {isTallyOnlyMode ? actionCopy.tallyConversionComplete : actionCopy.conversionComplete}
             </span>
           </div>
-          <p className="text-sm font-medium text-muted-foreground">Download your file:</p>
+          <p className="text-sm font-medium text-muted-foreground">
+            {actionCopy.downloadYourFile} {singleDownloadFileName || "bank-statement.xlsx"}
+          </p>
           {isPremiumSelectedFlow ? (
             <div className="flex justify-center">
               <Button
@@ -471,7 +770,7 @@ export const ResultsSection = ({
                 className="border-white/15 bg-[#161616] text-white hover:border-white/25 hover:bg-[#1b1b1b]"
               >
                 <FileText className="mr-2 h-5 w-5" />
-                Download {selectedPremiumLabel}
+                {actionCopy.downloadPrefix} {selectedPremiumLabel}
               </Button>
             </div>
           ) : isTallyOnlyMode ? (
@@ -483,12 +782,12 @@ export const ResultsSection = ({
                   {downloading ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Downloading...
+                      {actionCopy.downloading}
                     </>
                   ) : (
                     <>
                       <Download className="mr-2 h-5 w-5" />
-                      Download Excel
+                      {actionCopy.downloadExcel}
                     </>
                   )}
                 </Button>
@@ -522,7 +821,7 @@ export const ResultsSection = ({
               {lockedFormats.length > 0 && (
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                   <Crown className="h-3 w-3 text-amber-500" />
-                  {lockedFormats.join(", ")} {lockedFormats.length === 1 ? "is" : "are"} plan-gated formats
+                  {lockedFormats.join(", ")} {lockedFormats.length === 1 ? actionCopy.lockedFormatsSuffixSingle : actionCopy.lockedFormatsSuffixPlural} {actionCopy.planGatedFormats}
                 </p>
               )}
             </>
@@ -546,7 +845,7 @@ export const ResultsSection = ({
             )}
             <div className="space-y-1 text-left">
               <p className="text-sm font-semibold text-white">
-                Edit PDF Check: {editedPdfCheckResult.status === "suspected" ? "Possible edit detected" : "No edit signal detected"}
+                {actionCopy.editPdfCheck} {editedPdfCheckResult.status === "suspected" ? actionCopy.possibleEditDetected : actionCopy.noEditSignalDetected}
               </p>
               <p className="text-xs text-white/70">{editedPdfCheckResult.reason}</p>
             </div>
@@ -557,14 +856,14 @@ export const ResultsSection = ({
       {converting && (
         <Card className="p-4 bg-[#191919]/80 border border-white/10">
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-white">{conversionProgressLabel}</p>
+            <p className="text-sm font-semibold text-white">{conversionProgressTitle}</p>
             <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
               <div
                 className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
                 style={{ width: `${Math.min(100, Math.max(0, conversionProgressPercent))}%` }}
               />
             </div>
-            <p className="text-xs text-muted-foreground">{conversionProgressSubLabel}</p>
+            <p className="text-xs text-muted-foreground">{conversionProgressDetail}</p>
           </div>
         </Card>
       )}
@@ -589,14 +888,14 @@ export const ResultsSection = ({
         <div className="space-y-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <PieChart className="w-5 h-5 text-primary" />
-            Financial Analytics
+            {actionCopy.financialAnalytics}
           </h3>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card className={`p-4 !bg-[#191919] ${toneClasses[creditTone].border}`}>
               <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[creditTone].text}`}>
                 <TrendingUp className={`w-4 h-4 ${toneClasses[creditTone].text}`} />
-                Total Credits
+                {actionCopy.totalCredits}
               </div>
               <p className={`text-2xl font-bold ${toneClasses[creditTone].text}`}>
                 {formatAmountNoSymbol(truncateDecimals(analytics.totalCredits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -606,7 +905,7 @@ export const ResultsSection = ({
             <Card className={`p-4 !bg-[#191919] ${toneClasses[debitTone].border}`}>
               <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[debitTone].text}`}>
                 <TrendingDown className={`w-4 h-4 ${toneClasses[debitTone].text}`} />
-                Total Debits
+                {actionCopy.totalDebits}
               </div>
               <p className={`text-2xl font-bold ${toneClasses[debitTone].text}`}>
                 {formatAmountNoSymbol(truncateDecimals(analytics.totalDebits), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -620,7 +919,7 @@ export const ResultsSection = ({
                 ) : (
                   <TrendingDown className={`w-4 h-4 ${toneClasses[netFlowTone].text}`} />
                 )}
-                Net Flow
+                {actionCopy.netFlow}
               </div>
               <p className={`text-2xl font-bold ${toneClasses[netFlowTone].text}`}>
                 {formatAmountNoSymbol(truncateDecimals(analytics.netFlow), { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "always" })}
@@ -631,7 +930,7 @@ export const ResultsSection = ({
               <Card className="p-4 !bg-[#191919] border-orange-500/30">
                 <div className="flex items-center gap-2 text-sm tone-moderate-text mb-1">
                   <AlertTriangle className="w-4 h-4 tone-moderate-text" />
-                  Duplicates Found
+                  {actionCopy.duplicatesFound}
                 </div>
                 <p className="text-2xl font-bold tone-moderate-text">{analytics.duplicateCount}</p>
               </Card>
@@ -639,7 +938,7 @@ export const ResultsSection = ({
           </div>
 
           <div className="mt-4">
-            <p className="text-sm text-muted-foreground mb-3">Category Breakdown</p>
+            <p className="text-sm text-muted-foreground mb-3">{actionCopy.categoryBreakdown}</p>
             <div className="flex flex-wrap gap-2">
               {Object.entries(analytics.categoryBreakdown)
                 .sort((a, b) => b[1].count - a[1].count)
@@ -661,7 +960,7 @@ export const ResultsSection = ({
       {!isTallyOnlyMode && transactions.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-lg font-semibold">Extracted Transactions</h3>
+            <h3 className="text-lg font-semibold">{actionCopy.extractedTransactions}</h3>
             <div className="flex items-center gap-3">
               {analytics && analytics.duplicateCount > 0 && (
                 <Button
@@ -675,11 +974,11 @@ export const ResultsSection = ({
                   }
                 >
                   <AlertTriangle className="w-4 h-4 mr-1" />
-                  {showDuplicatesOnly ? "Show All" : `Show Duplicates (${analytics.duplicateCount})`}
+                  {showDuplicatesOnly ? actionCopy.showAll : actionCopy.showDuplicates(analytics.duplicateCount)}
                 </Button>
               )}
               <span className="text-sm text-muted-foreground">
-                {transactions.length} transaction{transactions.length !== 1 ? "s" : ""} found
+                {actionCopy.transactionsFound(transactions.length)}
               </span>
             </div>
           </div>
@@ -690,12 +989,12 @@ export const ResultsSection = ({
                 <Table className="min-w-[720px]">
                   <TableHeader>
                     <TableRow className="bg-[#191919]">
-                      <TableHead className="font-semibold">Date</TableHead>
-                      <TableHead className="font-semibold">Description</TableHead>
-                      <TableHead className="font-semibold">Category</TableHead>
-                      <TableHead className="font-semibold text-right tone-bad-text">Debit</TableHead>
-                      <TableHead className="font-semibold text-right tone-excellent-text">Credit</TableHead>
-                      <TableHead className="font-semibold text-right">Balance</TableHead>
+                      <TableHead className="font-semibold">{actionCopy.date}</TableHead>
+                      <TableHead className="font-semibold">{actionCopy.description}</TableHead>
+                      <TableHead className="font-semibold">{actionCopy.category}</TableHead>
+                      <TableHead className="font-semibold text-right tone-bad-text">{actionCopy.debit}</TableHead>
+                      <TableHead className="font-semibold text-right tone-excellent-text">{actionCopy.credit}</TableHead>
+                      <TableHead className="font-semibold text-right">{actionCopy.balance}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -723,7 +1022,7 @@ export const ResultsSection = ({
                                     <ShieldAlert className="w-4 h-4 tone-bad-text" />
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    Balance mismatch! Expected: {transaction.expectedBalance == null ? "N/A" : formatAmountNoSymbol(transaction.expectedBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {actionCopy.balanceMismatchExpected} {transaction.expectedBalance == null ? actionCopy.na : formatAmountNoSymbol(transaction.expectedBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </TooltipContent>
                                 </Tooltip>
                               )}
@@ -732,7 +1031,7 @@ export const ResultsSection = ({
                                   <TooltipTrigger aria-label="Risk flag warning">
                                     <AlertTriangle className="w-4 h-4 text-orange-500" />
                                   </TooltipTrigger>
-                                  <TooltipContent>Risk Flag: {transaction.riskFlag}</TooltipContent>
+                                  <TooltipContent>{actionCopy.riskFlag} {transaction.riskFlag}</TooltipContent>
                                 </Tooltip>
                               )}
                               {transaction.isDuplicate && !transaction.balanceMismatch && !transaction.riskFlag && (
@@ -741,7 +1040,7 @@ export const ResultsSection = ({
                                     <AlertTriangle className="w-4 h-4 text-yellow-500" />
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    Potential duplicate (Group #{transaction.duplicateGroup})
+                                    {actionCopy.potentialDuplicate} (Group #{transaction.duplicateGroup})
                                   </TooltipContent>
                                 </Tooltip>
                               )}
@@ -780,7 +1079,7 @@ export const ResultsSection = ({
                             {formatAmountNoSymbol(transaction.balance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             {transaction.balanceMismatch && transaction.expectedBalance && (
                               <div className="text-xs text-muted-foreground">
-                                Expected: {formatAmountNoSymbol(transaction.expectedBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {actionCopy.expected} {formatAmountNoSymbol(transaction.expectedBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </div>
                             )}
                           </TableCell>

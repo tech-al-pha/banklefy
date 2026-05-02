@@ -2676,14 +2676,8 @@ const dedupeAndSortTransactions = (rows: Transaction[]): Transaction[] => {
     deduped.push(...bucketRows);
   }
 
-  deduped.sort((a, b) => {
-    const aTime = parseStatementDateToTimestamp(a.date);
-    const bTime = parseStatementDateToTimestamp(b.date);
-    if (aTime == null && bTime == null) return 0;
-    if (aTime == null) return 1;
-    if (bTime == null) return -1;
-    return aTime - bTime;
-  });
+  // Keep the extracted statement row order as-is.
+  // Date-sorting here can incorrectly move rows when statements contain repeated/back-and-forth dates.
   return deduped;
 };
 

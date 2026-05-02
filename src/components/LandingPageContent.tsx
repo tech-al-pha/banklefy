@@ -1,14 +1,24 @@
 import { Hero } from "@/components/Hero";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
+import { useLanguage, type Language } from "@/contexts/LanguageContext";
 
 const UploadDemo = lazyWithRetry(() =>
   import("@/components/UploadDemo").then((module) => ({ default: module.UploadDemo })),
 );
 
 export const LandingPageContent = () => {
+  const { language } = useLanguage();
   const [shouldLoadUpload, setShouldLoadUpload] = useState(false);
   const demoRef = useRef<HTMLDivElement>(null);
+  const loadingLabelByLanguage: Record<Language, string> = {
+    en: "Loading converter...",
+    ar: "جارٍ تحميل أداة التحويل...",
+    zh: "正在加载转换器...",
+    es: "Cargando convertidor...",
+    hi: "कन्वर्टर लोड हो रहा है...",
+  };
+  const loadingLabel = loadingLabelByLanguage[language] ?? loadingLabelByLanguage.en;
 
   useEffect(() => {
     if (shouldLoadUpload) return;
@@ -62,7 +72,7 @@ export const LandingPageContent = () => {
           <Suspense
             fallback={
               <div className="bg-background py-12 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
-                Loading converter...
+                {loadingLabel}
               </div>
             }
           >
@@ -70,7 +80,7 @@ export const LandingPageContent = () => {
           </Suspense>
         ) : (
           <div className="bg-background py-12 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
-            Loading converter...
+            {loadingLabel}
           </div>
         )}
       </div>
