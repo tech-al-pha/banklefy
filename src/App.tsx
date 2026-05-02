@@ -396,18 +396,12 @@ const AppRoutes = () => {
   const normalizedPathname = normalizePathname(location.pathname);
   const meta = META_BY_PATH[normalizedPathname] || DEFAULT_META;
   const siteUrl = getSiteUrl();
-  const currentOrigin =
-    typeof window !== "undefined" ? window.location.origin.replace(/\/+$/, "") : null;
+  const runtimeHost = typeof window !== "undefined" ? window.location.hostname : null;
   const canonical = `${siteUrl}${normalizedPathname === "/" ? "/" : normalizedPathname}`;
   const imageUrl = toAbsoluteUrl(meta.image || DEFAULT_META.image || "/og-banklefy.jpg", siteUrl);
-  const normalizeOriginForIndexing = (origin: string) =>
-    origin.replace(/\/+$/, "").replace("://www.", "://");
-  const isSameSiteOrigin = currentOrigin
-    ? normalizeOriginForIndexing(currentOrigin) === normalizeOriginForIndexing(siteUrl)
-    : true;
   const shouldNoIndex =
     NO_INDEX_PREFIXES.some((path) => normalizedPathname.startsWith(path)) ||
-    !isSameSiteOrigin;
+    (runtimeHost ? runtimeHost.endsWith(".vercel.app") : false);
   const structuredData = getStructuredDataByRoute(normalizedPathname, canonical, siteUrl, meta);
 
   return (
