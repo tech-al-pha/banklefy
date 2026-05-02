@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { activeLanguages } from "@/contexts/languageData";
 import { LuxuryCursor } from "@/components/LuxuryCursor";
 import { Suspense } from "react";
 import { Helmet, HelmetProvider } from "@dr.pogodin/react-helmet";
@@ -387,6 +388,37 @@ const getStructuredDataByRoute = (
     return schemas;
   }
 
+  if (pathname !== "/") {
+    const breadcrumbItems = pathname
+      .split("/")
+      .filter(Boolean)
+      .map((segment, index, segments) => {
+        const path = `/${segments.slice(0, index + 1).join("/")}`;
+        const itemUrl = `${siteUrl}${path}`;
+        const itemMeta = META_BY_PATH[path] || DEFAULT_META;
+        return {
+          "@type": "ListItem",
+          position: index + 2,
+          name: itemMeta.title,
+          item: itemUrl,
+        };
+      });
+
+    schemas.push({
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: DEFAULT_META.title,
+          item: `${siteUrl}/`,
+        },
+        ...breadcrumbItems,
+      ],
+    });
+  }
+
   schemas.push(...baseSchemas);
   return schemas;
 };
@@ -403,18 +435,30 @@ const AppRoutes = () => {
     NO_INDEX_PREFIXES.some((path) => normalizedPathname.startsWith(path)) ||
     (runtimeHost ? runtimeHost.endsWith(".vercel.app") : false);
   const structuredData = getStructuredDataByRoute(normalizedPathname, canonical, siteUrl, meta);
+  const alternateLanguageLinks = activeLanguages
+    .filter((lang) => lang !== "en")
+    .map((lang) => ({ lang, href: `${canonical}?lang=${lang}` }));
 
   return (
     <ErrorBoundary resetKey={location.pathname}>
       <Helmet>
         <title>{meta.title}</title>
         <link rel="canonical" href={canonical} />
+        <link rel="alternate" hrefLang="x-default" href={canonical} />
+        <link rel="alternate" hrefLang="en" href={canonical} />
+        {alternateLanguageLinks.map((alt) => (
+          <link key={`alt-${alt.lang}`} rel="alternate" hrefLang={alt.lang} href={alt.href} />
+        ))}
 
         <meta name="description" content={meta.description} />
         <meta name="robots" content={shouldNoIndex ? "noindex, nofollow" : "index, follow"} />
 
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Banklefy" />
+        <meta property="og:locale" content="en_US" />
+        {alternateLanguageLinks.map((alt) => (
+          <meta key={`og-alt-${alt.lang}`} property="og:locale:alternate" content={alt.lang} />
+        ))}
         <meta property="og:title" content={meta.title} />
         <meta property="og:description" content={meta.description} />
         <meta property="og:url" content={canonical} />

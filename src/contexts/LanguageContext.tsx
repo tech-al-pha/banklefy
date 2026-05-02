@@ -50,6 +50,11 @@ const protectTerms = (value: string): string =>
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<Language>(() => {
     try {
+      // Allow deep links like /pricing?lang=hi to render in the selected language.
+      if (typeof window !== "undefined") {
+        const urlLanguage = new URLSearchParams(window.location.search).get("lang");
+        if (isSupportedLanguage(urlLanguage)) return urlLanguage;
+      }
       const saved = localStorage.getItem('language');
       return isSupportedLanguage(saved) ? saved : 'en';
     } catch {
@@ -66,6 +71,20 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (typeof document !== 'undefined') {
       document.documentElement.lang = language;
       document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+    }
+    // Keep URL param in sync so Google can discover language variants.
+    if (typeof window !== "undefined") {
+      try {
+        const url = new URL(window.location.href);
+        if (language === "en") {
+          url.searchParams.delete("lang");
+        } else {
+          url.searchParams.set("lang", language);
+        }
+        window.history.replaceState({}, "", url.toString());
+      } catch {
+        // Ignore URL update failures
+      }
     }
   }, [language]);
 
