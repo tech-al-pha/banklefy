@@ -400,9 +400,14 @@ const AppRoutes = () => {
     typeof window !== "undefined" ? window.location.origin.replace(/\/+$/, "") : null;
   const canonical = `${siteUrl}${normalizedPathname === "/" ? "/" : normalizedPathname}`;
   const imageUrl = toAbsoluteUrl(meta.image || DEFAULT_META.image || "/og-banklefy.jpg", siteUrl);
+  const normalizeOriginForIndexing = (origin: string) =>
+    origin.replace(/\/+$/, "").replace("://www.", "://");
+  const isSameSiteOrigin = currentOrigin
+    ? normalizeOriginForIndexing(currentOrigin) === normalizeOriginForIndexing(siteUrl)
+    : true;
   const shouldNoIndex =
     NO_INDEX_PREFIXES.some((path) => normalizedPathname.startsWith(path)) ||
-    (currentOrigin ? currentOrigin !== siteUrl : false);
+    !isSameSiteOrigin;
   const structuredData = getStructuredDataByRoute(normalizedPathname, canonical, siteUrl, meta);
 
   return (
