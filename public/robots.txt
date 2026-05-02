@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://banklefy.vercel.app/sitemap.xml
+Sitemap: https://www.banklefy.site/sitemap.xml
