@@ -179,6 +179,17 @@ const getSiteUrl = () => {
   return "https://www.banklefy.site";
 };
 
+const getPublicContactSignals = () => {
+  const supportEmail = (import.meta.env.VITE_PUBLIC_SUPPORT_EMAIL as string | undefined)?.trim();
+  const securityEmail = (import.meta.env.VITE_PUBLIC_SECURITY_EMAIL as string | undefined)?.trim();
+  const instagramUrl = (import.meta.env.VITE_PUBLIC_INSTAGRAM_URL as string | undefined)?.trim();
+  return {
+    supportEmail: supportEmail && supportEmail.includes("@") ? supportEmail : null,
+    securityEmail: securityEmail && securityEmail.includes("@") ? securityEmail : null,
+    instagramUrl: instagramUrl && /^https?:\/\//i.test(instagramUrl) ? instagramUrl : null,
+  };
+};
+
 const toAbsoluteUrl = (value: string, baseUrl: string) => {
   if (/^https?:\/\//i.test(value)) return value;
   const normalizedPath = value.startsWith("/") ? value : `/${value}`;
@@ -192,6 +203,7 @@ const getStructuredDataByRoute = (
   meta: RouteMeta,
 ): JsonLd[] => {
   const schemas: JsonLd[] = [];
+  const contactSignals = getPublicContactSignals();
 
   const organizationSchema: JsonLd = {
     "@context": "https://schema.org",
@@ -200,9 +212,32 @@ const getStructuredDataByRoute = (
     name: "Banklefy",
     url: siteUrl,
     logo: `${siteUrl}/favicon.svg`,
-    sameAs: [
-      "https://www.instagram.com/banklefy",
-    ],
+    ...(contactSignals.supportEmail ? { email: contactSignals.supportEmail } : {}),
+    ...(contactSignals.supportEmail || contactSignals.securityEmail
+      ? {
+          contactPoint: [
+            ...(contactSignals.supportEmail
+              ? [
+                  {
+                    "@type": "ContactPoint",
+                    contactType: "customer support",
+                    email: contactSignals.supportEmail,
+                  },
+                ]
+              : []),
+            ...(contactSignals.securityEmail
+              ? [
+                  {
+                    "@type": "ContactPoint",
+                    contactType: "security",
+                    email: contactSignals.securityEmail,
+                  },
+                ]
+              : []),
+          ],
+        }
+      : {}),
+    ...(contactSignals.instagramUrl ? { sameAs: [contactSignals.instagramUrl] } : {}),
   };
 
   const websiteSchema: JsonLd = {
