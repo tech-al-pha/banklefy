@@ -6,6 +6,8 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
   const envOrigin = Deno.env.get('ALLOWED_ORIGIN');
   const allowedOrigins = [
     envOrigin,
+    'https://www.banklefy.site',
+    'https://banklefy.site',
     'https://banklefy.lovable.app',
     'https://banklefy.vercel.app',
     'http://localhost:8080',
@@ -29,7 +31,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
     return requestOrigin;
   }
 
-  return allowedOrigins[0] || 'https://banklefy.vercel.app';
+  return allowedOrigins[0] || 'https://www.banklefy.site';
 };
 
 const getCorsHeaders = (req: Request) => ({

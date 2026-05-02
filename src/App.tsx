@@ -49,7 +49,7 @@ const DEFAULT_META: RouteMeta = {
   title: "Bank Statement to Excel, CSV, MT940 & Tally in Seconds | Banklefy",
   description:
     "Convert bank statement PDFs into clean Excel, CSV, JSON, MT940 and Tally-ready exports with fast AI OCR and secure processing.",
-  image: "https://banklefy.vercel.app/og-banklefy.jpg",
+  image: "https://www.banklefy.site/og-banklefy.jpg",
 };
 
 const META_BY_PATH: Record<string, RouteMeta> = {
@@ -175,7 +175,7 @@ const getSiteUrl = () => {
   if (configured && configured.trim()) {
     return configured.replace(/\/+$/, "");
   }
-  return "https://banklefy.vercel.app";
+  return "https://www.banklefy.site";
 };
 
 const toAbsoluteUrl = (value: string, baseUrl: string) => {

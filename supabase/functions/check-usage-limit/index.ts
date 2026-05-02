@@ -10,6 +10,8 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
   // Explicit allow-list for known production domains
   const allowedOrigins = [
     envOrigin,
+    'https://www.banklefy.site',
+    'https://banklefy.site',
     'https://banklefy.lovable.app',
     'https://banklefy.vercel.app',
     'http://localhost:8080',
@@ -41,7 +43,7 @@ const getAllowedOrigin = (requestOrigin: string | null): string => {
   }
   
   // Default fallback
-  return allowedOrigins[0] || 'https://banklefy.vercel.app';
+  return allowedOrigins[0] || 'https://www.banklefy.site';
 };
 
 const getCorsHeaders = (req: Request) => ({
