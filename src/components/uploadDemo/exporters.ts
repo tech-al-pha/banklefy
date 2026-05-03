@@ -1,4 +1,5 @@
 import {
+  buildQuickBooksIif,
   buildQuickBooksCsv,
   buildMt940,
   buildStatementCsv,
@@ -94,22 +95,35 @@ export const exportAsQuickBooksCsv = async ({
 
   try {
     const statementData = resolveCanonicalStatementData({ transactions, bankInfo, currencyCode, jsonData });
-    const content = buildQuickBooksCsv(statementData);
-    downloadTextFile(
-      content,
-      `${getExportBaseName(exportBaseName)}-quickbooks.csv`,
-      'text/csv;charset=utf-8',
-    );
+
+    const userAgent = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    const isDesktop = /\b(Windows|Macintosh|Linux)\b/i.test(userAgent) && !/\b(Mobile|Android|iPhone|iPad)\b/i.test(userAgent);
+
+    if (isDesktop) {
+      const content = buildQuickBooksIif(statementData);
+      downloadTextFile(
+        content,
+        `${getExportBaseName(exportBaseName)}.iif`,
+        'text/plain;charset=utf-8',
+      );
+    } else {
+      const content = buildQuickBooksCsv(statementData);
+      downloadTextFile(
+        content,
+        `${getExportBaseName(exportBaseName)}-quickbooks.csv`,
+        'text/csv;charset=utf-8',
+      );
+    }
     toast({
-      title: 'QuickBooks CSV Downloaded',
-      description: 'Your transactions have been exported in QuickBooks-friendly CSV format.',
+      title: 'QuickBooks Download Ready',
+      description: 'QuickBooks Desktop users: Download IIF format. QuickBooks Online users: Download CSV format. After import, please review and assign correct account codes.',
     });
   } catch (error: unknown) {
     if (import.meta.env.DEV) { console.error('QuickBooks export error:', error); }
     toast({
       variant: 'destructive',
       title: 'QuickBooks export failed',
-      description: getErrorMessage(error, 'Failed to export QuickBooks CSV.'),
+      description: getErrorMessage(error, 'Failed to export QuickBooks export.'),
     });
   }
 };
@@ -130,7 +144,7 @@ export const exportAsXeroCsv = async ({
     const content = buildXeroCsv(statementData);
     downloadTextFile(
       content,
-      `${getExportBaseName(exportBaseName)}-xero.csv`,
+      `${getExportBaseName(exportBaseName)}_xero_export.csv`,
       'text/csv;charset=utf-8',
     );
     toast({
@@ -294,8 +308,12 @@ export const exportAsTallyXml = ({ transactions, exportBaseName, toast, getError
 
   try {
     const bankLedger = 'Bank';
+    const now = new Date();
+    const fallbackStatementId = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const statementIdSource = transactions[0]?.date || '';
+    const statementId = (formatTallyDate(statementIdSource) || fallbackStatementId).replace(/[^0-9]/g, '').slice(0, 8) || fallbackStatementId;
 
-    const vouchers = transactions.map((t) => {
+    const vouchers = transactions.map((t, index) => {
       const amount = (t.debit || t.credit || 0);
       if (!amount) return '';
       const isReceipt = (t.credit || 0) > 0;
@@ -307,11 +325,14 @@ export const exportAsTallyXml = ({ transactions, exportBaseName, toast, getError
       const positiveAmount = Math.abs(amount).toFixed(2);
       const bankAmount = isReceipt ? positiveAmount : `-${positiveAmount}`;
       const counterpartyAmount = isReceipt ? `-${positiveAmount}` : positiveAmount;
+      const rowNumber = String(index + 1).padStart(3, '0');
+      const voucherNumber = `VCH-${statementId}-${rowNumber}`;
 
       return `
     <TALLYMESSAGE xmlns:UDF="TallyUDF">
       <VOUCHER VCHTYPE="${voucherType}" ACTION="Create">
         <DATE>${date}</DATE>
+        <VOUCHERNUMBER>${escapeXml(voucherNumber)}</VOUCHERNUMBER>
         <NARRATION>${narration}</NARRATION>
         <REFERENCE>${escapeXml(t.refNumber || '')}</REFERENCE>
         <ALLLEDGERENTRIES.LIST>
@@ -357,7 +378,7 @@ export const exportAsTallyXml = ({ transactions, exportBaseName, toast, getError
 
     toast({
       title: 'Tally XML Downloaded',
-      description: 'Import this XML into Tally Prime as Vouchers.',
+      description: 'Before importing, ensure these ledgers exist in Tally: Bank, and all party names in transactions',
     });
   } catch (error: unknown) {
     if (import.meta.env.DEV) { console.error('Tally export error:', error); }

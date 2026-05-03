@@ -606,24 +606,29 @@ export const ResultsSection = ({
       </Button>
 
       {hasPremiumFormatAccess && showPremiumFormats && (
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {premiumFormatCards.map((format) => (
-            <Button
-              key={format.key}
-              size="sm"
-              variant="outline"
-              onClick={format.onClick}
-              disabled={format.status !== "live"}
-              className={`min-w-[122px] border backdrop-blur-sm ${format.className}`}
-            >
-              {format.label}
-              {format.status !== "live" && (
+        <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {premiumFormatCards.map((format) => (
+              <Button
+                key={format.key}
+                size="sm"
+                variant="outline"
+                onClick={format.onClick}
+                disabled={format.status !== "live"}
+                className={`min-w-[122px] border backdrop-blur-sm ${format.className}`}
+              >
+                {format.label}
+                {format.status !== "live" && (
                   <span className="ml-2 rounded-full border border-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.16em] text-white/65">
-                  {actionCopy.soon}
+                    {actionCopy.soon}
                   </span>
-              )}
-            </Button>
-          ))}
+                )}
+              </Button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground text-center max-w-[560px]">
+            QuickBooks Desktop users: Download IIF format. QuickBooks Online users: Download CSV format. After import, please review and assign correct account codes.
+          </p>
         </div>
       )}
     </div>

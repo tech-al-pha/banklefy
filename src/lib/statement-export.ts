@@ -251,6 +251,14 @@ const formatCsvAmount = (value: unknown): string => {
 
 const formatIsoDate = (value: unknown): string => parseStatementDateToIso(value) ?? sanitizeText(value, "", 40);
 
+const formatDdMmYyyy = (value: unknown): string => {
+  const iso = parseStatementDateToIso(value);
+  if (!iso) return sanitizeText(value, "", 40);
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return iso;
+  return `${match[3]}/${match[2]}/${match[1]}`;
+};
+
 const getSignedAmount = (transaction: StatementExportTransaction): number =>
   roundMoney(toNumber(transaction.credit) - toNumber(transaction.debit));
 
@@ -293,33 +301,60 @@ export const buildStatementCsv = (
 export const buildQuickBooksCsv = ({
   transactions,
 }: AccountingCsvArgs): string => {
-  const header = ["Date", "Description", "Credit", "Debit"];
+  // QuickBooks Online supports CSV import with manual mapping. Keep the same 4-column structure as Xero/Zoho.
+  const header = ["Date", "Description", "Debit", "Credit"];
   const rows = transactions.map((transaction) => ([
-    formatIsoDate(transaction.date),
+    formatDdMmYyyy(transaction.date),
     sanitizeText(transaction.description, "", 250),
-    formatCsvAmount(transaction.credit),
     formatCsvAmount(transaction.debit),
+    formatCsvAmount(transaction.credit),
   ]));
 
   return [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
 };
 
-export const buildXeroCsv = ({
+export const buildQuickBooksIif = ({
   transactions,
   bankInfo,
-  currencyCode,
 }: AccountingCsvArgs): string => {
-  const accountCode = sanitizeText(bankInfo?.accountNumber || bankInfo?.iban, "", 80);
-  const currency = normalizeCurrency(bankInfo?.currency || currencyCode);
-  const header = ["Date", "Amount", "Payee", "Description", "Reference", "Currency", "Account Code"];
+  // QuickBooks Desktop IIF: tab-separated with 2 lines per transaction (TRNS + SPL).
+  const account = sanitizeText(bankInfo?.accountNumber || bankInfo?.iban || bankInfo?.bankName, "Bank", 80) || "Bank";
+  const header = [
+    "!TRNS\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO",
+    "!SPL\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO",
+    "!ENDTRNS",
+  ];
+
+  const lines: string[] = [...header];
+
+  for (const transaction of transactions) {
+    const description = sanitizeText(transaction.description, "", 250) || "Transaction";
+    const date = formatDdMmYyyy(transaction.date);
+    const signed = getSignedAmount(transaction);
+    if (!Number.isFinite(signed) || signed === 0) continue;
+
+    const amount = signed.toFixed(2);
+    const opposite = (-signed).toFixed(2);
+
+    // Keep TRNS on bank ledger, SPL on opposite entry.
+    lines.push(`TRNS\tBANK\t${date}\t${account}\t${description}\t${amount}\t${description}`);
+    lines.push(`SPL\tBANK\t${date}\t${account}\t${description}\t${opposite}\t${description}`);
+    lines.push("ENDTRNS");
+  }
+
+  return lines.join("\n");
+};
+
+export const buildXeroCsv = ({
+  transactions,
+}: AccountingCsvArgs): string => {
+  // Universal Xero/Zoho-compatible CSV (no balance column).
+  const header = ["Date", "Description", "Debit", "Credit"];
   const rows = transactions.map((transaction) => ([
-    formatIsoDate(transaction.date),
-    getSignedAmount(transaction).toFixed(2),
-    sanitizeText(transaction.description, "", 120),
-    getTransactionMemo(transaction),
-    getReference(transaction),
-    currency,
-    accountCode,
+    formatDdMmYyyy(transaction.date),
+    sanitizeText(transaction.description, "", 250),
+    formatCsvAmount(transaction.debit),
+    formatCsvAmount(transaction.credit),
   ]));
 
   return [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
@@ -328,14 +363,13 @@ export const buildXeroCsv = ({
 export const buildZohoCsv = ({
   transactions,
 }: AccountingCsvArgs): string => {
-  const header = ["Date", "Description", "Reference Number", "Deposit", "Withdrawal", "Balance"];
+  // Keep the same universal Xero-compatible structure for Zoho.
+  const header = ["Date", "Description", "Debit", "Credit"];
   const rows = transactions.map((transaction) => ([
-    formatIsoDate(transaction.date),
+    formatDdMmYyyy(transaction.date),
     sanitizeText(transaction.description, "", 250),
-    getReference(transaction),
-    formatCsvAmount(transaction.credit),
     formatCsvAmount(transaction.debit),
-    formatCsvAmount(transaction.balance),
+    formatCsvAmount(transaction.credit),
   ]));
 
   return [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
