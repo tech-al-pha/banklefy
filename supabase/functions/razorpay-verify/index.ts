@@ -63,8 +63,10 @@ const PLAN_PAGES: Record<string, number> = {
   per_page_lite: 10,
   per_page_standard: 25,
   per_page_power: 50,
+  per_page_pack_starter: 500,
   per_page_pack_basic: 1000,
-  per_page_pack_pro: 11000,
+  per_page_pack_pro: 5000,
+  per_page_pack_enterprise: 11000,
 };
 
 const toIsoDate = (value: Date): string => value.toISOString().slice(0, 10);

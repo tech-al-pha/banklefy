@@ -50,6 +50,7 @@ export const resolveUnderwritingTier = (
   if (
     normalizedPlan === 'per_page_power' ||
     normalizedPlan === 'per_page_pack_pro' ||
+    normalizedPlan === 'per_page_pack_enterprise' ||
     normalizedPlan === 'unlimited'
   ) {
     return 'advanced';

@@ -810,7 +810,7 @@ const extractMashreqMetadataFromText = (text: string): BankMetadata | undefined 
     }
 
     if (/^Account Number\b/i.test(line)) {
-      const inlineAccountMatch = line.match(/^Account Number\s*[:\-]?\s*([A-Z0-9]{6,})$/i);
+      const inlineAccountMatch = line.match(/^Account Number\s*[:-]?\s*([A-Z0-9]{6,})$/i);
       if (inlineAccountMatch) {
         metadata.accountNumber = inlineAccountMatch[1].trim();
         continue;
@@ -2960,8 +2960,10 @@ const normalizeRequestedFormat = (value: unknown): ExportFormat => {
 };
 
 const getCurrentPackFromLimit = (conversionsLimit: number): string | null => {
-  if (conversionsLimit >= 11000) return 'per_page_pack_pro';
+  if (conversionsLimit >= 11000) return 'per_page_pack_enterprise';
+  if (conversionsLimit >= 5000) return 'per_page_pack_pro';
   if (conversionsLimit >= 1000) return 'per_page_pack_basic';
+  if (conversionsLimit >= 500) return 'per_page_pack_starter';
   if (conversionsLimit >= 50) return 'per_page_power';
   if (conversionsLimit >= 25) return 'per_page_standard';
   if (conversionsLimit >= 10) return 'per_page_lite';
@@ -5283,7 +5285,12 @@ Deno.serve(async (req) => {
         const currentRemaining = Math.max(0, conversionsLimit - conversionsUsed);
         const remainingAfterDebit = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
 
-        const { error: incrementError } = await (supabaseAdminClient.rpc as any)('increment_usage_count', {
+        const rpc = supabaseAdminClient.rpc as unknown as (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ error: { message: string } | null }>;
+
+        const { error: incrementError } = await rpc('increment_usage_count', {
           p_ip_address: user ? undefined : trackingKey,
           p_user_id: user ? user.id : undefined,
           p_increment: incrementBy,

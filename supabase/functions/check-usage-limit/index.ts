@@ -173,8 +173,10 @@ const toNumber = (value: unknown, fallback: number): number => {
 };
 
 const getCurrentPackFromLimit = (conversionsLimit: number): string | null => {
-  if (conversionsLimit >= 11000) return 'per_page_pack_pro';
+  if (conversionsLimit >= 11000) return 'per_page_pack_enterprise';
+  if (conversionsLimit >= 5000) return 'per_page_pack_pro';
   if (conversionsLimit >= 1000) return 'per_page_pack_basic';
+  if (conversionsLimit >= 500) return 'per_page_pack_starter';
   if (conversionsLimit >= 50) return 'per_page_power';
   if (conversionsLimit >= 25) return 'per_page_standard';
   if (conversionsLimit >= 10) return 'per_page_lite';

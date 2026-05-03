@@ -179,8 +179,10 @@ const toDateString = (value: unknown): string | null => {
 };
 
 const getCurrentPackFromLimit = (limit: number): string | null => {
-  if (limit >= 11000) return 'per_page_pack_pro';
+  if (limit >= 11000) return 'per_page_pack_enterprise';
+  if (limit >= 5000) return 'per_page_pack_pro';
   if (limit >= 1000) return 'per_page_pack_basic';
+  if (limit >= 500) return 'per_page_pack_starter';
   if (limit >= 50) return 'per_page_power';
   if (limit >= 25) return 'per_page_standard';
   if (limit >= 10) return 'per_page_lite';

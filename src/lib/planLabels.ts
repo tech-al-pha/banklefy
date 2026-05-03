@@ -8,8 +8,10 @@ const PLAN_LABELS: Record<string, string> = {
   per_page_lite: 'Lite',
   per_page_standard: 'Standard',
   per_page_power: 'Power',
+  per_page_pack_starter: 'Starter Pack',
   per_page_pack_basic: 'Basic Pack',
   per_page_pack_pro: 'Pro Pack',
+  per_page_pack_enterprise: 'Enterprise Pack',
   unlimited: 'Unlimited',
 };
 

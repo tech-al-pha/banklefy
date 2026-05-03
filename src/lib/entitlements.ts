@@ -10,8 +10,10 @@ export const normalizePlanType = (planType?: string | null): string =>
 
 const getCurrentPackFromLimit = (limit: number | null): string | null => {
   if (limit === null) return null;
-  if (limit >= 11000) return "per_page_pack_pro";
+  if (limit >= 11000) return "per_page_pack_enterprise";
+  if (limit >= 5000) return "per_page_pack_pro";
   if (limit >= 1000) return "per_page_pack_basic";
+  if (limit >= 500) return "per_page_pack_starter";
   if (limit >= 50) return "per_page_power";
   if (limit >= 25) return "per_page_standard";
   if (limit >= 10) return "per_page_lite";
@@ -74,7 +76,17 @@ export const hasTallyXmlAccess = (input: EntitlementInput): boolean => {
   return (
     normalizedPlan === "per_page_pack_basic" ||
     normalizedPlan === "per_page_pack_pro" ||
+    normalizedPlan === "per_page_pack_enterprise" ||
     normalizedPlan === "unlimited"
+  );
+};
+
+export const hasAccountingIntegrationsAccess = (input: EntitlementInput): boolean => {
+  const normalizedPlan = resolvePlanForFeatures(input);
+  return (
+    normalizedPlan === "unlimited" ||
+    normalizedPlan === "per_page_pack_pro" ||
+    normalizedPlan === "per_page_pack_enterprise"
   );
 };
 
@@ -83,7 +95,8 @@ export const hasFoirDashboardAccess = (input: EntitlementInput): boolean => {
   return (
     normalizedPlan === "unlimited" ||
     normalizedPlan === "per_page_pack_basic" ||
-    normalizedPlan === "per_page_pack_pro"
+    normalizedPlan === "per_page_pack_pro" ||
+    normalizedPlan === "per_page_pack_enterprise"
   );
 };
 
@@ -91,13 +104,14 @@ export const hasFraudDetectorAccess = (input: EntitlementInput): boolean => {
   const normalizedPlan = resolvePlanForFeatures(input);
   return (
     normalizedPlan === "unlimited" ||
-    normalizedPlan === "per_page_pack_pro"
+    normalizedPlan === "per_page_pack_enterprise"
   );
 };
 
 export const getEditPdfDetectorTier = (input: EntitlementInput): "none" | "basic" | "advanced" => {
   const normalizedPlan = resolvePlanForFeatures(input);
-  if (normalizedPlan === "unlimited" || normalizedPlan === "per_page_pack_pro") return "advanced";
+  if (normalizedPlan === "unlimited" || normalizedPlan === "per_page_pack_enterprise") return "advanced";
+  if (normalizedPlan === "per_page_pack_pro") return "basic";
   if (normalizedPlan === "per_page_pack_basic") {
     return "basic";
   }

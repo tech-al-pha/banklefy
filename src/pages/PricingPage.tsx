@@ -49,40 +49,61 @@ const pricingPlans: Plan[] = [
     price: "₹0",
     amountInRupee: 0,
     unit: "forever",
-    description: "Free for guest and logged-in users.",
+    description: "Test our accuracy before you buy.",
     statements: "2 Pages / day (Guest) | 5 Pages / day (Signed in)",
-    features: ["Excel/CSV exports", "Basic parsing", "No AI-only features"],
+    features: ["XLSX exports", "CSV exports"],
     isFree: true,
+  },
+  {
+    planId: "per_page_pack_starter",
+    category: "perPage",
+    name: "Starter Pack",
+    price: "₹999",
+    amountInRupee: 999,
+    unit: "one-time",
+    description: "Perfect for testing JSON and MT940.",
+    statements: "500 Pages",
+    features: ["XLSX", "CSV", "JSON", "MT940"],
   },
   {
     planId: "per_page_pack_basic",
     category: "perPage",
     name: "Basic Pack",
-    price: "₹1,999",
-    amountInRupee: 1999,
+    price: "₹1,799",
+    amountInRupee: 1799,
     unit: "one-time",
-    description: "Best for occasional usage",
+    description: "Best for Indian CAs and accountants. Includes Tally XML.",
     statements: "1,000 Pages",
-    statementsNote: "100 premium formats",
-    features: ["Excel with 3 basic formats", "Tally + premium formats", "FOIR + EMI insights"],
+    features: [
+      "XLSX",
+      "CSV",
+      "JSON",
+      "MT940",
+      "Tally XML",
+    ],
     highlighted: true,
   },
   {
     planId: "per_page_pack_pro",
     category: "perPage",
     name: "Pro Pack",
-    price: "₹19,999",
-    amountInRupee: 19999,
+    price: "₹7,999",
+    amountInRupee: 7999,
     unit: "one-time",
-    description: "High-volume credits for teams",
+    description: "Full accounting software integration — Xero, Zoho, QuickBooks.",
+    statements: "5,000 Pages",
+    features: ["XLSX", "CSV", "JSON", "MT940", "Tally XML", "Xero", "Zoho", "QuickBooks"],
+  },
+  {
+    planId: "per_page_pack_enterprise",
+    category: "perPage",
+    name: "Enterprise Pack",
+    price: "₹14,999",
+    amountInRupee: 14999,
+    unit: "one-time",
+    description: "Fraud detection + priority support. For large teams.",
     statements: "11,000 Pages",
-    statementsNote: "1000 premium formats",
-    features: [
-      "Excel with 3 basic formats",
-      "Tally + premium formats",
-      "FOIR + EMI insights",
-      "Fraud + edited PDF checks",
-    ],
+    features: ["All Pro formats", "Fraud detection", "Priority support"],
   },
 ];
 
@@ -92,54 +113,55 @@ const perConversionPlans: Plan[] = [
     planId: "per_page_lite",
     category: "perPage",
     name: "Lite",
-    price: "₹99",
-    amountInRupee: 99,
+    price: "₹49",
+    amountInRupee: 49,
     unit: "/conversion",
-    description: "Quick single conversion",
+    description: "No login required. Perfect for one-off conversions.",
     statements: "10 Pages",
-    features: ["XLSX with 3 basic formats"],
+    features: ["XLSX", "CSV"],
   },
   {
     planId: "per_page_standard",
     category: "perPage",
     name: "Standard",
-    price: "₹199",
-    amountInRupee: 199,
+    price: "₹99",
+    amountInRupee: 99,
     unit: "/conversion",
-    description: "Popular for small batches",
+    description: "No login required. Perfect for one-off conversions.",
     statements: "25 Pages",
-    features: ["XLSX with 3 basic formats"],
+    features: ["XLSX", "CSV"],
     highlighted: true,
   },
   {
     planId: "per_page_power",
     category: "perPage",
     name: "Power",
-    price: "₹299",
-    amountInRupee: 299,
+    price: "₹149",
+    amountInRupee: 149,
     unit: "/conversion",
-    description: "For larger batches",
+    description: "No login required. Perfect for one-off conversions.",
     statements: "50 Pages",
-    features: ["XLSX with 3 basic formats"],
+    features: ["XLSX", "CSV"],
   },
 ];
 
 const comparisonTables: ComparisonTable[] = [
   {
     title: "Credit Pack Comparison",
-    description: "Compare recurring access and premium feature unlocks across Free, Basic Pack, and Pro Pack.",
-    columns: ["Feature", "Free", "Basic Pack", "Pro Pack"],
+    description: "Compare formats included across Starter, Basic, Pro, and Enterprise packs.",
+    columns: ["Format / Feature", "Starter", "Basic", "Pro", "Enterprise"],
     rows: [
-      { label: "Pages included", values: ["2/day guest, 5/day login", "1,000 pages", "11,000 pages"] },
-      { label: "XLSX", values: ["Yes", "Yes", "Yes"] },
-      { label: "CSV", values: ["Yes", "Yes", "Yes"] },
-      { label: "JSON", values: ["No", "Yes", "Yes"] },
-      { label: "MT940", values: ["No", "Yes", "Yes"] },
-      { label: "Tally XML", values: ["No", "Yes", "Yes"] },
-      { label: "Underwriting insights", values: ["No", "Yes", "Yes"] },
-      { label: "Fraud checks", values: ["No", "No", "Yes"] },
-      { label: "Edited PDF checks", values: ["No", "Basic", "Advanced"] },
-      { label: "Premium format quota", values: ["None", "100 formats", "1000 formats"] },
+      { label: "Pages included", values: ["500", "1,000", "5,000", "11,000"] },
+      { label: "XLSX", values: ["Yes", "Yes", "Yes", "Yes"] },
+      { label: "CSV", values: ["Yes", "Yes", "Yes", "Yes"] },
+      { label: "JSON", values: ["Yes", "Yes", "Yes", "Yes"] },
+      { label: "MT940", values: ["Yes", "Yes", "Yes", "Yes"] },
+      { label: "Tally XML", values: ["No", "Yes", "Yes", "Yes"] },
+      { label: "Xero", values: ["No", "No", "Yes", "Yes"] },
+      { label: "Zoho", values: ["No", "No", "Yes", "Yes"] },
+      { label: "QuickBooks", values: ["No", "No", "Yes", "Yes"] },
+      { label: "Fraud detection", values: ["No", "No", "No", "Yes"] },
+      { label: "Priority support", values: ["No", "No", "No", "Yes"] },
     ],
   },
   {
@@ -332,7 +354,8 @@ const PricingPage = () => {
   };
 
   const handlePlanPurchase = async (plan: Plan) => {
-    if (!isAuthenticated) {
+    const noLoginPlans = new Set(["per_page_lite", "per_page_standard", "per_page_power"]);
+    if (!isAuthenticated && !noLoginPlans.has(plan.planId)) {
       toast.error("Please login to purchase a plan.");
       navigate("/auth");
       return;
@@ -577,7 +600,7 @@ const PricingPage = () => {
             </span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Simple one-time credit packs. Buy once and use credits anytime.
+            Simple one-time credit packs. Buy once, use anytime. No expiry. No subscription.
           </p>
         </section>
 

@@ -9,6 +9,7 @@ import { useRecaptcha } from "@/hooks/useRecaptcha";
 import { useSettings } from "@/hooks/useSettings";
 import {
   getEditPdfDetectorTier,
+  hasAccountingIntegrationsAccess,
   hasFoirDashboardAccess,
   hasFraudDetectorAccess,
   hasMt940Access,
@@ -2350,12 +2351,19 @@ export const useUploadDemoController = () => {
   const hasPremiumExportAccess = hasMt940Access(entitlementInput);
   const hasTallyAccess = hasTallyXmlAccess(entitlementInput);
   const hasPremiumFormatsAccess = hasTallyAccess;
+  const hasIntegrationsAccess = hasAccountingIntegrationsAccess(entitlementInput);
   const hasFoirAccess = hasFoirDashboardAccess(entitlementInput);
   const hasFraudAccess = hasFraudDetectorAccess(entitlementInput);
 
   const getPremiumFormatLimit = (normalizedPlan: string): number | null => {
-    if (normalizedPlan === "per_page_pack_basic") return 25;
-    if (normalizedPlan === "per_page_pack_pro") return 300;
+    if (
+      normalizedPlan === "per_page_pack_basic" ||
+      normalizedPlan === "per_page_pack_pro" ||
+      normalizedPlan === "per_page_pack_enterprise" ||
+      normalizedPlan === "unlimited"
+    ) {
+      return 999999;
+    }
     return null;
   };
 
@@ -2431,6 +2439,10 @@ export const useUploadDemoController = () => {
     }
 
     if (format === 'quickbooks' || format === 'xero' || format === 'zoho') {
+      if (!hasIntegrationsAccess) {
+        setShowUpgradeDialog(true);
+        return;
+      }
       const usageContext = ensurePremiumFormatExportAllowed();
       if (!usageContext) return;
 

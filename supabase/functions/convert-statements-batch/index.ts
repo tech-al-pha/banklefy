@@ -2195,7 +2195,12 @@ Deno.serve(async (req) => {
     const incrementBy = isFreeMode ? successfulConversions : pagesWithDataTotal;
     let remaining = Math.max(0, conversionsLimit - conversionsUsed);
     if (incrementBy > 0) {
-      const { error: incrementError } = await (supabaseAdminClient.rpc as any)('increment_usage_count', {
+      const rpc = supabaseAdminClient.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ error: { message: string } | null }>;
+
+      const { error: incrementError } = await rpc('increment_usage_count', {
         p_ip_address: user ? undefined : trackingKey,
         p_user_id: user ? user.id : undefined,
         p_increment: incrementBy,

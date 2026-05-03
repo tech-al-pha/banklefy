@@ -286,9 +286,10 @@ const resolvePlanCapabilities = (rawPlan: string, isAdminOverride: boolean): Pla
   const isUnlimited = plan === 'unlimited';
   const isBasicPack = plan === 'per_page_pack_basic';
   const isProPack = plan === 'per_page_pack_pro';
+  const isEnterprisePack = plan === 'per_page_pack_enterprise';
   const isCurrentPaidPack = plan.startsWith('per_page') || isUnlimited;
-  const allowFoirExport = isUnlimited || isBasicPack || isProPack;
-  const allowFraudPreview = isUnlimited || isProPack;
+  const allowFoirExport = isUnlimited || isBasicPack || isProPack || isEnterprisePack;
+  const allowFraudPreview = isUnlimited || isEnterprisePack;
   const allowedFormats = new Set<ExportFormat>(core);
 
   if (allowFoirExport) {
