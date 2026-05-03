@@ -330,7 +330,7 @@ const getStructuredDataByRoute = (
           name: "How do refunds work?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Refunds for eligible one-time packs are processed within 14 days. Refunds are not available if 35% or more of the usage has been consumed. The same terms are listed in the Privacy Policy and handled through support.",
+            text: "14-day full refund. Requests are handled through support.",
           },
         },
       ],

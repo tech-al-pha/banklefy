@@ -721,7 +721,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "helpPage.sections.refunds.title": "Refunds",
 
-    "helpPage.sections.refunds.desc": "Refunds are available within 14 days for eligible one-time credit packs. Refunds are not available if 35% or more of usage is consumed. Contact support with your order ID.",
+    "helpPage.sections.refunds.desc": "14-day full refund. Contact support with your order ID.",
 
     "helpPage.sections.contact.title": "Contact Support",
 
@@ -1010,7 +1010,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "helpPage.sections.limits.title": "الحدود اليومية",
     "helpPage.sections.accuracy.title": "نصائح الدقة",
     "helpPage.sections.refunds.title": "المبالغ المستردة",
-    "helpPage.sections.refunds.desc": "تتوفر المبالغ المستردة في غضون 14 يومًا للخطط المؤهلة. لا يمكن استرداد الأموال في حالة استهلاك 35% أو أكثر من الاستخدام. اتصل بالدعم باستخدام معرف الطلب الخاص بك.",
+    "helpPage.sections.refunds.desc": "استرداد كامل خلال 14 يومًا. اتصل بالدعم مع رقم الطلب الخاص بك.",
     "helpPage.sections.contact.title": "اتصل بالدعم",
     "helpPage.sections.contact.desc": "بحاجة الى مساعدة؟ اتصل بالدعم وشارك معرف الطلب الخاص بك إذا كان متاحًا.",
     "helpPage.cta.contact": "اتصل بالدعم",
@@ -1289,7 +1289,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "helpPage.sections.limits.title": "每日限额",
     "helpPage.sections.accuracy.title": "准确性提示",
     "helpPage.sections.refunds.title": "退款",
-    "helpPage.sections.refunds.desc": "符合条件的计划可在 14 天内退款。如果使用量达到或超过 35%，则无法退款。联系支持人员并提供您的订单 ID。",
+    "helpPage.sections.refunds.desc": "14 天全额退款。请联系支持并提供您的订单 ID。",
     "helpPage.sections.contact.title": "联系支持人员",
     "helpPage.sections.contact.desc": "需要帮助吗？联系支持人员并分享您的订单 ID（如果有）。",
     "helpPage.cta.contact": "联系支持人员",
@@ -2014,7 +2014,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "helpPage.sections.refunds.title": "Reembolsos",
 
-    "helpPage.sections.refunds.desc": "Los reembolsos est?n disponibles dentro de los 14 d?as para los paquetes de cr?dito ?nicos elegibles. No hay reembolsos si se consume el 35% o m?s del uso. Contacta con soporte con tu ID de pedido.",
+    "helpPage.sections.refunds.desc": "Reembolso completo de 14 días. Contacta con soporte con tu ID de pedido.",
 
     "helpPage.sections.contact.title": "Contactar con soporte",
 
@@ -2303,7 +2303,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "helpPage.sections.limits.title": "दैनिक सीमाएँ",
     "helpPage.sections.accuracy.title": "सटीकता युक्तियाँ",
     "helpPage.sections.refunds.title": "रिफंड",
-    "helpPage.sections.refunds.desc": "पात्र योजनाओं के लिए रिफंड 14 दिनों के भीतर उपलब्ध हैं। यदि 35% या अधिक उपयोग हो जाता है तो रिफंड उपलब्ध नहीं होता है। अपने ऑर्डर आईडी के साथ समर्थन से संपर्क करें।",
+    "helpPage.sections.refunds.desc": "14-दिन का फुल रिफंड। अपने ऑर्डर आईडी के साथ सपोर्ट से संपर्क करें।",
     "helpPage.sections.contact.title": "समर्थन से संपर्क करें",
     "helpPage.sections.contact.desc": "मदद की ज़रूरत है? सहायता से संपर्क करें और यदि उपलब्ध हो तो अपना ऑर्डर आईडी साझा करें।",
     "helpPage.cta.contact": "समर्थन से संपर्क करें",

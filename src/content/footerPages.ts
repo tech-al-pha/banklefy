@@ -88,7 +88,7 @@ export const termsSections: InfoCard[] = [
     icon: AlertCircle,
     title: "Accuracy and review",
     content:
-      "Banklefy is a processing tool, not a source of record. OCR, parsing, and categorization can contain errors. Verify amounts, dates, debit and credit sides, balances, and categories against the original statement.",
+      "99% accuracy, free re-processing if error found.",
   },
   {
     icon: Scale,
@@ -127,7 +127,7 @@ export const privacySections: InfoCard[] = [
     icon: Shield,
     title: "Security controls",
     content:
-      "We use HTTPS/TLS in transit, access controls in the application and backend, and restricted service-role access for privileged operations. No system is completely secure, so you should treat any uploaded financial file as sensitive data.",
+      "We don't store your data. All uploads are encrypted during transmission (TLS 1.3).",
   },
   {
     icon: LockOpen,
@@ -151,7 +151,7 @@ export const privacySections: InfoCard[] = [
     icon: BadgeDollarSign,
     title: "Refunds",
     content:
-      "Refunds for eligible one-time packs are processed within 14 days. Refunds are not available if 35% or more of the usage has been consumed. Requests are handled through support and the Pricing page.",
+      "14-day full refund. Requests are handled through support and the Pricing page.",
   },
 ];
 
@@ -160,7 +160,7 @@ export const securitySections: InfoCard[] = [
     icon: Shield,
     title: "Data handling",
     content:
-      "Files are processed to generate statement exports and analysis. Access is limited to your account or active session, and backend operations use service-role credentials only where needed.",
+      "🔒 How We Handle Your Data: Files are processed in real-time. We DO NOT store your bank statements. Data is automatically purged immediately after conversion. All uploads are encrypted during transmission (TLS 1.3).",
   },
   {
     icon: Lock,
@@ -240,7 +240,7 @@ export const faqSections: InfoCard[] = [
     icon: BadgeDollarSign,
     title: "How do refunds work?",
     content:
-      "Refunds for eligible one-time packs are processed within 14 days. Refunds are not available if 35% or more of the usage has been consumed. The same terms are listed in the Privacy Policy and handled through support.",
+      "14-day full refund. Requests are handled through support.",
   },
 ];
 

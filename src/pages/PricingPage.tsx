@@ -74,7 +74,7 @@ const pricingPlans: Plan[] = [
     price: "₹19,999",
     amountInRupee: 19999,
     unit: "one-time",
-    description: "High-volume credits for teams",
+    description: "High-volume credits for teams (Launch offer â€” India pricing)",
     statements: "11,000 Pages",
     statementsNote: "1000 premium formats",
     features: [
@@ -622,9 +622,7 @@ const PricingPage = () => {
             <div>
               <h2 className="text-2xl font-bold text-white">Refund Policy</h2>
               <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-                Refunds are processed within 14 days. Refunds are not available if 35% or more
-                of the plan usage has been consumed. Repeated refund requests may result in
-                IP blocking to prevent abuse. Email support with your order ID to start the refund.
+                14-day full refund. Email support with your order ID to start the refund.
               </p>
               <SupportContactDialog
                 source="pricing_refund"
