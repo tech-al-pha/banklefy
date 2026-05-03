@@ -74,7 +74,7 @@ const pricingPlans: Plan[] = [
     price: "₹19,999",
     amountInRupee: 19999,
     unit: "one-time",
-    description: "High-volume credits for teams (Launch offer â€” India pricing)",
+    description: "High-volume credits for teams",
     statements: "11,000 Pages",
     statementsNote: "1000 premium formats",
     features: [
@@ -415,6 +415,7 @@ const PricingPage = () => {
 
   const renderPlanCard = (plan: Plan) => {
     const isProcessing = processingPlan === plan.planId;
+    const showLaunchOffer = plan.planId === "per_page_pack_basic" || plan.planId === "per_page_pack_pro";
     const planFeatureItems = plan.editPdfDetector
       ? [...plan.features, `${plan.editPdfDetector} Edit PDF Detector`]
       : plan.features;
@@ -431,6 +432,12 @@ const PricingPage = () => {
         {plan.highlighted && (
           <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground border-0 font-bold px-4 py-1 uppercase tracking-wider text-xs">
             Most Popular
+          </Badge>
+        )}
+
+        {showLaunchOffer && (
+          <Badge className="absolute top-4 right-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-black border-0 font-extrabold px-3 py-1 uppercase tracking-widest text-[10px] shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+            Launch Offer
           </Badge>
         )}
 
