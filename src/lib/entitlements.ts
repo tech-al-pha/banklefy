@@ -69,7 +69,16 @@ const resolvePlanForFeatures = (input: EntitlementInput): string =>
   resolveEffectivePlanType(input.planType, input.conversionsLimit);
 
 export const hasMt940Access = (input: EntitlementInput): boolean =>
-  isPaidPlan(input);
+  {
+    const normalizedPlan = resolvePlanForFeatures(input);
+    return (
+      normalizedPlan === "unlimited" ||
+      normalizedPlan === "per_page_pack_starter" ||
+      normalizedPlan === "per_page_pack_basic" ||
+      normalizedPlan === "per_page_pack_pro" ||
+      normalizedPlan === "per_page_pack_enterprise"
+    );
+  };
 
 export const hasTallyXmlAccess = (input: EntitlementInput): boolean => {
   const normalizedPlan = resolvePlanForFeatures(input);
