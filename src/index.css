@@ -131,7 +131,7 @@
   html.luxury-cursor-active,
   html.luxury-cursor-active body,
   html.luxury-cursor-active * {
-    cursor: auto !important;
+    cursor: none !important;
   }
 
   #root {

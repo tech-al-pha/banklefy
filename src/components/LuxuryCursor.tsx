@@ -7,6 +7,7 @@ export const LuxuryCursor = () => {
   const [isEnabled, setIsEnabled] = useState(false);
   const isVisibleRef = useRef(false);
   const isHoveringRef = useRef(false);
+  const isActiveRef = useRef(false);
   const positionRef = useRef({ x: -100, y: -100 });
   const rafRef = useRef<number | undefined>(undefined);
 
@@ -20,7 +21,6 @@ export const LuxuryCursor = () => {
   useEffect(() => {
     if (!isEnabled) return;
     const root = document.documentElement;
-    root.classList.add("luxury-cursor-active");
 
     const updateCursor = () => {
       if (cursorRef.current) {
@@ -34,6 +34,10 @@ export const LuxuryCursor = () => {
       if (!isVisibleRef.current) {
         isVisibleRef.current = true;
         setIsVisible(true);
+      }
+      if (!isActiveRef.current) {
+        isActiveRef.current = true;
+        root.classList.add("luxury-cursor-active");
       }
       
       // Use requestAnimationFrame for smooth updates
@@ -97,11 +101,12 @@ export const LuxuryCursor = () => {
       }
       isVisibleRef.current = false;
       isHoveringRef.current = false;
+      isActiveRef.current = false;
       root.classList.remove("luxury-cursor-active");
     };
   }, [isEnabled]);
 
-  if (!isEnabled || !isVisible) return null;
+  if (!isEnabled) return null;
 
   return (
     <div
@@ -110,6 +115,7 @@ export const LuxuryCursor = () => {
       style={{
         left: -100,
         top: -100,
+        opacity: isVisible ? 1 : 0,
       }}
     />
   );
