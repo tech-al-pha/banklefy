@@ -92,6 +92,7 @@ type ResultsSectionProps = {
   transactions: Transaction[];
   isPaidUser: boolean;
   hasTallyAccess: boolean;
+  hasIntegrationsAccess: boolean;
   exportAsCSV: () => Promise<void>;
   handleTallyExport: () => Promise<boolean>;
   handlePremiumExport: (format: "json" | "mt940" | "quickbooks" | "xero" | "zoho" | "tally") => void;
@@ -129,6 +130,7 @@ export const ResultsSection = ({
   transactions,
   isPaidUser,
   hasTallyAccess,
+  hasIntegrationsAccess,
   exportAsCSV,
   handleTallyExport,
   handlePremiumExport,
@@ -552,15 +554,15 @@ export const ResultsSection = ({
   if (!isPaidUser) lockedFormats.push("JSON", "MT940");
 
   const premiumFormatCards = [
-    {
+    ...(hasTallyAccess ? [{
       key: "tally",
       label: "Tally",
       status: "live" as const,
       onClick: () => void handlePremiumExport("tally"),
       className:
         "border-[#6a5b3a]/70 bg-[#211b12] text-[#ead8a7] hover:border-[#8a7650] hover:bg-[#282015]",
-    },
-    {
+    }] : []),
+    ...(hasIntegrationsAccess ? [{
       key: "quickbooks",
       label: "QuickBooks",
       status: "live" as const,
@@ -583,7 +585,7 @@ export const ResultsSection = ({
       onClick: () => void handlePremiumExport("zoho"),
       className:
         "border-[#6c5148]/70 bg-[#221815] text-[#e2cbc3] hover:border-[#866258] hover:bg-[#2a1d19]",
-    },
+    }] : []),
   ];
   const selectedPremiumLabel = premiumFormatCards.find((item) => item.key === selectedPremiumFormat)?.label ?? "Premium Format";
 
