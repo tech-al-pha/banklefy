@@ -282,15 +282,30 @@ const resolvePlanCapabilities = (rawPlan: string, isAdminOverride: boolean): Pla
     };
   }
 
-  const core = new Set<ExportFormat>(['xlsx', 'csv', 'json', 'mt940']);
+  const core: Set<ExportFormat> = new Set(['xlsx', 'csv', 'json', 'mt940']);
   const isUnlimited = plan === 'unlimited';
+  const isOneTimeConversion =
+    plan === 'per_page_lite' ||
+    plan === 'per_page_standard' ||
+    plan === 'per_page_power';
+  const isStarterPack = plan === 'per_page_pack_starter';
   const isBasicPack = plan === 'per_page_pack_basic';
   const isProPack = plan === 'per_page_pack_pro';
   const isEnterprisePack = plan === 'per_page_pack_enterprise';
   const isCurrentPaidPack = plan.startsWith('per_page') || isUnlimited;
   const allowFoirExport = isUnlimited || isBasicPack || isProPack || isEnterprisePack;
   const allowFraudPreview = isUnlimited || isEnterprisePack;
-  const allowedFormats = new Set<ExportFormat>(core);
+
+  // One-time conversions should only support XLSX + CSV.
+  // Starter/Basic/Pro/Enterprise packs support the full core exports (XLSX/CSV/JSON/MT940).
+  const basePaidFormats: Set<ExportFormat> = isOneTimeConversion
+    ? new Set<ExportFormat>(['xlsx', 'csv'])
+    : new Set<ExportFormat>(core);
+
+  // Ensure starter pack is treated as paid pack for core exports.
+  const allowCorePaidExports = isUnlimited || isStarterPack || isBasicPack || isProPack || isEnterprisePack;
+
+  const allowedFormats = new Set<ExportFormat>(basePaidFormats);
 
   if (allowFoirExport) {
     allowedFormats.add('foir_report');
@@ -301,7 +316,11 @@ const resolvePlanCapabilities = (rawPlan: string, isAdminOverride: boolean): Pla
 
   return {
     planName: plan || 'free',
-    allowedFormats: isCurrentPaidPack ? allowedFormats : core,
+    allowedFormats: isCurrentPaidPack
+      ? allowCorePaidExports
+        ? allowedFormats
+        : new Set<ExportFormat>(['xlsx', 'csv'])
+      : new Set<ExportFormat>(['xlsx', 'csv']),
     allowFraudPreview,
     allowFoirExport,
   };

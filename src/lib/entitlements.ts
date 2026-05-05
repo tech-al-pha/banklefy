@@ -60,7 +60,18 @@ export const resolveEffectivePlanType = (
 export const isPaidPlan = ({ planType, conversionsLimit }: EntitlementInput): boolean => {
   const normalizedPlan = resolveEffectivePlanType(planType, conversionsLimit);
 
-  if (normalizedPlan === "unlimited" || normalizedPlan.startsWith("per_page")) return true;
+  if (normalizedPlan === "unlimited") return true;
+
+  // One-time conversions should not unlock premium exports (JSON/MT940/etc.).
+  if (
+    normalizedPlan === "per_page_lite" ||
+    normalizedPlan === "per_page_standard" ||
+    normalizedPlan === "per_page_power"
+  ) {
+    return false;
+  }
+
+  if (normalizedPlan.startsWith("per_page_pack_")) return true;
 
   return false;
 };
