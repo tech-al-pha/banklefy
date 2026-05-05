@@ -301,6 +301,7 @@ export const UploadDemoView = ({
                   transactions={transactions}
                   isPaidUser={isPaidUser}
                   hasTallyAccess={hasTallyAccess}
+                  hasIntegrationsAccess={hasIntegrationsAccess}
                   exportAsCSV={exportAsCSV}
                   handleTallyExport={handleTallyExport}
                   handlePremiumExport={handlePremiumExport}
