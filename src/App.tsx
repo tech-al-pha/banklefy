@@ -6,7 +6,6 @@ import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { activeLanguages } from "@/contexts/languageData";
-import { LuxuryCursor } from "@/components/LuxuryCursor";
 import { Suspense } from "react";
 import { Helmet, HelmetProvider } from "@dr.pogodin/react-helmet";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -566,7 +565,6 @@ const App = () => (
       <LanguageProvider>
         <AuthProvider>
           <TooltipProvider>
-            <LuxuryCursor />
             <Toaster />
             <Sonner />
             <AppRoutes />
