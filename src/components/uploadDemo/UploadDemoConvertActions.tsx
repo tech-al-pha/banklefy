@@ -11,6 +11,8 @@ type UploadDemoConvertActionsProps = {
   uploadPrepActive: boolean;
   limitReached: boolean;
   hasPremiumFormatsAccess: boolean;
+  hasTallyAccess: boolean;
+  hasIntegrationsAccess: boolean;
   editedPdfWarningActive: boolean;
   lastErrorActive: boolean;
   onConvertStandard: () => void;
@@ -25,6 +27,8 @@ export const UploadDemoConvertActions = ({
   uploadPrepActive,
   limitReached,
   hasPremiumFormatsAccess,
+  hasTallyAccess,
+  hasIntegrationsAccess,
   editedPdfWarningActive,
   lastErrorActive,
   onConvertStandard,
@@ -39,10 +43,12 @@ export const UploadDemoConvertActions = ({
 
   const disabled = uploading || converting || uploadPrepActive || editedPdfWarningActive;
   const premiumFormats: Array<{ key: PremiumFormat; label: string; className: string }> = [
-    { key: "tally", label: "Tally", className: "border-[#6a5b3a]/70 bg-[#211b12] text-[#ead8a7] hover:border-[#8a7650] hover:bg-[#282015]" },
-    { key: "quickbooks", label: "QuickBooks", className: "border-[#395947]/70 bg-[#16211b] text-[#c7ddcf] hover:border-[#4b735b] hover:bg-[#1a2821]" },
-    { key: "xero", label: "Xero", className: "border-[#365566]/70 bg-[#131f27] text-[#c5d8e4] hover:border-[#496d81] hover:bg-[#182630]" },
-    { key: "zoho", label: "Zoho", className: "border-[#6c5148]/70 bg-[#221815] text-[#e2cbc3] hover:border-[#866258] hover:bg-[#2a1d19]" },
+    ...(hasTallyAccess ? [{ key: "tally" as const, label: "Tally", className: "border-[#6a5b3a]/70 bg-[#211b12] text-[#ead8a7] hover:border-[#8a7650] hover:bg-[#282015]" }] : []),
+    ...(hasIntegrationsAccess ? [
+      { key: "quickbooks" as const, label: "QuickBooks", className: "border-[#395947]/70 bg-[#16211b] text-[#c7ddcf] hover:border-[#4b735b] hover:bg-[#1a2821]" },
+      { key: "xero" as const, label: "Xero", className: "border-[#365566]/70 bg-[#131f27] text-[#c5d8e4] hover:border-[#496d81] hover:bg-[#182630]" },
+      { key: "zoho" as const, label: "Zoho", className: "border-[#6c5148]/70 bg-[#221815] text-[#e2cbc3] hover:border-[#866258] hover:bg-[#2a1d19]" },
+    ] : []),
   ];
 
   return (
