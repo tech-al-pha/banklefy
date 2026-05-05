@@ -354,8 +354,7 @@ const PricingPage = () => {
   };
 
   const handlePlanPurchase = async (plan: Plan) => {
-    const noLoginPlans = new Set(["per_page_lite", "per_page_standard", "per_page_power"]);
-    if (!isAuthenticated && !noLoginPlans.has(plan.planId)) {
+    if (!isAuthenticated) {
       toast.error("Please login to purchase a plan.");
       navigate("/auth");
       return;

@@ -72,7 +72,7 @@
     line-height: 1.6;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
-    cursor: none;
+    cursor: auto;
   }
 
   html[lang="ar"] body {
@@ -131,7 +131,7 @@
   html.luxury-cursor-active,
   html.luxury-cursor-active body,
   html.luxury-cursor-active * {
-    cursor: none !important;
+    cursor: auto !important;
   }
 
   #root {

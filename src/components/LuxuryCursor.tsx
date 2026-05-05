@@ -21,18 +21,6 @@ export const LuxuryCursor = () => {
     if (!isEnabled) return;
     const root = document.documentElement;
     root.classList.add("luxury-cursor-active");
-    const styleId = "force-cursor-none";
-    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
-    if (!styleEl) {
-      styleEl = document.createElement("style");
-      styleEl.id = styleId;
-      styleEl.textContent = `
-        html, body, * , *::before, *::after {
-          cursor: none !important;
-        }
-      `;
-      document.head.appendChild(styleEl);
-    }
 
     const updateCursor = () => {
       if (cursorRef.current) {
@@ -110,9 +98,6 @@ export const LuxuryCursor = () => {
       isVisibleRef.current = false;
       isHoveringRef.current = false;
       root.classList.remove("luxury-cursor-active");
-      if (styleEl && styleEl.parentNode) {
-        styleEl.parentNode.removeChild(styleEl);
-      }
     };
   }, [isEnabled]);
 
