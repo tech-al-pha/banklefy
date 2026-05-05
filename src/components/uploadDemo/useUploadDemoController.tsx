@@ -2738,6 +2738,7 @@ export const useUploadDemoController = () => {
     handleRetryLastConversion,
     hasTallyAccess,
     hasPremiumFormatsAccess,
+    hasIntegrationsAccess,
     handleRunStandardConversion: () => runSelectedConversion('standard', null),
     handleRunPremiumConversion: (format: PremiumFormat) => runSelectedConversion('standard', format),
     pluralize,
