@@ -121,19 +121,14 @@ export const hasFoirDashboardAccess = (input: EntitlementInput): boolean => {
 };
 
 export const hasFraudDetectorAccess = (input: EntitlementInput): boolean => {
-  const normalizedPlan = resolvePlanForFeatures(input);
-  return (
-    normalizedPlan === "unlimited" ||
-    normalizedPlan === "per_page_pack_enterprise"
-  );
+  // Risk signals (circular trading, balance/pricing mismatches, etc.) are shown for all plans.
+  // Edit-detector (PDF tamper) signals remain gated separately by getEditPdfDetectorTier().
+  return true;
 };
 
 export const getEditPdfDetectorTier = (input: EntitlementInput): "none" | "basic" | "advanced" => {
   const normalizedPlan = resolvePlanForFeatures(input);
   if (normalizedPlan === "unlimited" || normalizedPlan === "per_page_pack_enterprise") return "advanced";
   if (normalizedPlan === "per_page_pack_pro") return "basic";
-  if (normalizedPlan === "per_page_pack_basic") {
-    return "basic";
-  }
   return "none";
 };

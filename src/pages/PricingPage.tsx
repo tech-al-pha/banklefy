@@ -51,7 +51,13 @@ const pricingPlans: Plan[] = [
     unit: "forever",
     description: "Test our accuracy before you buy.",
     statements: "2 Pages / day (Guest) | 5 Pages / day (Signed in)",
-    features: ["XLSX exports", "CSV exports"],
+    features: [
+      "XLSX exports",
+      "CSV exports",
+      "★ Pricing mismatch",
+      "★ Circular trading",
+      "★ API (Beta, signed-in)",
+    ],
     isFree: true,
   },
   {
@@ -63,7 +69,7 @@ const pricingPlans: Plan[] = [
     unit: "one-time",
     description: "Perfect for testing JSON and MT940.",
     statements: "500 Pages",
-    features: ["XLSX", "CSV", "JSON", "MT940"],
+    features: ["XLSX", "CSV", "JSON", "MT940", "★ Pricing mismatch", "★ Circular trading", "★ API (Beta)"],
   },
   {
     planId: "per_page_pack_basic",
@@ -80,6 +86,10 @@ const pricingPlans: Plan[] = [
       "JSON",
       "MT940",
       "Tally XML",
+      "★ EMI + LOAN + FOIR calculator",
+      "★ Pricing mismatch",
+      "★ Circular trading",
+      "★ API (Beta)",
     ],
     highlighted: true,
   },
@@ -92,7 +102,21 @@ const pricingPlans: Plan[] = [
     unit: "one-time",
     description: "Full accounting software integration — Xero, Zoho, QuickBooks.",
     statements: "5,000 Pages",
-    features: ["XLSX", "CSV", "JSON", "MT940", "Tally XML", "Xero", "Zoho", "QuickBooks"],
+    features: [
+      "XLSX",
+      "CSV",
+      "JSON",
+      "MT940",
+      "Tally XML",
+      "Xero",
+      "Zoho",
+      "QuickBooks",
+      "★ EMI + LOAN + FOIR calculator",
+      "★ Edit detector",
+      "★ Pricing mismatch",
+      "★ Circular trading",
+      "★ API (Beta)",
+    ],
   },
   {
     planId: "per_page_pack_enterprise",
@@ -103,7 +127,16 @@ const pricingPlans: Plan[] = [
     unit: "one-time",
     description: "Fraud detection + priority support. For large teams.",
     statements: "11,000 Pages",
-    features: ["All Pro formats", "Fraud detection", "Priority support"],
+    features: [
+      "All Pro formats",
+      "★ Fraud detection",
+      "★ EMI + LOAN + FOIR calculator",
+      "★ Edit detector",
+      "★ Pricing mismatch",
+      "★ Circular trading",
+      "★ API (Beta)",
+      "★ Priority support",
+    ],
   },
 ];
 
@@ -118,7 +151,7 @@ const perConversionPlans: Plan[] = [
     unit: "/conversion",
     description: "No login required. Perfect for one-off conversions.",
     statements: "10 Pages",
-    features: ["XLSX", "CSV"],
+    features: ["XLSX", "CSV", "★ Pricing mismatch", "★ Circular trading"],
   },
   {
     planId: "per_page_standard",
@@ -129,7 +162,7 @@ const perConversionPlans: Plan[] = [
     unit: "/conversion",
     description: "No login required. Perfect for one-off conversions.",
     statements: "25 Pages",
-    features: ["XLSX", "CSV"],
+    features: ["XLSX", "CSV", "★ Pricing mismatch", "★ Circular trading"],
     highlighted: true,
   },
   {
@@ -141,7 +174,7 @@ const perConversionPlans: Plan[] = [
     unit: "/conversion",
     description: "No login required. Perfect for one-off conversions.",
     statements: "50 Pages",
-    features: ["XLSX", "CSV"],
+    features: ["XLSX", "CSV", "★ Pricing mismatch", "★ Circular trading"],
   },
 ];
 
@@ -160,6 +193,7 @@ const comparisonTables: ComparisonTable[] = [
       { label: "Xero", values: ["No", "No", "Yes", "Yes"] },
       { label: "Zoho", values: ["No", "No", "Yes", "Yes"] },
       { label: "QuickBooks", values: ["No", "No", "Yes", "Yes"] },
+      { label: "API (Beta)", values: ["Yes", "Yes", "Yes", "Yes"] },
       { label: "Fraud detection", values: ["No", "No", "No", "Yes"] },
       { label: "Priority support", values: ["No", "No", "No", "Yes"] },
     ],
@@ -441,6 +475,8 @@ const PricingPage = () => {
     const planFeatureItems = plan.editPdfDetector
       ? [...plan.features, `${plan.editPdfDetector} Edit PDF Detector`]
       : plan.features;
+    const highlightFeature = (feature: string) => feature.trim().startsWith("★");
+    const displayFeature = (feature: string) => feature.replace(/^★\s*/, "");
 
     return (
       <Card
@@ -500,7 +536,9 @@ const PricingPage = () => {
               {planFeatureItems.map((feature, idx) => (
                 <li key={idx} className="flex items-start gap-2">
                   <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-muted-foreground">{feature}</span>
+                  <span className={`text-sm ${highlightFeature(feature) ? "text-white font-semibold" : "text-muted-foreground"}`}>
+                    {displayFeature(feature)}
+                  </span>
                 </li>
               ))}
             </ul>
