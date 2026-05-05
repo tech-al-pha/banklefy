@@ -459,7 +459,7 @@ const PricingPage = () => {
 
         {showLaunchOffer && (
           <Badge className="absolute top-4 right-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-black border-0 font-extrabold px-3 py-1 uppercase tracking-widest text-[10px] shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-            Launch Offer
+            Bestseller
           </Badge>
         )}
 
