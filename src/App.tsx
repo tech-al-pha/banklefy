@@ -12,6 +12,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { RequireAuth, RequirePaid } from "@/components/RouteGuards";
 import LoadingScreen from "@/components/LoadingScreen";
+import { LuxuryCursor } from "@/components/LuxuryCursor";
 
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const Index = lazyWithRetry(() => import("./pages/Index"));
@@ -565,6 +566,7 @@ const App = () => (
       <LanguageProvider>
         <AuthProvider>
           <TooltipProvider>
+            <LuxuryCursor />
             <Toaster />
             <Sonner />
             <AppRoutes />
