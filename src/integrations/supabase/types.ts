@@ -369,8 +369,13 @@ export type Database = {
           conversions_limit: number
           conversions_used: number
           created_at: string
+          free_daily_limit: number
+          free_daily_used: number
           id: string
           last_reset_date: string
+          pack_limit: number
+          pack_used: number
+          plan_type: string
           tier: Database["public"]["Enums"]["subscription_tier"]
           timezone: string
           updated_at: string
@@ -382,8 +387,13 @@ export type Database = {
           conversions_limit?: number
           conversions_used?: number
           created_at?: string
+          free_daily_limit?: number
+          free_daily_used?: number
           id?: string
           last_reset_date?: string
+          pack_limit?: number
+          pack_used?: number
+          plan_type?: string
           tier?: Database["public"]["Enums"]["subscription_tier"]
           timezone?: string
           updated_at?: string
@@ -395,8 +405,13 @@ export type Database = {
           conversions_limit?: number
           conversions_used?: number
           created_at?: string
+          free_daily_limit?: number
+          free_daily_used?: number
           id?: string
           last_reset_date?: string
+          pack_limit?: number
+          pack_used?: number
+          plan_type?: string
           tier?: Database["public"]["Enums"]["subscription_tier"]
           timezone?: string
           updated_at?: string
@@ -445,6 +460,23 @@ export type Database = {
       increment_usage_count: {
         Args: { p_ip_address?: string; p_user_id?: string }
         Returns: boolean
+      }
+      process_razorpay_payment: {
+        Args: {
+          p_amount: number
+          p_currency: string
+          p_order_id: string
+          p_pages_to_add: number
+          p_plan_id: string
+          p_razorpay_order_id: string
+          p_razorpay_payment_id: string
+          p_razorpay_signature: string
+          p_user_id: string
+        }
+        Returns: {
+          already_processed: boolean
+          pages_added: number
+        }[]
       }
     }
     Enums: {

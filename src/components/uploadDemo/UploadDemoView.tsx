@@ -53,6 +53,7 @@ type UploadDemoViewProps = {
   handleRetryLastConversion: () => void;
   hasTallyAccess: boolean;
   hasPremiumFormatsAccess: boolean;
+  hasIntegrationsAccess: boolean;
   handleRunStandardConversion: () => void;
   handleRunPremiumConversion: (format: PremiumFormat) => void;
   pluralize: (count: number, singular: string, plural?: string) => string;
@@ -143,6 +144,7 @@ export const UploadDemoView = ({
   handleRetryLastConversion,
   hasTallyAccess,
   hasPremiumFormatsAccess,
+  hasIntegrationsAccess,
   handleRunStandardConversion,
   handleRunPremiumConversion,
   pluralize,
@@ -275,6 +277,8 @@ export const UploadDemoView = ({
                   uploadPrepActive={uploadPrepActive}
                   limitReached={limitReached}
                   hasPremiumFormatsAccess={hasPremiumFormatsAccess}
+                  hasTallyAccess={hasTallyAccess}
+                  hasIntegrationsAccess={hasIntegrationsAccess}
                   editedPdfWarningActive={Boolean(editedPdfWarning)}
                   lastErrorActive={Boolean(lastError)}
                   onConvertStandard={handleRunStandardConversion}
@@ -297,6 +301,7 @@ export const UploadDemoView = ({
                   transactions={transactions}
                   isPaidUser={isPaidUser}
                   hasTallyAccess={hasTallyAccess}
+                  hasIntegrationsAccess={hasIntegrationsAccess}
                   exportAsCSV={exportAsCSV}
                   handleTallyExport={handleTallyExport}
                   handlePremiumExport={handlePremiumExport}
