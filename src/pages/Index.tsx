@@ -362,6 +362,22 @@ const Index = () => {
                       {t('footer.terms')}
                     </Link>
                   </li>
+                  <li>
+                    <Link
+                      to="/cancellation-and-refund"
+                      className="text-glow-link text-left font-medium"
+                    >
+                      Cancellation & Refund
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/shipping-and-exchange"
+                      className="text-glow-link text-left font-medium"
+                    >
+                      Shipping & Exchange
+                    </Link>
+                  </li>
                 </ul>
               </div>
             </div>

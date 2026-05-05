@@ -30,6 +30,8 @@ const HowItWorksPage = lazyWithRetry(() => import("./pages/HowItWorksPage"));
 const SecurityPage = lazyWithRetry(() => import("./pages/Security"));
 const ContactPage = lazyWithRetry(() => import("./pages/Contact"));
 const FaqsPage = lazyWithRetry(() => import("./pages/Faqs"));
+const CancellationRefundPage = lazyWithRetry(() => import("./pages/CancellationRefund"));
+const ShippingExchangePage = lazyWithRetry(() => import("./pages/ShippingExchange"));
 const BlogLaunch = lazyWithRetry(() => import("./pages/blog/LaunchPost"));
 const BlogAccuracy = lazyWithRetry(() => import("./pages/blog/AccuracyPost"));
 const BlogPrivacy = lazyWithRetry(() => import("./pages/blog/PrivacyPost"));
@@ -119,6 +121,14 @@ const META_BY_PATH: Record<string, RouteMeta> = {
   "/contact": {
     title: "Contact | Banklefy",
     description: "How to contact Banklefy support for conversion, billing, privacy, and account issues.",
+  },
+  "/cancellation-and-refund": {
+    title: "Cancellation & Refund Policy | Banklefy",
+    description: "Refund timelines and how to request a refund for eligible purchases.",
+  },
+  "/shipping-and-exchange": {
+    title: "Shipping & Exchange Policy | Banklefy",
+    description: "Banklefy is a digital service. No physical goods are shipped.",
   },
   "/faqs": {
     title: "FAQs & Help | Banklefy",
@@ -541,6 +551,8 @@ const AppRoutes = () => {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/cookie-policy" element={<Navigate to="/privacy" replace />} />
           <Route path="/documentation" element={<Navigate to="/faqs#help" replace />} />
+          <Route path="/cancellation-and-refund" element={<CancellationRefundPage />} />
+          <Route path="/shipping-and-exchange" element={<ShippingExchangePage />} />
           <Route path="/faqs" element={<FaqsPage />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/launch" element={<BlogLaunch />} />
