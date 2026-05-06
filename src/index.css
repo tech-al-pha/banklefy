@@ -113,6 +113,12 @@
     color-scheme: dark;
   }
 
+  html,
+  body,
+  #root {
+    overflow-x: hidden;
+  }
+
   input,
   textarea,
   select {

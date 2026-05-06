@@ -150,7 +150,7 @@ const Index = () => {
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="bg-surface-elevated/95 border-primary/20 w-[320px]">
+                <SheetContent side="right" className="bg-black/95 border-primary/20 w-[320px]">
                   <SheetHeader className="sr-only">
                     <SheetTitle>Navigation</SheetTitle>
                     <SheetDescription>Mobile menu</SheetDescription>
@@ -262,123 +262,81 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-primary/20 py-16 px-4 sm:px-6 bg-background">
         <div className="container mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-[1.2fr_0.9fr_0.9fr_0.9fr] gap-8 mb-12">
+          <div className="mb-12 grid grid-cols-1 gap-10 md:grid-cols-[1.15fr_1fr] md:gap-16">
             <div className="space-y-4">
               <Logo />
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {t('hero.subtitle')}
               </p>
             </div>
-            
-            <div className="flex flex-col md:items-start">
-              <div>
-                <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.product')}</h4>
-                <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li>
-                    <Link
-                      to="/how-it-works"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.howItWorks')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/security"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.security')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/blog"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.blog')}
-                    </Link>
-                  </li>
-                </ul>
+            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-12">
+              <div className="space-y-4">
+                <Link
+                  to="/how-it-works"
+                  className="block text-left text-sm font-medium text-white/84 transition-colors hover:text-white"
+                >
+                  {t('footer.howItWorks')}
+                </Link>
+                <Link
+                  to="/security"
+                  className="block text-left text-sm font-medium text-white/84 transition-colors hover:text-white"
+                >
+                  {t('footer.security')}
+                </Link>
+                <Link
+                  to="/blog"
+                  className="block text-left text-sm font-medium text-white/84 transition-colors hover:text-white"
+                >
+                  {t('footer.blog')}
+                </Link>
+                <Link
+                  to="/faqs#help"
+                  className="block text-left text-sm font-medium text-white/84 transition-colors hover:text-white"
+                >
+                  {t('footer.helpCenter')}
+                </Link>
               </div>
-            </div>
 
-            <div className="flex flex-col md:items-start">
-              <div>
-                <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.resources')}</h4>
-                <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li>
-                    <Link
-                      to="/faqs#help"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.helpCenter')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/sample-report"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.sampleReport')}
-                    </Link>
-                  </li>
-                </ul>
+              <div className="space-y-4">
+                <Link
+                  to="/sample-report"
+                  className="block text-left text-sm font-medium text-white/84 transition-colors hover:text-white"
+                >
+                  {t('footer.sampleReport')}
+                </Link>
+                <Link
+                  to="/about"
+                  className="block text-left text-sm font-medium text-white/84 transition-colors hover:text-white"
+                >
+                  About & Contact
+                </Link>
+                <a
+                  href="https://www.banklefy.site/privacy"
+                  className="block text-left text-sm font-medium text-white/92 transition-colors hover:text-white"
+                >
+                  Privacy Policy
+                </a>
               </div>
-            </div>
-            
-            <div className="flex flex-col md:items-start">
-              <div className="w-full md:w-auto">
-                <h4 className="font-bold mb-6 text-foreground uppercase tracking-widest text-xs">{t('footer.company')}</h4>
-                <ul className="space-y-3 text-sm text-muted-foreground">
-                  <li>
-                    <Link
-                      to="/about"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.about')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/contact"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.contact')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/privacy"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.privacy')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/terms"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      {t('footer.terms')}
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/cancellation-and-refund"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      Cancellation & Refund
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      to="/shipping-and-exchange"
-                      className="text-glow-link text-left font-medium"
-                    >
-                      Shipping & Exchange
-                    </Link>
-                  </li>
-                </ul>
+
+              <div className="space-y-4">
+                <Link
+                  to="/terms"
+                  className="block text-left text-sm font-medium text-white/84 transition-colors hover:text-white"
+                >
+                  Terms of Use
+                </Link>
+                <Link
+                  to="/cancellation-and-refund"
+                  className="block text-left text-sm font-medium text-white/84 transition-colors hover:text-white"
+                >
+                  Refund Policy
+                </Link>
+                <Link
+                  to="/shipping-and-exchange"
+                  className="block text-left text-sm font-medium text-white/84 transition-colors hover:text-white"
+                >
+                  Delivery & Exchange
+                </Link>
               </div>
             </div>
           </div>

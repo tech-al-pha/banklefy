@@ -112,19 +112,20 @@ Deno.serve(async (req) => {
   }
 
   const razorpaySecret =
-    Deno.env.get('RAZERPAY_SECRET_KEY') ||
+    Deno.env.get('RAZORPAY_KEY_SECRET') ||
     Deno.env.get('RAZORPAY_SECRET_KEY') ||
-    Deno.env.get('RAZORPAY_KEY_SECRET');
+    Deno.env.get('RAZERPAY_SECRET_KEY');
   const serverRazorpayKeyId =
-    Deno.env.get('RAZERPAY_SITE_KEY') ||
-    Deno.env.get('RAZORPAY_SITE_KEY') ||
     Deno.env.get('RAZORPAY_KEY_ID') ||
-    Deno.env.get('VITE_RAZORPAY_SITE_KEY');
+    Deno.env.get('RAZORPAY_SITE_KEY') ||
+    Deno.env.get('RAZERPAY_SITE_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
   if (!razorpaySecret) {
-    return respond(req, 500, { error: 'Razorpay secret key is not configured.' });
+    return respond(req, 500, {
+      error: 'Razorpay secret key is not configured. Set RAZORPAY_KEY_SECRET (recommended) or RAZORPAY_SECRET_KEY in Supabase Function secrets.',
+    });
   }
 
   if (!supabaseUrl || !supabaseServiceKey) {
@@ -160,7 +161,9 @@ Deno.serve(async (req) => {
   }
 
   if (!serverRazorpayKeyId) {
-    return respond(req, 500, { error: 'Razorpay site key is not configured on server.' });
+    return respond(req, 500, {
+      error: 'Razorpay key id is not configured on server. Set RAZORPAY_KEY_ID (recommended) or RAZORPAY_SITE_KEY in Supabase Function secrets.',
+    });
   }
 
   const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization');

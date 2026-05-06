@@ -28,7 +28,6 @@ const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const Blog = lazyWithRetry(() => import("./pages/Blog"));
 const HowItWorksPage = lazyWithRetry(() => import("./pages/HowItWorksPage"));
 const SecurityPage = lazyWithRetry(() => import("./pages/Security"));
-const ContactPage = lazyWithRetry(() => import("./pages/Contact"));
 const FaqsPage = lazyWithRetry(() => import("./pages/Faqs"));
 const CancellationRefundPage = lazyWithRetry(() => import("./pages/CancellationRefund"));
 const ShippingExchangePage = lazyWithRetry(() => import("./pages/ShippingExchange"));
@@ -548,7 +547,7 @@ const AppRoutes = () => {
           <Route path="/help" element={<Navigate to="/faqs#help" replace />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/security" element={<SecurityPage />} />
-          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/contact" element={<Navigate to="/about#contact" replace />} />
           <Route path="/cookie-policy" element={<Navigate to="/privacy" replace />} />
           <Route path="/documentation" element={<Navigate to="/faqs#help" replace />} />
           <Route path="/cancellation-and-refund" element={<CancellationRefundPage />} />

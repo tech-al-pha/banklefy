@@ -109,14 +109,17 @@ Deno.serve(async (req) => {
   }
 
   const razorpaySecret =
-    Deno.env.get('RAZERPAY_SECRET_KEY') ||
+    Deno.env.get('RAZORPAY_KEY_SECRET') ||
     Deno.env.get('RAZORPAY_SECRET_KEY') ||
-    Deno.env.get('RAZORPAY_KEY_SECRET');
+    Deno.env.get('RAZERPAY_SECRET_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
   if (!razorpaySecret || !supabaseUrl || !supabaseServiceKey) {
-    return respond(req, 500, { error: 'Server configuration incomplete.' });
+    return respond(req, 500, {
+      error:
+        'Server configuration incomplete. Ensure SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and Razorpay secret (RAZORPAY_KEY_SECRET recommended) are set as Supabase Function secrets.',
+    });
   }
 
   if (req.method !== 'POST') {

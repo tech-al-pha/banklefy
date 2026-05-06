@@ -52,7 +52,7 @@ export const termsSections: InfoCard[] = [
     icon: FileText,
     title: "What the service does",
     content:
-      "Banklefy processes uploaded bank statements and returns structured exports such as Excel, CSV, JSON, and MT940 outputs. Text-based PDFs are parsed directly. Scanned or image-based pages may use OCR.",
+      "Banklefy converts uploaded bank statements into structured outputs such as Excel, CSV, JSON, MT940, and other export formats shown inside the app. Text-based PDFs are parsed directly. Scanned or image-based pages may use OCR.",
   },
   {
     icon: ShieldCheck,
@@ -64,7 +64,7 @@ export const termsSections: InfoCard[] = [
     icon: Database,
     title: "File handling",
     content:
-      "Uploaded files are processed to generate conversions and analysis during your active session. Download what you need before refresh or sign-out.",
+      "Uploaded files are processed to generate conversions and analysis. If you need a copy of the output, download it before ending your session. Temporary processing files may be removed after the job finishes or fails.",
   },
   {
     icon: Clock,
@@ -76,7 +76,7 @@ export const termsSections: InfoCard[] = [
     icon: BadgeDollarSign,
     title: "Payments and plans",
     content:
-      "One-time packs and any applicable free usage are sold as shown on the Pricing page. Payments are processed through Razorpay. We store only the payment references needed to unlock features and support billing queries.",
+      "One-time packs and any applicable free usage are sold as shown on the Pricing page. Payments are processed through Razorpay. We store the payment references needed to unlock features and support billing questions.",
   },
   {
     icon: Users,
@@ -88,7 +88,7 @@ export const termsSections: InfoCard[] = [
     icon: AlertCircle,
     title: "Accuracy and review",
     content:
-      "99% accuracy, free re-processing if error found.",
+      "Results should be reviewed before you use them for accounting, lending, tax, audit, or compliance work. Output quality can depend on scan quality, statement layout, and source file quality.",
   },
   {
     icon: Scale,
@@ -103,7 +103,7 @@ export const privacySections: InfoCard[] = [
     icon: Database,
     title: "Data we collect",
     content:
-      "We collect account details such as email, upload metadata, usage counters, billing references, and support messages. We also collect basic technical data such as IP address, browser, device, and timestamps for security and troubleshooting.",
+      "We collect account details such as your email address, usage counters, billing references, and support messages. We also receive technical data such as IP address, browser type, device information, and timestamps for security, fraud prevention, and troubleshooting.",
   },
   {
     icon: Eye,
@@ -115,43 +115,43 @@ export const privacySections: InfoCard[] = [
     icon: Users,
     title: "When data is shared",
     content:
-      "We send data to the providers that operate the service, including Supabase for authentication and storage, Google reCAPTCHA for abuse prevention, OCR providers when OCR is used, and Razorpay for payment processing. We do not sell your data.",
+      "We share data only with the providers that help run the service, including Supabase for authentication and storage, Google reCAPTCHA for abuse prevention, OCR providers when OCR is used, and Razorpay for payment processing. We do not sell personal data.",
   },
   {
     icon: Clock,
     title: "Storage and retention",
     content:
-      "Uploaded files are processed during your active session only. Some preferences and session state are stored in your browser using localStorage, sessionStorage, or a first-party cookie.",
+      "Uploaded files are used to process your request. Temporary files may remain available during processing and may be cleaned up after the job finishes or fails. Account records such as plan activation, support history, and usage limits can remain associated with your account until they are deleted or no longer needed.",
   },
   {
     icon: Shield,
     title: "Security controls",
     content:
-      "We don't store your data. All uploads are encrypted during transmission (TLS 1.3).",
+      "Traffic between your browser and the service is protected with HTTPS/TLS. Access to backend systems is controlled through service credentials and platform access controls. No internet service can promise perfect security, but we try to limit access and collect only what we need to operate the app.",
   },
   {
     icon: LockOpen,
     title: "Your choices",
     content:
-      "You can sign out, clear browser storage, and ask support about account or data requests. If you do not want a file to remain accessible, refresh or close the session after download.",
+      "You can sign out, clear browser storage, and contact support about account or data-related requests. If you are using a shared device, sign out when you finish and remove downloaded files from that device if needed.",
   },
   {
     icon: Mail,
     title: "Contact and requests",
     content:
-      "For privacy questions, deletion requests, or access requests, contact support using the contact form or email shown on the Contact page.",
+      "For privacy questions, deletion requests, or access requests, contact support using the support form or the email shown on the About page.",
   },
   {
     icon: Cookie,
     title: "Cookies and browser storage",
     content:
-      "Banklefy uses a first-party cookie for sidebar state and browser storage for session and interface preferences. Third-party providers used by the app may also set their own cookies or browser signals.",
+      "Banklefy uses browser storage and a small number of first-party settings to keep the app working, such as session state and interface preferences. Third-party providers used by the app, including reCAPTCHA, may also place cookies or collect browser signals.",
   },
   {
     icon: BadgeDollarSign,
     title: "Refunds",
     content:
-      "14-day full refund. Requests are handled through support and the Pricing page.",
+      "Refunds are handled according to the policy shown on the cancellation and refund page. If you have a billing question, contact support and include your order reference.",
   },
 ];
 
@@ -160,7 +160,7 @@ export const securitySections: InfoCard[] = [
     icon: Shield,
     title: "Data handling",
     content:
-      "🔒 How We Handle Your Data: Files are processed in real-time. We DO NOT store your bank statements. Data is automatically purged immediately after conversion. All uploads are encrypted during transmission (TLS 1.3).",
+      "Files are processed to generate exports and analysis. Temporary processing files can exist while a job is running and may be removed after processing or after a failed run.",
   },
   {
     icon: Lock,
@@ -178,7 +178,7 @@ export const securitySections: InfoCard[] = [
     icon: Database,
     title: "Retention and deletion",
     content:
-      "Files are intended for active-session processing only. Temporary uploads may be cleaned up after processing or after failed jobs.",
+      "Account records such as usage counters, billing references, and support requests can remain tied to your account. Temporary processing files may be cleaned up after processing or after failed jobs.",
   },
   {
     icon: Globe,
@@ -240,7 +240,7 @@ export const faqSections: InfoCard[] = [
     icon: BadgeDollarSign,
     title: "How do refunds work?",
     content:
-      "14-day full refund. Requests are handled through support.",
+      "Refunds are handled according to the cancellation and refund policy linked from the footer. Contact support with your order details if you need help.",
   },
 ];
 
@@ -334,7 +334,7 @@ export const helpSections: HelpSection[] = [
     items: [
       "Keep your account signed out on shared devices.",
       "Do not upload passwords or credentials unless they are part of the statement password flow.",
-      "Use the Contact page for privacy or security questions.",
+      "Use the About page for privacy or security questions.",
     ],
   },
   {

@@ -49,7 +49,7 @@ export const Hero = () => {
   const heroHighlights = heroHighlightsByLanguage[language] ?? heroHighlightsByLanguage.en;
 
   return (
-    <section className="relative min-h-[70vh] flex items-center justify-center pt-8 pb-10 bg-transparent">
+    <section className="relative min-h-[70vh] flex items-center justify-center pt-8 pb-10 bg-transparent overflow-x-hidden">
 
       <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 sm:px-2 text-left">
         <div className="max-w-none mx-auto grid gap-10 md:grid-cols-[1.1fr_0.9fr] items-center pt-16">
@@ -66,7 +66,11 @@ export const Hero = () => {
               style={{ fontSize: "clamp(2.8rem, 9.8vw, 7.8rem)" }}
               aria-label={titleLine2}
             >
-              <span className="flex w-full justify-between">
+              {/* On small screens, avoid per-character flex spacing which can overflow and break layout. */}
+              <span className="block md:hidden text-left tracking-[0.08em]">
+                {titleLine2}
+              </span>
+              <span className="hidden md:flex w-full justify-between">
                 {titleLine2Chars.map((char, index) => (
                   <span key={`${char}-${index}`} className="inline-block">
                     {char}
