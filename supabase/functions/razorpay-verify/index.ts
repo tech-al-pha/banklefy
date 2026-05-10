@@ -108,10 +108,20 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: getCorsHeaders(req) });
   }
 
-  const razorpaySecret =
-    Deno.env.get('RAZORPAY_KEY_SECRET') ||
-    Deno.env.get('RAZORPAY_SECRET_KEY') ||
-    Deno.env.get('RAZERPAY_SECRET_KEY');
+  const mode = (Deno.env.get('RAZORPAY_MODE') || '').trim().toLowerCase();
+
+  const getRazorpaySecret = (): string | null => {
+    if (mode === 'live') return Deno.env.get('RAZORPAY_LIVE_KEY_SECRET') || null;
+    if (mode === 'test') return Deno.env.get('RAZORPAY_TEST_KEY_SECRET') || null;
+    return (
+      Deno.env.get('RAZORPAY_KEY_SECRET') ||
+      Deno.env.get('RAZORPAY_SECRET_KEY') ||
+      Deno.env.get('RAZERPAY_SECRET_KEY') ||
+      null
+    );
+  };
+
+  const razorpaySecret = getRazorpaySecret();
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
