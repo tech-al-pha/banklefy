@@ -6,7 +6,7 @@ import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { activeLanguages } from "@/contexts/languageData";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { Helmet, HelmetProvider } from "@dr.pogodin/react-helmet";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
@@ -482,6 +482,18 @@ const AppRoutes = () => {
   const alternateLanguageLinks = activeLanguages
     .filter((lang) => lang !== "en")
     .map((lang) => ({ lang, href: `${canonical}?lang=${lang}` }));
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const preferredHost = "www.banklefy.site";
+    const currentUrl = new URL(window.location.href);
+
+    if (currentUrl.hostname === "banklefy.site") {
+      currentUrl.hostname = preferredHost;
+      window.location.replace(currentUrl.toString());
+    }
+  }, [location.pathname, location.search, location.hash]);
 
   return (
     <ErrorBoundary resetKey={location.pathname}>

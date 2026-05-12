@@ -11,6 +11,7 @@ import AutoHideHeader from "@/components/AutoHideHeader";
 
 const PURCHASE_TOAST_STORAGE_KEY = "banklefy:last-plan-purchase";
 const RAZORPAY_CHECKOUT_URL = "https://checkout.razorpay.com/v1/checkout.js";
+const USD_TO_INR_RATE = 95.1369; // mid-market rate as of 2026-05-11 04:49 UTC (XE)
 
 type Plan = {
   planId: string;
@@ -28,6 +29,8 @@ type Plan = {
   highlighted?: boolean;
   isFree?: boolean;
 };
+
+type PriceCurrency = "INR" | "USD";
 
 type ComparisonRow = {
   label: string;
@@ -56,7 +59,6 @@ const pricingPlans: Plan[] = [
       "CSV exports",
       "★ Pricing mismatch",
       "★ Circular trading",
-      "★ API (Beta, signed-in)",
     ],
     isFree: true,
   },
@@ -69,7 +71,7 @@ const pricingPlans: Plan[] = [
     unit: "one-time",
     description: "Perfect for testing JSON and MT940.",
     statements: "500 Pages",
-    features: ["XLSX", "CSV", "JSON", "MT940", "★ Pricing mismatch", "★ Circular trading", "★ API (Beta)"],
+    features: ["All core formats", "★ Pricing mismatch", "★ Circular trading"],
   },
   {
     planId: "per_page_pack_basic",
@@ -81,15 +83,11 @@ const pricingPlans: Plan[] = [
     description: "Best for Indian CAs and accountants. Includes Tally XML.",
     statements: "1,000 Pages",
     features: [
-      "XLSX",
-      "CSV",
-      "JSON",
-      "MT940",
+      "All core formats",
       "Tally XML",
-      "★ EMI + LOAN + FOIR calculator",
+      "★ EMI + LOAN + FOIR analyzer",
       "★ Pricing mismatch",
       "★ Circular trading",
-      "★ API (Beta)",
     ],
     highlighted: true,
   },
@@ -103,19 +101,15 @@ const pricingPlans: Plan[] = [
     description: "Full accounting software integration — Xero, Zoho, QuickBooks.",
     statements: "5,000 Pages",
     features: [
-      "XLSX",
-      "CSV",
-      "JSON",
-      "MT940",
+      "All core formats",
       "Tally XML",
       "Xero",
       "Zoho",
       "QuickBooks",
-      "★ EMI + LOAN + FOIR calculator",
-      "★ Edit detector",
+      "★ EMI + LOAN + FOIR analyzer",
+      "★ Edited PDF detector",
       "★ Pricing mismatch",
       "★ Circular trading",
-      "★ API (Beta)",
     ],
   },
   {
@@ -125,17 +119,16 @@ const pricingPlans: Plan[] = [
     price: "₹14,999",
     amountInRupee: 14999,
     unit: "one-time",
-    description: "Fraud detection + priority support. For large teams.",
+    description: "Fraud detection + dedicated support. For large teams.",
     statements: "11,000 Pages",
     features: [
       "All Pro formats",
       "★ Fraud detection",
-      "★ EMI + LOAN + FOIR calculator",
-      "★ Edit detector",
+      "★ EMI + LOAN + FOIR analyzer",
+      "★ Edited PDF detector",
       "★ Pricing mismatch",
       "★ Circular trading",
       "★ API (Beta)",
-      "★ Priority support",
     ],
   },
 ];
@@ -193,9 +186,8 @@ const comparisonTables: ComparisonTable[] = [
       { label: "Xero", values: ["No", "No", "Yes", "Yes"] },
       { label: "Zoho", values: ["No", "No", "Yes", "Yes"] },
       { label: "QuickBooks", values: ["No", "No", "Yes", "Yes"] },
-      { label: "API (Beta)", values: ["Yes", "Yes", "Yes", "Yes"] },
+      { label: "API (Beta)", values: ["No", "No", "No", "Yes"] },
       { label: "Fraud detection", values: ["No", "No", "No", "Yes"] },
-      { label: "Priority support", values: ["No", "No", "No", "Yes"] },
     ],
   },
   {
@@ -220,7 +212,31 @@ const comparisonTables: ComparisonTable[] = [
 const PricingPage = () => {
   const [processingPlan, setProcessingPlan] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [priceCurrency, setPriceCurrency] = useState<PriceCurrency>("INR");
   const navigate = useNavigate();
+
+  const scrollToSection = (id: string) => {
+    if (typeof document === "undefined") return;
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const formatPlanPrice = (amountInRupee: number) => {
+    if (priceCurrency === "INR") {
+      return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+      }).format(amountInRupee);
+    }
+
+    const amountInUsd = amountInRupee / USD_TO_INR_RATE;
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amountInUsd);
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -481,7 +497,7 @@ const PricingPage = () => {
     return (
       <Card
         key={plan.planId}
-        className={`relative p-8 bg-surface-elevated/80 backdrop-blur-xl transition-all duration-300 rounded-2xl ${
+        className={`relative w-full max-w-md md:max-w-none p-6 md:p-8 bg-surface-elevated/80 backdrop-blur-xl transition-all duration-300 rounded-2xl ${
           plan.highlighted
             ? "border-2 border-primary shadow-neon scale-105"
             : "border border-primary/20 hover:border-primary/40 hover:shadow-card"
@@ -508,7 +524,7 @@ const PricingPage = () => {
           <div className="space-y-1">
             <div className="flex items-baseline gap-1">
               <span className="text-4xl md:text-5xl font-black text-white tracking-tighter">
-                {plan.price}
+                {formatPlanPrice(plan.amountInRupee)}
               </span>
               {plan.unit && (
                 <span className="text-muted-foreground font-medium">{plan.unit}</span>
@@ -639,6 +655,49 @@ const PricingPage = () => {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Simple one-time credit packs. Buy once, use anytime. No expiry. No subscription.
           </p>
+          <div className="pt-2 flex flex-col items-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full h-8 px-4 border-white/10 bg-white/[0.02] text-white/90 hover:bg-white/[0.05]"
+                onClick={() => scrollToSection("one-time-conversions")}
+              >
+                One-time conversions
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="rounded-full h-8 px-4 border-white/10 bg-white/[0.02] text-white/90 hover:bg-white/[0.05]"
+                onClick={() => scrollToSection("plan-comparison")}
+              >
+                Plan comparison
+              </Button>
+            </div>
+            <div className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] p-1 backdrop-blur-xl">
+              <Button
+                size="sm"
+                variant={priceCurrency === "INR" ? "default" : "outline"}
+                className="rounded-full h-8 px-4"
+                onClick={() => setPriceCurrency("INR")}
+                aria-pressed={priceCurrency === "INR"}
+              >
+                ₹ INR
+              </Button>
+              <Button
+                size="sm"
+                variant={priceCurrency === "USD" ? "default" : "outline"}
+                className="rounded-full h-8 px-4"
+                onClick={() => setPriceCurrency("USD")}
+                aria-pressed={priceCurrency === "USD"}
+              >
+                $ USD
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              1 USD ≈ {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(USD_TO_INR_RATE)}
+            </p>
+          </div>
         </section>
 
         {/* Pricing cards */}
@@ -653,7 +712,7 @@ const PricingPage = () => {
         </section>
 
         {/* One-time conversion plans */}
-        <section className="mb-12 space-y-4">
+        <section id="one-time-conversions" className="mb-12 space-y-4 scroll-mt-28">
           <h2 className="text-xl md:text-2xl font-bold text-white">One-time conversions</h2>
           <p className="text-sm text-muted-foreground">
             Quick conversion with no commitments.
@@ -663,7 +722,7 @@ const PricingPage = () => {
           </div>
         </section>
 
-        <section className="mb-12">
+        <section id="plan-comparison" className="mb-12 scroll-mt-28">
           <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6 sm:p-8 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
             <div className="space-y-2">
               <h2 className="text-xl md:text-2xl font-bold text-white">Plan comparison</h2>

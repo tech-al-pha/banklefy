@@ -31,29 +31,9 @@
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://www.banklefy.site/documentation</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
     <loc>https://www.banklefy.site/faqs</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://www.banklefy.site/help</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://www.banklefy.site/contact</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://www.banklefy.site/cookie-policy</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
   </url>
   <url>
     <loc>https://www.banklefy.site/about</loc>
@@ -72,6 +52,16 @@
   </url>
   <url>
     <loc>https://www.banklefy.site/terms</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.banklefy.site/cancellation-and-refund</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.banklefy.site/shipping-and-exchange</loc>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>

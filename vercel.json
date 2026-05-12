@@ -3,6 +3,12 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "banklefy.site" }],
+      "destination": "https://www.banklefy.site/$1",
+      "permanent": true
+    },
     { "source": "/dashboard", "destination": "/?next=demo", "permanent": false },
     { "source": "/:path+/", "destination": "/:path+", "permanent": true }
   ],

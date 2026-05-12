@@ -539,7 +539,7 @@ export const ResultsSection = ({
   const conversionProgressDetail = conversionProgressSubLabel || actionCopy.preparingDocument;
   const [showPremiumFormats, setShowPremiumFormats] = useState(false);
   const isTallyOnlyMode = resultMode === "tally_only";
-  const hasPremiumFormatAccess = hasTallyAccess;
+  const hasPremiumFormatAccess = hasTallyAccess || hasIntegrationsAccess;
   const isPremiumSelectedFlow = selectedPremiumFormat !== null;
   const creditTone: ToneName = analytics ? getCreditTone(analytics.totalCredits) : "good";
   const debitTone: ToneName = analytics ? getDebitTone(analytics.totalCredits, analytics.totalDebits) : "moderate";
