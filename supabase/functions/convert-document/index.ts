@@ -16,6 +16,7 @@ import {
   mergeOcrTransactionsDeterministic,
   normalizeRawTransactions,
   recoverAdcbTransactionsFromOcrText,
+  recoverEmiratesIslamicTransactionsFromOcrText,
   scoreRunningBalanceFlow,
   type ClientPdfParseAssessment,
   type OCRResult,
@@ -1149,6 +1150,15 @@ const extractPdfTextTransactionsFromBytes = async (
         });
         return { transactions: mashreqRows, text: allLines.join('\n') };
       }
+    }
+
+    const emiratesIslamicRows = recoverEmiratesIslamicTransactionsFromOcrText(allLines.join('\n'));
+    if (emiratesIslamicRows.length > 0) {
+      console.log("[ROW_COUNT]", {
+        stage: "emirates_islamic_specialized_parse",
+        totalAfter: emiratesIslamicRows.length,
+      });
+      return { transactions: emiratesIslamicRows, text: allLines.join('\n') };
     }
 
     for (const entry of allLineEntries) {

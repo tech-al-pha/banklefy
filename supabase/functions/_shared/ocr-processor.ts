@@ -2311,6 +2311,208 @@ export const recoverAdcbTransactionsFromOcrText = (ocrText: string): RawTransact
   return inferDebitCreditFromDrafts(drafts, openingBalance);
 };
 
+const isLikelyEmiratesIslamicStatementText = (value: string): boolean => {
+  const lower = value.toLowerCase();
+  return (
+    lower.includes('statement of account') &&
+    lower.includes('emirates islamic') &&
+    lower.includes('date description debits credits balance')
+  );
+};
+
+const isEmiratesIslamicStructuralLine = (line: string): boolean => {
+  const lower = line.toLowerCase();
+  return (
+    lower === 'statement of account' ||
+    lower.includes('account details') ||
+    lower.includes('account no. account type currency profit payout branch iban') ||
+    lower.includes('date description debits credits balance') ||
+    lower.includes('emirates islamic bank (p.j.s.c.) is licensed') ||
+    lower.includes('period ') ||
+    lower.includes('customer trn') ||
+    lower.includes('po box ') ||
+    lower.includes('name ') ||
+    lower.includes('account (s) summary') ||
+    lower.includes('notes on accounts:') ||
+    lower.includes('notes on deposits:') ||
+    lower.includes('empowering your business growth') ||
+    lower.includes('businessonline') ||
+    lower.includes('dedicated contact centre')
+  );
+};
+
+const inferEmiratesIslamicSide = (
+  description: string,
+  amount: number,
+  previousBalance: number | undefined,
+  balance: number,
+): { debit: number; credit: number } => {
+  const lower = description.toLowerCase();
+  if (Number.isFinite(previousBalance as number)) {
+    const delta = roundMoney2(balance - Number(previousBalance));
+    const deltaAbs = roundMoney2(Math.abs(delta));
+    const repairedAmount = repairAmountUsingBalanceDelta(amount, deltaAbs);
+    if (delta > 0.01) return { debit: 0, credit: repairedAmount };
+    if (delta < -0.01) return { debit: repairedAmount, credit: 0 };
+    amount = repairedAmount;
+  }
+
+  if (/\binward\b|\bcredit\b|remittance|received|deposit/i.test(lower)) {
+    return { debit: 0, credit: roundMoney2(Math.abs(amount)) };
+  }
+  return { debit: roundMoney2(Math.abs(amount)), credit: 0 };
+};
+
+const normalizeEmiratesIslamicDescription = (value: string): string => {
+  let normalized = value.replace(/\s+/g, ' ').trim();
+  for (let i = 0; i < 3; i += 1) {
+    const next = normalized
+      .replace(/\b([A-Z0-9])\s+([A-Z]{2,})\b/g, '$1$2')
+      .replace(/\b([A-Z])\s+([A-Z])\b(?=\s+[A-Z]{2,}\b)/g, '$1$2');
+    if (next === normalized) break;
+    normalized = next;
+  }
+  return normalized;
+};
+
+export const recoverEmiratesIslamicTransactionsFromOcrText = (ocrText: string): RawTransaction[] => {
+  if (!ocrText || !isLikelyEmiratesIslamicStatementText(ocrText)) return [];
+
+  const lines = ocrText
+    .replace(/\r/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  const rows: RawTransaction[] = [];
+  const dedupe = new Set<string>();
+  const amountPattern = /\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2}/g;
+  const rowStartPattern = /^(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\s*(.*)$/i;
+  const nextDescriptionPreludePattern = /^(?:inward remittance|outward remittance|swift transfer|tt ref:|remittance ref:)/i;
+  let inTransactionTable = false;
+  let previousBalance: number | undefined;
+  let floatingDescriptionParts: string[] = [];
+  let current: {
+    date: string;
+    amount: number;
+    balance: number;
+    descriptionParts: string[];
+  } | null = null;
+
+  const flushCurrent = () => {
+    if (!current) return;
+    const description = normalizeEmiratesIslamicDescription(current.descriptionParts.join(' ')) || 'Transaction';
+    if (!Number.isFinite(current.amount) || current.amount <= 0 || !Number.isFinite(current.balance)) {
+      current = null;
+      return;
+    }
+
+    const inferred = inferEmiratesIslamicSide(description, current.amount, previousBalance, current.balance);
+    const row: RawTransaction = {
+      date: current.date,
+      description,
+      debit: inferred.debit,
+      credit: inferred.credit,
+      balance: roundMoney2(current.balance),
+      refNumber: '',
+    };
+
+    const key = `${normalizeDateKey(row.date)}|${toMinor(row.debit)}|${toMinor(row.credit)}|${toMinor(row.balance)}|${row.description}`;
+    if (!dedupe.has(key)) {
+      dedupe.add(key);
+      rows.push(row);
+      previousBalance = row.balance;
+    }
+    current = null;
+  };
+
+  for (const line of lines) {
+    if (line === 'Date Description Debits Credits Balance') {
+      flushCurrent();
+      floatingDescriptionParts = [];
+      inTransactionTable = true;
+      previousBalance = undefined;
+      continue;
+    }
+
+    if (!inTransactionTable) continue;
+
+    if (isEmiratesIslamicStructuralLine(line)) {
+      flushCurrent();
+      if (line.toLowerCase().includes('emirates islamic bank (p.j.s.c.) is licensed')) {
+        inTransactionTable = false;
+        floatingDescriptionParts = [];
+      }
+      continue;
+    }
+
+    const rowStart = line.match(rowStartPattern);
+    if (rowStart) {
+      const parsedDate = parseStatementDate(rowStart[1]);
+      const remainder = (rowStart[2] || '').trim();
+      if (!parsedDate) continue;
+
+      const openingMatch = remainder.match(/opening balance:\s*([0-9,]+\.\d{2})/i);
+      if (openingMatch) {
+        flushCurrent();
+        const openingBalance = parseMoney(openingMatch[1]);
+        previousBalance = Number.isFinite(openingBalance) ? roundMoney2(openingBalance) : previousBalance;
+        floatingDescriptionParts = [];
+        continue;
+      }
+
+      if (/closing balance:/i.test(remainder)) {
+        flushCurrent();
+        floatingDescriptionParts = [];
+        continue;
+      }
+
+      const amountMatches = [...remainder.matchAll(amountPattern)];
+      if (amountMatches.length < 2) {
+        if (!isEmiratesIslamicStructuralLine(line)) {
+          floatingDescriptionParts.push(line);
+        }
+        continue;
+      }
+
+      flushCurrent();
+      const amountToken = amountMatches[amountMatches.length - 2];
+      const balanceToken = amountMatches[amountMatches.length - 1];
+      const amount = parseMoney(amountToken[0]);
+      const balance = parseMoney(balanceToken[0]);
+      const prefixDescription = remainder.slice(0, amountToken.index ?? 0).trim();
+      current = {
+        date: parsedDate,
+        amount,
+        balance,
+        descriptionParts: [
+          ...floatingDescriptionParts,
+          prefixDescription,
+        ].filter((part) => part.length > 0),
+      };
+      floatingDescriptionParts = [];
+      continue;
+    }
+
+    if (current) {
+      if (nextDescriptionPreludePattern.test(line)) {
+        flushCurrent();
+        floatingDescriptionParts = [line];
+        continue;
+      }
+      current.descriptionParts.push(line);
+      continue;
+    }
+
+    if (!isEmiratesIslamicStructuralLine(line)) {
+      floatingDescriptionParts.push(line);
+    }
+  }
+
+  flushCurrent();
+  return rows;
+};
+
 // ============= DOCUMENT TYPE CLASSIFIER =============
 export interface DocumentClassification {
   type: 'digital' | 'text' | 'scanned' | 'image';

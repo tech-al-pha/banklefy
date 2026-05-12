@@ -13,6 +13,7 @@ import {
   mergeOcrTransactionsDeterministic,
   normalizeRawTransactions,
   recoverAdcbTransactionsFromOcrText,
+  recoverEmiratesIslamicTransactionsFromOcrText,
   scoreRunningBalanceFlow,
   type ClientPdfParseAssessment,
   type OCRResult,
@@ -286,6 +287,13 @@ const extractPdfPageLineEntries = async (pdf: PdfDocumentProxy, pageNumber: numb
 };
 
 const parseDeterministicRowsFromLineEntries = (lineEntries: BatchLineEntry[]): RawTransaction[] => {
+  const specializedEmiratesRows = recoverEmiratesIslamicTransactionsFromOcrText(
+    lineEntries.map((entry) => entry.text).join('\n'),
+  );
+  if (specializedEmiratesRows.length > 0) {
+    return specializedEmiratesRows;
+  }
+
   const rows: RawTransaction[] = [];
   const amountLayout: PdfAmountColumnLayout | null = detectPdfAmountColumnLayout(
     lineEntries,
