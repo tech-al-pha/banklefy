@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Globe,
+  Building2,
   Brain,
   Zap,
   FileSpreadsheet,
@@ -156,10 +156,10 @@ export const featureItems: FeatureItem[] = [
 
   // User Experience / Assistant
   {
-    id: "languages",
-    icon: Globe,
-    titleKey: "featuresPage.items.languages.title",
-    descriptionKey: "featuresPage.items.languages.desc",
+    id: "banks",
+    icon: Building2,
+    titleKey: "featuresPage.items.banks.title",
+    descriptionKey: "featuresPage.items.banks.desc",
     categoryId: "accessibility",
   },
   {

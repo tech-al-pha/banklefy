@@ -160,7 +160,7 @@ export const securitySections: InfoCard[] = [
     icon: Shield,
     title: "Data handling",
     content:
-      "Files are processed to generate exports and analysis. Temporary processing files can exist while a job is running and may be removed after processing or after a failed run.",
+      "Files are processed to generate exports and analysis. Temporary processing files can exist while a job is running and are removed after processing or after a failed run.",
   },
   {
     icon: Lock,

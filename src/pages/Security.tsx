@@ -9,7 +9,7 @@ const Security = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
       <AutoHideHeader as="nav" className="border-b border-primary/20 bg-surface-elevated/80 backdrop-blur-xl">
         <div className="container mx-auto flex items-center justify-between px-6 py-4">
           <Logo />
@@ -38,7 +38,7 @@ const Security = () => {
           {securitySections.map((section) => (
             <div
               key={section.title}
-              className="flex gap-4 rounded-2xl border border-primary/20 bg-[#141414] p-6"
+              className="glass-card flex gap-4 rounded-2xl p-6 transition-all hover:shadow-neon"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <section.icon className="h-6 w-6" />

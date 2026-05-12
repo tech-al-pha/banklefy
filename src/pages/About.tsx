@@ -29,7 +29,7 @@ const AboutPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background text-white selection:bg-primary/30">
+    <div className="min-h-screen bg-background text-white font-sans selection:bg-primary/30">
       <AutoHideHeader as="nav" className="border-b border-primary/10 bg-ink/40 p-4 backdrop-blur-md">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
@@ -51,21 +51,21 @@ const AboutPage = () => {
         </section>
 
         <section className="mb-16 grid gap-6 md:grid-cols-3">
-          <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="glass-card space-y-3 rounded-2xl p-6 transition-all hover:shadow-neon">
             <ShieldCheck className="text-primary" size={30} />
             <h2 className="text-sm uppercase tracking-[0.25em] text-white/90">What It Does</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               Converts statements into structured outputs for review, analysis, and downstream accounting workflows.
             </p>
           </div>
-          <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="glass-card space-y-3 rounded-2xl p-6 transition-all hover:shadow-neon">
             <Zap className="text-primary" size={30} />
             <h2 className="text-sm uppercase tracking-[0.25em] text-white/90">How It Works</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               Text PDFs are parsed directly when possible. OCR is used for scanned or image-based pages where direct parsing is not enough.
             </p>
           </div>
-          <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-6">
+          <div className="glass-card space-y-3 rounded-2xl p-6 transition-all hover:shadow-neon">
             <Mail className="text-primary" size={30} />
             <h2 className="text-sm uppercase tracking-[0.25em] text-white/90">Support</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
@@ -79,7 +79,7 @@ const AboutPage = () => {
             <h2 className="border-b border-white/10 pb-4 text-2xl tracking-wide">Product summary</h2>
             <ul className="space-y-3 text-sm leading-relaxed text-muted-foreground">
               {productPoints.map((point) => (
-                <li key={point} className="rounded-2xl border border-white/8 bg-white/4 p-4">
+                <li key={point} className="glass-card rounded-2xl p-4">
                   {point}
                 </li>
               ))}
@@ -90,7 +90,7 @@ const AboutPage = () => {
             <h2 className="border-b border-white/10 pb-4 text-2xl tracking-wide">Operating principles</h2>
             <ul className="space-y-3 text-sm leading-relaxed text-muted-foreground">
               {principles.map((point) => (
-                <li key={point} className="rounded-2xl border border-white/8 bg-white/4 p-4">
+                <li key={point} className="glass-card rounded-2xl p-4">
                   {point}
                 </li>
               ))}
@@ -106,11 +106,11 @@ const AboutPage = () => {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6">
+          <div className="glass-card rounded-2xl p-6 transition-all hover:shadow-neon">
             <h3 className="text-lg font-semibold text-white">Common reasons to contact support</h3>
             <ul className="mt-4 grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
               {supportItems.map((item) => (
-                <li key={item} className="rounded-xl border border-white/8 bg-white/4 p-4">
+                <li key={item} className="glass-card rounded-xl p-4">
                   {item}
                 </li>
               ))}
@@ -122,7 +122,7 @@ const AboutPage = () => {
               href="https://t.me/n3x4z"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center gap-6 rounded-[2rem] border border-primary/20 p-8 transition-all hover:border-primary hover:shadow-neon"
+              className="glass-card group flex items-center gap-6 rounded-[2rem] p-8 transition-all hover:shadow-neon"
             >
               <div className="rounded-full bg-primary/10 p-4 text-primary transition-transform group-hover:scale-110">
                 <MessageCircle size={24} />
@@ -137,7 +137,7 @@ const AboutPage = () => {
               href="https://www.linkedin.com/in/faizan-rizvi-8589a93a8"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center gap-6 rounded-[2rem] border border-primary/20 p-8 transition-all hover:border-primary hover:shadow-neon"
+              className="glass-card group flex items-center gap-6 rounded-[2rem] p-8 transition-all hover:shadow-neon"
             >
               <div className="rounded-full bg-primary/10 p-4 text-primary transition-transform group-hover:scale-110">
                 <Linkedin size={24} />
@@ -152,7 +152,7 @@ const AboutPage = () => {
               href="https://x.com/inspirexali"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center gap-6 rounded-[2rem] border border-primary/20 p-8 transition-all hover:border-primary hover:shadow-neon"
+              className="glass-card group flex items-center gap-6 rounded-[2rem] p-8 transition-all hover:shadow-neon"
             >
               <div className="rounded-full bg-primary/10 p-4 text-primary transition-transform group-hover:scale-110">
                 <X size={24} />
@@ -166,7 +166,7 @@ const AboutPage = () => {
             <SupportContactDialog
               source="about_page"
               trigger={
-                <div className="group flex cursor-pointer items-center gap-6 rounded-[2rem] border border-primary/20 p-8 transition-all hover:border-primary hover:shadow-neon">
+                <div className="glass-card group flex cursor-pointer items-center gap-6 rounded-[2rem] p-8 transition-all hover:shadow-neon">
                   <div className="rounded-full bg-primary/10 p-4 text-primary transition-transform group-hover:scale-110">
                     <Mail size={24} />
                   </div>
@@ -182,7 +182,7 @@ const AboutPage = () => {
               href="https://maps.google.com/?q=Prem%20Nagar%201%2C%20Kota%2C%20Rajasthan%20324004%2C%20India"
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex items-center gap-6 rounded-[2rem] border border-primary/20 p-8 transition-all hover:border-primary hover:shadow-neon md:col-span-2"
+              className="glass-card group flex items-center gap-6 rounded-[2rem] p-8 transition-all hover:shadow-neon md:col-span-2"
             >
               <div className="rounded-full bg-primary/10 p-4 text-primary">
                 <MapPin size={24} />

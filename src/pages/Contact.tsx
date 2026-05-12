@@ -10,7 +10,7 @@ const Contact = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
       <AutoHideHeader as="nav" className="bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
         <div className="container mx-auto px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
@@ -38,7 +38,7 @@ const Contact = () => {
           {contactCards.map((card) => {
             const Icon = card.icon;
             const content = (
-              <article className="rounded-2xl border border-primary/20 bg-[#141414] p-6 space-y-4">
+              <article className="glass-card rounded-2xl p-6 space-y-4 transition-all hover:shadow-neon">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Icon className="h-5 w-5" />
                 </div>
@@ -78,7 +78,7 @@ const Contact = () => {
           })}
         </section>
 
-        <section className="mt-10 rounded-2xl border border-primary/20 bg-[#141414] p-6 text-sm leading-relaxed text-muted-foreground">
+        <section className="mt-10 glass-card rounded-2xl p-6 text-sm leading-relaxed text-muted-foreground">
           <h2 className="text-lg font-semibold text-white">What to include</h2>
           <p className="mt-2">
             File name, conversion ID, order ID for billing-related issues, a screenshot when the issue is visual,

@@ -57,7 +57,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "howItWorks.step2.title": "AI Processing",
 
-    "howItWorks.step2.desc": "Our AI-powered OCR instantly extracts and organizes transaction data with high accuracy. Supports 50+ languages including Hindi, Arabic, and Mandarin.",
+    "howItWorks.step2.desc": "Our AI-powered OCR instantly extracts and organizes transaction data with high accuracy. Works across major bank statement formats worldwide.",
 
     "howItWorks.step3.title": "Download Excel",
 
@@ -324,9 +324,9 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.underwritingPanel.desc": "All key metrics at a glance: income, EMI, FOIR, balance trends, and risk flags — built for lending decisions.",
 
-    "featuresPage.items.languages.title": "50+ LANGUAGE SUPPORT",
+    "featuresPage.items.banks.title": "SUPPORTS 1000+ BANKS",
 
-    "featuresPage.items.languages.desc": "Process statements in 50+ languages. Handles multilingual documents and international bank formats.",
+    "featuresPage.items.banks.desc": "Works with a wide range of bank statement layouts and formats — including major Indian and international banks.",
 
     "featuresPage.items.instantProcessing.title": "INSTANT PROCESSING",
 
@@ -454,7 +454,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.roadmapBullets.three": "Smarter categorization and cashflow insights.",
 
-    "aboutPage.roadmapBullets.four": "More language support for regional narration.",
+    "aboutPage.roadmapBullets.four": "More bank formats and layout coverage.",
 
     "aboutPage.connectTitle": "Connect with the Creator",
 
@@ -767,7 +767,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "howItWorks.step1.title": "رفع",
     "howItWorks.step1.desc": "قم بتحميل كشف حسابك البنكي بأي تنسيق - PDF أو صورة ممسوحة ضوئيًا أو صورة. نحن ندعم المستندات من أي بنك في جميع أنحاء العالم.",
     "howItWorks.step2.title": "معالجة الذكاء الاصطناعي",
-    "howItWorks.step2.desc": "يقوم نظام التعرف الضوئي على الحروف (OCR) المدعوم بالذكاء الاصطناعي باستخراج بيانات المعاملات وتنظيمها على الفور بدقة عالية. يدعم أكثر من 50 لغة بما في ذلك الهندية والعربية والماندرين.",
+    "howItWorks.step2.desc": "يقوم نظام OCR المدعوم بالذكاء الاصطناعي باستخراج بيانات المعاملات وتنظيمها فورًا بدقة عالية. يعمل عبر تنسيقات كشوف الحسابات البنكية الشائعة عالميًا.",
     "howItWorks.step3.title": "تحميل اكسل",
     "howItWorks.step3.desc": "احصل على جدول بيانات Excel نظيف ومنظم وجاهز للمحاسبة أو التحليل أو التكامل مع أدواتك المالية.",
     "features.title": "سمات",
@@ -870,8 +870,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "featuresPage.items.integrityScoring.desc": "التحقق من تناسق كشف الحساب عبر التواريخ والأرصدة للمساعدة في اكتشاف التلاعب والأخطاء.",
     "featuresPage.items.underwritingPanel.title": "لوحة الاكتتاب",
     "featuresPage.items.underwritingPanel.desc": "نظرة سريعة على جميع المقاييس الرئيسية: الدخل، والأقساط الشهرية المتساوية، وFOIR، واتجاهات التوازن، وأعلام المخاطر - المصممة لقرارات الإقراض.",
-    "featuresPage.items.languages.title": "50+ دعم اللغة",
-    "featuresPage.items.languages.desc": "معالجة البيانات بأكثر من 50 لغة. يتعامل مع المستندات متعددة اللغات وتنسيقات البنوك الدولية.",
+    "featuresPage.items.banks.title": "يدعم أكثر من 1000 بنك",
+    "featuresPage.items.banks.desc": "يتعامل مع نطاق واسع من تخطيطات وتنسيقات كشوف الحسابات — بما في ذلك البنوك الهندية والدولية الكبرى.",
     "featuresPage.items.instantProcessing.title": "معالجة فورية",
     "featuresPage.items.instantProcessing.desc": "تحويلات سريعة في أقل من 30 ثانية تقريبًا — مثالية للمحاسبة وعمليات التدقيق الحساسة للوقت.",
     "featuresPage.items.batchProcessing.title": "معالجة الدفعات",
@@ -1046,7 +1046,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "howItWorks.step1.title": "上传",
     "howItWorks.step1.desc": "上传任何格式的银行对账单 - PDF、扫描图像或照片。我们支持全球任何银行的文件。",
     "howItWorks.step2.title": "人工智能处理",
-    "howItWorks.step2.desc": "我们的人工智能 OCR 可以立即高精度地提取和组织交易数据。支持 50 多种语言，包括印地语、阿拉伯语和普通话。",
+    "howItWorks.step2.desc": "我们的 AI OCR 可立即高精度提取并整理交易数据。适配全球常见的银行对账单格式。",
     "howItWorks.step3.title": "下载Excel",
     "howItWorks.step3.desc": "收到干净、结构化的 Excel 电子表格，准备用于会计、分析或与您的财务工具集成。",
     "features.title": "特征",
@@ -1149,8 +1149,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "featuresPage.items.integrityScoring.desc": "验证跨日期和余额的报表一致性，以帮助检测篡改和错误。",
     "featuresPage.items.underwritingPanel.title": "承销小组",
     "featuresPage.items.underwritingPanel.desc": "所有关键指标一目了然：收入、EMI、FOIR、余额趋势和风险标记 - 专为贷款决策而构建。",
-    "featuresPage.items.languages.title": "50 多种语言支持",
-    "featuresPage.items.languages.desc": "50 多种语言的流程语句。处理多语言文档和国际银行格式。",
+    "featuresPage.items.banks.title": "支持 1000+ 家银行",
+    "featuresPage.items.banks.desc": "覆盖多种银行对账单版式与格式，包括印度及国际主流银行。",
     "featuresPage.items.instantProcessing.title": "即时处理",
     "featuresPage.items.instantProcessing.desc": "在约 30 秒内快速转换 - 非常适合时间敏感的会计和审计。",
     "featuresPage.items.batchProcessing.title": "批处理",
@@ -1349,7 +1349,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "howItWorks.step2.title": "Procesamiento de IA",
 
-    "howItWorks.step2.desc": "Nuestro OCR basado en IA extrae y organiza instantáneamente datos de transacciones con alta precisión. Admite más de 50 idiomas, incluidos hindi, árabe y mandarín.",
+    "howItWorks.step2.desc": "Nuestro OCR con IA extrae y organiza al instante los datos de transacciones con alta precisión. Funciona con los formatos de extractos bancarios más comunes a nivel mundial.",
 
     "howItWorks.step3.title": "Descargar Excel",
 
@@ -1616,9 +1616,9 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "featuresPage.items.underwritingPanel.desc": "Todas las métricas clave de un vistazo: ingresos, EMI, FOIR, tendencias de saldo e indicadores de riesgo, diseñadas para decisiones crediticias.",
 
-    "featuresPage.items.languages.title": "SOPORTE PARA MÁS DE 50 IDIOMAS",
+    "featuresPage.items.banks.title": "COMPATIBLE CON 1000+ BANCOS",
 
-    "featuresPage.items.languages.desc": "Procese declaraciones en más de 50 idiomas. Maneja documentos multilingües y formatos bancarios internacionales.",
+    "featuresPage.items.banks.desc": "Funciona con una amplia variedad de formatos y diseños de extractos bancarios, incluidos bancos importantes de India e internacionales.",
 
     "featuresPage.items.instantProcessing.title": "PROCESAMIENTO INSTANTÁNEO",
 
@@ -1746,7 +1746,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "aboutPage.roadmapBullets.three": "Clasificación más inteligente e insights de flujo de caja.",
 
-    "aboutPage.roadmapBullets.four": "Más soporte de idiomas regionales.",
+    "aboutPage.roadmapBullets.four": "Más formatos bancarios y cobertura de diseños.",
 
     "aboutPage.connectTitle": "Conéctate con el Creador",
 
@@ -2060,7 +2060,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "howItWorks.step1.title": "अपलोड करें",
     "howItWorks.step1.desc": "अपना बैंक विवरण किसी भी प्रारूप में अपलोड करें - पीडीएफ, स्कैन की गई छवि, या फोटो। हम दुनिया भर के किसी भी बैंक के दस्तावेज़ों का समर्थन करते हैं।",
     "howItWorks.step2.title": "एआई प्रोसेसिंग",
-    "howItWorks.step2.desc": "हमारा एआई-संचालित ओसीआर तुरंत उच्च सटीकता के साथ लेनदेन डेटा निकालता है और व्यवस्थित करता है। हिंदी, अरबी और मंदारिन सहित 50+ भाषाओं का समर्थन करता है।",
+    "howItWorks.step2.desc": "हमारा एआई-संचालित ओसीआर तुरंत उच्च सटीकता के साथ लेनदेन डेटा निकालता है और व्यवस्थित करता है। यह प्रमुख बैंक स्टेटमेंट फॉर्मेट्स के साथ काम करता है।",
     "howItWorks.step3.title": "एक्सेल डाउनलोड करें",
     "howItWorks.step3.desc": "लेखांकन, विश्लेषण, या अपने वित्तीय उपकरणों के साथ एकीकरण के लिए तैयार एक साफ, संरचित एक्सेल स्प्रेडशीट प्राप्त करें।",
     "features.title": "विशेषताएँ",
@@ -2163,8 +2163,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "featuresPage.items.integrityScoring.desc": "छेड़छाड़ और त्रुटियों का पता लगाने में मदद करने के लिए तिथियों और शेषों में विवरण की स्थिरता को मान्य करता है।",
     "featuresPage.items.underwritingPanel.title": "हामीदारी पैनल",
     "featuresPage.items.underwritingPanel.desc": "एक नज़र में सभी प्रमुख मेट्रिक्स: आय, ईएमआई, एफओआईआर, शेष रुझान, और जोखिम ध्वज - ऋण देने के निर्णयों के लिए बनाए गए।",
-    "featuresPage.items.languages.title": "50+ भाषा समर्थन",
-    "featuresPage.items.languages.desc": "50+ भाषाओं में कथनों की प्रक्रिया करें। बहुभाषी दस्तावेज़ों और अंतर्राष्ट्रीय बैंक प्रारूपों को संभालता है।",
+    "featuresPage.items.banks.title": "1000+ बैंकों का समर्थन",
+    "featuresPage.items.banks.desc": "विभिन्न बैंक स्टेटमेंट लेआउट और फॉर्मेट्स के साथ काम करता है — प्रमुख भारतीय और अंतरराष्ट्रीय बैंकों सहित।",
     "featuresPage.items.instantProcessing.title": "त्वरित प्रसंस्करण",
     "featuresPage.items.instantProcessing.desc": "~30 सेकंड से कम समय में तेज़ रूपांतरण - समय-संवेदनशील लेखांकन और ऑडिट के लिए आदर्श।",
     "featuresPage.items.batchProcessing.title": "प्रचय संसाधन",

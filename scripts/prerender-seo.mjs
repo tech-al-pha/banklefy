@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const distDir = path.resolve(repoRoot, "dist");
 
-const preferredOrigin = process.env.PRERENDER_ORIGIN || "https://www.banklefy.site";
+const preferredOrigin = (process.env.PRERENDER_ORIGIN || "https://banklefy.site").replace(/\/+$/, "");
 
 const routes = [
   "/",
