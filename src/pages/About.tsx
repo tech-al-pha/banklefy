@@ -43,7 +43,10 @@ const AboutPage = () => {
         <section className="mb-16 space-y-6">
           <div className="space-y-2">
             <p className="text-sm uppercase tracking-[0.3em] text-primary/80">About Banklefy</p>
-            <h1 className="font-noir text-3xl md:text-5xl font-black uppercase tracking-tight leading-[1.05]">
+            <h1
+              className="text-3xl md:text-5xl font-black uppercase tracking-tight leading-[1.05]"
+              style={{ fontFamily: '"DM Serif Display", "Cormorant Garamond", "Noir", serif' }}
+            >
               A bank statement conversion tool
               <span className="block text-white/90">built for practical review work.</span>
             </h1>

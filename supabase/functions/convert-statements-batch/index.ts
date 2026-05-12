@@ -117,7 +117,7 @@ type PdfDocumentProxy = {
 };
 
 const BATCH_DATE_TOKEN_SOURCE =
-  '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}[/-]\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{2,4})';
+  '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}(?:[/-]|\\s)+\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{2,4})';
 const BATCH_ROW_START_PATTERN = new RegExp(
   `^(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]+\\s+)?(${BATCH_DATE_TOKEN_SOURCE})\\s+(.+)$`,
   'i',
@@ -257,13 +257,13 @@ const extractPdfPageLineEntries = async (pdf: PdfDocumentProxy, pageNumber: numb
 
   tokens.sort((a, b) => {
     const yDiff = Math.abs(a.y - b.y);
-    if (yDiff <= 1.5) return a.x - b.x;
+    if (yDiff <= 2.5) return a.x - b.x;
     return b.y - a.y;
   });
 
   const buckets: Array<{ y: number; tokens: BatchLineToken[] }> = [];
   for (const token of tokens) {
-    const bucket = buckets.find((entry) => Math.abs(entry.y - token.y) <= 1.5);
+    const bucket = buckets.find((entry) => Math.abs(entry.y - token.y) <= 2.5);
     if (bucket) bucket.tokens.push(token);
     else buckets.push({ y: token.y, tokens: [token] });
   }

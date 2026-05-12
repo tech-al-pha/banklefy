@@ -990,9 +990,11 @@ export async function callGroqVisionOCR(
   mimeType: string,
   options?: GroqVisionOcrOptions,
 ): Promise<OCRResult> {
-  const GROQ_API_KEY = readEnv('GROQ_API_KEY');
-  
-  if (!GROQ_API_KEY) {
+  const groqKeys = [readEnv('GROQ_API_KEY'), readEnv('GROQ_API_KEY_2')]
+    .map((key) => (key || '').trim())
+    .filter((key, index, arr) => key.length > 0 && arr.indexOf(key) === index);
+
+  if (groqKeys.length === 0) {
     console.log('GROQ_API_KEY not configured, skipping Groq Vision OCR');
     return { success: false, error: 'Groq API key not configured' };
   }
@@ -1025,24 +1027,25 @@ export async function callGroqVisionOCR(
       max_tokens: strictTableMode ? 9500 : 8000,
     };
 
-    let response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestPayload)
-    });
-    
-    if (!response.ok) {
-      const firstErrorText = await response.text();
-      // Some environments may reject response_format for this endpoint/model.
-      // Retry once without response_format before failing hard.
-      if (response.status === 400) {
+    let response: Response | null = null;
+    let lastErrorStatus: number | null = null;
+    let lastErrorText = '';
+
+    for (const key of groqKeys) {
+      response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload)
+      });
+
+      if (!response.ok && response.status === 400) {
         response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${GROQ_API_KEY}`,
+            'Authorization': `Bearer ${key}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -1051,11 +1054,18 @@ export async function callGroqVisionOCR(
           })
         });
       }
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Groq Vision OCR error:', response.status, errorText || firstErrorText);
-        return { success: false, error: `Groq API error: ${response.status}` };
-      }
+
+      if (response.ok) break;
+
+      lastErrorStatus = response.status;
+      lastErrorText = await response.text();
+      const canFailover = response.status === 401 || response.status === 403 || response.status === 429 || response.status >= 500;
+      if (!canFailover) break;
+    }
+
+    if (!response || !response.ok) {
+      console.error('Groq Vision OCR error:', lastErrorStatus, lastErrorText);
+      return { success: false, error: `Groq API error: ${lastErrorStatus ?? 'unknown'}` };
     }
     
     const data = await response.json();

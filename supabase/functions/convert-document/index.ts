@@ -219,7 +219,7 @@ type PdfDocumentProxy = {
 };
 
 const DATE_TOKEN_SOURCE =
-  '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}[/-]\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{2,4})';
+  '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}(?:[/-]|\\s)+\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{2,4})';
 const DATE_TOKEN = new RegExp(DATE_TOKEN_SOURCE);
 const FLEXIBLE_PREFIX_SOURCE = '(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]+\\s+)?';
 const ROW_START_PATTERN = new RegExp(`^${FLEXIBLE_PREFIX_SOURCE}(${DATE_TOKEN_SOURCE})\\s+(${DATE_TOKEN_SOURCE})\\s+(.+)$`);
@@ -457,13 +457,13 @@ const groupTokensIntoLines = (items: Array<Record<string, unknown>>): LineEntry[
 
   tokens.sort((a, b) => {
     const yDiff = Math.abs(a.y - b.y);
-    if (yDiff <= 1.5) return a.x - b.x;
+    if (yDiff <= 2.5) return a.x - b.x;
     return b.y - a.y;
   });
 
   const buckets: Array<{ y: number; tokens: Array<{ x: number; y: number; text: string }> }> = [];
   for (const token of tokens) {
-    const bucket = buckets.find((entry) => Math.abs(entry.y - token.y) <= 1.5);
+    const bucket = buckets.find((entry) => Math.abs(entry.y - token.y) <= 2.5);
     if (bucket) {
       bucket.tokens.push(token);
       continue;
@@ -1555,19 +1555,23 @@ const buildSelectiveOcrPagePlan = async ({
 const attemptGroqTextRescue = async (
   rawText: string,
 ): Promise<{ rows: RawTransaction[] | null; tokenUsage: number; rescueConfidence: number }> => {
-  const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY');
-  if (!GROQ_API_KEY) return { rows: null, tokenUsage: 0, rescueConfidence: 0 };
+  const groqKeys = [Deno.env.get('GROQ_API_KEY'), Deno.env.get('GROQ_API_KEY_2')]
+    .map((key) => (key || '').trim())
+    .filter((key, index, arr) => key.length > 0 && arr.indexOf(key) === index);
+  if (groqKeys.length === 0) return { rows: null, tokenUsage: 0, rescueConfidence: 0 };
   if (!rawText || rawText.trim().length < AI_RESCUE_MIN_TEXT_CHARS) {
     return { rows: null, tokenUsage: 0, rescueConfidence: 0 };
   }
   try {
-    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    let groqResponse: Response | null = null;
+    for (const key of groqKeys) {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [
           {
@@ -1589,9 +1593,14 @@ const attemptGroqTextRescue = async (
         temperature: 0.1,
         max_tokens: 8000,
       }),
-    });
+      });
+      groqResponse = response;
+      if (response.ok) break;
+      const canFailover = response.status === 401 || response.status === 403 || response.status === 429 || response.status >= 500;
+      if (!canFailover) break;
+    }
 
-    if (!groqResponse.ok) return { rows: null, tokenUsage: 0, rescueConfidence: 0 };
+    if (!groqResponse || !groqResponse.ok) return { rows: null, tokenUsage: 0, rescueConfidence: 0 };
     const groqData = await groqResponse.json();
     const responseText = String(groqData.choices?.[0]?.message?.content || '').trim();
     const tokenUsage = Number(groqData?.usage?.total_tokens || 0);
