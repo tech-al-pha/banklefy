@@ -59,7 +59,7 @@ Secure • Fast • Mobile-Friendly
 
 # Pricing
 
-Flexible plans starting from approximately $1 per conversion.
+Flexible plans starting from approximately $2 per page.
 
 Subscription plans available for individuals and professionals with higher usage requirements.
 
@@ -69,12 +69,7 @@ Subscription plans available for individuals and professionals with higher usage
 
 * Team collaboration & shared workspaces
 * Public API access
-* QuickBooks export support
-* Xero export support
-* Zoho Books export support
-* GST reconciliation
 * Receipt & invoice matching
-* Cash flow forecasting
 * Behavioral risk scoring
 * Account Aggregator (AA) integration
 
@@ -104,13 +99,14 @@ Infrastructure:
 * Vercel
 * Supabase
 * Cloudflare
+* Render
 
 Security:
 
 * Bank-grade encryption
-* 24-hour auto-delete
+* No data store
 * reCAPTCHA v3
-
+* RLS policy
 ---
 
 # Razorpay Integration
@@ -123,4 +119,3 @@ Required server-side environment variables:
 
 * RAZORPAY_KEY_ID
 * RAZORPAY_KEY_SECRET
-* RECA
