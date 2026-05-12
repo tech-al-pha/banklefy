@@ -51,7 +51,7 @@ Secure • Fast • Mobile-Friendly
 * Multiple file uploads
 * Merge or separate reports
 * Automated analyzed PDF reports
-* 24-hour automatic data deletion
+* No aren't kept you data
 * reCAPTCHA protection
 * Privacy-focused workflow
 
