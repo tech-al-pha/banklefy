@@ -43,7 +43,10 @@ const AboutPage = () => {
         <section className="mb-16 space-y-6">
           <div className="space-y-2">
             <p className="text-sm uppercase tracking-[0.3em] text-primary/80">About Banklefy</p>
-            <h1 className="text-4xl font-semibold tracking-tight md:text-6xl">A bank statement conversion tool built for practical review work.</h1>
+            <h1 className="font-noir text-3xl md:text-5xl font-black uppercase tracking-tight leading-[1.05]">
+              A bank statement conversion tool
+              <span className="block text-white/90">built for practical review work.</span>
+            </h1>
             <p className="max-w-3xl text-lg leading-relaxed text-muted-foreground">
               Banklefy is designed to help users turn bank statements into structured outputs that are easier to inspect, export, and work with. It is a processing tool, not a bank, an accounting system, or a substitute for human review.
             </p>
