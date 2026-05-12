@@ -630,12 +630,27 @@ export async function generateProfessionalExcel(config: ExcelConfig): Promise<Ex
 
   rows.push(...buildAccountRows(config.bankInfo, statementPeriod));
   rows.push(layout.headers);
-  const txnRows = buildTransactionRows(config.transactions, layout);
-  rows.push(...txnRows);
+  rows.push(...buildTransactionRows(config.transactions, layout));
   rows.push(buildTotalsRow(config.transactions, layout));
 
-  const workbook = await buildWorkbook('Transactions', rows, layout);
-  return workbook;
+  if (!config.premiumExport) {
+    return buildWorkbook('Transactions', rows, layout);
+  }
+
+  // Premium: Transactions + Summary + Monthly Cashflow + Category Breakdown + Audit
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Banklefy';
+  workbook.created = new Date();
+  addTransactionsSheet(workbook, 'Transactions', rows, layout);
+  addSummarySheet(workbook, config.transactions, config.bankInfo);
+  addMonthlyCashflowSheet(workbook, config.transactions);
+  addCategoryBreakdownSheet(workbook, config.analytics);
+  addAuditSheet(workbook, config);
+  const buffer = await workbook.xlsx.writeBuffer();
+  return {
+    buffer: toArrayBuffer(buffer),
+    sheets: ['Transactions', 'Summary', 'Monthly Cashflow', 'Category Breakdown', 'Audit & Reconciliation'],
+  };
 }
 
 export async function generateSimpleExcel(transactions: Transaction[]): Promise<ArrayBuffer> {
