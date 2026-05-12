@@ -82,9 +82,17 @@ export const buildCSV = (
   };
 };
 
+const PREMIUM_PLAN_PREFIXES = ['per_page_', 'unlimited', 'starter', 'business', 'admin'];
+
+const isPremiumPlan = (plan?: string): boolean => {
+  const p = String(plan || '').toLowerCase();
+  if (!p || p === 'free') return false;
+  return PREMIUM_PLAN_PREFIXES.some((prefix) => p.startsWith(prefix));
+};
+
 export const buildXLSX = async (
   transactions: ReadonlyArray<Transaction>,
-  _metadata: ExportMetadata,
+  metadata: ExportMetadata,
   context: XlsxBuilderContext,
 ): Promise<ExportBuildArtifact> => {
   const excel = await generateProfessionalExcel({
@@ -95,6 +103,7 @@ export const buildXLSX = async (
     liquidity: context.liquidity,
     reconciliation: context.reconciliation,
     bankInfo: context.bankInfo,
+    premiumExport: isPremiumPlan(metadata.userPlan),
   });
   return {
     fileBuffer: new Uint8Array(excel.buffer),

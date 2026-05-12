@@ -428,14 +428,12 @@ function columnLetter(index: number): string {
   return result;
 }
 
-async function buildWorkbook(
+function addTransactionsSheet(
+  workbook: ExcelJS.Workbook,
   sheetName: string,
   rows: SheetData,
   layout: ColumnLayout,
-): Promise<ExcelGenerationResult> {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Banklefy';
-  workbook.created = new Date();
+): ExcelJS.Worksheet {
   const worksheet = workbook.addWorksheet(sheetName);
   worksheet.addRows(rows);
 
@@ -449,12 +447,172 @@ async function buildWorkbook(
   const dataEndRow = totalRowIndex + 1;
 
   applyWorksheetStyling(worksheet, rows, layout, headerRowIndex, totalRowIndex, dataStartRow, dataEndRow);
+  return worksheet;
+}
 
+async function buildWorkbook(
+  sheetName: string,
+  rows: SheetData,
+  layout: ColumnLayout,
+): Promise<ExcelGenerationResult> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Banklefy';
+  workbook.created = new Date();
+  addTransactionsSheet(workbook, sheetName, rows, layout);
   const buffer = await workbook.xlsx.writeBuffer();
-  return {
-    buffer: toArrayBuffer(buffer),
-    sheets: [sheetName],
-  };
+  return { buffer: toArrayBuffer(buffer), sheets: [sheetName] };
+}
+
+// ---------- Premium extra sheets ----------
+
+const monthKey = (iso: string): string => {
+  const m = /^(\d{4})-(\d{2})/.exec(iso || '');
+  return m ? `${m[1]}-${m[2]}` : 'Unknown';
+};
+
+function addSummarySheet(workbook: ExcelJS.Workbook, txns: Transaction[], bankInfo?: BankInfo): void {
+  const ws = workbook.addWorksheet('Summary');
+  let totalDebit = 0;
+  let totalCredit = 0;
+  for (const t of txns) {
+    totalDebit += Number(t.debit) || 0;
+    totalCredit += Number(t.credit) || 0;
+  }
+  const opening = txns.length ? Number(txns[0].balance) - (Number(txns[0].credit) || 0) + (Number(txns[0].debit) || 0) : 0;
+  const closing = txns.length ? Number(txns[txns.length - 1].balance) || 0 : 0;
+  const period = chooseStatementPeriodLabel(bankInfo?.statementPeriod, txns);
+
+  const rows: SheetData = [
+    ['Statement Summary', ''],
+    ['Account Holder', bankInfo?.accountHolder || ''],
+    ['Bank', bankInfo?.bankName || ''],
+    ['Currency', bankInfo?.currency || ''],
+    ['Statement Period', period || ''],
+    [],
+    ['Metric', 'Value'],
+    ['Opening Balance', Number(opening.toFixed(2))],
+    ['Closing Balance', Number(closing.toFixed(2))],
+    ['Total Credits', Number(totalCredit.toFixed(2))],
+    ['Total Debits', Number(totalDebit.toFixed(2))],
+    ['Net Cashflow', Number((totalCredit - totalDebit).toFixed(2))],
+    ['Transaction Count', txns.length],
+    ['Days in Statement', txns.length ? new Set(txns.map((t) => t.date)).size : 0],
+  ];
+  ws.addRows(rows);
+
+  ws.getRow(1).font = { bold: true, size: 14, color: { argb: `FF${THEME.headerBg}` } };
+  ws.getRow(7).eachCell((c) => {
+    c.font = { bold: true, color: { argb: `FF${THEME.headerFg}` } };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${THEME.headerBg}` } };
+  });
+  for (let r = 8; r <= rows.length; r += 1) {
+    const cell = ws.getCell(r, 2);
+    if (typeof cell.value === 'number') cell.numFmt = MONEY_FORMAT;
+  }
+  ws.columns = [{ width: 28 }, { width: 22 }];
+}
+
+function addMonthlyCashflowSheet(workbook: ExcelJS.Workbook, txns: Transaction[]): void {
+  const ws = workbook.addWorksheet('Monthly Cashflow');
+  const map = new Map<string, { debit: number; credit: number; closing: number; lastDate: string }>();
+  for (const t of txns) {
+    const key = monthKey(t.date);
+    const cur = map.get(key) || { debit: 0, credit: 0, closing: 0, lastDate: '' };
+    cur.debit += Number(t.debit) || 0;
+    cur.credit += Number(t.credit) || 0;
+    if (!cur.lastDate || (t.date && t.date > cur.lastDate)) {
+      cur.lastDate = t.date;
+      cur.closing = Number(t.balance) || cur.closing;
+    }
+    map.set(key, cur);
+  }
+  const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  ws.addRow(['Month', 'Credits', 'Debits', 'Net', 'Closing Balance']);
+  for (const [month, v] of sorted) {
+    ws.addRow([
+      month,
+      Number(v.credit.toFixed(2)),
+      Number(v.debit.toFixed(2)),
+      Number((v.credit - v.debit).toFixed(2)),
+      Number(v.closing.toFixed(2)),
+    ]);
+  }
+  ws.getRow(1).eachCell((c) => {
+    c.font = { bold: true, color: { argb: `FF${THEME.headerFg}` } };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${THEME.headerBg}` } };
+    c.alignment = { horizontal: 'center' };
+  });
+  for (let r = 2; r <= sorted.length + 1; r += 1) {
+    for (let c = 2; c <= 5; c += 1) {
+      ws.getCell(r, c).numFmt = MONEY_FORMAT;
+      ws.getCell(r, c).alignment = { horizontal: 'right' };
+    }
+  }
+  ws.columns = [{ width: 14 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 18 }];
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
+function addCategoryBreakdownSheet(
+  workbook: ExcelJS.Workbook,
+  analytics: ExcelConfig['analytics'],
+): void {
+  const ws = workbook.addWorksheet('Category Breakdown');
+  const entries = Object.entries(analytics?.categoryBreakdown || {});
+  const totalSpend = entries.reduce((sum, [, v]) => sum + (v.totalDebit || 0), 0);
+
+  ws.addRow(['Category', 'Count', 'Total Debit', 'Total Credit', '% of Spend']);
+  const sorted = entries.sort(([, a], [, b]) => (b.totalDebit || 0) - (a.totalDebit || 0));
+  for (const [cat, v] of sorted) {
+    ws.addRow([
+      cat,
+      v.count,
+      Number((v.totalDebit || 0).toFixed(2)),
+      Number((v.totalCredit || 0).toFixed(2)),
+      totalSpend > 0 ? Number(((v.totalDebit || 0) / totalSpend).toFixed(4)) : 0,
+    ]);
+  }
+  ws.getRow(1).eachCell((c) => {
+    c.font = { bold: true, color: { argb: `FF${THEME.headerFg}` } };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${THEME.headerBg}` } };
+    c.alignment = { horizontal: 'center' };
+  });
+  for (let r = 2; r <= sorted.length + 1; r += 1) {
+    ws.getCell(r, 3).numFmt = MONEY_FORMAT;
+    ws.getCell(r, 4).numFmt = MONEY_FORMAT;
+    ws.getCell(r, 5).numFmt = '0.00%';
+  }
+  ws.columns = [{ width: 28 }, { width: 10 }, { width: 16 }, { width: 16 }, { width: 14 }];
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
+function addAuditSheet(workbook: ExcelJS.Workbook, config: ExcelConfig): void {
+  const ws = workbook.addWorksheet('Audit & Reconciliation');
+  const txns = config.transactions || [];
+  const mismatchCount = txns.filter((t) => t.balanceMismatch).length;
+  const dupCount = txns.filter((t) => t.isDuplicate).length;
+  const integrity = config.underwriting?.integrityScore ?? null;
+
+  const rows: SheetData = [
+    ['Accuracy & Integrity Audit', ''],
+    [],
+    ['Check', 'Result'],
+    ['Total Transactions', txns.length],
+    ['Running-Balance Mismatches', mismatchCount],
+    ['Duplicates Detected', dupCount],
+    ['Reconciliation Pass Rate', txns.length > 0 ? Number((1 - mismatchCount / txns.length).toFixed(4)) : 1],
+    ['Integrity Score (0-100)', integrity == null ? 'N/A' : Number(integrity)],
+    ['Fraud Alerts', (config.fraudAlerts || []).length],
+    [],
+    ['Note', 'Text-based pages parsed deterministically (pure code). Vision OCR used only on scanned pages.'],
+  ];
+  ws.addRows(rows);
+  ws.getRow(1).font = { bold: true, size: 14, color: { argb: `FF${THEME.headerBg}` } };
+  ws.getRow(3).eachCell((c) => {
+    c.font = { bold: true, color: { argb: `FF${THEME.headerFg}` } };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${THEME.headerBg}` } };
+  });
+  ws.getCell(7, 2).numFmt = '0.00%';
+  ws.columns = [{ width: 32 }, { width: 22 }];
 }
 
 function toArrayBuffer(value: unknown): ArrayBuffer {
@@ -472,12 +630,27 @@ export async function generateProfessionalExcel(config: ExcelConfig): Promise<Ex
 
   rows.push(...buildAccountRows(config.bankInfo, statementPeriod));
   rows.push(layout.headers);
-  const txnRows = buildTransactionRows(config.transactions, layout);
-  rows.push(...txnRows);
+  rows.push(...buildTransactionRows(config.transactions, layout));
   rows.push(buildTotalsRow(config.transactions, layout));
 
-  const workbook = await buildWorkbook('Transactions', rows, layout);
-  return workbook;
+  if (!config.premiumExport) {
+    return buildWorkbook('Transactions', rows, layout);
+  }
+
+  // Premium: Transactions + Summary + Monthly Cashflow + Category Breakdown + Audit
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Banklefy';
+  workbook.created = new Date();
+  addTransactionsSheet(workbook, 'Transactions', rows, layout);
+  addSummarySheet(workbook, config.transactions, config.bankInfo);
+  addMonthlyCashflowSheet(workbook, config.transactions);
+  addCategoryBreakdownSheet(workbook, config.analytics);
+  addAuditSheet(workbook, config);
+  const buffer = await workbook.xlsx.writeBuffer();
+  return {
+    buffer: toArrayBuffer(buffer),
+    sheets: ['Transactions', 'Summary', 'Monthly Cashflow', 'Category Breakdown', 'Audit & Reconciliation'],
+  };
 }
 
 export async function generateSimpleExcel(transactions: Transaction[]): Promise<ArrayBuffer> {
