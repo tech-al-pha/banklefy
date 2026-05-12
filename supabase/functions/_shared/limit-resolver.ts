@@ -227,6 +227,14 @@ const resolveCurrentPlanType = (planType: string, conversionsLimit: number): str
     return planType;
   }
 
+  // Legacy tiers stored as generic labels should still unlock the right pack exports based on limit.
+  // Example: plan_type = "business"/"paid"/"pro"/"basic" with conversions_limit carrying the pack size.
+  if (planType === 'basic') return inferredPack ?? 'per_page_pack_basic';
+  if (planType === 'starter') return inferredPack ?? 'per_page_pack_starter';
+  if (planType === 'pro' || planType === 'business' || planType === 'paid') {
+    return inferredPack ?? 'per_page_pack_pro';
+  }
+
   return planType;
 };
 

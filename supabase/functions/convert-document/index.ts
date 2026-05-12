@@ -3014,6 +3014,9 @@ const resolveCurrentPlanType = (planType: string, conversionsLimit: number): str
   if (planType === 'free') return inferredPack ?? 'free';
   if (planType === 'unlimited') return conversionsLimit >= 900000 ? 'unlimited' : (inferredPack ?? 'free');
   if (planType.startsWith('per_page')) return planType;
+  if (planType === 'basic') return inferredPack ?? 'per_page_pack_basic';
+  if (planType === 'starter') return inferredPack ?? 'per_page_pack_starter';
+  if (planType === 'pro' || planType === 'business' || planType === 'paid') return inferredPack ?? 'per_page_pack_pro';
   return planType;
 };
 
