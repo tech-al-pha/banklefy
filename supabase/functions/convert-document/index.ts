@@ -232,6 +232,8 @@ const DATE_TOKEN_FLEX_PATTERN = new RegExp(`(${DATE_TOKEN_SOURCE})`);
 const DASH_PLACEHOLDER = /^[-\u2013\u2014]+$/;
 const normalizeDashToken = (token: string): string => token.replace(/[–—]/g, '-');
 const PACKED_DATE_TOKEN_PATTERN = /^\d{6,8}$/;
+const DATE_LIKE_AMOUNT_PATTERN =
+  /^(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}[/-][A-Za-z]{3,9}(?:[/-]|\s)+\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})$/i;
 
 const MONTH_INDEX: Record<string, number> = {
   jan: 1,
@@ -355,6 +357,8 @@ const isPackedDateNumber = (value: string): boolean => {
 const parseAmount = (value: string): number => {
   const raw = String(value || '').trim();
   if (!raw) return 0;
+  const dateClean = raw.replace(/\b(CR|DR)\b/gi, '').replace(/[()]/g, '').trim();
+  if (DATE_LIKE_AMOUNT_PATTERN.test(dateClean)) return Number.NaN;
   const hasParens = raw.startsWith('(') && raw.endsWith(')');
   const marker = raw.match(/\b(CR|DR)\b/i)?.[1]?.toUpperCase();
   const normalized = raw
@@ -377,6 +381,7 @@ const parseAmount = (value: string): number => {
 const isAmountToken = (value: string): boolean => {
   if (!AMOUNT_TOKEN_PATTERN.test(value)) return false;
   const normalized = String(value || '').replace(/\b(CR|DR)\b/gi, '').replace(/[(),]/g, '').trim();
+  if (DATE_LIKE_AMOUNT_PATTERN.test(normalized)) return false;
   if (PACKED_DATE_TOKEN_PATTERN.test(normalized) && isPackedDateNumber(normalized)) return false;
   return true;
 };

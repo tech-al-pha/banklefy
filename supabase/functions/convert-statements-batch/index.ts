@@ -174,6 +174,8 @@ const normalizeBatchDate = (value: string): string => {
 const parseBatchAmount = (value: string): number => {
   const raw = String(value || '').trim();
   if (!raw) return 0;
+  const dateClean = raw.replace(/\b(CR|DR)\b/gi, '').replace(/[()]/g, '').trim();
+  if (DATE_LIKE_AMOUNT_PATTERN.test(dateClean)) return Number.NaN;
   const hasParens = raw.startsWith('(') && raw.endsWith(')');
   const marker = raw.match(/\b(CR|DR)\b/i)?.[1]?.toUpperCase();
   const cleaned = raw.replace(/\b(CR|DR)\b/gi, '').replace(/[(),]/g, '').trim();
@@ -202,6 +204,8 @@ const inferBatchDebitCredit = (line: string, amount: number): { debit: number; c
 
 const BATCH_AMOUNT_TOKEN_PATTERN = new RegExp(`^[+-]?(?:\\(?${BATCH_AMOUNT_NUMBER_SOURCE}\\)?)(?:\\s*(?:CR|DR))?$`, 'i');
 const PACKED_DATE_TOKEN_PATTERN = /^\d{6,8}$/;
+const DATE_LIKE_AMOUNT_PATTERN =
+  /^(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}[/-][A-Za-z]{3,9}(?:[/-]|\s)+\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4})$/i;
 
 const isPackedDateNumber = (value: string): boolean => {
   if (!PACKED_DATE_TOKEN_PATTERN.test(value)) return false;
@@ -233,6 +237,7 @@ const isPackedDateNumber = (value: string): boolean => {
 const isBatchAmountToken = (value: string): boolean => {
   if (!BATCH_AMOUNT_TOKEN_PATTERN.test(value)) return false;
   const cleaned = String(value || '').replace(/\b(CR|DR)\b/gi, '').replace(/[(),]/g, '').trim();
+  if (DATE_LIKE_AMOUNT_PATTERN.test(cleaned)) return false;
   if (PACKED_DATE_TOKEN_PATTERN.test(cleaned) && isPackedDateNumber(cleaned)) return false;
   return true;
 };
