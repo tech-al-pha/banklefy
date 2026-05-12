@@ -287,6 +287,13 @@ const extractPdfPageLineEntries = async (pdf: PdfDocumentProxy, pageNumber: numb
 };
 
 const parseDeterministicRowsFromLineEntries = (lineEntries: BatchLineEntry[]): RawTransaction[] => {
+  const specializedAdcbRows = recoverAdcbTransactionsFromOcrText(
+    lineEntries.map((entry) => entry.text).join('\n'),
+  );
+  if (specializedAdcbRows.length > 0) {
+    return specializedAdcbRows;
+  }
+
   const specializedEmiratesRows = recoverEmiratesIslamicTransactionsFromOcrText(
     lineEntries.map((entry) => entry.text).join('\n'),
   );

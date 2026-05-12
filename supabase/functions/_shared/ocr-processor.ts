@@ -1912,8 +1912,17 @@ export const mergeOcrTransactionsDeterministic = (
 const isLikelyAdcbStatementText = (value: string): boolean => {
   const lower = value.toLowerCase();
   return (
-    (lower.includes('statement of accounts') || lower.includes('statement of account')) &&
-    (lower.includes('adcb') || lower.includes('procash')) &&
+    (
+      lower.includes('statement of accounts') ||
+      lower.includes('statement of account') ||
+      lower.includes('report date:')
+    ) &&
+    (
+      lower.includes('adcb') ||
+      lower.includes('abu dhabi commercial bank') ||
+      lower.includes('procash') ||
+      lower.includes('total debit amount')
+    ) &&
     lower.includes('debit') &&
     lower.includes('credit')
   );
@@ -1941,12 +1950,15 @@ const scoreBalanceTransition = (
 const buildDescriptionFromAdcbRow = (raw: string): string => {
   return raw
     .replace(/^\s*[[(]?\d+\s*/g, ' ')
+    .replace(/\b[A-Za-z]{3}-\b/g, ' ')
     .replace(/\b\d{1,2}[-/](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[-/]\d{2,4}\b/gi, ' ')
     .replace(/\b\d{1,2}[-/](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/gi, ' ')
     .replace(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/g, ' ')
+    .replace(/\b20\d{2}\b/g, ' ')
     .replace(/\b(?:phub|mob|m\d{6,}|ae\d{5,}|e\d{6,})[a-z0-9/.-]*\b/gi, ' ')
     .replace(/\b\d{1,3}(?:,\d{3})*\.\d{2}\b/g, ' ')
     .replace(/\b(?:debit|credit|running|balance|value|date|reference|amount)\b/gi, ' ')
+    .replace(/\s-\s/g, ' ')
     .replace(/[_[\]{}|]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -2006,7 +2018,7 @@ const extractAdcbDraftRowsFromText = (ocrText: string): AdcbRowDraft[] => {
     )
     .filter(Boolean);
 
-  const tableHeaderPattern = /value\s+bank\s+customer\s+description/i;
+  const tableHeaderPattern = /(?:value\s+bank\s+customer\s+description|sr\.?no\s+date\s+value\s+bank\s+customer\s+description)/i;
   const rowStartPattern =
     /^\s*[[(]?\d+\s+[^\n]*?\d{1,2}\s*[-/]\s*[A-Za-z]{3}\s*[-/]/i;
   const rowStartDateLeadPattern = /^\s*[[(]?\d{1,2}\s*[-/]\s*[A-Za-z]{3}\s*[-/]?/i;
@@ -2027,8 +2039,14 @@ const extractAdcbDraftRowsFromText = (ocrText: string): AdcbRowDraft[] => {
       const balanceToken = amounts[amounts.length - 1];
       const amount = parseMoney(amountToken);
       const balance = parseMoney(balanceToken);
+      const yearFromBody = joined.match(/\b(20\d{2})\b/)?.[1];
+      const normalizedDateRaw = current.dateRaw.replace(/\s+/g, '');
+      const completedDateRaw =
+        /\d{4}$/.test(normalizedDateRaw)
+          ? normalizedDateRaw
+          : `${normalizedDateRaw}${yearFromBody ? yearFromBody : defaultYear ?? ''}`;
       const parsedDate =
-        parseStatementDate(current.dateRaw.replace(/\s+/g, ''), defaultYear) ||
+        parseStatementDate(completedDateRaw, defaultYear) ||
         parseStatementDate(current.dateRaw, defaultYear);
       if (parsedDate && Number.isFinite(amount) && Number.isFinite(balance) && amount > 0) {
         const refMatch = joined.match(/\b(?:PHUB|MOB|M\d{6,}|AE\d{5,})[A-Z0-9/.-]*\b/i);

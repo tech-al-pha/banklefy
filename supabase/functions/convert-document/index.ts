@@ -1152,6 +1152,15 @@ const extractPdfTextTransactionsFromBytes = async (
       }
     }
 
+    const adcbRecoveredRows = recoverAdcbTransactionsFromOcrText(allLines.join('\n'));
+    if (adcbRecoveredRows.length > 0) {
+      console.log("[ROW_COUNT]", {
+        stage: "adcb_specialized_parse",
+        totalAfter: adcbRecoveredRows.length,
+      });
+      return { transactions: adcbRecoveredRows, text: allLines.join('\n') };
+    }
+
     const emiratesIslamicRows = recoverEmiratesIslamicTransactionsFromOcrText(allLines.join('\n'));
     if (emiratesIslamicRows.length > 0) {
       console.log("[ROW_COUNT]", {
