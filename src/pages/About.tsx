@@ -29,7 +29,7 @@ const AboutPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background text-white font-sans selection:bg-primary/30">
+    <div className="min-h-screen bg-background text-white selection:bg-primary/30">
       <AutoHideHeader as="nav" className="border-b border-primary/10 bg-ink/40 p-4 backdrop-blur-md">
         <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Logo />
