@@ -32,8 +32,6 @@ playwright-report/
 .tmp_supabase_init/
 supabase/.temp/
 
-# Temporary Firebase CLI artifacts
-.firebase/
 .tmp/
 
 .vercel
