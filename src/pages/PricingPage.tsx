@@ -660,7 +660,7 @@ const PricingPage = () => {
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-full h-8 px-4 border-white/10 bg-white/[0.02] text-white/90 hover:bg-white/[0.05]"
+                className="glass-card rounded-full h-9 px-5 border-white/10 bg-white/[0.03] text-white/90 transition-all hover:bg-white/[0.06] hover:shadow-neon hover:-translate-y-0.5 active:translate-y-0"
                 onClick={() => scrollToSection("one-time-conversions")}
               >
                 One-time conversions
@@ -668,17 +668,17 @@ const PricingPage = () => {
               <Button
                 size="sm"
                 variant="outline"
-                className="rounded-full h-8 px-4 border-white/10 bg-white/[0.02] text-white/90 hover:bg-white/[0.05]"
+                className="glass-card rounded-full h-9 px-5 border-white/10 bg-white/[0.03] text-white/90 transition-all hover:bg-white/[0.06] hover:shadow-neon hover:-translate-y-0.5 active:translate-y-0"
                 onClick={() => scrollToSection("plan-comparison")}
               >
                 Plan comparison
               </Button>
             </div>
-            <div className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] p-1 backdrop-blur-xl">
+            <div className="glass-card inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] p-1 backdrop-blur-xl shadow-[0_20px_50px_-35px_rgba(0,0,0,0.95)]">
               <Button
                 size="sm"
                 variant={priceCurrency === "INR" ? "default" : "outline"}
-                className="rounded-full h-8 px-4"
+                className="rounded-full h-9 px-5 font-bold tracking-wide transition-all hover:shadow-neon hover:-translate-y-0.5 active:translate-y-0"
                 onClick={() => setPriceCurrency("INR")}
                 aria-pressed={priceCurrency === "INR"}
               >
@@ -687,7 +687,7 @@ const PricingPage = () => {
               <Button
                 size="sm"
                 variant={priceCurrency === "USD" ? "default" : "outline"}
-                className="rounded-full h-8 px-4"
+                className="rounded-full h-9 px-5 font-bold tracking-wide transition-all hover:shadow-neon hover:-translate-y-0.5 active:translate-y-0"
                 onClick={() => setPriceCurrency("USD")}
                 aria-pressed={priceCurrency === "USD"}
               >
