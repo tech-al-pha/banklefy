@@ -231,6 +231,7 @@ const AMOUNT_TOKEN_PATTERN = new RegExp(`^${AMOUNT_TOKEN_SOURCE}$`, 'i');
 const DATE_TOKEN_FLEX_PATTERN = new RegExp(`(${DATE_TOKEN_SOURCE})`);
 const DASH_PLACEHOLDER = /^[-\u2013\u2014]+$/;
 const normalizeDashToken = (token: string): string => token.replace(/[–—]/g, '-');
+const PACKED_DATE_TOKEN_PATTERN = /^\d{6,8}$/;
 
 const MONTH_INDEX: Record<string, number> = {
   jan: 1,
@@ -325,6 +326,32 @@ const normalizeDate = (value: string): string => {
   return raw;
 };
 
+const isPackedDateNumber = (value: string): boolean => {
+  if (!PACKED_DATE_TOKEN_PATTERN.test(value)) return false;
+
+  const tryYmd = (yyyy: number, mm: number, dd: number): boolean => {
+    if (!Number.isFinite(yyyy) || !Number.isFinite(mm) || !Number.isFinite(dd)) return false;
+    if (yyyy < 1990 || yyyy > 2099) return false;
+    if (mm < 1 || mm > 12) return false;
+    if (dd < 1 || dd > 31) return false;
+    return true;
+  };
+
+  if (value.length === 8) {
+    const yyyyFirst = tryYmd(Number(value.slice(0, 4)), Number(value.slice(4, 6)), Number(value.slice(6, 8)));
+    const ddFirst = tryYmd(Number(value.slice(4, 8)), Number(value.slice(2, 4)), Number(value.slice(0, 2)));
+    return yyyyFirst || ddFirst;
+  }
+
+  if (value.length === 6) {
+    const yy = Number(value.slice(4, 6));
+    const year = normalizeTwoDigitYear(yy);
+    return tryYmd(year, Number(value.slice(2, 4)), Number(value.slice(0, 2)));
+  }
+
+  return false;
+};
+
 const parseAmount = (value: string): number => {
   const raw = String(value || '').trim();
   if (!raw) return 0;
@@ -334,12 +361,24 @@ const parseAmount = (value: string): number => {
     .replace(/\b(CR|DR)\b/gi, '')
     .replace(/[(),]/g, '')
     .trim();
+
+  // Guard: OCR/text extraction can collapse dates into 6-8 digit numbers (DDMMYY/DDMMYYYY/YYYYMMDD).
+  // Those should never be treated as money amounts.
+  if (PACKED_DATE_TOKEN_PATTERN.test(normalized) && isPackedDateNumber(normalized)) return Number.NaN;
+
   const amount = Number(normalized);
   if (!Number.isFinite(amount)) return 0;
   if (hasParens) return -Math.abs(amount);
   if (marker === 'DR') return -Math.abs(amount);
   if (marker === 'CR') return Math.abs(amount);
   return amount;
+};
+
+const isAmountToken = (value: string): boolean => {
+  if (!AMOUNT_TOKEN_PATTERN.test(value)) return false;
+  const normalized = String(value || '').replace(/\b(CR|DR)\b/gi, '').replace(/[(),]/g, '').trim();
+  if (PACKED_DATE_TOKEN_PATTERN.test(normalized) && isPackedDateNumber(normalized)) return false;
+  return true;
 };
 
 const inferDebitCreditFromContext = (
@@ -453,7 +492,7 @@ const linesFromTextItems = (items: Array<Record<string, unknown>>): string[] =>
 const detectAmountColumns = (lineEntries: LineEntry[]): PdfAmountColumnLayout | null =>
   detectPdfAmountColumnLayout(
     lineEntries,
-    (value) => AMOUNT_TOKEN_PATTERN.test(value),
+    isAmountToken,
   );
 
 const extractAnchoredAmounts = (
@@ -462,7 +501,7 @@ const extractAnchoredAmounts = (
 ): { debit: number; credit: number; balance: number } | null => {
   return extractAnchoredAmountsFromLayout(entry, layout, {
     inferSide: inferDebitCreditFromContext,
-    isAmountToken: (value) => AMOUNT_TOKEN_PATTERN.test(value),
+    isAmountToken,
     parseAmount,
   });
 };

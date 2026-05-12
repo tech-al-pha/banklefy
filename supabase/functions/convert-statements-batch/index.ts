@@ -177,6 +177,7 @@ const parseBatchAmount = (value: string): number => {
   const hasParens = raw.startsWith('(') && raw.endsWith(')');
   const marker = raw.match(/\b(CR|DR)\b/i)?.[1]?.toUpperCase();
   const cleaned = raw.replace(/\b(CR|DR)\b/gi, '').replace(/[(),]/g, '').trim();
+  if (PACKED_DATE_TOKEN_PATTERN.test(cleaned) && isPackedDateNumber(cleaned)) return Number.NaN;
   const amount = Number(cleaned.replace(/,/g, ''));
   if (!Number.isFinite(amount)) return 0;
   if (hasParens || marker === 'DR') return -Math.abs(amount);
@@ -200,6 +201,41 @@ const inferBatchDebitCredit = (line: string, amount: number): { debit: number; c
 };
 
 const BATCH_AMOUNT_TOKEN_PATTERN = new RegExp(`^[+-]?(?:\\(?${BATCH_AMOUNT_NUMBER_SOURCE}\\)?)(?:\\s*(?:CR|DR))?$`, 'i');
+const PACKED_DATE_TOKEN_PATTERN = /^\d{6,8}$/;
+
+const isPackedDateNumber = (value: string): boolean => {
+  if (!PACKED_DATE_TOKEN_PATTERN.test(value)) return false;
+
+  const tryYmd = (yyyy: number, mm: number, dd: number): boolean => {
+    if (!Number.isFinite(yyyy) || !Number.isFinite(mm) || !Number.isFinite(dd)) return false;
+    if (yyyy < 1990 || yyyy > 2099) return false;
+    if (mm < 1 || mm > 12) return false;
+    if (dd < 1 || dd > 31) return false;
+    return true;
+  };
+
+  const normalizeTwoDigitYear = (yy: number): number => (yy < 50 ? 2000 + yy : 1900 + yy);
+
+  if (value.length === 8) {
+    const yyyyFirst = tryYmd(Number(value.slice(0, 4)), Number(value.slice(4, 6)), Number(value.slice(6, 8)));
+    const ddFirst = tryYmd(Number(value.slice(4, 8)), Number(value.slice(2, 4)), Number(value.slice(0, 2)));
+    return yyyyFirst || ddFirst;
+  }
+
+  if (value.length === 6) {
+    const year = normalizeTwoDigitYear(Number(value.slice(4, 6)));
+    return tryYmd(year, Number(value.slice(2, 4)), Number(value.slice(0, 2)));
+  }
+
+  return false;
+};
+
+const isBatchAmountToken = (value: string): boolean => {
+  if (!BATCH_AMOUNT_TOKEN_PATTERN.test(value)) return false;
+  const cleaned = String(value || '').replace(/\b(CR|DR)\b/gi, '').replace(/[(),]/g, '').trim();
+  if (PACKED_DATE_TOKEN_PATTERN.test(cleaned) && isPackedDateNumber(cleaned)) return false;
+  return true;
+};
 
 const extractPdfPageLineEntries = async (pdf: PdfDocumentProxy, pageNumber: number): Promise<BatchLineEntry[]> => {
   const page = await pdf.getPage(pageNumber);
@@ -248,7 +284,7 @@ const parseDeterministicRowsFromLineEntries = (lineEntries: BatchLineEntry[]): R
   const rows: RawTransaction[] = [];
   const amountLayout: PdfAmountColumnLayout | null = detectPdfAmountColumnLayout(
     lineEntries,
-    (value) => BATCH_AMOUNT_TOKEN_PATTERN.test(value),
+    isBatchAmountToken,
   );
 
   for (const entry of lineEntries) {
@@ -264,7 +300,7 @@ const parseDeterministicRowsFromLineEntries = (lineEntries: BatchLineEntry[]): R
     const remainder = rowMatch[2] || '';
     const anchored = extractAnchoredAmountsFromLayout(entry, amountLayout, {
       inferSide: inferBatchDebitCredit,
-      isAmountToken: (value) => BATCH_AMOUNT_TOKEN_PATTERN.test(value),
+      isAmountToken: isBatchAmountToken,
       parseAmount: parseBatchAmount,
     });
     const matches: Array<{ raw: string; marker: string | null }> = [];
