@@ -3,7 +3,7 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTi
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Settings, Menu, Sparkles, CircleDollarSign, Gift } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
+import { useEffect } from "react";
 import Logo from "@/components/Logo";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { useLanguage } from "@/contexts/LanguageContext";
