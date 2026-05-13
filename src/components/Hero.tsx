@@ -111,11 +111,11 @@ export const Hero = () => {
             {/* Stats... (unchanged) */}
           </div>
 
-          <div className="hidden md:flex flex-col justify-center gap-6 w-full max-w-[620px] md:translate-x-4 lg:translate-x-8">
+          <div className="flex flex-col justify-center gap-3 sm:gap-4 md:gap-6 w-full max-w-[620px] md:translate-x-4 lg:translate-x-8">
             {heroHighlights.map((line) => (
               <div
                 key={line}
-                className="rounded-full border border-white/30 bg-gradient-to-r from-[#0a0a0b] via-[#151617] to-[#2a2d31] px-6 py-3 text-center text-sm font-semibold text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_0_12px_rgba(255,255,255,0.08)]"
+                className="rounded-full border border-white/30 bg-gradient-to-r from-[#0a0a0b] via-[#151617] to-[#2a2d31] px-4 py-2.5 text-center text-xs font-semibold text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_0_12px_rgba(255,255,255,0.08)] sm:px-5 md:px-6 md:py-3 md:text-sm"
               >
                 {line}
               </div>

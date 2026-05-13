@@ -750,9 +750,24 @@
     overflow-x: hidden;
   }
 
+  body {
+    letter-spacing: 0;
+  }
+
   /* Prevent any element from overflowing horizontally */
   *, *::before, *::after {
     max-width: 100%;
+    min-width: 0;
+  }
+
+  #root > *,
+  main,
+  section,
+  header,
+  nav,
+  footer {
+    width: 100%;
+    max-width: 100vw;
   }
 
   img, video, svg, canvas, iframe {
@@ -767,23 +782,37 @@
     word-wrap: break-word;
     overflow-wrap: break-word;
     hyphens: auto;
+    text-wrap: balance;
   }
   h2 {
     font-size: clamp(1.4rem, 5.5vw, 1.875rem) !important;
     line-height: 1.25 !important;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    text-wrap: balance;
   }
   h3 {
     font-size: clamp(1.15rem, 4.5vw, 1.5rem) !important;
     line-height: 1.3 !important;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    text-wrap: balance;
   }
   p, li, span, a {
     word-wrap: break-word;
     overflow-wrap: break-word;
     line-height: 1.6;
+  }
+
+  [class*="tracking-"] {
+    letter-spacing: 0.08em !important;
+  }
+
+  [class*="text-5xl"],
+  [class*="text-6xl"],
+  [class*="text-7xl"] {
+    font-size: clamp(1.85rem, 8vw, 2.6rem) !important;
+    line-height: 1.12 !important;
   }
 
   /* Section padding */
@@ -795,6 +824,18 @@
     padding-left: 16px !important;
     padding-right: 16px !important;
     max-width: 100% !important;
+  }
+
+  .fixed.inset-y-0,
+  [role="dialog"] {
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  .back-pill {
+    width: 100% !important;
+    min-height: 48px;
+    justify-content: center;
+    white-space: normal;
   }
 
   /* Grids: collapse multi-col to single col */
@@ -824,20 +865,33 @@
     padding-right: max(16px, env(safe-area-inset-right));
   }
 
+  .glass-card .flex,
+  .ultra-glass-panel .flex,
+  article .flex,
+  section .flex {
+    min-width: 0;
+  }
+
   /* Tables — horizontally scrollable */
   table {
-    display: block;
-    width: 100%;
+    display: table;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .overflow-x-auto,
+  [class*="overflow-x-auto"] {
+    max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    white-space: nowrap;
   }
 
   /* Buttons: full width + 48px touch target */
-  button:not([class*="icon"]):not([aria-label*="close" i]):not([aria-label*="menu" i]):not([role="tab"]):not([data-state]),
+  button:not([class*="icon"]):not([aria-label*="close" i]):not([aria-label*="menu" i]):not([role="tab"]),
   a[class*="btn"],
   .btn-glow {
     min-height: 48px;
+    white-space: normal;
   }
   /* Stacked button groups go full width */
   .flex.flex-col > button,
@@ -845,8 +899,31 @@
     width: 100%;
   }
 
+  section .flex-wrap > button,
+  section .flex-wrap > a,
+  section .flex-wrap > [role="button"] {
+    flex: 1 1 100%;
+  }
+
   /* Navigation: prevent overflow of horizontal nav lists */
   nav ul, nav ol {
     flex-wrap: wrap;
+  }
+
+  nav .container > .flex,
+  header .container > .flex {
+    gap: 0.75rem;
+  }
+
+  article,
+  .glass-card,
+  .ultra-glass-panel,
+  [class*="rounded-2xl"],
+  [class*="rounded-3xl"] {
+    overflow-wrap: anywhere;
+  }
+
+  .hero-title-3d {
+    letter-spacing: 0.02em !important;
   }
 }
