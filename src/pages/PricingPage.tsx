@@ -706,7 +706,7 @@ const PricingPage = () => {
           <p className="text-sm text-muted-foreground">
             No subscriptions, no renewal pressure.
           </p>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-3 gap-8">
             {pricingPlans.map(renderPlanCard)}
           </div>
         </section>
@@ -717,7 +717,7 @@ const PricingPage = () => {
           <p className="text-sm text-muted-foreground">
             Quick conversion with no commitments.
           </p>
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-3 gap-8">
             {perConversionPlans.map(renderPlanCard)}
           </div>
         </section>

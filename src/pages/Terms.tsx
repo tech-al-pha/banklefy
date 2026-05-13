@@ -13,9 +13,9 @@ const Terms = () => {
     <div className="min-h-screen bg-background text-foreground">
       <AutoHideHeader as="nav" className="border-b border-primary/20 bg-surface-elevated/80 backdrop-blur-xl">
         <div className="container mx-auto px-6 py-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-row items-center justify-between gap-3">
             <Logo />
-            <Button variant="ghost" onClick={() => navigate("/")} className="back-pill w-full sm:w-auto">
+            <Button variant="ghost" onClick={() => navigate("/")} className="back-pill">
               <ArrowLeft size={18} /> Back to Home
             </Button>
           </div>

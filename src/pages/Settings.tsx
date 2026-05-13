@@ -584,7 +584,7 @@ const Settings = () => {
         {items.map((item) => (
           <Card key={item.id} className="bg-surface-elevated/60 border-primary/20 backdrop-blur-sm">
             <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className={item.tone === "danger" ? "p-2 rounded-lg bg-red-500/10 text-red-300" : "p-2 rounded-lg bg-primary/10 text-primary"}>
                     {item.icon}
@@ -624,8 +624,8 @@ const Settings = () => {
                 <Logo />
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full sm:w-auto">
-              <div className="relative w-full sm:w-auto">
+            <div className="flex w-auto flex-row items-center gap-4">
+              <div className="relative w-auto">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder={t('settings.searchPlaceholder')}
@@ -638,7 +638,7 @@ const Settings = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => navigate('/')}
-                className="border-primary/50 bg-[#141414] text-foreground w-full sm:w-auto btn-target-glow"
+                className="btn-target-glow w-auto border-primary/50 bg-[#141414] text-foreground"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 {t('settings.backToHome')}

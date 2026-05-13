@@ -40,7 +40,7 @@ export const UploadDemoEditedWarningCard = ({
           </p>
         </div>
       </div>
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex gap-3">
         <Button
           variant="outline"
           className="w-full border border-amber-500/40 text-amber-200 bg-amber-500/10 hover:bg-amber-500/20"

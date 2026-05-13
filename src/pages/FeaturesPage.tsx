@@ -32,12 +32,12 @@ const FeaturesPage = () => {
     <div className="min-h-screen bg-background text-white font-sans selection:bg-primary/30">
       {/* Header Area */}
       <AutoHideHeader as="nav" className="border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
-        <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="container mx-auto flex flex-row items-center justify-between gap-3">
           <Logo />
           <Button 
             variant="ghost" 
             onClick={() => navigate('/')} 
-            className="back-pill w-full sm:w-auto"
+            className="back-pill"
           >
             <ArrowLeft size={18} /> Back to Home
           </Button>
@@ -73,7 +73,7 @@ const FeaturesPage = () => {
             <h2 className="text-2xl font-black text-primary uppercase tracking-widest mb-8 border-b border-primary/20 pb-4">
               {t(featureCategoryLabelKey[categoryId as FeatureCategoryId])}
             </h2>
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid grid-cols-2 gap-6">
               {(categoryFeatures as FeatureItem[]).map((feature, index) => {
                 const Icon = feature.icon;
                 return (

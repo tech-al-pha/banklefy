@@ -54,7 +54,7 @@ export const UploadDemoConvertActions = ({
   return (
     <div className="text-center space-y-3">
       <div className="space-y-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+        <div className="flex justify-center gap-3">
           <Button
             size="lg"
             className="convert-button w-full md:w-auto"

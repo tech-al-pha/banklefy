@@ -85,9 +85,9 @@ const Blog = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AutoHideHeader as="nav" className="border-b border-primary/10 bg-ink/40 backdrop-blur-md p-4">
-        <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="container mx-auto flex flex-row items-center justify-between gap-3">
           <Logo />
-          <Button variant="ghost" onClick={() => navigate("/")} className="back-pill w-full sm:w-auto">
+          <Button variant="ghost" onClick={() => navigate("/")} className="back-pill">
             <ArrowLeft size={18} /> Back to Home
           </Button>
         </div>

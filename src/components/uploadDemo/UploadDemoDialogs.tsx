@@ -41,7 +41,7 @@ export const UploadDemoDialogs = ({
             <DialogTitle>{limitDialogTitle}</DialogTitle>
             <DialogDescription className="space-y-4 pt-4">
               <p>{limitDialogMessage}</p>
-              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <div className="flex gap-2 pt-2">
                 {limitDialogShowSignup && (
                   <Button
                     className="bg-primary text-primary-foreground"
@@ -87,7 +87,7 @@ export const UploadDemoDialogs = ({
               <p className="text-sm text-muted-foreground">
                 Upgrade your plan to unlock premium formats beyond XLSX and CSV.
               </p>
-              <div className="flex flex-col sm:flex-row gap-2 pt-4">
+              <div className="flex gap-2 pt-4">
                 <Button
                   className="bg-primary text-primary-foreground"
                   onClick={() => {

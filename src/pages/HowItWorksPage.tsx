@@ -47,7 +47,7 @@ const HowItWorksPage = () => {
       </section>
 
       <section className="pb-16 px-6">
-        <div className="container mx-auto max-w-5xl grid gap-6 md:grid-cols-3">
+        <div className="container mx-auto grid max-w-5xl grid-cols-3 gap-6">
           {steps.map((step) => (
             <Card
               key={step.title}

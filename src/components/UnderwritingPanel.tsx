@@ -285,7 +285,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
       {!showLimitedDataNotice && (
         <>
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         {/* FOIR Score */}
         <Card className={`p-3 !bg-[#191919] card-hover-glow ${showLimitedDataNotice ? "border-amber-500/20" : ""}`}>
           <Tooltip>
@@ -365,7 +365,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
             <CreditCard className="w-4 h-4 text-muted-foreground" />
             EMI Breakdown by Loan Type
           </h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {Object.entries(summary.emiByLoanType).map(([type, data]) => (
               <div 
                 key={type} 
@@ -483,7 +483,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
             <Wallet className="w-4 h-4 text-muted-foreground" />
             Advanced Underwriting Signals
           </h4>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+          <div className="grid grid-cols-3 gap-3 text-sm">
             <div className="rounded-md bg-muted/30 p-2">
               <p className="label-muted text-xs">Disposable Income</p>
               <p className="font-semibold">{formatAmount(advancedSignals.disposableIncome)}</p>

@@ -63,7 +63,7 @@ export const UploadDemoPasswordCard = ({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex gap-3">
         <div className="relative flex-1">
           <label htmlFor="pdf-password" className="sr-only">
             PDF password

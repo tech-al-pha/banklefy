@@ -12,9 +12,9 @@ const Contact = () => {
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30">
       <AutoHideHeader as="nav" className="bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
-        <div className="container mx-auto px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="container mx-auto flex flex-row items-center justify-between gap-3 px-6 py-4">
           <Logo />
-          <Button variant="ghost" onClick={() => navigate("/")} className="back-pill w-full sm:w-auto">
+          <Button variant="ghost" onClick={() => navigate("/")} className="back-pill">
             <ArrowLeft size={18} /> Back to Home
           </Button>
         </div>
@@ -34,7 +34,7 @@ const Contact = () => {
           <p className="text-xs text-muted-foreground">Last updated: March 27, 2026</p>
         </section>
 
-        <section className="mt-10 grid gap-6 md:grid-cols-2">
+        <section className="mt-10 grid grid-cols-2 gap-6">
           {contactCards.map((card) => {
             const Icon = card.icon;
             const content = (

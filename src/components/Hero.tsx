@@ -49,10 +49,10 @@ export const Hero = () => {
   const heroHighlights = heroHighlightsByLanguage[language] ?? heroHighlightsByLanguage.en;
 
   return (
-    <section className="relative min-h-[70vh] flex items-center justify-center pt-8 pb-10 bg-transparent overflow-x-hidden">
+    <section className="relative flex min-h-[70vh] items-center justify-center bg-transparent pb-10 pt-8">
 
-      <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 sm:px-2 text-left">
-        <div className="max-w-none mx-auto grid gap-10 md:grid-cols-[1.1fr_0.9fr] items-center pt-16">
+      <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 text-left">
+        <div className="mx-auto grid max-w-none grid-cols-[1.1fr_0.9fr] items-center gap-10 pt-16">
           <div className="flex flex-col items-start space-y-6">
             <div className="inline-flex w-fit max-w-full flex-col items-start leading-tight overflow-visible">
             <h1
@@ -66,11 +66,7 @@ export const Hero = () => {
               style={{ fontSize: "clamp(2.8rem, 9.8vw, 7.8rem)" }}
               aria-label={titleLine2}
             >
-              {/* On small screens, avoid per-character flex spacing which can overflow and break layout. */}
-              <span className="block md:hidden text-left tracking-[0.08em]">
-                {titleLine2}
-              </span>
-              <span className="hidden md:flex w-full justify-between">
+              <span className="flex w-full justify-between gap-2">
                 {titleLine2Chars.map((char, index) => (
                   <span key={`${char}-${index}`} className="inline-block">
                     {char}
@@ -80,18 +76,18 @@ export const Hero = () => {
             </h2>
             </div>
 
-            <div className="inline-flex flex-wrap items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-[0.65rem] sm:text-xs md:text-sm font-semibold text-primary/80 tracking-[0.28em] uppercase shadow-[0_0_18px_rgba(255,255,255,0.08)]">
+            <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.28em] text-primary/80 shadow-[0_0_18px_rgba(255,255,255,0.08)]">
               {t("hero.tagline")}
             </div>
 
-            <p className="text-sm md:text-lg text-white/70 max-w-2xl leading-relaxed mt-6 mb-12 italic">
+            <p className="mt-6 mb-12 max-w-2xl text-lg italic leading-relaxed text-white/70">
               {t("hero.subtitle")}
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-start items-start sm:items-center mt-14 w-full max-w-2xl">
+            <div className="mt-14 flex w-full max-w-2xl items-center justify-start gap-4">
             <Button 
               size="lg" 
-              className="w-full sm:w-auto bg-primary text-primary-foreground shadow-none transition-all duration-300 hover:scale-105 group px-8 border-0 no-glow"
+              className="group w-auto border-0 bg-primary px-8 text-primary-foreground shadow-none transition-all duration-300 hover:scale-105 no-glow"
               onClick={() => scrollToId("demo")}
             >
               <Upload className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" aria-hidden="true" />
@@ -101,7 +97,7 @@ export const Hero = () => {
             <Button 
               size="lg" 
               variant="outline"
-              className="w-full sm:w-auto border-primary/40 bg-[#141414] text-primary backdrop-blur-xl shadow-none transition-all duration-300 px-8 btn-target-glow"
+              className="btn-target-glow w-auto border-primary/40 bg-[#141414] px-8 text-primary shadow-none backdrop-blur-xl transition-all duration-300"
               onClick={() => navigate("/sample-report")}
             >
               {t('hero.sampleReportBtn')}
@@ -111,7 +107,7 @@ export const Hero = () => {
             {/* Stats... (unchanged) */}
           </div>
 
-          <div className="flex flex-col justify-center gap-3 sm:gap-4 md:gap-6 w-full max-w-[620px] md:translate-x-4 lg:translate-x-8">
+          <div className="flex w-full max-w-[620px] translate-x-4 flex-col justify-center gap-6 lg:translate-x-8">
             {heroHighlights.map((line) => (
               <div
                 key={line}

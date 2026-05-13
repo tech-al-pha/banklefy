@@ -116,7 +116,7 @@
   html,
   body,
   #root {
-    overflow-x: hidden;
+    overflow-x: auto;
   }
 
   input,
@@ -143,6 +143,10 @@
   #root {
     min-height: 100vh;
     background: var(--background);
+  }
+
+  .mobile-desktop-shell {
+    min-height: 100vh;
   }
 
   h1,
@@ -220,6 +224,19 @@
 }
 
 @media (hover: none) and (pointer: coarse) {
+  html,
+  body,
+  #root {
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-desktop-shell {
+    min-width: 1180px;
+    width: max(1180px, 100%);
+  }
+
   body {
     cursor: auto;
   }

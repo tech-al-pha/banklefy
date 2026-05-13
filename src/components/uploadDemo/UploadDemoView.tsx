@@ -194,7 +194,7 @@ export const UploadDemoView = ({
 }: UploadDemoViewProps) => {
   return (
     <>
-      <section className="relative py-16 px-4 sm:px-6 overflow-hidden bg-background">
+      <section className="relative bg-background px-4 py-16">
         <div className="container mx-auto relative z-10">
           <UploadDemoHeader />
 

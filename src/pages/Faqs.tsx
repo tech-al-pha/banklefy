@@ -25,9 +25,9 @@ const Faqs = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <AutoHideHeader as="nav" className="bg-surface-elevated/80 backdrop-blur-xl border-b border-primary/20">
-        <div className="container mx-auto px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="container mx-auto flex flex-row items-center justify-between gap-3 px-6 py-4">
           <Logo />
-          <Button variant="ghost" onClick={() => navigate("/")} className="back-pill w-full sm:w-auto">
+          <Button variant="ghost" onClick={() => navigate("/")} className="back-pill">
             <ArrowLeft size={18} /> Back to Home
           </Button>
         </div>

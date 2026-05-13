@@ -143,7 +143,7 @@ export default function SampleReport() {
   }
 
   return (
-    <section className="relative min-h-screen overflow-hidden bg-background px-4 py-16 sm:px-6">
+    <section className="relative min-h-screen bg-background px-4 py-16 sm:px-6">
       <div className="absolute inset-0 bg-gradient-dark -z-10">
         <div className="absolute inset-0 bg-gradient-glow opacity-40" />
         <div className="absolute -top-10 left-8 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
@@ -292,7 +292,7 @@ export default function SampleReport() {
               </div>
             </Card>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3">
               {highlights.map((item) => (
                 <Card key={item} className="border-white/15 bg-[#171717] p-4 backdrop-blur-xl">
                   <div className="flex items-start gap-3">

@@ -31,9 +31,9 @@ const AboutPage = () => {
   return (
     <div className="min-h-screen bg-background text-white selection:bg-primary/30">
       <AutoHideHeader as="nav" className="border-b border-primary/10 bg-ink/40 p-4 backdrop-blur-md">
-        <div className="container mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="container mx-auto flex flex-row items-center justify-between gap-3">
           <Logo />
-          <Button variant="ghost" onClick={() => navigate("/")} className="back-pill w-full sm:w-auto">
+          <Button variant="ghost" onClick={() => navigate("/")} className="back-pill">
             <ArrowLeft size={18} /> Back to Home
           </Button>
         </div>
@@ -56,7 +56,7 @@ const AboutPage = () => {
           </div>
         </section>
 
-        <section className="mb-16 grid gap-6 md:grid-cols-3">
+        <section className="mb-16 grid grid-cols-3 gap-6">
           <div className="glass-card space-y-3 rounded-2xl p-6 transition-all hover:shadow-neon">
             <ShieldCheck className="text-primary" size={30} />
             <h2 className="text-sm uppercase tracking-[0.25em] text-white/90">What It Does</h2>
@@ -80,7 +80,7 @@ const AboutPage = () => {
           </div>
         </section>
 
-        <section className="mb-16 grid gap-8 md:grid-cols-2">
+        <section className="mb-16 grid grid-cols-2 gap-8">
           <div className="space-y-4">
             <h2 className="border-b border-white/10 pb-4 text-2xl tracking-wide">Product summary</h2>
             <ul className="space-y-3 text-sm leading-relaxed text-muted-foreground">
@@ -114,7 +114,7 @@ const AboutPage = () => {
 
           <div className="glass-card rounded-2xl p-6 transition-all hover:shadow-neon">
             <h3 className="text-lg font-semibold text-white">Common reasons to contact support</h3>
-            <ul className="mt-4 grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
+            <ul className="mt-4 grid grid-cols-2 gap-3 text-sm text-muted-foreground">
               {supportItems.map((item) => (
                 <li key={item} className="glass-card rounded-xl p-4">
                   {item}
@@ -123,7 +123,7 @@ const AboutPage = () => {
             </ul>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <a
               href="https://t.me/n3x4z"
               target="_blank"

@@ -406,7 +406,7 @@ export const FraudAlertPanel = ({
       </Card>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <Card className={`ultra-glass-panel p-3 !bg-[#191919] ${balanceMismatches > 0 ? 'bg-ink/60 border-border/60' : 'bg-surface-elevated/20 border-border/40'}`}>
           <div className="flex items-center gap-2 text-xs label-muted mb-1">
             {balanceMismatches > 0 ? (

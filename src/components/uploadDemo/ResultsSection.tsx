@@ -664,7 +664,7 @@ export const ResultsSection = ({
             renderPremiumFormatsLauncher()
           ) : (
             <>
-              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <div className="flex justify-center gap-2">
                 <Button
                   size="lg"
                   className="excel-button"
@@ -784,7 +784,7 @@ export const ResultsSection = ({
             renderPremiumFormatsLauncher()
           ) : (
             <>
-              <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <div className="flex justify-center gap-2">
                 <Button size="lg" className="excel-button" onClick={handleDownload} disabled={downloading}>
                   {downloading ? (
                     <>
@@ -898,7 +898,7 @@ export const ResultsSection = ({
             {actionCopy.financialAnalytics}
           </h3>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <Card className={`p-4 !bg-[#191919] ${toneClasses[creditTone].border}`}>
               <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[creditTone].text}`}>
                 <TrendingUp className={`w-4 h-4 ${toneClasses[creditTone].text}`} />
@@ -1126,7 +1126,7 @@ export const ResultsSection = ({
         </Card>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-6">
         <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-white/80">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             <FileText className="w-4 h-4 text-primary" />

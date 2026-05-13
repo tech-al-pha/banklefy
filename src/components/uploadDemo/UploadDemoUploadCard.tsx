@@ -135,7 +135,7 @@ export const UploadDemoUploadCard = ({
       tabIndex={0}
       aria-disabled={limitReached}
       data-hover
-      className={`subtle-border-glow bg-[#191919]/80 border-2 border-primary/20 hover:border-primary/40 rounded-xl p-6 sm:p-10 md:p-12 text-center transition-all duration-500 cursor-pointer group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+      className={`subtle-border-glow group relative cursor-pointer rounded-xl border-2 border-primary/20 bg-[#191919]/80 p-12 text-center transition-all duration-500 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
         limitReached ? "opacity-50 cursor-not-allowed" : ""
       }`}
     >
@@ -227,9 +227,9 @@ export const UploadDemoUploadCard = ({
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3">
           <Button
-            className="bg-primary text-primary-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto active:bg-primary active:text-primary-foreground"
+            className="w-auto rounded-lg bg-primary px-8 py-3 font-medium text-primary-foreground active:bg-primary active:text-primary-foreground"
             onClick={(event) => {
               event.stopPropagation();
               onUploadClick();
@@ -240,7 +240,7 @@ export const UploadDemoUploadCard = ({
           </Button>
           {selectedFileCount > 0 && (
             <Button
-              className="bg-accent text-accent-foreground font-medium px-8 py-3 rounded-lg w-full sm:w-auto"
+              className="w-auto rounded-lg bg-accent px-8 py-3 font-medium text-accent-foreground"
               onClick={(event) => {
                 event.stopPropagation();
                 onClearAll();

@@ -168,7 +168,7 @@ export const UsageLimitBanner = ({
 
   // Show usage counter
   return (
-    <div className="subtle-border-glow flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6 px-5 py-3 rounded-xl bg-[#191919]/70 backdrop-blur-lg border border-primary/20">
+    <div className="subtle-border-glow mb-6 flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-[#191919]/70 px-5 py-3 backdrop-blur-lg">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Crown className="h-4 w-4 text-primary" />
         <span>
@@ -192,7 +192,7 @@ export const UsageLimitBanner = ({
           variant="link"
           size="sm"
           onClick={() => navigate('/auth')}
-          className="text-glow-link no-hover-glow text-primary p-0 h-auto font-medium w-full sm:w-auto justify-start sm:justify-center"
+          className="text-glow-link no-hover-glow h-auto w-auto justify-center p-0 font-medium text-primary"
         >
           {t("upload.remaining.signupMore")}{" ->"}
         </Button>

@@ -66,9 +66,9 @@ const Index = () => {
       </a>
       {/* Navigation */}
       <AutoHideHeader as="nav" className="bg-surface-elevated/60 backdrop-blur-lg border-b border-primary/20" aria-label="Primary">
-          <div className="container mx-auto px-4 sm:px-6 py-1.5 sm:py-2.5">
+          <div className="container mx-auto px-4 py-2.5">
             <div className="flex items-center justify-between">
-            <div className="ml-1 sm:ml-0">
+            <div className="ml-1">
               <Logo />
             </div>
           <div className="hidden lg:flex items-center gap-3">
@@ -248,16 +248,16 @@ const Index = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-primary/20 py-16 px-4 sm:px-6 bg-background">
+      <footer className="border-t border-primary/20 bg-background px-4 py-16">
         <div className="container mx-auto">
-          <div className="mb-12 grid grid-cols-1 gap-10 md:grid-cols-[1.15fr_1fr] md:gap-16">
+          <div className="mb-12 grid grid-cols-[1.15fr_1fr] gap-16">
             <div className="space-y-4">
               <Logo />
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {t('hero.subtitle')}
               </p>
             </div>
-            <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-12">
+            <div className="grid grid-cols-3 gap-8 gap-x-12">
               <div className="space-y-4">
                 <Link
                   to="/how-it-works"

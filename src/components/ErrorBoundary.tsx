@@ -42,7 +42,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           {this.state.error?.message && (
             <p className="text-xs text-destructive/80 break-words">{this.state.error.message}</p>
           )}
-          <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+          <div className="flex justify-center gap-2 pt-2">
             <Button
               variant="outline"
               className="border-primary/40"

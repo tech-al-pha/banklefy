@@ -543,41 +543,43 @@ const AppRoutes = () => {
           <LoadingScreen />
         }
       >
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<RequireAuth><Navigate to="/?next=demo" replace /></RequireAuth>} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/features" element={<FeaturesPage />} />
-          <Route path="/benefits" element={<BenefitsPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/sample-report" element={<SampleReport />} />
-          <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
-          <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
-          <Route path="/help" element={<Navigate to="/faqs#help" replace />} />
-          <Route path="/how-it-works" element={<HowItWorksPage />} />
-          <Route path="/security" element={<SecurityPage />} />
-          <Route path="/contact" element={<Navigate to="/about#contact" replace />} />
-          <Route path="/cookie-policy" element={<Navigate to="/privacy" replace />} />
-          <Route path="/documentation" element={<Navigate to="/faqs#help" replace />} />
-          <Route path="/cancellation-and-refund" element={<CancellationRefundPage />} />
-          <Route path="/shipping-and-exchange" element={<ShippingExchangePage />} />
-          <Route path="/faqs" element={<FaqsPage />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/blog/launch" element={<BlogLaunch />} />
-          <Route path="/blog/accuracy" element={<BlogAccuracy />} />
-          <Route path="/blog/privacy" element={<BlogPrivacy />} />
-          <Route path="/blog/multi-format-export" element={<BlogMultiFormat />} />
-          <Route path="/blog/bulk-conversion" element={<BlogBulk />} />
-          <Route path="/blog/underwriting" element={<BlogUnderwriting />} />
-          <Route path="/blog/fraud-detection" element={<BlogFraudDetection />} />
-          <Route path="/blog/multi-language" element={<BlogMultiLanguage />} />
-          <Route path="/blog/password-pdf" element={<BlogPasswordPdf />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <div className="mobile-desktop-shell">
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/dashboard" element={<RequireAuth><Navigate to="/?next=demo" replace /></RequireAuth>} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/features" element={<FeaturesPage />} />
+            <Route path="/benefits" element={<BenefitsPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/sample-report" element={<SampleReport />} />
+            <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
+            <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
+            <Route path="/help" element={<Navigate to="/faqs#help" replace />} />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
+            <Route path="/security" element={<SecurityPage />} />
+            <Route path="/contact" element={<Navigate to="/about#contact" replace />} />
+            <Route path="/cookie-policy" element={<Navigate to="/privacy" replace />} />
+            <Route path="/documentation" element={<Navigate to="/faqs#help" replace />} />
+            <Route path="/cancellation-and-refund" element={<CancellationRefundPage />} />
+            <Route path="/shipping-and-exchange" element={<ShippingExchangePage />} />
+            <Route path="/faqs" element={<FaqsPage />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/launch" element={<BlogLaunch />} />
+            <Route path="/blog/accuracy" element={<BlogAccuracy />} />
+            <Route path="/blog/privacy" element={<BlogPrivacy />} />
+            <Route path="/blog/multi-format-export" element={<BlogMultiFormat />} />
+            <Route path="/blog/bulk-conversion" element={<BlogBulk />} />
+            <Route path="/blog/underwriting" element={<BlogUnderwriting />} />
+            <Route path="/blog/fraud-detection" element={<BlogFraudDetection />} />
+            <Route path="/blog/multi-language" element={<BlogMultiLanguage />} />
+            <Route path="/blog/password-pdf" element={<BlogPasswordPdf />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </div>
       </Suspense>
     </ErrorBoundary>
   );
