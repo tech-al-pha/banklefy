@@ -232,26 +232,6 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  .mobile-desktop-shell {
-    --mobile-desktop-scale: var(--mobile-desktop-scale, 1);
-    width: calc(1180px * var(--mobile-desktop-scale));
-    min-width: calc(1180px * var(--mobile-desktop-scale));
-    margin-left: auto;
-    margin-right: auto;
-  }
-
-  .mobile-desktop-canvas {
-    width: 1180px;
-    min-width: 1180px;
-    transform: scale(var(--mobile-desktop-scale));
-    transform-origin: top left;
-  }
-
-  /* Keep the scaled canvas vertically scrollable without clipping. */
-  #root {
-    min-height: calc(100vh / var(--mobile-desktop-scale, 1));
-  }
-
   .auto-hide-header-sentinel {
     display: none !important;
   }
