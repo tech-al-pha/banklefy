@@ -899,8 +899,31 @@
     width: 100%;
   }
 
+  section .flex-wrap > button,
+  section .flex-wrap > a,
+  section .flex-wrap > [role="button"] {
+    flex: 1 1 100%;
+  }
+
   /* Navigation: prevent overflow of horizontal nav lists */
   nav ul, nav ol {
     flex-wrap: wrap;
+  }
+
+  nav .container > .flex,
+  header .container > .flex {
+    gap: 0.75rem;
+  }
+
+  article,
+  .glass-card,
+  .ultra-glass-panel,
+  [class*="rounded-2xl"],
+  [class*="rounded-3xl"] {
+    overflow-wrap: anywhere;
+  }
+
+  .hero-title-3d {
+    letter-spacing: 0.02em !important;
   }
 }
