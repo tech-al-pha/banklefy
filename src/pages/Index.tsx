@@ -66,7 +66,7 @@ const Index = () => {
       </a>
       {/* Navigation */}
       <AutoHideHeader as="nav" className="bg-surface-elevated/60 backdrop-blur-lg border-b border-primary/20" aria-label="Primary">
-          <div className="container mx-auto px-4 py-2.5">
+          <div className="container mx-auto px-4 py-2.5 md:py-4">
             <div className="flex items-center justify-between">
             <div className="ml-1">
               <Logo />
@@ -76,36 +76,36 @@ const Index = () => {
               {/* Pricing Button */}
               <Link
                 to="/pricing"
-                className="text-glow-link text-xs font-medium"
+                className="text-glow-link text-xs md:text-sm font-medium"
               >
-                <CircleDollarSign className="h-3 w-3" />
+                <CircleDollarSign className="h-3 w-3 md:h-4 md:w-4" />
                 <span>{t('nav.pricing')}</span>
               </Link>
 
               {/* Benefits Button */}
               <Link
                 to="/benefits"
-                className="text-glow-link text-xs font-medium"
+                className="text-glow-link text-xs md:text-sm font-medium"
               >
-                <Gift className="h-3 w-3" />
+                <Gift className="h-3 w-3 md:h-4 md:w-4" />
                 <span>{t('nav.benefits')}</span>
               </Link>
 
               {/* Features Button */}
               <Link
                 to="/features"
-                className="text-glow-link text-xs font-medium"
+                className="text-glow-link text-xs md:text-sm font-medium"
               >
-                <Sparkles className="h-3 w-3" />
+                <Sparkles className="h-3 w-3 md:h-4 md:w-4" />
                 <span>{t('nav.features')}</span>
               </Link>
 
               {user && (
                 <Link
                   to="/settings"
-                  className="text-glow-link text-xs font-medium"
+                  className="text-glow-link text-xs md:text-sm font-medium"
                 >
-                  <Settings className="h-3 w-3" />
+                  <Settings className="h-3 w-3 md:h-4 md:w-4" />
                   <span>{t('nav.settings')}</span>
                 </Link>
               )}
@@ -140,10 +140,10 @@ const Index = () => {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="text-muted-foreground"
+                    className="h-12 w-12 text-muted-foreground"
                     aria-label="Open menu"
                   >
-                    <Menu className="h-5 w-5" />
+                    <Menu className="h-7 w-7" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="bg-black/95 border-primary/20 w-[320px]">

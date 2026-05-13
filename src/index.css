@@ -777,7 +777,7 @@
    MOBILE-ONLY RESPONSIVENESS FIXES (max-width: 768px)
    Desktop styles are intentionally untouched.
    ===================================================== */
-@media (max-width: 0px) {
+@media (max-width: 768px) {
   html, body, #root {
     max-width: 100vw;
     overflow-x: hidden;
@@ -785,6 +785,14 @@
 
   body {
     letter-spacing: 0;
+  }
+
+  .auto-hide-header-sentinel {
+    display: none !important;
+  }
+
+  .auto-hide-header {
+    position: sticky !important;
   }
 
   /* Prevent any element from overflowing horizontally */

@@ -49,10 +49,10 @@ export const Hero = () => {
   const heroHighlights = heroHighlightsByLanguage[language] ?? heroHighlightsByLanguage.en;
 
   return (
-    <section className="relative flex min-h-[70vh] items-center justify-center bg-transparent pb-10 pt-8">
+    <section className="relative flex min-h-[70vh] items-center justify-center bg-transparent pb-10 pt-4 md:pt-8">
 
       <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 text-left">
-        <div className="mx-auto grid max-w-none grid-cols-[1.1fr_0.9fr] items-center gap-10 pt-16">
+        <div className="mx-auto grid max-w-none grid-cols-[1.1fr_0.9fr] items-center gap-10 pt-10 md:pt-16">
           <div className="flex flex-col items-start space-y-6">
             <div className="inline-flex w-fit max-w-full flex-col items-start leading-tight overflow-visible">
             <h1
