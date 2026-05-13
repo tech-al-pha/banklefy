@@ -2,6 +2,9 @@
 // ============= GROQ VISION OCR PROCESSOR =============
 // Using Groq's Llama Vision model for OCR
 
+declare const Deno: { env?: { get?: (key: string) => string | undefined } } | undefined;
+declare const process: { env?: Record<string, string | undefined> } | undefined;
+
 type HeaderAliasMap = {
   date: string[];
   valueDate: string[];
