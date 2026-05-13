@@ -94,7 +94,7 @@ describe("bank statement parser regressions", () => {
 
     expect(rows.some((row) => row.balance === 7 || row.debit === 2026 || row.credit === 7)).toBe(false);
     expect(rows[0]).toMatchObject({ debit: 50, credit: 0, balance: 94986.47 });
-    expect(rows.at(-1)).toMatchObject({ debit: 0, credit: 34920, balance: 42031.76 });
+    expect(rows[rows.length - 1]).toMatchObject({ debit: 0, credit: 34920, balance: 42031.76 });
   });
 
   it("uses opening balance to correct an edge row while preserving extracted amounts", () => {
