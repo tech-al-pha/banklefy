@@ -566,7 +566,8 @@ const AppRoutes = () => {
         }
       >
         <div className="mobile-desktop-shell">
-          <Routes>
+          <div className="mobile-desktop-canvas">
+            <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<RequireAuth><Navigate to="/?next=demo" replace /></RequireAuth>} />
@@ -600,7 +601,8 @@ const AppRoutes = () => {
             <Route path="/blog/password-pdf" element={<BlogPasswordPdf />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
+            </Routes>
+          </div>
         </div>
       </Suspense>
     </ErrorBoundary>

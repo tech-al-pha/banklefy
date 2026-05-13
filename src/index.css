@@ -234,6 +234,13 @@
 
   .mobile-desktop-shell {
     --mobile-desktop-scale: var(--mobile-desktop-scale, 1);
+    width: calc(1180px * var(--mobile-desktop-scale));
+    min-width: calc(1180px * var(--mobile-desktop-scale));
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .mobile-desktop-canvas {
     width: 1180px;
     min-width: 1180px;
     transform: scale(var(--mobile-desktop-scale));
