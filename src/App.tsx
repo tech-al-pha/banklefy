@@ -495,6 +495,28 @@ const AppRoutes = () => {
     }
   }, [location.pathname, location.search, location.hash]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const DESKTOP_CANVAS_WIDTH = 1180;
+    const mql = window.matchMedia?.("(hover: none) and (pointer: coarse)");
+    if (!mql?.matches) return;
+
+    const applyScale = () => {
+      const vw = Math.max(320, window.innerWidth || 0);
+      const scale = Math.min(1, vw / DESKTOP_CANVAS_WIDTH);
+      document.documentElement.style.setProperty("--mobile-desktop-scale", String(scale));
+    };
+
+    applyScale();
+    window.addEventListener("resize", applyScale, { passive: true });
+    window.addEventListener("orientationchange", applyScale, { passive: true });
+    return () => {
+      window.removeEventListener("resize", applyScale);
+      window.removeEventListener("orientationchange", applyScale);
+    };
+  }, []);
+
   return (
     <ErrorBoundary resetKey={location.pathname}>
       <Helmet>
