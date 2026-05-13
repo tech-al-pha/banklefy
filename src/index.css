@@ -750,9 +750,24 @@
     overflow-x: hidden;
   }
 
+  body {
+    letter-spacing: 0;
+  }
+
   /* Prevent any element from overflowing horizontally */
   *, *::before, *::after {
     max-width: 100%;
+    min-width: 0;
+  }
+
+  #root > *,
+  main,
+  section,
+  header,
+  nav,
+  footer {
+    width: 100%;
+    max-width: 100vw;
   }
 
   img, video, svg, canvas, iframe {
@@ -767,23 +782,37 @@
     word-wrap: break-word;
     overflow-wrap: break-word;
     hyphens: auto;
+    text-wrap: balance;
   }
   h2 {
     font-size: clamp(1.4rem, 5.5vw, 1.875rem) !important;
     line-height: 1.25 !important;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    text-wrap: balance;
   }
   h3 {
     font-size: clamp(1.15rem, 4.5vw, 1.5rem) !important;
     line-height: 1.3 !important;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    text-wrap: balance;
   }
   p, li, span, a {
     word-wrap: break-word;
     overflow-wrap: break-word;
     line-height: 1.6;
+  }
+
+  [class*="tracking-"] {
+    letter-spacing: 0.08em !important;
+  }
+
+  [class*="text-5xl"],
+  [class*="text-6xl"],
+  [class*="text-7xl"] {
+    font-size: clamp(1.85rem, 8vw, 2.6rem) !important;
+    line-height: 1.12 !important;
   }
 
   /* Section padding */
