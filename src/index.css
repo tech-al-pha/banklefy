@@ -876,7 +876,7 @@
     width: 100% !important;
     min-height: 48px;
     justify-content: center;
-    white-space: normal;
+    white-space: nowrap;
   }
 
   /* Grids: collapse multi-col to single col */
@@ -932,7 +932,9 @@
   a[class*="btn"],
   .btn-glow {
     min-height: 48px;
-    white-space: normal;
+    font-size: 0.9rem;
+    line-height: 1.1;
+    white-space: nowrap;
   }
   /* Stacked button groups go full width */
   .flex.flex-col > button,
