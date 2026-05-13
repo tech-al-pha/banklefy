@@ -826,6 +826,18 @@
     max-width: 100% !important;
   }
 
+  .fixed.inset-y-0,
+  [role="dialog"] {
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  .back-pill {
+    width: 100% !important;
+    min-height: 48px;
+    justify-content: center;
+    white-space: normal;
+  }
+
   /* Grids: collapse multi-col to single col */
   .grid.grid-cols-2,
   .grid.grid-cols-3,
@@ -853,20 +865,33 @@
     padding-right: max(16px, env(safe-area-inset-right));
   }
 
+  .glass-card .flex,
+  .ultra-glass-panel .flex,
+  article .flex,
+  section .flex {
+    min-width: 0;
+  }
+
   /* Tables — horizontally scrollable */
   table {
-    display: block;
-    width: 100%;
+    display: table;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .overflow-x-auto,
+  [class*="overflow-x-auto"] {
+    max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    white-space: nowrap;
   }
 
   /* Buttons: full width + 48px touch target */
-  button:not([class*="icon"]):not([aria-label*="close" i]):not([aria-label*="menu" i]):not([role="tab"]):not([data-state]),
+  button:not([class*="icon"]):not([aria-label*="close" i]):not([aria-label*="menu" i]):not([role="tab"]),
   a[class*="btn"],
   .btn-glow {
     min-height: 48px;
+    white-space: normal;
   }
   /* Stacked button groups go full width */
   .flex.flex-col > button,
