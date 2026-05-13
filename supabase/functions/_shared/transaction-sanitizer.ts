@@ -587,23 +587,29 @@ export const sanitizeTransactions = (transactions: Transaction[], options?: Sani
   // Preserve statement row order exactly as extracted.
   // Re-sorting by date can move rows (e.g. 20 -> 25 -> 20) and break user-visible sequence.
   const statementOrdered = filtered;
-  const normalizedAmounts = statementOrdered.map((transaction) => normalizeSignedAmounts(transaction));
+  const directionCorrected = correctAmountDirection(statementOrdered);
+  const direction = inferBalanceDirection(directionCorrected);
+
+  // Even in preserve mode, debit/credit side can be wrong on the first/last row
+  // because there is no adjacent transaction to validate against.
+  if (Number.isFinite(Number(options?.openingBalance))) {
+    const edgeIndex = direction === 'forward' ? 0 : directionCorrected.length - 1;
+    trySwapByOpeningBalance(directionCorrected, edgeIndex, Number(options?.openingBalance));
+  }
 
   if (options?.preserveAmounts) {
-    const directionCorrected = correctAmountDirection(statementOrdered);
     return dedupeTransactions(directionCorrected);
   }
 
-  const directionCorrected = correctAmountDirection(statementOrdered);
   const offsetAligned = maybeApplyBalanceOffset(directionCorrected, options);
-  const direction = inferBalanceDirection(offsetAligned);
+  const offsetDirection = inferBalanceDirection(offsetAligned);
 
   // Resolve edge-row ambiguity using opening balance when available.
   if (Number.isFinite(Number(options?.openingBalance))) {
-    const edgeIndex = direction === 'forward' ? 0 : offsetAligned.length - 1;
+    const edgeIndex = offsetDirection === 'forward' ? 0 : offsetAligned.length - 1;
     trySwapByOpeningBalance(offsetAligned, edgeIndex, Number(options?.openingBalance));
   }
 
-  const amountHarmonized = harmonizeAmountsWithRunningBalance(offsetAligned, direction);
+  const amountHarmonized = harmonizeAmountsWithRunningBalance(offsetAligned, offsetDirection);
   return dedupeTransactions(amountHarmonized);
 };

@@ -57,6 +57,8 @@ export interface ParsedPdfBankMetadata {
   bsb?: string;
   micr?: string;
   statementPeriod?: string;
+  openingBalance?: number;
+  closingBalance?: number;
 }
 
 export interface ParsedPdfData {
@@ -555,8 +557,14 @@ export const detectPasswordProtectedPdf = async (file: File): Promise<boolean> =
   }
 };
 
-const DATE_TOKEN = /\d{2}[/-]\d{2}[/-]\d{4}/;
-const ROW_START_PATTERN = /^(\d{2}[/-]\d{2}[/-]\d{4})(?:\s+(\d{2}[/-]\d{2}[/-]\d{4}))?\s+(.+)$/;
+const DATE_TOKEN_SOURCE =
+  "(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}(?:[/-]|\\s)+\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{2,4})";
+const DATE_TOKEN = new RegExp(DATE_TOKEN_SOURCE, "i");
+const ROW_PREFIX_SOURCE = "(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]*\\d[A-Za-z0-9._/-]*\\s+)?";
+const ROW_START_PATTERN = new RegExp(
+  `^${ROW_PREFIX_SOURCE}(${DATE_TOKEN_SOURCE})(?:\\s+(${DATE_TOKEN_SOURCE}))?\\s+(.+)$`,
+  "i",
+);
 const AMOUNT_PATTERN = /-?(?:\d{1,3}(?:,\d{2,3})+|\d{1,7})(?:\.\d{1,4})?/g;
 const PERIOD_FROM_TO_PATTERN =
   /\bfrom\b\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\s*(?:to|-)\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i;
@@ -630,6 +638,34 @@ const cleanMetadataValue = (value?: string): string => {
   return value.replace(/\s+/g, " ").replace(/^[\s:;-]+|[\s:;-]+$/g, "").trim();
 };
 
+const parseMetadataAmount = (value?: string): number | undefined => {
+  if (!value) return undefined;
+  const token = value.match(/\d{1,3}(?:,\d{2,3})*\.\d{2}|\d+\.\d{2}/)?.[0];
+  if (!token) return undefined;
+  const amount = Number(token.replace(/,/g, ""));
+  return Number.isFinite(amount) ? amount : undefined;
+};
+
+const cleanAccountNumberValue = (value?: string): string => {
+  const cleaned = cleanMetadataValue(value)
+    .split(/\baccount\s*name\b/i)[0]
+    .split(/\baverage\s+balance\b/i)[0]
+    .trim();
+  const candidates = cleaned.match(/\b[A-Z0-9*.-]*\d[A-Z0-9*.-]{5,}\b/g) || [];
+  if (candidates.length === 0) return cleaned;
+  return candidates
+    .map((token) => ({ token, digits: (token.match(/\d/g) || []).length }))
+    .sort((left, right) => right.digits - left.digits || right.token.length - left.token.length)[0].token;
+};
+
+const cleanAccountHolderValue = (value?: string): string => {
+  const cleaned = cleanMetadataValue(value)
+    .split(/\biban\b/i)[0]
+    .split(/\baverage\s+balance\b/i)[0]
+    .trim();
+  return cleaned.replace(/\s+-\s+[A-Z]{3}\b.*$/i, "").trim();
+};
+
 const findLabeledValue = (lines: string[], labels: string[]): string | undefined => {
   for (const line of lines) {
     const normalized = line.replace(/\s+/g, " ").trim();
@@ -699,21 +735,21 @@ const extractBankMetadataFromLines = (sourceLines: string[]): ParsedPdfBankMetad
     }
   }
 
-  const accountNumber = findLabeledValue(lines, [
+  const accountNumber = cleanAccountNumberValue(findLabeledValue(lines, [
     "Account Number",
     "Account No",
     "A/C No",
     "Acct No",
-  ]);
+  ]));
   if (accountNumber) metadata.accountNumber = accountNumber;
 
-  const accountHolder = findLabeledValue(lines, [
+  const accountHolder = cleanAccountHolderValue(findLabeledValue(lines, [
     "Account Holder Name",
     "Account Holder",
     "Account Name",
     "Customer Name",
     "Name",
-  ]);
+  ]));
   if (accountHolder && !/statement/i.test(accountHolder)) {
     metadata.accountHolder = accountHolder;
   }
@@ -760,8 +796,16 @@ const extractBankMetadataFromLines = (sourceLines: string[]): ParsedPdfBankMetad
   const micr = cleanMetadataValue(findLabeledValue(lines, ["MICR"]));
   if (micr) metadata.micr = micr;
 
-  const hasMetadata = Object.values(metadata).some(
-    (value) => typeof value === "string" && value.trim().length > 0,
+  metadata.openingBalance = parseMetadataAmount(
+    findLabeledValue(lines, ["Opening Balance", "Opening Bal", "Balance B/F"]),
+  );
+  metadata.closingBalance = parseMetadataAmount(
+    findLabeledValue(lines, ["Closing Balance", "Closing(Available) Balance", "Closing Available Balance"]),
+  );
+
+  const hasMetadata = Object.values(metadata).some((value) =>
+    (typeof value === "string" && value.trim().length > 0) ||
+    (typeof value === "number" && Number.isFinite(value))
   );
 
   return hasMetadata ? metadata : undefined;
@@ -772,6 +816,12 @@ const isNoiseLine = (line: string): boolean => {
   if (!lower) return true;
   const hasArabic = /[\u0600-\u06FF]/.test(line);
   if (lower.includes("account statement")) return true;
+  if (lower.includes("statement of account")) return true;
+  if (lower.includes("account (s) summary")) return true;
+  if (lower.includes("account details")) return true;
+  if (lower.includes("account no. account type currency")) return true;
+  if (lower.includes("date description debits credits balance")) return true;
+  if (/^period\s+\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s*(?:-|to)/i.test(line)) return true;
   if (/^from\s+\d{1,2}\/\d{1,2}\/\d{2,4}\s+to\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b/i.test(line)) return true;
   if (lower.includes("total records")) return true;
   if (lower.includes("transaction date") && lower.includes("value date")) return true;

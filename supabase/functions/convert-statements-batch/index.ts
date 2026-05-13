@@ -120,7 +120,7 @@ type PdfDocumentProxy = {
 const BATCH_DATE_TOKEN_SOURCE =
   '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}(?:[/-]|\\s)+\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{2,4})';
 const BATCH_ROW_START_PATTERN = new RegExp(
-  `^(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]+\\s+)?(${BATCH_DATE_TOKEN_SOURCE})\\s+(.+)$`,
+  `^(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]*\\d[A-Za-z0-9._/-]*\\s+)?(${BATCH_DATE_TOKEN_SOURCE})\\s+(.+)$`,
   'i',
 );
 const BATCH_AMOUNT_NUMBER_SOURCE = '(?:\\d{1,3}(?:,\\d{2,3})+|\\d{1,7})(?:\\.\\d{1,4})?';
@@ -243,6 +243,32 @@ const isBatchAmountToken = (value: string): boolean => {
   return true;
 };
 
+const isBatchNonTransactionLine = (line: string): boolean => {
+  const lower = line.toLowerCase();
+  if (!lower) return true;
+  return (
+    /^page\s*\d+(?:\s*\/\s*\d+|\s+of\s+\d+)?$/i.test(line) ||
+    lower.includes('statement of accounts') ||
+    lower.includes('statement of account') ||
+    lower.includes('account (s) summary') ||
+    lower.includes('account details') ||
+    lower.includes('account no. account type currency') ||
+    lower.includes('date description debits credits balance') ||
+    lower.includes('transaction date') ||
+    lower.includes('value date') ||
+    lower.includes('running balance') ||
+    lower.includes('opening balance') ||
+    lower.includes('closing balance') ||
+    lower.includes('total debit') ||
+    lower.includes('total credit') ||
+    lower.includes('customer trn') ||
+    lower.includes('po box') ||
+    lower.includes('period ') ||
+    lower.includes('this is a system generated') ||
+    lower.includes('licensed by the central bank')
+  );
+};
+
 const extractPdfPageLineEntries = async (pdf: PdfDocumentProxy, pageNumber: number): Promise<BatchLineEntry[]> => {
   const page = await pdf.getPage(pageNumber);
   const textContent = await page.getTextContent?.();
@@ -310,8 +336,7 @@ const parseDeterministicRowsFromLineEntries = (lineEntries: BatchLineEntry[]): R
   for (const entry of lineEntries) {
     const line = entry.text.trim().replace(/\s+/g, ' ');
     if (!line) continue;
-    if (/^page\s*\d+/i.test(line)) continue;
-    if (/statement of accounts|transaction date|value date|running balance|account statement|opening balance|closing balance/i.test(line)) continue;
+    if (isBatchNonTransactionLine(line)) continue;
 
     const rowMatch = line.match(BATCH_ROW_START_PATTERN);
     if (!rowMatch) continue;

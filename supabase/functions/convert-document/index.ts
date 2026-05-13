@@ -222,7 +222,7 @@ type PdfDocumentProxy = {
 const DATE_TOKEN_SOURCE =
   '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}(?:[/-]|\\s)+\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{2,4})';
 const DATE_TOKEN = new RegExp(DATE_TOKEN_SOURCE);
-const FLEXIBLE_PREFIX_SOURCE = '(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]+\\s+)?';
+const FLEXIBLE_PREFIX_SOURCE = '(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]*\\d[A-Za-z0-9._/-]*\\s+)?';
 const ROW_START_PATTERN = new RegExp(`^${FLEXIBLE_PREFIX_SOURCE}(${DATE_TOKEN_SOURCE})\\s+(${DATE_TOKEN_SOURCE})\\s+(.+)$`);
 const GROUPED_AMOUNT_SOURCE = '(?:\\d{1,3}(?:,\\d{2,3})+|\\d{1,7})';
 const AMOUNT_NUMBER_SOURCE = `(?:${GROUPED_AMOUNT_SOURCE})(?:\\.\\d{1,4})?`;
@@ -411,7 +411,13 @@ const isNoiseLine = (line: string): boolean => {
   if (!lower) return true;
   const hasArabic = /[\u0600-\u06FF]/.test(line);
   if (lower.includes("account statement")) return true;
+  if (lower.includes("statement of account")) return true;
+  if (lower.includes('account (s) summary')) return true;
+  if (lower.includes('account details')) return true;
+  if (lower.includes('account no. account type currency')) return true;
+  if (lower.includes('date description debits credits balance')) return true;
   if (/^from\s+\d{1,2}\/\d{1,2}\/\d{2,4}\s+to\s+\d{1,2}\/\d{1,2}\/\d{2,4}\b/i.test(line)) return true;
+  if (/^period\s+\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s*(?:-|to)/i.test(line)) return true;
   if (lower.includes("total records")) return true;
   if (lower.includes("transaction date") && lower.includes("value date")) return true;
   if (lower.includes("running balance")) return true;
@@ -433,6 +439,9 @@ const isNoiseLine = (line: string): boolean => {
   if (lower.includes('total credit')) return true;
   if (lower.includes('generated on')) return true;
   if (lower.includes('this is a system generated')) return true;
+  if (lower.includes('licensed by the central bank')) return true;
+  if (lower.includes('customer trn')) return true;
+  if (lower.includes('po box')) return true;
   if (/^page\s*\d+(\s*of\s*\d+)?$/i.test(line)) return true;
   if (
     hasArabic &&
