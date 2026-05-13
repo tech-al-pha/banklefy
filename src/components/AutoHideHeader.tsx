@@ -77,7 +77,7 @@ export default function AutoHideHeader<T extends ElementType = "nav">({
   return (
     <>
       <div
-        className="fixed left-0 right-0 top-0 z-[55] h-5"
+        className="auto-hide-header-sentinel fixed left-0 right-0 top-0 z-[55] h-5"
         onMouseEnter={() => {
           hoveringRef.current = true;
           showHeader();
@@ -89,7 +89,7 @@ export default function AutoHideHeader<T extends ElementType = "nav">({
       />
       <Tag
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          "auto-hide-header fixed top-0 left-0 right-0 z-50 transition-transform duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)]",
           isVisible ? "translate-y-0" : "-translate-y-[115%]",
           className,
         )}
