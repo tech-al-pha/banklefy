@@ -80,7 +80,7 @@ export const Hero = () => {
               {t("hero.tagline")}
             </div>
 
-            <p className="mt-6 mb-12 max-w-2xl text-lg italic leading-relaxed text-white/70">
+            <p className="hero-subtitle mt-6 mb-12 max-w-2xl text-sm md:text-lg italic leading-relaxed text-white/70">
               {t("hero.subtitle")}
             </p>
 
@@ -111,7 +111,7 @@ export const Hero = () => {
             {heroHighlights.map((line) => (
               <div
                 key={line}
-                className="rounded-full border border-white/30 bg-gradient-to-r from-[#0a0a0b] via-[#151617] to-[#2a2d31] px-4 py-2.5 text-center text-xs font-semibold text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_0_12px_rgba(255,255,255,0.08)] sm:px-5 md:px-6 md:py-3 md:text-sm"
+                className="hero-highlight-pill rounded-full border border-white/30 bg-gradient-to-r from-[#0a0a0b] via-[#151617] to-[#2a2d31] px-4 py-2.5 text-center text-xs font-semibold text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_0_12px_rgba(255,255,255,0.08)] sm:px-5 md:px-6 md:py-3 md:text-sm"
               >
                 {line}
               </div>

@@ -842,7 +842,13 @@
   p, li, span, a {
     word-wrap: break-word;
     overflow-wrap: break-word;
-    line-height: 1.6;
+    line-height: 1.45;
+  }
+
+  /* Slightly smaller body text keeps cards/pills from breaking the layout. */
+  p,
+  li {
+    font-size: 0.95rem;
   }
 
   [class*="tracking-"] {
@@ -935,6 +941,19 @@
     font-size: 0.9rem;
     line-height: 1.1;
     white-space: nowrap;
+  }
+
+  .hero-highlight-pill {
+    font-size: 0.78rem;
+    line-height: 1.15;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+
+  .hero-subtitle {
+    font-size: 0.95rem;
+    line-height: 1.35;
+    margin-bottom: 1.75rem;
   }
   /* Stacked button groups go full width */
   .flex.flex-col > button,
