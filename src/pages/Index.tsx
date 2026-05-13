@@ -8,12 +8,8 @@ import Logo from "@/components/Logo";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
-import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import AutoHideHeader from "@/components/AutoHideHeader";
-
-const LandingPageContent = lazyWithRetry(() =>
-  import("@/components/LandingPageContent").then((module) => ({ default: module.LandingPageContent })),
-);
+import { LandingPageContent } from "@/components/LandingPageContent";
 
 const Index = () => {
   const { user } = useAuth();
@@ -248,15 +244,7 @@ const Index = () => {
       </AutoHideHeader>
 
       <main id="main-content" tabIndex={-1}>
-        <Suspense
-          fallback={
-            <div className="min-h-[60vh] flex items-center justify-center text-muted-foreground">
-              <span className="text-sm">Loading content?</span>
-            </div>
-          }
-        >
-          <LandingPageContent />
-        </Suspense>
+        <LandingPageContent />
       </main>
 
       {/* Footer */}
