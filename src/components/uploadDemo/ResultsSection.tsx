@@ -1126,34 +1126,34 @@ export const ResultsSection = ({
         </Card>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-white/80">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <FileText className="w-4 h-4 text-primary" />
+      <div className="flex w-full gap-2 sm:gap-6 justify-between">
+        <div className="flex-1 subtle-border-glow flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-1.5 sm:gap-3 p-2 sm:p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-white/80">
+          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <FileText className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
           </div>
-          <div className="space-y-1">
-            <p className="font-semibold text-sm">{localizedCopy.step1Title}</p>
-            <p className="text-xs text-muted-foreground">{localizedCopy.step1Desc}</p>
-          </div>
-        </div>
-
-        <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-secondary/20">
-          <div className="w-8 h-8 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
-            <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
-          </div>
-          <div className="space-y-1">
-            <p className="font-semibold text-sm">{localizedCopy.step2Title}</p>
-            <p className="text-xs text-muted-foreground">{localizedCopy.step2Desc}</p>
+          <div className="space-y-0.5 sm:space-y-1">
+            <p className="font-semibold text-[10px] sm:text-sm leading-tight">{localizedCopy.step1Title}</p>
+            <p className="text-[8.5px] sm:text-xs text-muted-foreground leading-tight">{localizedCopy.step1Desc}</p>
           </div>
         </div>
 
-        <div className="subtle-border-glow flex items-start gap-3 p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-green-500/20">
-          <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
-            <CheckCircle className="w-4 h-4 tone-excellent-text" />
+        <div className="flex-1 subtle-border-glow flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-1.5 sm:gap-3 p-2 sm:p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-secondary/20">
+          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
           </div>
-          <div className="space-y-1">
-            <p className="font-semibold text-sm">{localizedCopy.step3Title}</p>
-            <p className="text-xs text-muted-foreground">{localizedCopy.step3Desc}</p>
+          <div className="space-y-0.5 sm:space-y-1">
+            <p className="font-semibold text-[10px] sm:text-sm leading-tight">{localizedCopy.step2Title}</p>
+            <p className="text-[8.5px] sm:text-xs text-muted-foreground leading-tight">{localizedCopy.step2Desc}</p>
+          </div>
+        </div>
+
+        <div className="flex-1 subtle-border-glow flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-1.5 sm:gap-3 p-2 sm:p-4 rounded-lg bg-[#191919]/70 backdrop-blur-lg border border-green-500/20">
+          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
+            <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 tone-excellent-text" />
+          </div>
+          <div className="space-y-0.5 sm:space-y-1">
+            <p className="font-semibold text-[10px] sm:text-sm leading-tight">{localizedCopy.step3Title}</p>
+            <p className="text-[8.5px] sm:text-xs text-muted-foreground leading-tight">{localizedCopy.step3Desc}</p>
           </div>
         </div>
       </div>
