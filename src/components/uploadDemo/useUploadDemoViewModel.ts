@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { formatCurrencyValue } from "@/lib/currency";
+import type { BatchFilePayload } from "./types";
 import { useLanguage, type Language } from "@/contexts/LanguageContext";
+
+type PreparedPdfDataRef = {
+  current: Map<
+    string,
+    { transactions?: BatchFilePayload["pdfParsedTransactions"]; bankMetadata?: BatchFilePayload["pdfParsedBankMetadata"] }
+  >;
+};
 
 type UseUploadDemoViewModelArgs = {
   selectedFiles: File[];
@@ -10,6 +18,7 @@ type UseUploadDemoViewModelArgs = {
   currencyCode: string;
   progressStep: number;
   uploading: boolean;
+  preparedPdfDataRef: PreparedPdfDataRef;
 };
 
 export const useUploadDemoViewModel = ({
@@ -19,6 +28,7 @@ export const useUploadDemoViewModel = ({
   currencyCode,
   progressStep,
   uploading,
+  preparedPdfDataRef,
 }: UseUploadDemoViewModelArgs) => {
   const { language } = useLanguage();
   const [showScanTimeCard, setShowScanTimeCard] = useState(false);
@@ -151,7 +161,13 @@ export const useUploadDemoViewModel = ({
     return Math.trunc(value * factor) / factor;
   };
 
-  const showImageProcessingHint = showScanTimeCard;
+  const showImageProcessingHint =
+    showScanTimeCard ||
+    selectedFiles.some((file) => {
+      if (!file.name.toLowerCase().endsWith(".pdf")) return false;
+      const cached = preparedPdfDataRef.current.get(`${file.name}__${file.size}__${file.lastModified}`);
+      return !cached?.transactions || cached.transactions.length === 0;
+    });
 
   const conversionProgressDetail = uploading
     ? progressLabels.uploadPreparing

@@ -619,6 +619,7 @@ export const useUploadDemoController = () => {
     currencyCode,
     progressStep,
     uploading,
+    preparedPdfDataRef,
   });
 
   // reCAPTCHA v3 for anonymous users - runs invisibly in background
@@ -874,11 +875,55 @@ export const useUploadDemoController = () => {
 
         setUploadPrepProgress(40);
         setUploadPrepLabel(uploadUiCopy.detectAmounts);
-        for (const file of newFiles) {
-          if (!file.name.toLowerCase().endsWith(".pdf")) continue;
-          const cacheKey = getFileCacheKey(file);
-          preparedPdfDataRef.current.delete(cacheKey);
-          preparedPdfImagesRef.current.delete(cacheKey);
+        try {
+          const { extractPdfDataFromText, pdfToPageImages } = await loadPdfUtils();
+          for (const file of newFiles) {
+            const cacheKey = getFileCacheKey(file);
+            if (file.name.toLowerCase().endsWith(".pdf")) {
+              try {
+                const parsedPdf = await extractPdfDataFromText(file, {
+                  password: pdfPassword.trim() || undefined,
+                  maxPdfRenderPages,
+                });
+                const parsedTxCount = parsedPdf.transactions?.length ?? 0;
+                const parsedPageCount = Math.max(1, parsedPdf.pageCount ?? 1);
+                const minimumExpectedRows = Math.max(12, Math.ceil(parsedPageCount * 4));
+                const localTextParseLooksReliable = parsedTxCount >= minimumExpectedRows;
+                preparedPdfDataRef.current.set(cacheKey, {
+                  transactions: localTextParseLooksReliable ? parsedPdf.transactions : [],
+                  bankMetadata: parsedPdf.bankMetadata,
+                });
+
+                const isTextBasedPdf = localTextParseLooksReliable;
+                if (!isTextBasedPdf) {
+                  setUploadPrepProgress(65);
+                  setUploadPrepLabel(uploadUiCopy.preparingOcr);
+                  try {
+                    const renderedPdfPageImages = await pdfToPageImages(file, {
+                      password: pdfPassword.trim() || undefined,
+                      maxPdfRenderPages,
+                      isFreeUsageMode,
+                      freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+                    });
+                    if (Array.isArray(renderedPdfPageImages) && renderedPdfPageImages.length > 0) {
+                      preparedPdfImagesRef.current.set(cacheKey, renderedPdfPageImages);
+                      setShowScanTimeCard(true);
+                    } else {
+                      preparedPdfImagesRef.current.delete(cacheKey);
+                    }
+                  } catch {
+                    preparedPdfImagesRef.current.delete(cacheKey);
+                  }
+                } else {
+                  preparedPdfImagesRef.current.delete(cacheKey);
+                }
+              } catch {
+                preparedPdfDataRef.current.delete(cacheKey);
+              }
+            }
+          }
+        } catch {
+          // Preparation failures should not block file selection.
         }
 
         setUploadPrepProgress(75);
@@ -1045,17 +1090,37 @@ export const useUploadDemoController = () => {
           requestBody.recaptchaToken = token;
         }
 
-      // For PDFs, send the original bytes first so text-based statements stay on
-      // the fast deterministic path. OCR page images are generated only if the
-      // backend asks for them.
+      // For PDFs: keep the raw bytes and page images together so the backend can
+      // choose between deterministic parsing and full-page OCR.
       if (isPdf) {
         const cacheKey = getFileCacheKey(fileToConvert);
         const cachedParsedPdf = preparedPdfDataRef.current.get(cacheKey);
+        const parsedPdfTransactionsCount = cachedParsedPdf?.transactions?.length ?? 0;
+        const isTextBasedPdf = parsedPdfTransactionsCount > 0;
         if (cachedParsedPdf?.bankMetadata) {
           requestBody.pdfParsedBankMetadata = cachedParsedPdf.bankMetadata;
         }
-        if ((cachedParsedPdf?.transactions?.length ?? 0) > 0) {
+        if (isTextBasedPdf) {
           requestBody.pdfParsedTransactions = cachedParsedPdf.transactions;
+        }
+        if (!isTextBasedPdf) {
+          let cachedPageImages = preparedPdfImagesRef.current.get(cacheKey);
+          if (!cachedPageImages || cachedPageImages.length === 0) {
+            const { pdfToPageImages } = await loadPdfUtils();
+            cachedPageImages = await pdfToPageImages(fileToConvert, {
+              password: pdfPassword.trim() || undefined,
+              maxPdfRenderPages,
+              isFreeUsageMode,
+              freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
+            });
+            if (Array.isArray(cachedPageImages) && cachedPageImages.length > 0) {
+              preparedPdfImagesRef.current.set(cacheKey, cachedPageImages);
+            }
+          }
+          if (cachedPageImages && cachedPageImages.length > 0) {
+            requestBody.pdfPageImages = cachedPageImages;
+            setShowScanTimeCard(true);
+          }
         }
       }
 
