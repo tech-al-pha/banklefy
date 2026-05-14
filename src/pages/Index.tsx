@@ -373,7 +373,7 @@ const Index = () => {
             </div>
           </div>
           
-          <div className="pt-8 border-t border-primary/10 text-center text-[10px] md:text-xs text-muted-foreground tracking-[0.2em] uppercase">
+          <div className="pt-8 border-t border-primary/10 text-center text-[8px] md:text-xs text-muted-foreground tracking-[0.2em] uppercase">
             <p>{t('footer.copyright')}</p>
           </div>
           <div className="mt-4 text-center text-[10px] md:text-xs text-muted-foreground">
