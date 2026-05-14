@@ -259,38 +259,7 @@ const Index = () => {
               </p>
             </div>
             
-            <div className="flex flex-wrap justify-center gap-2.5 max-w-4xl mx-auto">
-              <Link to="/how-it-works" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                {t('footer.howItWorks')}
-              </Link>
-              <Link to="/security" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                {t('footer.security')}
-              </Link>
-              <Link to="/blog" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                {t('footer.blog')}
-              </Link>
-              <Link to="/faqs#help" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                {t('footer.helpCenter')}
-              </Link>
-              <Link to="/sample-report" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                {t('footer.sampleReport')}
-              </Link>
-              <Link to="/about" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                About & Contact
-              </Link>
-              <a href="https://www.banklefy.site/privacy" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                Privacy Policy
-              </a>
-              <Link to="/terms" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                Terms of Use
-              </Link>
-              <Link to="/cancellation-and-refund" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                Refund Policy
-              </Link>
-              <Link to="/shipping-and-exchange" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                Delivery & Exchange
-              </Link>
-            </div>
+
           </div>
 
           {/* Desktop View */}
@@ -373,6 +342,39 @@ const Index = () => {
             </div>
           </div>
           
+          <div className="flex md:hidden flex-wrap justify-center gap-2 max-w-4xl mx-auto mb-8 px-2">
+            <Link to="/how-it-works" className="px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+              {t('footer.howItWorks')}
+            </Link>
+            <Link to="/security" className="px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+              {t('footer.security')}
+            </Link>
+            <Link to="/blog" className="px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+              {t('footer.blog')}
+            </Link>
+            <Link to="/faqs#help" className="px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+              {t('footer.helpCenter')}
+            </Link>
+            <Link to="/sample-report" className="px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+              {t('footer.sampleReport')}
+            </Link>
+            <Link to="/about" className="px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+              About & Contact
+            </Link>
+            <a href="https://www.banklefy.site/privacy" className="px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+              Privacy Policy
+            </a>
+            <Link to="/terms" className="px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+              Terms of Use
+            </Link>
+            <Link to="/cancellation-and-refund" className="px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+              Refund Policy
+            </Link>
+            <Link to="/shipping-and-exchange" className="px-2.5 py-1 text-[10px] sm:text-[11px] rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+              Delivery & Exchange
+            </Link>
+          </div>
+
           <div className="pt-8 border-t border-primary/10 text-center text-xs text-muted-foreground tracking-[0.2em] uppercase">
             <p>{t('footer.copyright')}</p>
           </div>
