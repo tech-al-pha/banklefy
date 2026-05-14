@@ -668,7 +668,7 @@ const PricingPage = () => {
               <Button
                 size="sm"
                 variant="outline"
-                className="glass-card rounded-full h-9 px-5 border-white/10 bg-white/[0.03] text-white/90 transition-all hover:bg-white/[0.06] hover:shadow-neon hover:-translate-y-0.5 active:translate-y-0"
+                className="hidden md:inline-flex glass-card rounded-full h-9 px-5 border-white/10 bg-white/[0.03] text-white/90 transition-all hover:bg-white/[0.06] hover:shadow-neon hover:-translate-y-0.5 active:translate-y-0"
                 onClick={() => scrollToSection("plan-comparison")}
               >
                 Plan comparison
@@ -722,7 +722,7 @@ const PricingPage = () => {
           </div>
         </section>
 
-        <section id="plan-comparison" className="mb-12 scroll-mt-28">
+        <section id="plan-comparison" className="hidden md:block mb-12 scroll-mt-28">
           <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6 sm:p-8 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
             <div className="space-y-2">
               <h2 className="text-xl md:text-2xl font-bold text-white">Plan comparison</h2>
