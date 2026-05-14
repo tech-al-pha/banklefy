@@ -166,8 +166,8 @@ export default function SampleReport() {
           </div>
         </div>
 
-        <div className="mt-10 grid items-start gap-8 lg:[grid-template-columns:minmax(340px,36vw)_minmax(0,1fr)]">
-          <div className="space-y-6 lg:max-w-[520px]">
+        <div className="mt-10 grid w-full min-w-0 items-start gap-8 lg:[grid-template-columns:minmax(340px,36vw)_minmax(0,1fr)]">
+          <div className="space-y-6 w-full min-w-0 lg:max-w-[520px]">
             <div className="space-y-3">
               <Badge className="bg-primary/15 text-primary border border-primary/30">
                 Sample Report
@@ -241,8 +241,8 @@ export default function SampleReport() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <Card className="border-white/20 bg-[#101010] p-5 backdrop-blur-xl">
+          <div className="space-y-4 w-full min-w-0">
+            <Card className="w-full overflow-hidden border-white/20 bg-[#101010] p-5 backdrop-blur-xl">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-2">
                   <Badge className="border border-primary/40 bg-primary/10 text-primary">
@@ -412,7 +412,7 @@ export default function SampleReport() {
               </Card>
             )}
 
-            <Card className="border-white/15 bg-[#111111] p-5 backdrop-blur-xl">
+            <Card className="w-full overflow-hidden border-white/15 bg-[#111111] p-4 sm:p-5 backdrop-blur-xl">
               <div className="flex flex-wrap gap-2">
                 {[
                   "Transfer Out: 18",
