@@ -13,9 +13,17 @@ export const LuxuryCursor = () => {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const finePointer = window.matchMedia?.("(pointer: fine)").matches ?? false;
-    const hoverCapable = window.matchMedia?.("(hover: hover)").matches ?? false;
-    setIsEnabled(finePointer && hoverCapable);
+    
+    const checkEnabled = () => {
+      const finePointer = window.matchMedia?.("(pointer: fine)").matches ?? false;
+      const hoverCapable = window.matchMedia?.("(hover: hover)").matches ?? false;
+      const isDesktopWidth = window.innerWidth >= 1024;
+      setIsEnabled(finePointer && hoverCapable && isDesktopWidth);
+    };
+
+    checkEnabled();
+    window.addEventListener("resize", checkEnabled);
+    return () => window.removeEventListener("resize", checkEnabled);
   }, []);
 
   useEffect(() => {

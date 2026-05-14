@@ -795,11 +795,6 @@
     position: sticky !important;
   }
 
-  /* Prevent any element from overflowing horizontally */
-  *, *::before, *::after {
-    max-width: 100%;
-    min-width: 0;
-  }
 
   #root > *,
   main,
@@ -817,7 +812,7 @@
   }
 
   /* Headings scale down + wrap safely */
-  h1 {
+  h1:not(.hero-title-3d) {
     font-size: clamp(1.75rem, 7vw, 2.25rem) !important;
     line-height: 1.2 !important;
     word-wrap: break-word;
@@ -825,12 +820,25 @@
     hyphens: auto;
     text-wrap: balance;
   }
-  h2 {
+  /* Hero title gets its own mobile scale — bigger than body h1 to maintain hierarchy */
+  h1.hero-title-3d {
+    font-size: clamp(2rem, 9vw, 5.7rem) !important;
+    line-height: 1.08 !important;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    text-wrap: balance;
+  }
+  h2:not(.hero-title-3d) {
     font-size: clamp(1.4rem, 5.5vw, 1.875rem) !important;
     line-height: 1.25 !important;
     word-wrap: break-word;
     overflow-wrap: break-word;
     text-wrap: balance;
+  }
+  /* Hero CONVERTER line — dominant, fills the screen width */
+  h2.hero-title-3d {
+    font-size: clamp(1.8rem, 12.5vw, 7.8rem) !important;
+    line-height: 0.98 !important;
   }
   h3 {
     font-size: clamp(1.15rem, 4.5vw, 1.5rem) !important;
@@ -864,12 +872,12 @@
 
   /* Section padding */
   section {
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
   }
   .container {
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
     max-width: 100% !important;
   }
 
@@ -937,23 +945,24 @@
   button:not([class*="icon"]):not([aria-label*="close" i]):not([aria-label*="menu" i]):not([role="tab"]),
   a[class*="btn"],
   .btn-glow {
-    min-height: 48px;
-    font-size: 0.9rem;
+    min-height: 44px;
+    font-size: 0.85rem;
     line-height: 1.1;
-    white-space: nowrap;
   }
 
   .hero-highlight-pill {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     line-height: 1.15;
-    padding-top: 0.55rem;
-    padding-bottom: 0.55rem;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
   }
 
   .hero-subtitle {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     line-height: 1.35;
-    margin-bottom: 1.75rem;
+    margin-bottom: 1rem;
   }
   /* Stacked button groups go full width */
   .flex.flex-col > button,
@@ -987,5 +996,23 @@
 
   .hero-title-3d {
     letter-spacing: 0.02em !important;
+  }
+
+  /* Footer links — smaller on mobile */
+  footer a {
+    font-size: 0.8rem;
+  }
+  footer p {
+    font-size: 0.8rem;
+  }
+
+  .luxury-cursor {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .luxury-cursor {
+    display: none !important;
   }
 }

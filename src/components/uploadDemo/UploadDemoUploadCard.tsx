@@ -135,7 +135,7 @@ export const UploadDemoUploadCard = ({
       tabIndex={0}
       aria-disabled={limitReached}
       data-hover
-      className={`subtle-border-glow group relative cursor-pointer rounded-xl border-2 border-primary/20 bg-[#191919]/80 p-12 text-center transition-all duration-500 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+      className={`subtle-border-glow group relative cursor-pointer rounded-xl border-2 border-primary/20 bg-[#191919]/80 p-6 sm:p-12 text-center transition-all duration-500 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
         limitReached ? "opacity-50 cursor-not-allowed" : ""
       }`}
     >
@@ -150,26 +150,26 @@ export const UploadDemoUploadCard = ({
 
       <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/5 via-transparent to-primary/3 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-      <div className="space-y-6 relative z-10">
+        <div className="space-y-4 sm:space-y-6 relative z-10">
         <div
-          className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center transition-all duration-500 ${
+          className={`mx-auto w-14 h-14 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all duration-500 ${
             limitReached ? "bg-muted/10" : "bg-primary/20 group-hover:scale-110 group-hover:shadow-neon"
           }`}
         >
           <Upload
-            className={`w-10 h-10 transition-all duration-300 ${
+            className={`w-7 h-7 sm:w-10 sm:h-10 transition-all duration-300 ${
               limitReached ? "text-muted-foreground utility-icon-muted" : "text-primary"
             }`}
           />
         </div>
 
-        <div className="space-y-3">
-          <p className="text-xl font-semibold tracking-wide text-white">
+        <div className="space-y-2 sm:space-y-3">
+          <p className="text-base sm:text-xl font-semibold tracking-wide text-white">
             {selectedFileCount > 0
               ? `${selectedFileCount} ${selectedFileCount === 1 ? labels.fileSingular : labels.filePlural} ${labels.selectedSuffix}`
               : labels.dropTitle}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             {limitReached
               ? labels.dailyLimit
               : labels.browseHint}

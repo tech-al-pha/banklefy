@@ -12,12 +12,12 @@ export const UploadDemoHeader = () => {
   const copy = copyByLanguage[language] ?? copyByLanguage.en;
 
   return (
-    <div className="text-center max-w-3xl mx-auto mb-12 space-y-4">
-      <h2 className="text-4xl md:text-5xl font-bold">
+    <div className="text-center max-w-3xl mx-auto mb-6 sm:mb-12 space-y-2 sm:space-y-4">
+      <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold">
         {copy.title}
         <span className="bg-gradient-primary bg-clip-text text-transparent"> {copy.accent}</span>
       </h2>
-      <p className="text-lg text-muted-foreground">
+      <p className="text-sm sm:text-lg text-muted-foreground">
         {copy.subtitle}
       </p>
     </div>
