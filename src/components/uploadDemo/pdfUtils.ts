@@ -215,9 +215,9 @@ export const getTotalPages = async (
       continue;
     }
     total += pages;
+    maxSingle = Math.max(maxSingle, pages);
     if (pages > maxPdfRenderPages) {
       overCap = true;
-      maxSingle = Math.max(maxSingle, pages);
     }
   }
 

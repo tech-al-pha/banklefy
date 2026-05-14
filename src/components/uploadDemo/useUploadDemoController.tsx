@@ -619,7 +619,6 @@ export const useUploadDemoController = () => {
     currencyCode,
     progressStep,
     uploading,
-    preparedPdfDataRef,
   });
 
   // reCAPTCHA v3 for anonymous users - runs invisibly in background
@@ -719,7 +718,8 @@ export const useUploadDemoController = () => {
     return () => window.clearTimeout(timeout);
   }, [uploading, converting, showProgress]);
 
-  const MAX_PDF_RENDER_PAGES = 120;
+  const MAX_PDF_RENDER_PAGES = 250;
+  const LARGE_PDF_NOTICE_PAGE_THRESHOLD = 50;
   const FREE_MAX_PDF_PAGES_PER_FILE = 15;
   const maxPdfRenderPages = isFreeUsageMode ? FREE_MAX_PDF_PAGES_PER_FILE : MAX_PDF_RENDER_PAGES;
   const EDGE_FUNCTION_SAFE_SINGLE_PDF_PAYLOAD_BYTES = 18 * 1024 * 1024;
@@ -776,6 +776,15 @@ export const useUploadDemoController = () => {
       message,
       showSignup: !isAuthenticated,
       showPricing: true,
+    });
+  };
+
+  const showLargePdfNoticeDialog = (pageCount: number) => {
+    openLimitDialog({
+      title: "Large PDF detected",
+      message: `This PDF has ${pageCount} pages, so conversion may take longer. Please keep this tab open while we process the full file.`,
+      showSignup: false,
+      showPricing: false,
     });
   };
 
@@ -848,6 +857,10 @@ export const useUploadDemoController = () => {
             return;
           }
 
+          if (!unknown && maxSingle >= LARGE_PDF_NOTICE_PAGE_THRESHOLD) {
+            showLargePdfNoticeDialog(maxSingle);
+          }
+
           const remainingCount = Math.max(0, remaining ?? 0);
           const limit = Math.max(0, conversionsLimit ?? 0);
           if (isFreeUsageMode && candidateFiles.length > remainingCount) {
@@ -861,55 +874,11 @@ export const useUploadDemoController = () => {
 
         setUploadPrepProgress(40);
         setUploadPrepLabel(uploadUiCopy.detectAmounts);
-        try {
-          const { extractPdfDataFromText, pdfToPageImages } = await loadPdfUtils();
-          for (const [fileIndex, file] of newFiles.entries()) {
-            const cacheKey = getFileCacheKey(file);
-            if (file.name.toLowerCase().endsWith(".pdf")) {
-              try {
-                const parsedPdf = await extractPdfDataFromText(file, {
-                  password: pdfPassword.trim() || undefined,
-                  maxPdfRenderPages,
-                });
-                const parsedTxCount = parsedPdf.transactions?.length ?? 0;
-                const parsedPageCount = Math.max(1, parsedPdf.pageCount ?? 1);
-                const minimumExpectedRows = Math.max(12, Math.ceil(parsedPageCount * 4));
-                const localTextParseLooksReliable = parsedTxCount >= minimumExpectedRows;
-                preparedPdfDataRef.current.set(cacheKey, {
-                  transactions: localTextParseLooksReliable ? parsedPdf.transactions : [],
-                  bankMetadata: parsedPdf.bankMetadata,
-                });
-
-                const isTextBasedPdf = localTextParseLooksReliable;
-                if (!isTextBasedPdf) {
-                  setUploadPrepProgress(65);
-                  setUploadPrepLabel(uploadUiCopy.preparingOcr);
-                  try {
-                    const renderedPdfPageImages = await pdfToPageImages(file, {
-                      password: pdfPassword.trim() || undefined,
-                      maxPdfRenderPages,
-                      isFreeUsageMode,
-                      freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
-                    });
-                    if (Array.isArray(renderedPdfPageImages) && renderedPdfPageImages.length > 0) {
-                      preparedPdfImagesRef.current.set(cacheKey, renderedPdfPageImages);
-                      setShowScanTimeCard(true);
-                    } else {
-                      preparedPdfImagesRef.current.delete(cacheKey);
-                    }
-                  } catch {
-                    preparedPdfImagesRef.current.delete(cacheKey);
-                  }
-                } else {
-                  preparedPdfImagesRef.current.delete(cacheKey);
-                }
-              } catch {
-                preparedPdfDataRef.current.delete(cacheKey);
-              }
-            }
-          }
-        } catch {
-          // Preparation failures should not block file selection.
+        for (const file of newFiles) {
+          if (!file.name.toLowerCase().endsWith(".pdf")) continue;
+          const cacheKey = getFileCacheKey(file);
+          preparedPdfDataRef.current.delete(cacheKey);
+          preparedPdfImagesRef.current.delete(cacheKey);
         }
 
         setUploadPrepProgress(75);
@@ -1076,34 +1045,17 @@ export const useUploadDemoController = () => {
           requestBody.recaptchaToken = token;
         }
 
-      // For PDFs: keep the raw bytes and page images together so the backend can
-      // choose between deterministic parsing and full-page OCR.
+      // For PDFs, send the original bytes first so text-based statements stay on
+      // the fast deterministic path. OCR page images are generated only if the
+      // backend asks for them.
       if (isPdf) {
         const cacheKey = getFileCacheKey(fileToConvert);
         const cachedParsedPdf = preparedPdfDataRef.current.get(cacheKey);
-        const parsedPdfTransactionsCount = cachedParsedPdf?.transactions?.length ?? 0;
-        const isTextBasedPdf = parsedPdfTransactionsCount > 0;
         if (cachedParsedPdf?.bankMetadata) {
           requestBody.pdfParsedBankMetadata = cachedParsedPdf.bankMetadata;
         }
-        if (!isTextBasedPdf) {
-          let cachedPageImages = preparedPdfImagesRef.current.get(cacheKey);
-          if (!cachedPageImages || cachedPageImages.length === 0) {
-            const { pdfToPageImages } = await loadPdfUtils();
-            cachedPageImages = await pdfToPageImages(fileToConvert, {
-              password: pdfPassword.trim() || undefined,
-              maxPdfRenderPages,
-              isFreeUsageMode,
-              freeMaxPdfPagesPerFile: FREE_MAX_PDF_PAGES_PER_FILE,
-            });
-            if (Array.isArray(cachedPageImages) && cachedPageImages.length > 0) {
-              preparedPdfImagesRef.current.set(cacheKey, cachedPageImages);
-            }
-          }
-          if (cachedPageImages && cachedPageImages.length > 0) {
-            requestBody.pdfPageImages = cachedPageImages;
-            setShowScanTimeCard(true);
-          }
+        if ((cachedParsedPdf?.transactions?.length ?? 0) > 0) {
+          requestBody.pdfParsedTransactions = cachedParsedPdf.transactions;
         }
       }
 
