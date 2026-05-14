@@ -887,8 +887,10 @@
   }
 
   .back-pill {
-    width: 100% !important;
-    min-height: 48px;
+    width: max-content !important;
+    min-height: 36px;
+    padding: 0.4rem 1rem !important;
+    font-size: 0.75rem;
     justify-content: center;
     white-space: nowrap;
   }
