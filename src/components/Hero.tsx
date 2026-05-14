@@ -107,7 +107,7 @@ export const Hero = () => {
             {/* Stats... (unchanged) */}
           </div>
 
-          <div className="flex w-full max-w-[620px] translate-x-0 md:translate-x-4 flex-col justify-center gap-3 sm:gap-6 lg:translate-x-8">
+          <div className="hidden md:flex w-full max-w-[620px] translate-x-0 md:translate-x-4 flex-col justify-center gap-3 sm:gap-6 lg:translate-x-8">
             {heroHighlights.map((line) => (
               <div
                 key={line}
