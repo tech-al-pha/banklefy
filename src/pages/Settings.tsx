@@ -196,7 +196,7 @@ const Settings = () => {
       category: "account",
       icon: <UserCircle2 className="h-5 w-5" />,
       component: (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-nowrap items-center gap-1 sm:gap-2">
           <Input
             value={displayName}
             onChange={(e) => {
@@ -219,7 +219,7 @@ const Settings = () => {
       category: "account",
       icon: <Mail className="h-5 w-5" />,
       component: (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-nowrap items-center gap-1 sm:gap-2">
           <Input
             value={email}
             onChange={(e) => {
@@ -263,7 +263,7 @@ const Settings = () => {
       category: "preferences",
       icon: <Download className="h-5 w-5" />,
       component: (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-nowrap gap-1 sm:gap-2">
           <Button
             size="sm"
             variant={settings.defaultExportFormat === "xlsx" ? "default" : "outline"}
@@ -288,7 +288,7 @@ const Settings = () => {
       category: "preferences",
       icon: <SettingsIcon className="h-5 w-5" />,
       component: (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-nowrap gap-1 sm:gap-2 overflow-x-auto scrollbar-hide pb-1">
           {(["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"] as const).map((format) => (
             <Button
               key={format}
@@ -322,8 +322,8 @@ const Settings = () => {
       category: "billing",
       icon: <CreditCard className="h-5 w-5" />,
       component: (
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge className="bg-primary/20 text-primary border-primary/30">{planLabel}</Badge>
+        <div className="flex flex-nowrap items-center gap-1 sm:gap-2">
+          <Badge className="bg-primary/20 text-primary border-primary/30 whitespace-nowrap text-[9px] sm:text-xs">{planLabel}</Badge>
           <Button variant="outline" size="sm" onClick={() => navigate("/pricing")}>
             Upgrade
           </Button>
@@ -439,7 +439,7 @@ const Settings = () => {
       category: "privacy",
       icon: <Eye className="h-5 w-5" />,
       component: (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-nowrap gap-1 sm:gap-2">
           <Button
             size="sm"
             variant={settings.editedPdfWarningTiming === "upload" ? "default" : "outline"}
@@ -657,15 +657,15 @@ const Settings = () => {
           </div>
 
           <Tabs defaultValue="all" className="w-full">
-            <TabsList className="flex flex-wrap gap-2 bg-transparent mb-8 h-auto p-0">
+            <TabsList className="flex flex-nowrap overflow-x-auto gap-1 sm:gap-2 bg-transparent mb-8 h-auto p-0 pb-2 w-full justify-start [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               {categories.map((cat) => (
                 <TabsTrigger
                   key={cat.id}
                   value={cat.id}
-                  className="chip-muted gap-2"
+                  className="chip-muted flex-shrink-0 gap-1 sm:gap-2 text-[10px] sm:text-sm px-2.5 sm:px-4 py-1.5 sm:py-2"
                 >
-                  {cat.icon}
-                  {cat.label}
+                  <div className="scale-75 sm:scale-100 flex items-center justify-center">{cat.icon}</div>
+                  <span className="whitespace-nowrap">{cat.label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
