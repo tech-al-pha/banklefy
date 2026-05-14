@@ -1158,7 +1158,7 @@ export const ResultsSection = ({
         </div>
       </div>
 
-      <div className="text-center pt-8 border-t border-muted">
+      <div className="hidden md:block text-center pt-8 border-t border-muted">
         <p className="text-sm text-muted-foreground mb-4">
           {localizedCopy.banksCompatible}
         </p>
