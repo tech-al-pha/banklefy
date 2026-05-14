@@ -594,7 +594,7 @@ const Settings = () => {
                     <p className="text-sm text-muted-foreground">{item.description}</p>
                   </div>
                 </div>
-                <div className="flex-shrink-0 w-full sm:w-auto">
+                <div className="flex-shrink-0 mt-3 sm:mt-0">
                   {item.component}
                 </div>
               </div>
