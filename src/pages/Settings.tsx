@@ -196,14 +196,14 @@ const Settings = () => {
       category: "account",
       icon: <UserCircle2 className="h-5 w-5" />,
       component: (
-        <div className="flex flex-nowrap items-center gap-1 sm:gap-2">
+        <div className="flex flex-nowrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           <Input
             value={displayName}
             onChange={(e) => {
               setDisplayName(e.target.value);
               setNameChanged(e.target.value !== (user?.user_metadata?.full_name ?? ""));
             }}
-            className="min-w-[220px]"
+            className="w-full sm:min-w-[220px]"
             placeholder="Enter your name"
           />
           <Button size="sm" onClick={handleSaveName} disabled={!nameChanged || saving}>
@@ -219,14 +219,14 @@ const Settings = () => {
       category: "account",
       icon: <Mail className="h-5 w-5" />,
       component: (
-        <div className="flex flex-nowrap items-center gap-1 sm:gap-2">
+        <div className="flex flex-nowrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           <Input
             value={email}
             onChange={(e) => {
               setEmail(e.target.value);
               setEmailChanged(e.target.value !== (user?.email ?? ""));
             }}
-            className="min-w-[240px]"
+            className="w-full sm:min-w-[240px]"
             placeholder="you@example.com"
           />
           <Button size="sm" onClick={handleSaveEmail} disabled={!emailChanged || emailSaving}>
@@ -583,9 +583,9 @@ const Settings = () => {
       <div className="space-y-4">
         {items.map((item) => (
           <Card key={item.id} className="bg-surface-elevated/60 border-primary/20 backdrop-blur-sm">
-            <CardContent className="p-4">
-              <div className="flex flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="flex items-start sm:items-center gap-3 sm:gap-4">
                   <div className={item.tone === "danger" ? "p-2 rounded-lg bg-red-500/10 text-red-300" : "p-2 rounded-lg bg-primary/10 text-primary"}>
                     {item.icon}
                   </div>
@@ -594,7 +594,7 @@ const Settings = () => {
                     <p className="text-sm text-muted-foreground">{item.description}</p>
                   </div>
                 </div>
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 w-full sm:w-auto">
                   {item.component}
                 </div>
               </div>
