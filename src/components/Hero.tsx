@@ -11,11 +11,11 @@ export const Hero = () => {
   const titleLine2Chars = Array.from(titleLine2.replace(/\s+/g, ""));
   const heroHighlightsByLanguage: Record<Language, string[]> = {
     en: [
-      "PDF to Excel, CSV, JSON, and MT940.",
-      "Edited PDF detector with integrity checks.",
-      "Accurate debit, credit, and balance mapping.",
-      "FOIR, EMI load, and risk insights.",
-      "Secure processing with user-controlled access.",
+      "Convert bank statement PDFs to Excel, CSV, JSON, and MT940.",
+      "Detect edited PDFs with integrity validation checks.",
+      "Extract and map debit, credit, and running balances accurately.",
+      "Generate FOIR, EMI load, and risk analysis insights.",
+      "Secure account access with user-controlled permissions.",
     ],
     ar: [
       "تحويل PDF إلى Excel وCSV وJSON وMT940.",

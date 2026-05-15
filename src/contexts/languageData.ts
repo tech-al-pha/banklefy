@@ -39,7 +39,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "hero.tagline": "Professional Look | OCR-Powered | Instant Results",
 
-    "hero.subtitle": "AI OCR that turns bank statements into clean, structured spreadsheets with secure processing, accurate extraction, and multi-format export.",
+    "hero.subtitle": "Banklefy converts bank statement PDFs into clean, structured spreadsheets with secure processing, accurate extraction, and multi-format export.",
 
     "hero.uploadBtn": "Upload Your Statement Now",
 
