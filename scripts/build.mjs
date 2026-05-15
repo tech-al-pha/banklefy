@@ -10,12 +10,9 @@ const run = (command, args) => {
 };
 
 if (!run("vite", ["build"])) process.exit(process.exitCode ?? 1);
-
-// Vercel build environment doesn't reliably support Playwright/Chromium prerendering.
-// Keep prerendering for local/CI workflows where Playwright is available.
-if (process.env.VERCEL) {
-  console.log("[build] Skipping SEO prerender on Vercel.");
-  process.exit(0);
+if (!run("node", ["scripts/prerender-seo.mjs"])) {
+  console.warn("[build] Interactive SEO prerender failed. Falling back to static SEO pages.");
+  if (!run("node", ["scripts/generate-static-seo-fallback.mjs"])) {
+    process.exit(process.exitCode ?? 1);
+  }
 }
-
-if (!run("node", ["scripts/prerender-seo.mjs"])) process.exit(process.exitCode ?? 1);
