@@ -34,7 +34,7 @@ export const Hero = () => {
     es: [
       "PDF a Excel, CSV, JSON y MT940.",
       "Detector de PDF editado con comprobaciones de integridad.",
-      "Mapeo preciso de débito, crédito y saldo.",
+      "Mapeo preciso de débito، crédito y saldo.",
       "Información de FOIR, carga EMI y riesgo.",
       "Procesamiento seguro con acceso controlado por el usuario.",
     ],
@@ -82,6 +82,12 @@ export const Hero = () => {
 
             <p className="hero-subtitle mt-4 sm:mt-6 mb-6 sm:mb-12 max-w-2xl text-xs sm:text-sm md:text-lg italic leading-relaxed text-white/70">
               {t("hero.subtitle")}
+            </p>
+
+            {/* Google OAuth Explanation for Verification */}
+            <p className="max-w-2xl text-base md:text-lg leading-relaxed text-white/80 mt-2 mb-6">
+              Banklefy helps you easily convert your bank statements from PDF to Excel, CSV, and other formats. 
+              We use Google Sign-In only for secure login to your account. Your Google data is used only for authentication and is never shared with anyone.
             </p>
 
             <div className="mt-6 sm:mt-14 flex w-full max-w-2xl flex-col sm:flex-row items-stretch sm:items-center justify-start gap-3 sm:gap-4">
