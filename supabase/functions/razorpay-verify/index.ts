@@ -103,6 +103,110 @@ const toInteger = (value: unknown, fallback: number): number => {
   return fallback;
 };
 
+const getPlanRank = (planId: string): number => {
+  switch (planId) {
+    case 'per_page_lite':
+      return 1;
+    case 'per_page_standard':
+      return 2;
+    case 'per_page_power':
+      return 3;
+    case 'per_page_pack_starter':
+      return 4;
+    case 'per_page_pack_basic':
+      return 5;
+    case 'per_page_pack_pro':
+      return 6;
+    case 'per_page_pack_enterprise':
+      return 7;
+    case 'unlimited':
+      return 8;
+    default:
+      return 0;
+  }
+};
+
+const preferHigherPlan = (currentPlanId: string | null | undefined, nextPlanId: string): string => {
+  const normalizedCurrent = typeof currentPlanId === 'string' ? currentPlanId.trim().toLowerCase() : 'free';
+  return getPlanRank(nextPlanId) > getPlanRank(normalizedCurrent) ? nextPlanId : normalizedCurrent;
+};
+
+const syncSubscriptionEntitlements = async ({
+  supabaseAdmin,
+  userId,
+  planId,
+  minimumLimit,
+}: {
+  supabaseAdmin: ReturnType<typeof createClient>;
+  userId: string;
+  planId: string;
+  minimumLimit: number;
+}): Promise<void> => {
+  const resetDate = toIsoDate(new Date());
+  const planTier = getTierForPlan(planId);
+  const { data: existingSubscription, error: subscriptionReadError } = await supabaseAdmin
+    .from('subscriptions')
+    .select('conversions_limit, conversions_used, free_daily_limit, free_daily_used, pack_limit, pack_used, tier, plan_type, timezone, last_reset_date')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (subscriptionReadError) {
+    throw new Error(`Failed to read subscription row (${subscriptionReadError.message})`);
+  }
+
+  if (!existingSubscription) {
+    const { error: subscriptionInsertError } = await supabaseAdmin.from('subscriptions').insert({
+      user_id: userId,
+      tier: planTier,
+      plan_type: planId,
+      conversions_limit: minimumLimit,
+      conversions_used: 0,
+      free_daily_limit: 5,
+      free_daily_used: 0,
+      pack_limit: minimumLimit,
+      pack_used: 0,
+      last_reset_date: resetDate,
+      timezone: 'UTC',
+    });
+
+    if (subscriptionInsertError) {
+      throw new Error(`Failed to create subscription row (${subscriptionInsertError.message})`);
+    }
+    return;
+  }
+
+  const existingLimit = Number(existingSubscription.conversions_limit || 0);
+  const existingPackLimit = Number(existingSubscription.pack_limit || 0);
+  const nextLimit = Math.max(existingLimit, existingPackLimit, minimumLimit);
+  const nextUsed = Math.min(nextLimit, Math.max(
+    Number(existingSubscription.conversions_used || 0),
+    Number(existingSubscription.pack_used || 0),
+  ));
+  const nextPlanId = preferHigherPlan(existingSubscription.plan_type, planId);
+
+  const updatePayload: Record<string, unknown> = {
+    conversions_limit: nextLimit,
+    conversions_used: nextUsed,
+    free_daily_limit: Math.max(5, Number(existingSubscription.free_daily_limit || 5)),
+    free_daily_used: Number(existingSubscription.free_daily_used || 0),
+    pack_limit: nextLimit,
+    pack_used: nextUsed,
+    tier: nextPlanId === 'free' ? 'free' : planTier,
+    plan_type: nextPlanId,
+    timezone: existingSubscription.timezone || 'UTC',
+    last_reset_date: existingSubscription.last_reset_date || resetDate,
+  };
+
+  const { error: subscriptionUpdateError } = await supabaseAdmin
+    .from('subscriptions')
+    .update(updatePayload)
+    .eq('user_id', userId);
+
+  if (subscriptionUpdateError) {
+    throw new Error(`Failed to update subscription row (${subscriptionUpdateError.message})`);
+  }
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: getCorsHeaders(req) });
@@ -110,15 +214,16 @@ Deno.serve(async (req) => {
 
   const mode = (Deno.env.get('RAZORPAY_MODE') || '').trim().toLowerCase();
 
+  const getLegacySecret = (): string | null =>
+    Deno.env.get('RAZORPAY_KEY_SECRET') ||
+    Deno.env.get('RAZORPAY_SECRET_KEY') ||
+    Deno.env.get('RAZERPAY_SECRET_KEY') ||
+    null;
+
   const getRazorpaySecret = (): string | null => {
-    if (mode === 'live') return Deno.env.get('RAZORPAY_LIVE_KEY_SECRET') || null;
-    if (mode === 'test') return Deno.env.get('RAZORPAY_TEST_KEY_SECRET') || null;
-    return (
-      Deno.env.get('RAZORPAY_KEY_SECRET') ||
-      Deno.env.get('RAZORPAY_SECRET_KEY') ||
-      Deno.env.get('RAZERPAY_SECRET_KEY') ||
-      null
-    );
+    if (mode === 'live') return Deno.env.get('RAZORPAY_LIVE_KEY_SECRET') || getLegacySecret();
+    if (mode === 'test') return Deno.env.get('RAZORPAY_TEST_KEY_SECRET') || getLegacySecret();
+    return getLegacySecret();
   };
 
   const razorpaySecret = getRazorpaySecret();
@@ -207,19 +312,29 @@ Deno.serve(async (req) => {
     return respond(req, 403, { error: 'Order does not belong to this user.' });
   }
 
+  const planId = order.plan_id as string;
+  const pagesToAdd = PLAN_PAGES[planId] || 0;
+
   if (order.status === 'paid') {
+    try {
+      await syncSubscriptionEntitlements({
+        supabaseAdmin,
+        userId,
+        planId,
+        minimumLimit: pagesToAdd,
+      });
+    } catch (syncError) {
+      console.error('Failed to repair already-paid subscription entitlements', syncError);
+    }
+
     return respond(req, 200, {
       success: true,
       alreadyProcessed: true,
       message: 'Order already marked as paid.',
-      plan_id: order.plan_id,
+      plan_id: planId,
       pages_added: 0,
     });
   }
-
-  // Update user subscription based on plan
-  const planId = order.plan_id as string;
-  const pagesToAdd = PLAN_PAGES[planId] || 0;
 
   // Preferred: atomic DB-side finalization for all plan types.
   const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('process_razorpay_payment', {
@@ -238,6 +353,17 @@ Deno.serve(async (req) => {
     const rpcRow = asRecord(Array.isArray(rpcData) ? rpcData[0] : rpcData);
     const alreadyProcessed = toBoolean(rpcRow?.already_processed, false);
     const pagesAdded = toInteger(rpcRow?.pages_added, alreadyProcessed ? 0 : pagesToAdd);
+
+    try {
+      await syncSubscriptionEntitlements({
+        supabaseAdmin,
+        userId,
+        planId,
+        minimumLimit: alreadyProcessed ? pagesToAdd : pagesAdded,
+      });
+    } catch (syncError) {
+      console.error('Failed to normalize subscription entitlements after RPC finalization', syncError);
+    }
 
     return respond(req, 200, {
       success: true,
@@ -297,66 +423,16 @@ Deno.serve(async (req) => {
   const alreadyProcessed = !paidOrderRows || paidOrderRows.length === 0;
   const pagesAdded = alreadyProcessed ? 0 : pagesToAdd;
 
-  if (!alreadyProcessed) {
-    const planTier = getTierForPlan(planId);
-    const resetDate = toIsoDate(new Date());
-    const { data: existingSubscription, error: subscriptionReadError } = await supabaseAdmin
-      .from('subscriptions')
-      .select('conversions_limit, conversions_used, free_daily_limit, free_daily_used, pack_limit, pack_used, tier, plan_type')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (subscriptionReadError) {
-      console.error('Failed to read subscription row', subscriptionReadError);
-      return respond(req, 500, { error: 'Failed to finalize payment.' });
-    }
-
-    if (!existingSubscription) {
-      const { error: subscriptionInsertError } = await supabaseAdmin.from('subscriptions').insert({
-        user_id: userId,
-        tier: planTier,
-        plan_type: planId,
-        conversions_limit: pagesToAdd,
-        conversions_used: 0,
-        free_daily_limit: 5,
-        free_daily_used: 0,
-        pack_limit: pagesToAdd,
-        pack_used: 0,
-        last_reset_date: resetDate,
-        timezone: 'UTC',
-      });
-
-      if (subscriptionInsertError) {
-        console.error('Failed to create subscription row', subscriptionInsertError);
-        return respond(req, 500, { error: 'Failed to finalize payment.' });
-      }
-    } else {
-      const existingLimit = Number(existingSubscription.conversions_limit || 0);
-      const existingUsed = Number(existingSubscription.conversions_used || 0);
-      const nextLimit = Math.max(existingLimit, 0) + pagesToAdd;
-      const nextUsed = Math.min(nextLimit, existingUsed);
-
-      const updatePayload: Record<string, unknown> = {
-        conversions_limit: nextLimit,
-        conversions_used: nextUsed,
-        free_daily_limit: Math.max(5, Number(existingSubscription.free_daily_limit || 5)),
-        free_daily_used: Number(existingSubscription.free_daily_used || 0),
-        pack_limit: nextLimit,
-        pack_used: nextUsed,
-        tier: planTier,
-        plan_type: planId,
-      };
-
-      const { error: subscriptionUpdateError } = await supabaseAdmin
-        .from('subscriptions')
-        .update(updatePayload)
-        .eq('user_id', userId);
-
-      if (subscriptionUpdateError) {
-        console.error('Failed to update subscription row', subscriptionUpdateError);
-        return respond(req, 500, { error: 'Failed to finalize payment.' });
-      }
-    }
+  try {
+    await syncSubscriptionEntitlements({
+      supabaseAdmin,
+      userId,
+      planId,
+      minimumLimit: alreadyProcessed ? pagesToAdd : pagesToAdd,
+    });
+  } catch (syncError) {
+    console.error('Failed to sync subscription row in fallback payment finalization', syncError);
+    return respond(req, 500, { error: 'Failed to finalize payment.' });
   }
 
   return respond(req, 200, {

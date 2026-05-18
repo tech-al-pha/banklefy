@@ -2,7 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getDefaultDailyLimit } from '@/lib/usageLimits';
-import { resolveEffectivePlanType } from '@/lib/entitlements';
+import { pickHigherValuePlan, resolveEffectivePlanType } from '@/lib/entitlements';
+
+const PURCHASE_TOAST_STORAGE_KEY = "banklefy:last-plan-purchase";
+const RECENT_PURCHASE_GRACE_MS = 1000 * 60 * 60 * 12;
 
 interface UsageLimit {
   conversionsUsed: number;
@@ -36,6 +39,36 @@ export const useUsageLimit = () => {
       return 'UTC';
     }
   };
+
+  const readRecentPurchaseOverride = useCallback(() => {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      const raw = window.sessionStorage.getItem(PURCHASE_TOAST_STORAGE_KEY);
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw) as {
+        at?: unknown;
+        planId?: unknown;
+        pagesAdded?: unknown;
+      };
+
+      const purchasedAt = Number(parsed.at ?? 0);
+      if (!Number.isFinite(purchasedAt) || purchasedAt <= 0) return null;
+      if (Date.now() - purchasedAt > RECENT_PURCHASE_GRACE_MS) return null;
+
+      const planId = typeof parsed.planId === 'string' ? parsed.planId.trim() : '';
+      if (!planId) return null;
+
+      const pagesAdded = Number(parsed.pagesAdded ?? 0);
+      return {
+        planId,
+        pagesAdded: Number.isFinite(pagesAdded) ? Math.max(0, pagesAdded) : 0,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
 
   const readSubscriptionUsageSnapshot = useCallback(async () => {
     if (!user) return null;
@@ -126,6 +159,18 @@ export const useUsageLimit = () => {
         resolvedRemaining = subscriptionSnapshot.remaining;
       }
 
+      const recentPurchase = readRecentPurchaseOverride();
+      if (recentPurchase) {
+        const upgradedPlan = pickHigherValuePlan(resolvedPlanType, recentPurchase.planId);
+        if (upgradedPlan !== resolvedPlanType) {
+          resolvedPlanType = upgradedPlan;
+          if (recentPurchase.pagesAdded > 0) {
+            resolvedLimit = Math.max(resolvedLimit, recentPurchase.pagesAdded);
+            resolvedRemaining = Math.max(0, resolvedLimit - resolvedUsed);
+          }
+        }
+      }
+
       setUsageLimit({
         conversionsUsed: resolvedUsed,
         conversionsLimit: resolvedLimit,
@@ -140,16 +185,23 @@ export const useUsageLimit = () => {
     } catch (err: unknown) {
       const subscriptionSnapshot = await readSubscriptionUsageSnapshot();
       if (subscriptionSnapshot) {
+        const recentPurchase = readRecentPurchaseOverride();
+        const resolvedPlanType = recentPurchase
+          ? pickHigherValuePlan(subscriptionSnapshot.planType, recentPurchase.planId)
+          : subscriptionSnapshot.planType;
+        const resolvedLimit = recentPurchase?.pagesAdded
+          ? Math.max(subscriptionSnapshot.conversionsLimit, recentPurchase.pagesAdded)
+          : subscriptionSnapshot.conversionsLimit;
         setUsageLimit(prev => ({
           ...prev,
           conversionsUsed: subscriptionSnapshot.conversionsUsed,
-          conversionsLimit: subscriptionSnapshot.conversionsLimit,
-          remaining: subscriptionSnapshot.remaining,
-          limitReached: subscriptionSnapshot.remaining <= 0,
+          conversionsLimit: resolvedLimit,
+          remaining: Math.max(0, resolvedLimit - subscriptionSnapshot.conversionsUsed),
+          limitReached: Math.max(0, resolvedLimit - subscriptionSnapshot.conversionsUsed) <= 0,
           isAuthenticated: !!user,
           loading: false,
           error: null,
-          planType: subscriptionSnapshot.planType,
+          planType: resolvedPlanType,
         }));
         hasLoadedOnceRef.current = true;
         return;
@@ -164,7 +216,7 @@ export const useUsageLimit = () => {
       }));
       hasLoadedOnceRef.current = true;
     }
-  }, [user, session?.access_token, defaultLimit, readSubscriptionUsageSnapshot]);
+  }, [user, session?.access_token, defaultLimit, readSubscriptionUsageSnapshot, readRecentPurchaseOverride]);
 
   useEffect(() => {
     checkUsageLimit();

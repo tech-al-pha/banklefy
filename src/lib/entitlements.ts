@@ -8,6 +8,18 @@ export type EntitlementInput = {
 export const normalizePlanType = (planType?: string | null): string =>
   (planType ?? "free").toLowerCase().trim();
 
+const PLAN_RANK: Record<string, number> = {
+  free: 0,
+  per_page_lite: 1,
+  per_page_standard: 2,
+  per_page_power: 3,
+  per_page_pack_starter: 4,
+  per_page_pack_basic: 5,
+  per_page_pack_pro: 6,
+  per_page_pack_enterprise: 7,
+  unlimited: 8,
+};
+
 const getCurrentPackFromLimit = (limit: number | null): string | null => {
   if (limit === null) return null;
   if (limit >= 11000) return "per_page_pack_enterprise";
@@ -55,6 +67,18 @@ export const resolveEffectivePlanType = (
   }
 
   return normalizedPlan;
+};
+
+export const getPlanRank = (planType?: string | null): number =>
+  PLAN_RANK[resolveEffectivePlanType(planType, null)] ?? 0;
+
+export const pickHigherValuePlan = (
+  currentPlanType?: string | null,
+  nextPlanType?: string | null,
+): string => {
+  const current = resolveEffectivePlanType(currentPlanType, null);
+  const next = resolveEffectivePlanType(nextPlanType, null);
+  return (PLAN_RANK[next] ?? 0) > (PLAN_RANK[current] ?? 0) ? next : current;
 };
 
 export const isPaidPlan = ({ planType, conversionsLimit }: EntitlementInput): boolean => {

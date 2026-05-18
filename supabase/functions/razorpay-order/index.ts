@@ -113,20 +113,7 @@ Deno.serve(async (req) => {
 
   const mode = (Deno.env.get('RAZORPAY_MODE') || '').trim().toLowerCase();
 
-  const getRazorpayCredentials = (): { keyId: string | null; secret: string | null; modeUsed: string } => {
-    if (mode === 'live') {
-      const keyId = Deno.env.get('RAZORPAY_LIVE_KEY_ID') || null;
-      const secret = Deno.env.get('RAZORPAY_LIVE_KEY_SECRET') || null;
-      return { keyId, secret, modeUsed: 'live' };
-    }
-
-    if (mode === 'test') {
-      const keyId = Deno.env.get('RAZORPAY_TEST_KEY_ID') || null;
-      const secret = Deno.env.get('RAZORPAY_TEST_KEY_SECRET') || null;
-      return { keyId, secret, modeUsed: 'test' };
-    }
-
-    // Backward compatible fallback.
+  const getLegacyCredentials = () => {
     const keyId =
       Deno.env.get('RAZORPAY_KEY_ID') ||
       Deno.env.get('RAZORPAY_SITE_KEY') ||
@@ -137,8 +124,30 @@ Deno.serve(async (req) => {
       Deno.env.get('RAZORPAY_SECRET_KEY') ||
       Deno.env.get('RAZERPAY_SECRET_KEY') ||
       null;
+    return { keyId, secret };
+  };
 
-    return { keyId, secret, modeUsed: mode || 'default' };
+  const getRazorpayCredentials = (): { keyId: string | null; secret: string | null; modeUsed: string } => {
+    if (mode === 'live') {
+      const keyId = Deno.env.get('RAZORPAY_LIVE_KEY_ID') || null;
+      const secret = Deno.env.get('RAZORPAY_LIVE_KEY_SECRET') || null;
+      // Allow existing deployments that only set legacy vars.
+      if (keyId && secret) return { keyId, secret, modeUsed: 'live' };
+      const legacy = getLegacyCredentials();
+      return { ...legacy, modeUsed: 'live(legacy)' };
+    }
+
+    if (mode === 'test') {
+      const keyId = Deno.env.get('RAZORPAY_TEST_KEY_ID') || null;
+      const secret = Deno.env.get('RAZORPAY_TEST_KEY_SECRET') || null;
+      // Allow existing deployments that only set legacy vars (often test keys).
+      if (keyId && secret) return { keyId, secret, modeUsed: 'test' };
+      const legacy = getLegacyCredentials();
+      return { ...legacy, modeUsed: 'test(legacy)' };
+    }
+
+    const legacy = getLegacyCredentials();
+    return { ...legacy, modeUsed: mode || 'default' };
   };
 
   const { keyId: serverRazorpayKeyId, secret: razorpaySecret } = getRazorpayCredentials();

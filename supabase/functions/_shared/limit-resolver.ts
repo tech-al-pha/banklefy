@@ -75,6 +75,22 @@ type UserRoleRow = {
   user_id: string;
 };
 
+type RazorpayOrderRow = {
+  id: string;
+  user_id: string;
+  plan_id: string | null;
+  status: string | null;
+};
+
+type RazorpayOrderInsert = {
+  id?: string;
+  user_id: string;
+  plan_id?: string | null;
+  status?: string | null;
+};
+
+type RazorpayOrderUpdate = Partial<RazorpayOrderInsert>;
+
 type UserRoleInsert = {
   id?: string;
   role?: 'admin' | 'user';
@@ -96,6 +112,12 @@ export type LimitResolverDatabase = {
         Row: SubscriptionRow;
         Insert: SubscriptionInsert;
         Update: SubscriptionUpdate;
+        Relationships: [];
+      };
+      razorpay_orders: {
+        Row: RazorpayOrderRow;
+        Insert: RazorpayOrderInsert;
+        Update: RazorpayOrderUpdate;
         Relationships: [];
       };
       user_roles: {
@@ -162,6 +184,26 @@ const DEFAULT_OWNER_EMAILS = ['inspirexali@gmail.com'];
 const DEFAULT_AUTH_LIMIT = 5;
 const DEFAULT_ANON_LIMIT = 2;
 const UNLIMITED_LIMIT = 999999;
+const PLAN_PAGES: Record<string, number> = {
+  per_page_lite: 10,
+  per_page_standard: 25,
+  per_page_power: 50,
+  per_page_pack_starter: 500,
+  per_page_pack_basic: 1000,
+  per_page_pack_pro: 5000,
+  per_page_pack_enterprise: 11000,
+};
+const PLAN_RANK: Record<string, number> = {
+  free: 0,
+  per_page_lite: 1,
+  per_page_standard: 2,
+  per_page_power: 3,
+  per_page_pack_starter: 4,
+  per_page_pack_basic: 5,
+  per_page_pack_pro: 6,
+  per_page_pack_enterprise: 7,
+  unlimited: 8,
+};
 
 const toNumber = (value: unknown, fallback: number): number => {
   const numeric = Number(value);
@@ -294,6 +336,12 @@ const buildResult = (
   };
 };
 
+const getPlanRank = (planType: string): number => PLAN_RANK[normalizePlan(planType)] ?? 0;
+
+const pickHigherValuePlan = (currentPlanType: string, nextPlanType: string): string => {
+  return getPlanRank(nextPlanType) > getPlanRank(currentPlanType) ? normalizePlan(nextPlanType) : normalizePlan(currentPlanType);
+};
+
 const ensureSubscriptionRow = async (
   supabaseAdmin: SupabaseLike,
   userId: string,
@@ -330,6 +378,87 @@ const ensureSubscriptionRow = async (
   }
 
   return created;
+};
+
+const reconcileSubscriptionFromPaidOrders = async (
+  supabaseAdmin: SupabaseLike,
+  row: SubscriptionRow,
+  userId: string,
+  timezone: string,
+  today: string,
+): Promise<SubscriptionRow> => {
+  const { data: paidOrders, error: paidOrdersError } = await supabaseAdmin
+    .from('razorpay_orders')
+    .select('plan_id, status')
+    .eq('user_id', userId)
+    .eq('status', 'paid');
+
+  if (paidOrdersError) {
+    console.warn(`resolveEffectiveLimit: failed to read paid orders for reconciliation (${paidOrdersError.message})`);
+    return row;
+  }
+
+  const knownPaidOrders = (paidOrders ?? [])
+    .map((order) => normalizePlan(order.plan_id))
+    .filter((planId) => PLAN_PAGES[planId] !== undefined);
+
+  if (knownPaidOrders.length === 0) {
+    return row;
+  }
+
+  const bestPaidPlan = knownPaidOrders.reduce((best, current) => pickHigherValuePlan(best, current), 'free');
+  const paidPagesTotal = knownPaidOrders.reduce((total, planId) => total + PLAN_PAGES[planId], 0);
+
+  const currentLimit = Math.max(
+    toNumber(row.conversions_limit, 0),
+    toNumber(row.pack_limit, 0),
+  );
+  const currentUsed = Math.max(
+    toNumber(row.conversions_used, 0),
+    toNumber(row.pack_used, 0),
+  );
+  const currentPlanType = resolvePlanType(row, currentLimit);
+
+  const needsRepair =
+    paidPagesTotal > currentLimit ||
+    getPlanRank(bestPaidPlan) > getPlanRank(currentPlanType) ||
+    currentPlanType === 'free';
+
+  if (!needsRepair) {
+    return row;
+  }
+
+  const nextLimit = Math.max(currentLimit, paidPagesTotal);
+  const nextUsed = Math.min(nextLimit, currentUsed);
+  const nextPlanType = pickHigherValuePlan(currentPlanType, bestPaidPlan);
+  const nextTier = nextPlanType === 'free' ? 'free' : 'business';
+
+  const updatePayload: SubscriptionUpdate = {
+    tier: nextTier,
+    plan_type: nextPlanType,
+    conversions_limit: nextLimit,
+    conversions_used: nextUsed,
+    free_daily_limit: Math.max(DEFAULT_AUTH_LIMIT, toNumber(row.free_daily_limit, DEFAULT_AUTH_LIMIT)),
+    free_daily_used: toNumber(row.free_daily_used, 0),
+    pack_limit: nextLimit,
+    pack_used: Math.min(nextLimit, toNumber(row.pack_used, nextUsed)),
+    last_reset_date: toDateString(row.last_reset_date) ?? today,
+    timezone: row.timezone || timezone,
+  };
+
+  const { data: repairedRow, error: repairError } = await supabaseAdmin
+    .from('subscriptions')
+    .update(updatePayload)
+    .eq('user_id', userId)
+    .select('*')
+    .single();
+
+  if (repairError || !repairedRow) {
+    console.warn(`resolveEffectiveLimit: failed to repair subscription from paid orders (${repairError?.message ?? 'unknown'})`);
+    return row;
+  }
+
+  return repairedRow;
 };
 
 const hasExplicitUnlimitedFlag = (row: SubscriptionRow): boolean => {
@@ -473,9 +602,16 @@ export const resolveEffectiveLimit = async ({
   const isOwner = !!userEmail && getOwnerEmailSet().has(userEmail);
 
   const row = await ensureSubscriptionRow(supabaseAdmin, user.id, timezone, dateParts.isoDate);
+  const reconciledRow = await reconcileSubscriptionFromPaidOrders(
+    supabaseAdmin,
+    row,
+    user.id,
+    timezone,
+    dateParts.isoDate,
+  );
 
   // 1) Explicit unlimited flag (only when no finite limits are configured)
-  if (hasExplicitUnlimitedFlag(row) && !hasFiniteConfiguredLimit(row)) {
+  if (hasExplicitUnlimitedFlag(reconciledRow) && !hasFiniteConfiguredLimit(reconciledRow)) {
     return buildResult({
       conversionsUsed: 0,
       conversionsLimit: UNLIMITED_LIMIT,
@@ -488,12 +624,12 @@ export const resolveEffectiveLimit = async ({
   }
 
   // 2) Explicit conversions_limit
-  const explicitLimit = toNumber(row.conversions_limit, 0);
+  const explicitLimit = toNumber(reconciledRow.conversions_limit, 0);
   if (explicitLimit > 0) {
-    const planType = resolvePlanType(row, explicitLimit);
-    let used = toNumber(row.conversions_used, 0);
+    const planType = resolvePlanType(reconciledRow, explicitLimit);
+    let used = toNumber(reconciledRow.conversions_used, 0);
     const resetBoundary = getResetBoundary(planType, dateParts);
-    const lastResetDate = toDateString(row.last_reset_date);
+    const lastResetDate = toDateString(reconciledRow.last_reset_date);
     if (resetBoundary && (!lastResetDate || lastResetDate < resetBoundary)) {
       used = 0;
       const { error: resetError } = await supabaseAdmin
@@ -522,16 +658,16 @@ export const resolveEffectiveLimit = async ({
 
   // 3) Bucket fallback for rows without a consolidated limit
   const hasBuckets =
-    Object.prototype.hasOwnProperty.call(row, 'free_daily_limit') ||
-    Object.prototype.hasOwnProperty.call(row, 'pack_limit');
+    Object.prototype.hasOwnProperty.call(reconciledRow, 'free_daily_limit') ||
+    Object.prototype.hasOwnProperty.call(reconciledRow, 'pack_limit');
 
   if (hasBuckets) {
-    const planType = resolvePlanType(row, explicitLimit);
-    const freeLimit = toNumber(row.free_daily_limit, DEFAULT_AUTH_LIMIT);
-    let freeUsed = toNumber(row.free_daily_used, 0);
-    const packLimit = toNumber(row.pack_limit, 0);
-    const packUsed = toNumber(row.pack_used, 0);
-    const lastResetDate = toDateString(row.last_reset_date);
+    const planType = resolvePlanType(reconciledRow, explicitLimit);
+    const freeLimit = toNumber(reconciledRow.free_daily_limit, DEFAULT_AUTH_LIMIT);
+    let freeUsed = toNumber(reconciledRow.free_daily_used, 0);
+    const packLimit = toNumber(reconciledRow.pack_limit, 0);
+    const packUsed = toNumber(reconciledRow.pack_used, 0);
+    const lastResetDate = toDateString(reconciledRow.last_reset_date);
 
     if (planType === 'free') {
       const shouldResetFree = !lastResetDate || lastResetDate < dateParts.isoDate;
@@ -591,7 +727,7 @@ export const resolveEffectiveLimit = async ({
   }
 
   // 4) Free fallback
-  const fallbackUsed = toNumber(row.conversions_used, 0);
+  const fallbackUsed = toNumber(reconciledRow.conversions_used, 0);
   return buildResult({
     conversionsUsed: fallbackUsed,
     conversionsLimit: DEFAULT_AUTH_LIMIT,
