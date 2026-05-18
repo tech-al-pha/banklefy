@@ -24,6 +24,7 @@ const BenefitsPage = lazyWithRetry(() => import("./pages/BenefitsPage"));
 const Settings = lazyWithRetry(() => import("./pages/Settings"));
 const PricingPage = lazyWithRetry(() => import("./pages/PricingPage"));
 const SampleReport = lazyWithRetry(() => import("./pages/SampleReport"));
+const Contact = lazyWithRetry(() => import("./pages/Contact"));
 const Profile = lazyWithRetry(() => import("./pages/Profile"));
 const Blog = lazyWithRetry(() => import("./pages/Blog"));
 const HowItWorksPage = lazyWithRetry(() => import("./pages/HowItWorksPage"));
@@ -78,13 +79,14 @@ const AppRoutes = () => {
           <Route path="/features" element={<FeaturesPage />} />
           <Route path="/benefits" element={<BenefitsPage />} />
           <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/sample-report" element={<SampleReport />} />
+          <Route path="/sample-data" element={<SampleReport />} />
+          <Route path="/sample-report" element={<Navigate to="/sample-data" replace />} />
           <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
           <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/help" element={<Navigate to="/faqs#help" replace />} />
           <Route path="/how-it-works" element={<HowItWorksPage />} />
           <Route path="/security" element={<SecurityPage />} />
-          <Route path="/contact" element={<Navigate to="/about#contact" replace />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="/cookie-policy" element={<Navigate to="/privacy" replace />} />
           <Route path="/documentation" element={<Navigate to="/faqs#help" replace />} />
           <Route path="/cancellation-and-refund" element={<CancellationRefundPage />} />

@@ -100,13 +100,25 @@ const routes = [
     ],
   },
   {
-    path: "/sample-report",
-    title: "Sample Report | Banklefy",
-    description: "Preview a clean, structured Excel report generated from a bank statement.",
-    heading: "Preview a sample converted report",
+    path: "/contact",
+    title: "Contact | Banklefy",
+    description:
+      "Contact Banklefy support for bank statement conversion issues, billing questions, privacy requests, or account access help.",
+    heading: "Contact Banklefy support",
     sections: [
-      "See how statement rows are cleaned and organized before export into spreadsheet and reconciliation workflows.",
-      "The sample report page helps users evaluate output structure, consistency, and formatting before purchase.",
+      "Use the contact page when you need help with bank statement conversion errors, account access, payment questions, refunds, or privacy-related requests.",
+      "Include your file name, conversion ID, order reference, and a screenshot when possible so support can resolve issues faster.",
+    ],
+    schemaType: "ContactPage",
+  },
+  {
+    path: "/sample-data",
+    title: "Sample Data | Banklefy Bank Statement Converter",
+    description: "Preview sample bank statement data and download clean Excel, CSV, JSON, XML, PDF, and MT940 outputs from Banklefy.",
+    heading: "Preview sample bank statement data",
+    sections: [
+      "See how statement rows are cleaned, categorized, and organized before export into spreadsheet and reconciliation workflows.",
+      "The sample data page helps users evaluate output structure, downloadable formats, and conversion quality before purchase.",
     ],
   },
   {
@@ -366,6 +378,24 @@ const buildStructuredData = (route) => {
     return base;
   }
 
+  if (route.schemaType === "ContactPage") {
+    base.push({
+      "@context": "https://schema.org",
+      "@type": "ContactPage",
+      name: route.title,
+      description: route.description,
+      url: canonical,
+      isPartOf: { "@id": `${siteUrl}/#website` },
+      mainEntity: {
+        "@type": "Organization",
+        name: "Banklefy",
+        url: siteUrl,
+        email: "banklefy@gmail.com",
+      },
+    });
+    return base;
+  }
+
   if (route.schemaType === "Article") {
     base.push({
       "@context": "https://schema.org",
@@ -428,7 +458,7 @@ const buildHtml = (template, route) => {
     )
     .replace(
       /<div id="root"><\/div>/i,
-      `<main data-seo-static class="seo-static"><h1>${heading}</h1><p>${description}</p>${sections}<ul><li><a href="/">Home</a></li><li><a href="/features">Features</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/sample-report">Sample report</a></li></ul></main><div id="root"></div>`,
+      `<main data-seo-static class="seo-static"><h1>${heading}</h1><p>${description}</p>${sections}<ul><li><a href="/">Home</a></li><li><a href="/features">Features</a></li><li><a href="/pricing">Pricing</a></li><li><a href="/about">About</a></li><li><a href="/contact">Contact</a></li><li><a href="/privacy">Privacy Policy</a></li><li><a href="/sample-data">Sample Data</a></li></ul></main><div id="root"></div>`,
     );
 };
 

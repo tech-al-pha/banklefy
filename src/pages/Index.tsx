@@ -272,8 +272,8 @@ const Index = () => {
               <Link to="/faqs#help" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
                 {t('footer.helpCenter')}
               </Link>
-              <Link to="/sample-report" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
-                {t('footer.sampleReport')}
+              <Link to="/sample-data" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
+                Sample Data
               </Link>
               <Link to="/about" className="px-3 py-1.5 text-xs rounded-full border border-white/5 bg-white/5 text-white/60 shadow-[0_0_8px_rgba(255,255,255,0.02)] transition-all duration-300 hover:border-white/20 hover:bg-white/10 hover:text-white hover:shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:-translate-y-0.5">
                 About & Contact
@@ -331,10 +331,10 @@ const Index = () => {
 
               <div className="space-y-4">
                 <Link
-                  to="/sample-report"
+                  to="/sample-data"
                   className="block text-left text-sm font-medium text-white/84 transition-colors hover:text-white"
                 >
-                  {t('footer.sampleReport')}
+                  Sample Data
                 </Link>
                 <Link
                   to="/about"

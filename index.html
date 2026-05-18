@@ -44,6 +44,27 @@
   </head>
 
     <body>
+      <!-- Static, crawlable homepage copy + legal links for brand verification.
+           Kept visually hidden so it doesn't affect the designed homepage (SPA content loads into #root). -->
+      <header
+        id="homepage-summary"
+        style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"
+      >
+        <h1>Banklefy</h1>
+        <p>
+          Banklefy converts bank statement PDFs into clean exports (Excel, CSV, JSON, MT940 and Tally-ready) using fast OCR and secure processing.
+        </p>
+        <nav aria-label="Legal">
+          <a href="/features">Features</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
+          <a href="/sample-data">Sample Data</a>
+          <a href="/privacy">Privacy Policy</a>
+          <a href="/terms">Terms of Service</a>
+        </nav>
+      </header>
+
       <div id="root"></div>
       <noscript>
         <main style="max-width: 900px; margin: 40px auto; padding: 0 16px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; line-height: 1.5;">
@@ -57,7 +78,7 @@
           <ul style="margin: 0 0 18px; padding-left: 18px;">
             <li><a href="/features">Features</a></li>
             <li><a href="/pricing">Pricing</a></li>
-            <li><a href="/sample-report">Sample report</a></li>
+            <li><a href="/sample-data">Sample Data</a></li>
             <li><a href="/about">About</a></li>
             <li><a href="/privacy">Privacy Policy</a></li>
             <li><a href="/terms">Terms of Service</a></li>

@@ -98,9 +98,9 @@ export const Hero = () => {
                 size="lg"
                 variant="outline"
                 className="btn-target-glow w-full sm:w-auto border-primary/40 bg-[#141414] px-6 sm:px-8 text-sm sm:text-base text-primary shadow-none backdrop-blur-xl transition-all duration-300"
-                onClick={() => navigate("/sample-report")}
+                onClick={() => navigate("/sample-data")}
               >
-                {t('hero.sampleReportBtn')}
+                Sample Data
               </Button>
             </div>
 

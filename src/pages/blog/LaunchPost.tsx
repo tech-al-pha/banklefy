@@ -67,8 +67,8 @@ const LaunchPost = () => {
           <Button className="bg-primary text-primary-foreground shadow-neon" onClick={() => navigate("/")}>
             Try the Converter
           </Button>
-          <Button variant="outline" className="border-primary/40 text-foreground" onClick={() => navigate("/sample-report")}>
-            View Sample Report
+          <Button variant="outline" className="border-primary/40 text-foreground" onClick={() => navigate("/sample-data")}>
+            View Sample Data
           </Button>
         </section>
       </main>

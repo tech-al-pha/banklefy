@@ -30,10 +30,10 @@ export const META_BY_PATH: Record<string, RouteMeta> = {
     description:
       "Product notes for Banklefy, including text-PDF parsing, OCR for scanned pages, session-only processing, and support channels.",
   },
-  "/sample-report": {
-    title: "Sample Report | Banklefy",
+  "/sample-data": {
+    title: "Sample Data | Banklefy Bank Statement Converter",
     description:
-      "Preview a clean, structured Excel report generated from a bank statement.",
+      "Preview sample bank statement data and download clean Excel, CSV, JSON, XML, PDF, and MT940 outputs from Banklefy.",
   },
   "/privacy": {
     title: "Privacy Policy | Banklefy",
@@ -358,6 +358,28 @@ export const getStructuredDataByRoute = (
       description: meta.description,
       url: canonical,
       isPartOf: { "@id": `${siteUrl}/#website` },
+    });
+    return schemas;
+  }
+
+  if (pathname === "/contact") {
+    schemas.push(...baseSchemas, {
+      "@context": "https://schema.org",
+      "@type": "ContactPage",
+      name: meta.title,
+      description: meta.description,
+      url: canonical,
+      isPartOf: { "@id": `${siteUrl}/#website` },
+      ...(contactSignals.supportEmail
+        ? {
+            mainEntity: {
+              "@type": "Organization",
+              name: "Banklefy",
+              email: contactSignals.supportEmail,
+              url: siteUrl,
+            },
+          }
+        : {}),
     });
     return schemas;
   }

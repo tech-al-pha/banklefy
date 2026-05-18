@@ -170,13 +170,13 @@ export default function SampleReport() {
           <div className="space-y-6 w-full min-w-0 lg:max-w-[520px]">
             <div className="space-y-3">
               <Badge className="bg-primary/15 text-primary border border-primary/30">
-                Sample Report
+                Sample Data
               </Badge>
               <h1 className="max-w-[14ch] text-4xl font-bold leading-tight text-white md:text-5xl xl:text-6xl">
-                AI Bank Statement Report
+                Sample Bank Statement Data
               </h1>
               <p className="text-muted-foreground">
-                A preview of the structured Excel-style report users receive after conversion.
+                Preview the sample bank statement data and downloadable output formats users receive after conversion.
               </p>
             </div>
 
