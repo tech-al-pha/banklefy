@@ -80,7 +80,7 @@ export const Hero = () => {
               {t("hero.tagline")}
             </div>
 
-            <p className="hero-subtitle mt-4 sm:mt-6 mb-6 sm:mb-12 max-w-2xl text-xs sm:text-sm md:text-lg italic leading-relaxed text-white/80">
+            <p className="hero-subtitle mt-4 sm:mt-6 mb-6 sm:mb-12 max-w-3xl text-pretty text-xs sm:text-sm md:text-lg italic leading-relaxed text-white/80">
               {t("hero.subtitle")}
             </p>
 
