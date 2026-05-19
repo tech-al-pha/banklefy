@@ -13,6 +13,7 @@ import { RequireAuth, RequirePaid } from "@/components/RouteGuards";
 import LoadingScreen from "@/components/LoadingScreen";
 import { LuxuryCursor } from "@/components/LuxuryCursor";
 import { SEOManager } from "@/components/SEOManager";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const Auth = lazyWithRetry(() => import("./pages/Auth"));
 const Index = lazyWithRetry(() => import("./pages/Index"));
@@ -63,6 +64,7 @@ const AppRoutes = () => {
   return (
     <ErrorBoundary resetKey={location.pathname}>
       <SEOManager />
+      <SpeedInsights />
 
       <Suspense
         fallback={
