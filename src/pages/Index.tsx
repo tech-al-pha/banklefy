@@ -10,7 +10,6 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { scrollToId } from "@/lib/scroll";
 import AutoHideHeader from "@/components/AutoHideHeader";
 import { LandingPageContent } from "@/components/LandingPageContent";
-import { AdsterraBanner } from "@/components/AdsterraBanner";
 
 const Index = () => {
   const { user } = useAuth();
@@ -247,13 +246,6 @@ const Index = () => {
       <main id="main-content" tabIndex={-1}>
         <LandingPageContent />
       </main>
-
-      <section className="border-t border-primary/10 bg-background px-4 py-8">
-        <div className="container mx-auto">
-          <AdsterraBanner />
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="border-t border-primary/20 bg-background px-4 pt-16 pb-6 md:pb-16">
         <div className="container mx-auto">
