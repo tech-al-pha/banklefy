@@ -19,6 +19,7 @@ import {
 import { formatCurrencyValue, normalizeCurrencyCode, sumMoney } from "@/lib/currency";
 import { useLanguage, type Language } from "@/contexts/LanguageContext";
 import { buildStatementCsv, parseStatementArchive } from "@/lib/statement-export";
+import type { PdfEditDetectionResult } from "./pdfUtils";
 const loadPdfUtils = () => import("./pdfUtils");
 const loadExporters = () => import("./exporters");
 import { initialUploadState, type UploadDemoState, uploadDemoReducer } from "./state";
@@ -153,6 +154,12 @@ export const useUploadDemoController = () => {
     fileName: string;
     status: "clean" | "suspected";
     reason: string;
+    score?: number;
+    riskLevel?: "low" | "medium" | "high";
+    editor?: string | null;
+    creationDate?: string | null;
+    modificationDate?: string | null;
+    pageAnomalies?: Array<{ pageNumber: number; codes: string[]; summary: string }>;
   };
   const [conversionMode, setConversionMode] = useState<ConversionMode>("standard");
   const [selectedPremiumFormat, setSelectedPremiumFormat] = useState<PremiumFormat | null>(null);
@@ -996,11 +1003,21 @@ export const useUploadDemoController = () => {
         tier: pdfDetectorTier,
         password: pdfPassword.trim() || undefined,
       });
+      const extraDetails = {
+        score: detection.score,
+        riskLevel: detection.riskLevel,
+        editor: detection.editor,
+        creationDate: detection.creationDate,
+        modificationDate: detection.modificationDate,
+        pageAnomalies: detection.pageAnomalies,
+      } as const;
+
       if (!detection.suspected) {
         setEditedPdfCheckResult({
           fileName: file.name,
           status: "clean",
           reason: detection.reason,
+          ...extraDetails,
         });
         return false;
       }
@@ -1010,6 +1027,7 @@ export const useUploadDemoController = () => {
         fileName: file.name,
         status: "suspected",
         reason: `${detection.riskLevel.toUpperCase()} risk - ${detection.reason}`,
+        ...extraDetails,
       });
       setEditedPdfWarning({
         fileName: file.name,
