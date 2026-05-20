@@ -83,7 +83,7 @@ serve(async (req) => {
 
     const inboxTo = getEnv("SUPPORT_INBOX_EMAIL") ?? "banklefy@gmail.com";
     const resendApiKey = getEnv("RESEND_API_KEY");
-    const fromEmail = getEnv("SUPPORT_FROM_EMAIL") ?? "Banklefy Support <support@banklefy.com>";
+    const fromEmail = getEnv("SUPPORT_FROM_EMAIL") ?? "Banklefy Support <onboarding@resend.dev>";
 
     // Email is optional; the DB insert is the source of truth.
     if (resendApiKey) {
@@ -117,7 +117,31 @@ serve(async (req) => {
 
         if (!res.ok) {
           const errText = await res.text().catch(() => "");
-          console.error("Resend send failed", res.status, errText);
+          const domainNotVerified = res.status === 403 && /domain not verified/i.test(errText);
+
+          if (domainNotVerified && !/onboarding@resend\.dev/i.test(fromEmail)) {
+            const fallbackPayload = {
+              ...emailPayload,
+              from: "Banklefy Support <onboarding@resend.dev>",
+            };
+            const retryRes = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${resendApiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(fallbackPayload),
+            });
+
+            if (!retryRes.ok) {
+              const retryErrText = await retryRes.text().catch(() => "");
+              console.error("Resend fallback send failed", retryRes.status, retryErrText);
+            } else {
+              console.warn("Resend primary sender rejected; fallback sender used");
+            }
+          } else {
+            console.error("Resend send failed", res.status, errText);
+          }
         }
       } catch (e) {
         console.error("Resend request failed", e);
