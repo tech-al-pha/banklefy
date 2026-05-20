@@ -38,13 +38,17 @@ serve(async (req) => {
       return json(500, { error: "Server not configured" });
     }
 
-    const authHeader = req.headers.get("Authorization") ?? "";
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false },
     });
 
-    const body = (await req.json()) as Partial<SupportRequestBody> | null;
+    let body: Partial<SupportRequestBody> | null = null;
+    try {
+      body = (await req.json()) as Partial<SupportRequestBody> | null;
+    } catch (e) {
+      console.error("Invalid JSON body", e);
+      return json(400, { error: "Invalid JSON body" });
+    }
     const message = typeof body?.message === "string" ? body.message.trim() : "";
     if (!message) return json(400, { error: "Message is required" });
 
@@ -54,9 +58,11 @@ serve(async (req) => {
     const source = typeof body?.source === "string" ? body.source.trim() : "";
     const kind = typeof body?.kind === "string" ? body.kind : null;
 
-    const {
-      data: { user },
-    } = await supabaseAdmin.auth.getUser();
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const bearer =
+      authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice("bearer ".length).trim() : "";
+    const { data: authData } = bearer ? await supabaseAdmin.auth.getUser(bearer) : { data: { user: null } };
+    const user = authData?.user ?? null;
 
     const insertPayload = {
       user_id: user?.id ?? null,
@@ -70,7 +76,10 @@ serve(async (req) => {
     const { error: insertError } = await supabaseAdmin
       .from("support_requests")
       .insert(insertPayload);
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error("support_requests insert failed", insertError);
+      // Do not fail the request: email is the user-visible path.
+    }
 
     const inboxTo = getEnv("SUPPORT_INBOX_EMAIL") ?? "banklefy@gmail.com";
     const resendApiKey = getEnv("RESEND_API_KEY");
@@ -96,28 +105,31 @@ serve(async (req) => {
         reply_to: insertPayload.email ?? undefined,
       };
 
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emailPayload),
-      });
+      try {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(emailPayload),
+        });
 
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        console.error("Resend send failed", res.status, errText);
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          console.error("Resend send failed", res.status, errText);
+        }
+      } catch (e) {
+        console.error("Resend request failed", e);
       }
     } else {
       console.warn("RESEND_API_KEY not configured; skipping email send");
     }
 
-    return json(200, { ok: true });
+    return json(200, { ok: true, emailed: Boolean(resendApiKey) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("support-request failed", err);
     return json(500, { error: message });
   }
 });
-
