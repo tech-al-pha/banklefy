@@ -82,6 +82,7 @@ serve(async (req) => {
     }
 
     const inboxTo = getEnv("SUPPORT_INBOX_EMAIL") ?? "banklefy@gmail.com";
+    const testInboxTo = getEnv("RESEND_TEST_INBOX_EMAIL") ?? getEnv("DEFAULT_OWNER_EMAIL");
     const resendApiKey = getEnv("RESEND_API_KEY");
     const fromEmail = getEnv("SUPPORT_FROM_EMAIL") ?? "Banklefy Support <onboarding@resend.dev>";
 
@@ -118,6 +119,8 @@ serve(async (req) => {
         if (!res.ok) {
           const errText = await res.text().catch(() => "");
           const domainNotVerified = res.status === 403 && /domain not verified/i.test(errText);
+          const testingDomainRestriction =
+            res.status === 403 && /testing domain restriction/i.test(errText);
 
           if (domainNotVerified && !/onboarding@resend\.dev/i.test(fromEmail)) {
             const fallbackPayload = {
@@ -138,6 +141,32 @@ serve(async (req) => {
               console.error("Resend fallback send failed", retryRes.status, retryErrText);
             } else {
               console.warn("Resend primary sender rejected; fallback sender used");
+            }
+          } else if (
+            testingDomainRestriction &&
+            /onboarding@resend\.dev/i.test(fromEmail) &&
+            testInboxTo &&
+            testInboxTo.toLowerCase() !== inboxTo.toLowerCase()
+          ) {
+            const testFallbackPayload = {
+              ...emailPayload,
+              to: [testInboxTo],
+              subject: `[Test Route for ${inboxTo}] ${safeSubject}`.slice(0, 200),
+              text: `Requested recipient: ${inboxTo}\n\n${lines.join("\n")}`,
+            };
+            const retryRes = await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${resendApiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(testFallbackPayload),
+            });
+            if (!retryRes.ok) {
+              const retryErrText = await retryRes.text().catch(() => "");
+              console.error("Resend test fallback send failed", retryRes.status, retryErrText);
+            } else {
+              console.warn("Resend test-domain restriction hit; routed to test inbox");
             }
           } else {
             console.error("Resend send failed", res.status, errText);
