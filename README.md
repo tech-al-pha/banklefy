@@ -115,7 +115,27 @@ Banklefy uses Razorpay Standard Checkout.
 
 Order creation and payment verification are handled securely through Supabase Edge Functions.
 
-Required server-side environment variables:
+Recommended Supabase function secrets:
 
-* RAZORPAY_KEY_ID
-* RAZORPAY_KEY_SECRET
+* `RAZORPAY_MODE`
+* `RAZORPAY_TEST_KEY_ID`
+* `RAZORPAY_TEST_KEY_SECRET`
+* `RAZORPAY_LIVE_KEY_ID`
+* `RAZORPAY_LIVE_KEY_SECRET`
+
+Legacy fallback secrets still supported:
+
+* `RAZORPAY_KEY_ID`
+* `RAZORPAY_KEY_SECRET`
+
+To enable live mode safely:
+
+1. Set `RAZORPAY_MODE=live` in Supabase function secrets.
+2. Set `RAZORPAY_LIVE_KEY_ID` and `RAZORPAY_LIVE_KEY_SECRET`.
+3. Redeploy `razorpay-order` and `razorpay-verify`.
+4. Run a real purchase smoke test on production and confirm:
+   `razorpay_orders.status = paid`
+   `razorpay_payments` row created
+   `subscriptions.plan_type` and page limit updated
+
+The frontend checkout key is returned by the secure order function, so live/test selection should be controlled from server-side secrets instead of the client bundle.
