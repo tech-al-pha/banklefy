@@ -23,6 +23,7 @@ const SupportContactDialog = ({ trigger, defaultSubject, source, kind }: Support
   const [email, setEmail] = useState(user?.email ?? "");
   const [subject, setSubject] = useState(defaultSubject ?? "");
   const [message, setMessage] = useState("");
+  const supportEmail = "support@banklefy.com";
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -84,14 +85,18 @@ const SupportContactDialog = ({ trigger, defaultSubject, source, kind }: Support
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Email</label>
-              <Input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                type="email"
-              />
+              <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">To</label>
+              <Input value={supportEmail} readOnly />
             </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Your Email</label>
+            <Input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              type="email"
+            />
           </div>
           <div className="space-y-1">
             <label className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Subject</label>
