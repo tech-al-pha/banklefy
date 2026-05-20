@@ -4,14 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import {
   AlertTriangle,
   ArrowLeft,
-  ArrowRight,
-  BarChart3,
   FileSpreadsheet,
   FileText,
-  Landmark,
   ShieldCheck,
   Sparkles,
-  Table2,
   TrendingDown,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -51,6 +47,18 @@ const downloads = [
     desc: "Banking interchange statement format",
   },
   {
+    label: "QuickBooks (.iif)",
+    href: "/samples/sample-report.iif",
+    icon: FileText,
+    desc: "QuickBooks Desktop import sample",
+  },
+  {
+    label: "Xero (.csv)",
+    href: "/samples/sample-report_xero_export.csv",
+    icon: FileText,
+    desc: "Xero-friendly import export",
+  },
+  {
     label: "PDF (.pdf)",
     href: "/samples/sample-source.pdf",
     icon: FileText,
@@ -66,59 +74,8 @@ const downloads = [
 
 const upcomingFormats = [
   {
-    label: "QuickBooks",
-    icon: FileText,
-  },
-  {
-    label: "Xero",
-    icon: FileText,
-  },
-  {
     label: "Zoho",
     icon: FileText,
-  },
-];
-
-const previewTransactions = [
-  {
-    date: "02 Jun 2018",
-    narration: "GM1TSA/MY0326/19",
-    category: "Salary/Income",
-    credit: "14,955.00",
-    balance: "29,064.95",
-  },
-  {
-    date: "03 Jun 2018",
-    narration: "IB BILLPAY DR-HDFCPE...",
-    category: "Bills & Utilities",
-    debit: "1,285.98",
-    balance: "27,778.97",
-  },
-  {
-    date: "05 Jun 2018",
-    narration: "EMI 4923306 CHQ S49...",
-    category: "Loan/EMI",
-    debit: "2,268.00",
-    balance: "27,510.97",
-  },
-];
-
-const exportPreviewCards = [
-  {
-    label: "XLSX",
-    desc: "Structured workbook with ready-to-use sheets",
-  },
-  {
-    label: "CSV",
-    desc: "Flat export for bulk imports and review",
-  },
-  {
-    label: "JSON",
-    desc: "Machine-readable format for systems and APIs",
-  },
-  {
-    label: "MT940",
-    desc: "Banking format for reconciliation workflows",
   },
 ];
 
