@@ -67,6 +67,25 @@ export interface ParsedPdfData {
   pageCount?: number;
 }
 
+export interface PdfEditDetectionPageAnomaly {
+  pageNumber: number;
+  codes: string[];
+  summary: string;
+}
+
+export interface PdfEditDetectionResult {
+  suspected: boolean;
+  score: number;
+  riskLevel: "low" | "medium" | "high";
+  reason: string;
+  flags: string[];
+  editor?: string | null;
+  creationDate?: string | null;
+  modificationDate?: string | null;
+  pageAnomalies?: PdfEditDetectionPageAnomaly[];
+  pageCount?: number;
+}
+
 const SUSPICIOUS_PRODUCER_PATTERNS: Array<{ pattern: RegExp; label: string }> = [
   { pattern: /smallpdf|ilovepdf|sejda|canva/i, label: "Consumer PDF editor detected" },
   { pattern: /microsoft\s+word|photoshop|foxit|nitro|pdfescape|pdf24/i, label: "Office/design editor detected" },
@@ -168,6 +187,28 @@ const summarizeFlags = (flags: DetectorFlag[]) => {
     .join(" | ");
 };
 
+const resolveEditorFromProducer = (producer: string, creator: string): string | null => {
+  const source = `${producer || ""} ${creator || ""}`.trim();
+  if (!source) return null;
+  const normalized = source.toLowerCase();
+  if (/smallpdf/i.test(source)) return "Smallpdf";
+  if (/ilovepdf/i.test(source)) return "iLovePDF";
+  if (/sejda/i.test(source)) return "Sejda";
+  if (/canva/i.test(source)) return "Canva";
+  if (/microsoft\s+word|word/i.test(normalized)) return "Microsoft Word";
+  if (/photoshop/i.test(normalized)) return "Adobe Photoshop";
+  if (/foxit/i.test(normalized)) return "Foxit";
+  if (/nitro/i.test(normalized)) return "Nitro PDF";
+  if (/pdfescape/i.test(normalized)) return "PDFescape";
+  if (/pdf24/i.test(normalized)) return "PDF24";
+  if (/adobe\s+acrobat/i.test(normalized)) return "Adobe Acrobat";
+  if (/libreoffice/i.test(normalized)) return "LibreOffice";
+  if (/itext/i.test(normalized)) return "iText";
+  if (/oracle/i.test(normalized)) return "Oracle";
+  if (/finacle/i.test(normalized)) return "Finacle";
+  return null;
+};
+
 export const getPdfPageCount = async (file: File, password?: string): Promise<number | null> => {
   const pdfjsLib = (await import("pdfjs-dist")) as unknown as PdfJsModule;
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
@@ -227,7 +268,7 @@ export const getTotalPages = async (
 export const detectEditedPdf = async (
   file: File,
   options?: { tier?: DetectorTier; password?: string },
-): Promise<{ suspected: boolean; reason: string; score: number; riskLevel: "low" | "medium" | "high"; flags: string[] }> => {
+): Promise<PdfEditDetectionResult> => {
   const tier: DetectorTier = options?.tier ?? "basic";
   const scoreFactor = tier === "advanced" ? 1.3 : 1;
   const buffer = await file.arrayBuffer();
@@ -294,6 +335,10 @@ export const detectEditedPdf = async (
   let pagesWithVerySparseText = 0;
   const charsPerPage: number[] = [];
   let pages = 0;
+  let editorHint: string | null = null;
+  let creationDateString: string | null = null;
+  let modificationDateString: string | null = null;
+  const pageAnomalies: PdfEditDetectionPageAnomaly[] = [];
 
   try {
     const loadingTask = pdfjsLib.getDocument({
@@ -313,6 +358,11 @@ export const detectEditedPdf = async (
       const creator = String(info.Creator || "");
       const fullProducer = `${producer} ${creator}`.trim();
 
+      editorHint = resolveEditorFromProducer(producer, creator) || null;
+      if (!editorHint && fullProducer) {
+        editorHint = fullProducer;
+      }
+
       if (fullProducer) {
         const suspicious = SUSPICIOUS_PRODUCER_PATTERNS.find((entry) => entry.pattern.test(fullProducer));
         if (suspicious) {
@@ -325,6 +375,9 @@ export const detectEditedPdf = async (
       const creationDate = parsePdfDate(String(info.CreationDate || ""));
       const modDate = parsePdfDate(String(info.ModDate || ""));
       const now = Date.now();
+
+      creationDateString = creationDate?.toISOString() ?? null;
+      modificationDateString = modDate?.toISOString() ?? null;
 
       if (modDate && modDate.getTime() > now + 5 * 60 * 1000) {
         pushFlag(flags, "FUTURE_MOD", "Modification date appears in the future", Math.round(24 * scoreFactor), "high");
@@ -359,22 +412,54 @@ export const detectEditedPdf = async (
         const fontName = String(item.fontName || "");
         if (fontName) uniqueFonts.add(fontName);
 
-          const transform = item.transform as number[] | undefined;
-          if (Array.isArray(transform) && transform.length >= 4) {
-            const approxSize = Math.max(Math.abs(transform[0]), Math.abs(transform[3]));
-            if (Number.isFinite(approxSize) && approxSize > 0) {
-              fontSizes.push(approxSize);
-              if (approxSize < 4) tinyFontCount += 1;
-            }
+        const transform = item.transform as number[] | undefined;
+        if (Array.isArray(transform) && transform.length >= 4) {
+          const approxSize = Math.max(Math.abs(transform[0]), Math.abs(transform[3]));
+          if (Number.isFinite(approxSize) && approxSize > 0) {
+            fontSizes.push(approxSize);
+            if (approxSize < 4) tinyFontCount += 1;
           }
         }
+      }
 
-       charsPerPage.push(pageTextChars);
-       if (pageTextChars > 20) {
-         pagesWithText += 1;
-       } else {
-         pagesWithVerySparseText += 1;
-       }
+      charsPerPage.push(pageTextChars);
+      if (pageTextChars > 20) {
+        pagesWithText += 1;
+      } else {
+        pagesWithVerySparseText += 1;
+      }
+    }
+
+    const averageCharsPerPage = charsPerPage.length
+      ? charsPerPage.reduce((sum, current) => sum + current, 0) / charsPerPage.length
+      : 0;
+
+    for (let idx = 0; idx < charsPerPage.length; idx += 1) {
+      const pageNum = idx + 1;
+      const pageChars = charsPerPage[idx];
+      const anomalyCodes: string[] = [];
+      const descriptions: string[] = [];
+
+      if (pageChars === 0 && pagesWithText > Math.max(1, pages * 0.7)) {
+        anomalyCodes.push("EMPTY_TEXT_PAGE");
+        descriptions.push("Selectable text missing on a mostly text-based document page");
+      }
+      if (pageChars > 0 && pageChars < Math.max(10, averageCharsPerPage * 0.08)) {
+        anomalyCodes.push("LOW_TEXT_PAGE");
+        descriptions.push("Very sparse selectable text on this page compared to the document average");
+      }
+      if (pageChars > 0 && pageChars <= 4) {
+        anomalyCodes.push("MINIMAL_TEXT_PAGE");
+        descriptions.push("Page contains only minimal selectable text");
+      }
+
+      if (anomalyCodes.length > 0) {
+        pageAnomalies.push({
+          pageNumber: pageNum,
+          codes: anomalyCodes,
+          summary: descriptions.join("; "),
+        });
+      }
     }
 
     await pdf.destroy?.();
@@ -523,12 +608,38 @@ export const detectEditedPdf = async (
         ? "medium"
         : "low";
 
+  const metadataSummaries: string[] = [];
+  if (editorHint) {
+    metadataSummaries.push(`Detected producer/editor: ${editorHint}`);
+  }
+  if (creationDateString) {
+    metadataSummaries.push(`Creation date: ${creationDateString}`);
+  }
+  if (modificationDateString) {
+    metadataSummaries.push(`Modification date: ${modificationDateString}`);
+  }
+  if (pageAnomalies.length > 0) {
+    const suspiciousPages = pageAnomalies.map((entry) => entry.pageNumber).slice(0, 8);
+    metadataSummaries.push(`Suspicious page anomalies on pages ${suspiciousPages.join(", ")}${pageAnomalies.length > suspiciousPages.length ? ", ..." : ""}`);
+  }
+
   return {
     suspected,
     score: totalScore,
     riskLevel,
     flags: flags.map((f) => `${f.code}: ${f.label}`),
-    reason: `${summarizeFlags(flags)}${flags.length ? ` (score: ${totalScore})` : ""}`,
+    editor: editorHint,
+    creationDate: creationDateString,
+    modificationDate: modificationDateString,
+    pageAnomalies: pageAnomalies.length > 0 ? pageAnomalies : undefined,
+    pageCount: pages || undefined,
+    reason: [
+      summarizeFlags(flags),
+      ...metadataSummaries,
+      flags.length ? `(score: ${totalScore})` : undefined,
+    ]
+      .filter(Boolean)
+      .join(" | "),
   };
 };
 
