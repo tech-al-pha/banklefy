@@ -27,6 +27,11 @@ const getEnv = (key: string): string | null => {
   return trimmed ? trimmed : null;
 };
 
+const extractEmailAddress = (value: string): string => {
+  const match = value.match(/<([^>]+)>/);
+  return (match?.[1] ?? value).trim().toLowerCase();
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return json(200, { ok: true });
   if (req.method !== "POST") return json(405, { error: "Method not allowed" });
@@ -85,6 +90,12 @@ serve(async (req) => {
     const testInboxTo = getEnv("RESEND_TEST_INBOX_EMAIL") ?? getEnv("DEFAULT_OWNER_EMAIL");
     const resendApiKey = getEnv("RESEND_API_KEY");
     const fromEmail = getEnv("SUPPORT_FROM_EMAIL") ?? "Banklefy Support <onboarding@resend.dev>";
+    const senderAddress = extractEmailAddress(fromEmail);
+    const isResendTestingSender = senderAddress.endsWith("@resend.dev");
+    const resolvedRecipient =
+      isResendTestingSender && testInboxTo && testInboxTo.toLowerCase() !== inboxTo.toLowerCase()
+        ? testInboxTo
+        : inboxTo;
 
     // Email is optional; the DB insert is the source of truth.
     if (resendApiKey) {
@@ -100,9 +111,12 @@ serve(async (req) => {
 
       const emailPayload = {
         from: fromEmail,
-        to: [inboxTo],
+        to: [resolvedRecipient],
         subject: safeSubject,
-        text: lines.join("\n"),
+        text:
+          resolvedRecipient.toLowerCase() === inboxTo.toLowerCase()
+            ? lines.join("\n")
+            : `Requested recipient: ${inboxTo}\nRouted recipient: ${resolvedRecipient}\n\n${lines.join("\n")}`,
         reply_to: insertPayload.email ?? undefined,
       };
 
@@ -146,13 +160,13 @@ serve(async (req) => {
             testingDomainRestriction &&
             /onboarding@resend\.dev/i.test(fromEmail) &&
             testInboxTo &&
-            testInboxTo.toLowerCase() !== inboxTo.toLowerCase()
+            testInboxTo.toLowerCase() !== resolvedRecipient.toLowerCase()
           ) {
             const testFallbackPayload = {
               ...emailPayload,
               to: [testInboxTo],
               subject: `[Test Route for ${inboxTo}] ${safeSubject}`.slice(0, 200),
-              text: `Requested recipient: ${inboxTo}\n\n${lines.join("\n")}`,
+              text: `Requested recipient: ${inboxTo}\nRouted recipient: ${testInboxTo}\n\n${lines.join("\n")}`,
             };
             const retryRes = await fetch("https://api.resend.com/emails", {
               method: "POST",
