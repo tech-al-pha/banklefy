@@ -105,7 +105,17 @@ type ResultsSectionProps = {
   truncateDecimals: (value: number, decimals?: number) => number;
   showEditDetectorSignals?: boolean;
   resultMode?: "standard" | "tally_only";
-  editedPdfCheckResult?: { fileName: string; status: "clean" | "suspected"; reason: string } | null;
+  editedPdfCheckResult?: {
+    fileName: string;
+    status: "clean" | "suspected";
+    reason: string;
+    score?: number;
+    riskLevel?: "low" | "medium" | "high";
+    editor?: string | null;
+    creationDate?: string | null;
+    modificationDate?: string | null;
+    pageAnomalies?: Array<{ pageNumber: number; codes: string[]; summary: string }>;
+  } | null;
   showUnderwriting?: boolean;
   showFraudSignals?: boolean;
   conversionProgressPercent?: number;
@@ -855,6 +865,18 @@ export const ResultsSection = ({
                 {actionCopy.editPdfCheck} {editedPdfCheckResult.status === "suspected" ? actionCopy.possibleEditDetected : actionCopy.noEditSignalDetected}
               </p>
               <p className="text-xs text-white/70">{editedPdfCheckResult.reason}</p>
+              {(editedPdfCheckResult.editor || editedPdfCheckResult.creationDate || editedPdfCheckResult.modificationDate || editedPdfCheckResult.pageAnomalies?.length) && (
+                <div className="mt-2 space-y-1 text-xs text-white/70">
+                  {editedPdfCheckResult.editor ? <p>Editor/Producer: {editedPdfCheckResult.editor}</p> : null}
+                  {editedPdfCheckResult.creationDate ? <p>Created: {editedPdfCheckResult.creationDate}</p> : null}
+                  {editedPdfCheckResult.modificationDate ? <p>Modified: {editedPdfCheckResult.modificationDate}</p> : null}
+                  {editedPdfCheckResult.pageAnomalies?.length ? (
+                    <p>
+                      Suspicious pages: {editedPdfCheckResult.pageAnomalies.map((page) => page.pageNumber).join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
         </Card>
