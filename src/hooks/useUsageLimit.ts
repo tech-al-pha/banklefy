@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { CENTENNIAL_BONUS_CREDITS, CENTENNIAL_BONUS_PLAN_TYPE, isCentennialBonusUser } from '@/lib/centennialBonus';
 import { getDefaultDailyLimit } from '@/lib/usageLimits';
 import { pickHigherValuePlan, resolveEffectivePlanType } from '@/lib/entitlements';
 
@@ -21,6 +22,9 @@ interface UsageLimit {
 export const useUsageLimit = () => {
   const { user, session } = useAuth();
   const defaultLimit = getDefaultDailyLimit(!!user);
+  const isBonusUser = isCentennialBonusUser({ id: user?.id, email: user?.email });
+  const shouldApplyBonusFreePlan = (planType?: string | null) =>
+    isBonusUser && (!planType || planType === 'free' || planType === CENTENNIAL_BONUS_PLAN_TYPE);
   const hasLoadedOnceRef = useRef(false);
   const [usageLimit, setUsageLimit] = useState<UsageLimit>({
     conversionsUsed: 0,
@@ -111,9 +115,11 @@ export const useUsageLimit = () => {
       conversionsUsed,
       conversionsLimit,
       remaining: Math.max(0, conversionsLimit - conversionsUsed),
-      planType: resolveEffectivePlanType(rawPlan, conversionsLimit),
+      planType: shouldApplyBonusFreePlan(resolveEffectivePlanType(rawPlan, conversionsLimit))
+        ? CENTENNIAL_BONUS_PLAN_TYPE
+        : resolveEffectivePlanType(rawPlan, conversionsLimit),
     };
-  }, [user]);
+  }, [isBonusUser, user]);
 
   const checkUsageLimit = useCallback(async () => {
     const shouldShowLoading = !hasLoadedOnceRef.current;
@@ -149,6 +155,12 @@ export const useUsageLimit = () => {
       let resolvedPlanType = resolveEffectivePlanType(data.planType ?? 'free', resolvedLimit);
       let resolvedRemaining = data.remaining ?? Math.max(0, resolvedLimit - resolvedUsed);
 
+      if (shouldApplyBonusFreePlan(resolvedPlanType)) {
+        resolvedLimit = Math.max(resolvedLimit, CENTENNIAL_BONUS_CREDITS);
+        resolvedPlanType = CENTENNIAL_BONUS_PLAN_TYPE;
+        resolvedRemaining = Math.max(0, resolvedLimit - resolvedUsed);
+      }
+
       const subscriptionSnapshot = await readSubscriptionUsageSnapshot();
       const likelyFallbackFreeValue =
         !!user && resolvedLimit <= 5 && !!subscriptionSnapshot && subscriptionSnapshot.conversionsLimit > 5;
@@ -179,7 +191,7 @@ export const useUsageLimit = () => {
         isAuthenticated: data.isAuthenticated ?? !!user,
         loading: false,
         error: null,
-        planType: resolvedPlanType,
+        planType: shouldApplyBonusFreePlan(resolvedPlanType) ? CENTENNIAL_BONUS_PLAN_TYPE : resolvedPlanType,
       });
       hasLoadedOnceRef.current = true;
     } catch (err: unknown) {
@@ -195,13 +207,13 @@ export const useUsageLimit = () => {
         setUsageLimit(prev => ({
           ...prev,
           conversionsUsed: subscriptionSnapshot.conversionsUsed,
-          conversionsLimit: resolvedLimit,
-          remaining: Math.max(0, resolvedLimit - subscriptionSnapshot.conversionsUsed),
-          limitReached: Math.max(0, resolvedLimit - subscriptionSnapshot.conversionsUsed) <= 0,
+          conversionsLimit: shouldApplyBonusFreePlan(resolvedPlanType) ? Math.max(resolvedLimit, CENTENNIAL_BONUS_CREDITS) : resolvedLimit,
+          remaining: Math.max(0, (shouldApplyBonusFreePlan(resolvedPlanType) ? Math.max(resolvedLimit, CENTENNIAL_BONUS_CREDITS) : resolvedLimit) - subscriptionSnapshot.conversionsUsed),
+          limitReached: Math.max(0, (shouldApplyBonusFreePlan(resolvedPlanType) ? Math.max(resolvedLimit, CENTENNIAL_BONUS_CREDITS) : resolvedLimit) - subscriptionSnapshot.conversionsUsed) <= 0,
           isAuthenticated: !!user,
           loading: false,
           error: null,
-          planType: resolvedPlanType,
+          planType: shouldApplyBonusFreePlan(resolvedPlanType) ? CENTENNIAL_BONUS_PLAN_TYPE : resolvedPlanType,
         }));
         hasLoadedOnceRef.current = true;
         return;
@@ -216,7 +228,7 @@ export const useUsageLimit = () => {
       }));
       hasLoadedOnceRef.current = true;
     }
-  }, [user, session?.access_token, defaultLimit, readSubscriptionUsageSnapshot, readRecentPurchaseOverride]);
+  }, [user, session?.access_token, defaultLimit, isBonusUser, readSubscriptionUsageSnapshot, readRecentPurchaseOverride]);
 
   useEffect(() => {
     checkUsageLimit();

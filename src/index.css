@@ -930,6 +930,29 @@
   }
 
   /* Tables — horizontally scrollable */
+
+  @keyframes bonus-float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes bonus-confetti {
+    0% {
+      transform: translate3d(0, -10px, 0) rotate(0deg);
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    100% {
+      transform: translate3d(0, 420px, 0) rotate(210deg);
+      opacity: 0;
+    }
+  }
   table {
     display: table;
     width: max-content;

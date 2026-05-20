@@ -3030,6 +3030,10 @@ const mergeProviderResults = (primary: OCRResult, secondary: OCRResult): OCRResu
 const normalizePlan = (value: unknown): string =>
   typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'free';
 
+const CENTENNIAL_BONUS_USER_ID = '1f04b6ab-c06a-43a5-8090-fb3a1d704521';
+const CENTENNIAL_BONUS_PLAN = 'bonus_free_basic';
+const CENTENNIAL_BONUS_LIMIT = 50;
+
 const normalizeRequestedFormat = (value: unknown): ExportFormat => {
   const raw = typeof value === 'string' ? value.trim().toLowerCase() : 'xlsx';
   if (raw === 'csv') return 'csv';
@@ -3053,6 +3057,7 @@ const getCurrentPackFromLimit = (conversionsLimit: number): string | null => {
 
 const resolveCurrentPlanType = (planType: string, conversionsLimit: number): string => {
   const inferredPack = getCurrentPackFromLimit(conversionsLimit);
+  if (planType === CENTENNIAL_BONUS_PLAN) return CENTENNIAL_BONUS_PLAN;
   if (planType === 'free') return inferredPack ?? 'free';
   if (planType === 'unlimited') return conversionsLimit >= 900000 ? 'unlimited' : (inferredPack ?? 'free');
   if (planType.startsWith('per_page')) return planType;
@@ -3106,6 +3111,7 @@ const getDatePartsInTimezone = (timezone: string) => {
 const getResetBoundary = (planType: string, dateParts: { year: string; month: string; isoDate: string }): string | null => {
   const normalizedPlan = normalizePlan(planType);
   if (normalizedPlan === 'free') return dateParts.isoDate;
+  if (normalizedPlan === CENTENNIAL_BONUS_PLAN) return null;
   if (normalizedPlan === 'unlimited' || normalizedPlan.startsWith('per_page')) return null;
   return null;
 };
@@ -3483,6 +3489,58 @@ const incrementUsageFallback = async ({
   } catch (error) {
     return { ok: false, error };
   }
+};
+
+const incrementCentennialBonusUsage = async ({
+  supabaseAdmin,
+  userId,
+  timezone,
+  incrementBy,
+}: {
+  supabaseAdmin: DocumentSupabaseClient;
+  userId: string;
+  timezone: string;
+  incrementBy: number;
+}) => {
+  const today = getDatePartsInTimezone(timezone).isoDate;
+  const { data: existing, error: readError } = await supabaseAdmin
+    .from('subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (readError) return { ok: false, error: readError, remaining: 0 };
+
+  const currentUsed = toNumber(existing?.conversions_used, 0);
+  const nextUsed = Math.min(CENTENNIAL_BONUS_LIMIT, currentUsed + incrementBy);
+
+  if (!existing) {
+    const { error: insertError } = await supabaseAdmin
+      .from('subscriptions')
+      .insert({
+        user_id: userId,
+        conversions_used: nextUsed,
+        conversions_limit: CENTENNIAL_BONUS_LIMIT,
+        last_reset_date: today,
+        timezone,
+        tier: 'free',
+        plan_type: CENTENNIAL_BONUS_PLAN,
+      });
+    return { ok: !insertError, error: insertError, remaining: Math.max(0, CENTENNIAL_BONUS_LIMIT - nextUsed) };
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('subscriptions')
+    .update({
+      conversions_used: nextUsed,
+      conversions_limit: Math.max(CENTENNIAL_BONUS_LIMIT, toNumber(existing.conversions_limit, 0)),
+      timezone,
+      tier: 'free',
+      plan_type: CENTENNIAL_BONUS_PLAN,
+    })
+    .eq('user_id', userId);
+
+  return { ok: !updateError, error: updateError, remaining: Math.max(0, CENTENNIAL_BONUS_LIMIT - nextUsed) };
 };
 
 // ============= MAIN HANDLER =============
@@ -5368,6 +5426,27 @@ Deno.serve(async (req) => {
       commitExportTransaction: async (payload) => {
         const currentRemaining = Math.max(0, conversionsLimit - conversionsUsed);
         const remainingAfterDebit = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
+
+        if (user && user.id === CENTENNIAL_BONUS_USER_ID && userPlanType === CENTENNIAL_BONUS_PLAN) {
+          const bonusResult = await incrementCentennialBonusUsage({
+            supabaseAdmin: supabaseAdminClient,
+            userId: user.id,
+            timezone: userTimezone,
+            incrementBy,
+          });
+          if (!bonusResult.ok) {
+            return {
+              ok: false,
+              creditsRemaining: currentRemaining,
+              error: `Credit deduction failed: ${String(bonusResult.error)}`,
+            };
+          }
+
+          return {
+            ok: true,
+            creditsRemaining: bonusResult.remaining ?? remainingAfterDebit,
+          };
+        }
 
         const rpc = supabaseAdminClient.rpc as unknown as (
           fn: string,

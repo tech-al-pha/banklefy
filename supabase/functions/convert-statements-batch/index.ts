@@ -117,8 +117,64 @@ type PdfDocumentProxy = {
   destroy?: () => void;
 };
 
+const CENTENNIAL_BONUS_USER_ID = '1f04b6ab-c06a-43a5-8090-fb3a1d704521';
+const CENTENNIAL_BONUS_PLAN = 'bonus_free_basic';
+const CENTENNIAL_BONUS_LIMIT = 50;
+
 const BATCH_DATE_TOKEN_SOURCE =
   '(?:\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}|\\d{1,2}[/-][A-Za-z]{3,9}(?:[/-]|\\s)+\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4}|[A-Za-z]{3,9}\\s+\\d{1,2},?\\s+\\d{2,4})';
+
+const incrementCentennialBonusUsage = async ({
+  supabaseAdmin,
+  userId,
+  timezone,
+  incrementBy,
+}: {
+  supabaseAdmin: BatchSupabaseClient;
+  userId: string;
+  timezone: string;
+  incrementBy: number;
+}) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: existing, error: readError } = await supabaseAdmin
+    .from('subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (readError) return { ok: false, error: readError, remaining: 0 };
+
+  const currentUsed = Number(existing?.conversions_used ?? 0) || 0;
+  const currentLimit = Number(existing?.conversions_limit ?? 0) || 0;
+  const nextUsed = Math.min(CENTENNIAL_BONUS_LIMIT, currentUsed + incrementBy);
+
+  if (!existing) {
+    const { error: insertError } = await supabaseAdmin.from('subscriptions').insert({
+      user_id: userId,
+      conversions_used: nextUsed,
+      conversions_limit: CENTENNIAL_BONUS_LIMIT,
+      last_reset_date: today,
+      timezone,
+      tier: 'free',
+      plan_type: CENTENNIAL_BONUS_PLAN,
+    } as BatchDatabase['public']['Tables']['subscriptions']['Insert']);
+    return { ok: !insertError, error: insertError, remaining: Math.max(0, CENTENNIAL_BONUS_LIMIT - nextUsed) };
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('subscriptions')
+    .update({
+      conversions_used: nextUsed,
+      conversions_limit: Math.max(CENTENNIAL_BONUS_LIMIT, currentLimit),
+      timezone,
+      tier: 'free',
+      plan_type: CENTENNIAL_BONUS_PLAN,
+    } as BatchDatabase['public']['Tables']['subscriptions']['Update'])
+    .eq('user_id', userId);
+
+  return { ok: !updateError, error: updateError, remaining: Math.max(0, CENTENNIAL_BONUS_LIMIT - nextUsed) };
+};
+
 const BATCH_ROW_START_PATTERN = new RegExp(
   `^(?:\\s*\\d+\\s+)?(?:[A-Za-z0-9._/-]*\\d[A-Za-z0-9._/-]*\\s+)?(${BATCH_DATE_TOKEN_SOURCE})\\s+(.+)$`,
   'i',
@@ -2276,20 +2332,34 @@ Deno.serve(async (req) => {
     const incrementBy = isFreeMode ? successfulConversions : pagesWithDataTotal;
     let remaining = Math.max(0, conversionsLimit - conversionsUsed);
     if (incrementBy > 0) {
-      const rpc = supabaseAdminClient.rpc as unknown as (
-        fn: string,
-        args: Record<string, unknown>,
-      ) => Promise<{ error: { message: string } | null }>;
-
-      const { error: incrementError } = await rpc('increment_usage_count', {
-        p_ip_address: user ? undefined : trackingKey,
-        p_user_id: user ? user.id : undefined,
-        p_increment: incrementBy,
-      });
-      if (incrementError) {
-        console.error('Error incrementing usage after success:', incrementError);
+      if (user && user.id === CENTENNIAL_BONUS_USER_ID && userPlanType === CENTENNIAL_BONUS_PLAN) {
+        const bonusResult = await incrementCentennialBonusUsage({
+          supabaseAdmin: supabaseAdminClient,
+          userId: user.id,
+          timezone: userTimezone,
+          incrementBy,
+        });
+        if (!bonusResult.ok) {
+          console.error('Error incrementing bonus usage after success:', bonusResult.error);
+        } else {
+          remaining = bonusResult.remaining;
+        }
       } else {
-        remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
+        const rpc = supabaseAdminClient.rpc as unknown as (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ error: { message: string } | null }>;
+
+        const { error: incrementError } = await rpc('increment_usage_count', {
+          p_ip_address: user ? undefined : trackingKey,
+          p_user_id: user ? user.id : undefined,
+          p_increment: incrementBy,
+        });
+        if (incrementError) {
+          console.error('Error incrementing usage after success:', incrementError);
+        } else {
+          remaining = Math.max(0, conversionsLimit - conversionsUsed - incrementBy);
+        }
       }
     }
 

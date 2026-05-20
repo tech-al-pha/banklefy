@@ -5,6 +5,7 @@ const normalizePlanType = (planType?: string): string => {
 
 const PLAN_LABELS: Record<string, string> = {
   free: 'Free',
+  bonus_free_basic: 'Bonus Credits',
   per_page_lite: 'Lite',
   per_page_standard: 'Standard',
   per_page_power: 'Power',
@@ -25,6 +26,9 @@ export const getPlanResetMessage = (planType?: string): string => {
 
   if (normalized === 'free') {
     return 'Your daily limit resets at midnight.';
+  }
+  if (normalized === 'bonus_free_basic') {
+    return 'This is a bonus credit grant with basic formats only.';
   }
   if (normalized.startsWith('per_page')) {
     return 'This is a one-time page pack. Purchase another plan to continue.';

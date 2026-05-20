@@ -10,6 +10,7 @@ export const normalizePlanType = (planType?: string | null): string =>
 
 const PLAN_RANK: Record<string, number> = {
   free: 0,
+  bonus_free_basic: 0,
   per_page_lite: 1,
   per_page_standard: 2,
   per_page_power: 3,
@@ -45,6 +46,10 @@ export const resolveEffectivePlanType = (
 
   if (normalizedPlan === "free") {
     return currentPackFromLimit ?? "free";
+  }
+
+  if (normalizedPlan === "bonus_free_basic") {
+    return "bonus_free_basic";
   }
 
   if (normalizedPlan === "unlimited") {

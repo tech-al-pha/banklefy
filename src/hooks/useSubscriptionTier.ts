@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { CENTENNIAL_BONUS_PLAN_TYPE, isCentennialBonusUser } from "@/lib/centennialBonus";
 import { resolveEffectivePlanType } from "@/lib/entitlements";
 
 type SubscriptionTier = "free" | "business";
@@ -48,17 +49,22 @@ export const useSubscriptionTier = () => {
       if (error) {
         if (import.meta.env.DEV) { console.error("Failed to load subscription tier:", error); }
         setTier("free");
-        setPlanType(null);
+        setPlanType(isCentennialBonusUser({ id: user.id, email: user.email }) ? CENTENNIAL_BONUS_PLAN_TYPE : null);
       } else {
         const row = data as Record<string, unknown> | null;
-        const nextPlanType = resolveEffectivePlanType(
+        const resolvedPlanType = resolveEffectivePlanType(
           typeof row?.plan_type === "string"
             ? row.plan_type
             : typeof row?.tier === "string"
               ? row.tier
-            : null,
+              : null,
           typeof row?.conversions_limit === "number" ? row.conversions_limit : null,
         );
+        const nextPlanType =
+          isCentennialBonusUser({ id: user.id, email: user.email }) &&
+          (resolvedPlanType === "free" || resolvedPlanType === CENTENNIAL_BONUS_PLAN_TYPE)
+            ? CENTENNIAL_BONUS_PLAN_TYPE
+            : resolvedPlanType;
         setPlanType(nextPlanType);
         setTier(deriveTierFromPlanType(nextPlanType));
       }

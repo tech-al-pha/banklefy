@@ -184,6 +184,10 @@ const DEFAULT_OWNER_EMAILS = ['inspirexali@gmail.com'];
 const DEFAULT_AUTH_LIMIT = 5;
 const DEFAULT_ANON_LIMIT = 2;
 const UNLIMITED_LIMIT = 999999;
+const CENTENNIAL_BONUS_USER_ID = '1f04b6ab-c06a-43a5-8090-fb3a1d704521';
+const CENTENNIAL_BONUS_EMAIL = 'bansalmittalassociates@gmail.com';
+const CENTENNIAL_BONUS_PLAN = 'bonus_free_basic';
+const CENTENNIAL_BONUS_LIMIT = 50;
 const PLAN_PAGES: Record<string, number> = {
   per_page_lite: 10,
   per_page_standard: 25,
@@ -195,6 +199,7 @@ const PLAN_PAGES: Record<string, number> = {
 };
 const PLAN_RANK: Record<string, number> = {
   free: 0,
+  bonus_free_basic: 0,
   per_page_lite: 1,
   per_page_standard: 2,
   per_page_power: 3,
@@ -212,6 +217,12 @@ const toNumber = (value: unknown, fallback: number): number => {
 
 const normalizePlan = (value: unknown): string =>
   typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'free';
+
+const isCentennialBonusUser = (user: AuthUser | null): boolean => {
+  const id = (user?.id ?? '').trim().toLowerCase();
+  const email = (user?.email ?? '').trim().toLowerCase();
+  return id === CENTENNIAL_BONUS_USER_ID || email === CENTENNIAL_BONUS_EMAIL;
+};
 
 const toDateString = (value: unknown): string | null => {
   if (typeof value !== 'string' || !value.trim()) return null;
@@ -256,6 +267,10 @@ const getDatePartsInTimezone = (timezone: string): DateParts => {
 const resolveCurrentPlanType = (planType: string, conversionsLimit: number): string => {
   const inferredPack = getCurrentPackFromLimit(conversionsLimit);
 
+  if (planType === CENTENNIAL_BONUS_PLAN) {
+    return CENTENNIAL_BONUS_PLAN;
+  }
+
   if (planType === 'free') {
     return inferredPack ?? 'free';
   }
@@ -292,6 +307,7 @@ const resolvePlanType = (row: SubscriptionRow | null, conversionsLimitHint?: num
 const getResetBoundary = (planType: string, dateParts: DateParts): string | null => {
   const normalizedPlan = normalizePlan(planType);
   if (normalizedPlan === 'free') return dateParts.isoDate;
+  if (normalizedPlan === CENTENNIAL_BONUS_PLAN) return null;
   if (normalizedPlan === 'unlimited' || normalizedPlan.startsWith('per_page')) return null;
   return null;
 };
@@ -348,6 +364,7 @@ const ensureSubscriptionRow = async (
   timezone: string,
   today: string,
 ): Promise<SubscriptionRow> => {
+  const isBonusUser = userId.trim().toLowerCase() === CENTENNIAL_BONUS_USER_ID;
   const { data, error } = await supabaseAdmin
     .from('subscriptions')
     .select('*')
@@ -365,10 +382,10 @@ const ensureSubscriptionRow = async (
     .insert({
       user_id: userId,
       conversions_used: 0,
-      conversions_limit: DEFAULT_AUTH_LIMIT,
+      conversions_limit: isBonusUser ? CENTENNIAL_BONUS_LIMIT : DEFAULT_AUTH_LIMIT,
       last_reset_date: today,
       timezone,
-      plan_type: 'free',
+      plan_type: isBonusUser ? CENTENNIAL_BONUS_PLAN : 'free',
     })
     .select('*')
     .single();
@@ -600,6 +617,7 @@ export const resolveEffectiveLimit = async ({
   const isAdmin = await resolveAdminRole(supabaseAdmin, user.id);
   const userEmail = (user.email ?? '').trim().toLowerCase();
   const isOwner = !!userEmail && getOwnerEmailSet().has(userEmail);
+  const isBonusUser = isCentennialBonusUser(user);
 
   const row = await ensureSubscriptionRow(supabaseAdmin, user.id, timezone, dateParts.isoDate);
   const reconciledRow = await reconcileSubscriptionFromPaidOrders(
@@ -609,6 +627,38 @@ export const resolveEffectiveLimit = async ({
     timezone,
     dateParts.isoDate,
   );
+
+  const currentPlanType = resolvePlanType(reconciledRow, toNumber(reconciledRow.conversions_limit, 0));
+  if (isBonusUser && getPlanRank(currentPlanType) === 0) {
+    const normalizedLimit = Math.max(CENTENNIAL_BONUS_LIMIT, toNumber(reconciledRow.conversions_limit, 0));
+    const normalizedUsed = Math.min(normalizedLimit, toNumber(reconciledRow.conversions_used, 0));
+
+    if (
+      normalizePlan(reconciledRow.plan_type) !== CENTENNIAL_BONUS_PLAN ||
+      toNumber(reconciledRow.conversions_limit, 0) < CENTENNIAL_BONUS_LIMIT
+    ) {
+      await supabaseAdmin
+        .from('subscriptions')
+        .update({
+          tier: 'free',
+          plan_type: CENTENNIAL_BONUS_PLAN,
+          conversions_limit: normalizedLimit,
+          conversions_used: normalizedUsed,
+          timezone,
+        })
+        .eq('user_id', user.id);
+    }
+
+    return buildResult({
+      conversionsUsed: normalizedUsed,
+      conversionsLimit: normalizedLimit,
+      planType: CENTENNIAL_BONUS_PLAN,
+      isAuthenticated: true,
+      isAdmin,
+      isOwner,
+      isUnlimited: false,
+    });
+  }
 
   // 1) Explicit unlimited flag (only when no finite limits are configured)
   if (hasExplicitUnlimitedFlag(reconciledRow) && !hasFiniteConfiguredLimit(reconciledRow)) {
