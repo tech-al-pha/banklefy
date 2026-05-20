@@ -107,7 +107,8 @@ export default function Auth() {
 
       toast({
         title: 'Check your email',
-        description: 'We sent you a password reset link.',
+        description:
+          "If an account exists for this email, you'll receive a password reset link shortly. Please check Spam/Junk too.",
       });
       setMode('login');
     } catch (error: unknown) {

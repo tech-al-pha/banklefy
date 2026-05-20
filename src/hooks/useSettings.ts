@@ -154,7 +154,8 @@ export const useSettings = () => {
 
       toast({
         title: "Password reset email sent",
-        description: "Check your inbox for the reset link.",
+        description:
+          "If an account exists for this email, you'll receive a reset link shortly. Please check Spam/Junk too.",
       });
     } catch (error: unknown) {
       toast({
