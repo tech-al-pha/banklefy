@@ -55,6 +55,7 @@ const Contact = () => {
                   {content}
                   <SupportContactDialog
                     source="contact_page"
+                    kind="support"
                     trigger={
                       <Button className="w-full bg-primary text-primary-foreground shadow-neon">
                         {card.actionLabel ?? "Open Support"}

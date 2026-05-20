@@ -67,6 +67,7 @@ const Privacy = () => {
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <SupportContactDialog
               source="privacy_page"
+              kind="privacy"
               trigger={
                 <Button size="lg" className="bg-primary text-primary-foreground shadow-neon">
                   Contact Support

@@ -11,9 +11,10 @@ type SupportContactDialogProps = {
   trigger: React.ReactNode;
   defaultSubject?: string;
   source?: string;
+  kind?: "support" | "refund" | "privacy" | "terms" | "billing" | "other";
 };
 
-const SupportContactDialog = ({ trigger, defaultSubject, source }: SupportContactDialogProps) => {
+const SupportContactDialog = ({ trigger, defaultSubject, source, kind }: SupportContactDialogProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
@@ -33,20 +34,26 @@ const SupportContactDialog = ({ trigger, defaultSubject, source }: SupportContac
     setSubmitting(true);
     try {
       const payload = {
-        user_id: user?.id ?? null,
         name: name.trim() || null,
         email: email.trim() || null,
         subject: subject.trim() || null,
         message: message.trim(),
         source: source ?? window.location.pathname,
+        kind: kind ?? "support",
       };
 
-      const { error } = await supabase.from("support_requests" as never).insert(payload as never);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+
+      const { error } = await supabase.functions.invoke("support-request", {
+        body: payload,
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
       if (error) throw error;
 
       toast({
-        title: "Message sent",
-        description: "Our team has received your request and will get back to you soon.",
+        title: "Request sent",
+        description: "We received your request. You'll hear back on email soon.",
       });
       setMessage("");
       if (!defaultSubject) setSubject("");
@@ -66,7 +73,8 @@ const SupportContactDialog = ({ trigger, defaultSubject, source }: SupportContac
         <DialogHeader>
           <DialogTitle>Contact Support</DialogTitle>
           <DialogDescription>
-            Share your question or issue and we'll respond as soon as possible.
+            Share your question or issue and we'll respond as soon as possible. You can also email{" "}
+            <span className="font-medium text-foreground">support@banklefy.com</span>.
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={handleSubmit}>

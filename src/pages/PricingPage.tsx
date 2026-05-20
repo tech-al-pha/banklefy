@@ -753,6 +753,7 @@ const PricingPage = () => {
               <SupportContactDialog
                 source="pricing_refund"
                 defaultSubject="Refund Request"
+                kind="refund"
                 trigger={
                   <Button className="mt-4 bg-primary text-primary-foreground shadow-neon">
                     Request Refund
@@ -776,6 +777,7 @@ const PricingPage = () => {
           <SupportContactDialog
             source="pricing_enterprise"
             defaultSubject="Enterprise Pricing"
+            kind="billing"
             trigger={
               <Button
                 variant="outline"

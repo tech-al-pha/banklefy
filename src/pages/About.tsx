@@ -171,6 +171,7 @@ const AboutPage = () => {
 
             <SupportContactDialog
               source="about_page"
+              kind="support"
               trigger={
                 <div className="glass-card group flex cursor-pointer items-center gap-6 rounded-[2rem] p-8 transition-all hover:shadow-neon">
                   <div className="rounded-full bg-primary/10 p-4 text-primary transition-transform group-hover:scale-110">

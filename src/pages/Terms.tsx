@@ -67,6 +67,7 @@ const Terms = () => {
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <SupportContactDialog
               source="terms_page"
+              kind="terms"
               trigger={
                 <Button size="lg" className="bg-primary text-primary-foreground shadow-neon">
                   Contact Support

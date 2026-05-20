@@ -205,8 +205,8 @@ export const contactCards: ContactCard[] = [
   {
     icon: Mail,
     title: "Email",
-    content: "Prefer email? Send the same details to banklefy@gmail.com.",
-    href: "mailto:banklefy@gmail.com",
+    content: "Prefer email? Send the same details to support@banklefy.com.",
+    href: "mailto:support@banklefy.com",
     actionLabel: "Email Support",
   },
 ];
@@ -419,8 +419,8 @@ export const aboutContacts: ContactCard[] = [
   {
     icon: Mail,
     title: "Email",
-    content: "banklefy@gmail.com",
-    href: "mailto:banklefy@gmail.com",
+    content: "support@banklefy.com",
+    href: "mailto:support@banklefy.com",
     actionLabel: "Send Email",
   },
   {

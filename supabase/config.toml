@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.razorpay-verify]
 verify_jwt = false
 
+[functions.support-request]
+verify_jwt = false
+
 [functions.delete-account]
 verify_jwt = true
 
