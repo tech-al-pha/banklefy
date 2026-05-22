@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Logo from "@/components/Logo";
-import { Camera, Loader2, LogOut } from "lucide-react";
+import { Camera, Loader2, LogOut, User } from "lucide-react";
 import { formatPlanLabel } from "@/lib/planLabels";
 import { useToast } from "@/hooks/use-toast";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -166,7 +166,9 @@ const Profile = () => {
                 <div className="relative">
                   <Avatar className="h-20 w-20 border border-primary/30">
                     <AvatarImage src={avatarUrl ?? undefined} />
-                    <AvatarFallback>{displayName ? displayName[0]?.toUpperCase() : "U"}</AvatarFallback>
+                    <AvatarFallback>
+                      <User className="h-8 w-8 text-muted-foreground" />
+                    </AvatarFallback>
                   </Avatar>
                   <label className="absolute -bottom-2 -right-2 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-neon">
                     {avatarUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
