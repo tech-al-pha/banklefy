@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import banklefyLogo from "@/assets/banklefy-logo.svg";
+import banklefyLogo from "@/assets/banklefy-logo.png";
 
 const Logo = () => {
   return (
