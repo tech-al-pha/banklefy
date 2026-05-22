@@ -174,7 +174,7 @@ export const getStructuredDataByRoute = (
     "@id": `${siteUrl}/#organization`,
     name: "Banklefy",
     url: siteUrl,
-    logo: `${siteUrl}/favicon.svg`,
+    logo: `${siteUrl}/favicon.png`,
     ...(contactSignals.supportEmail ? { email: contactSignals.supportEmail } : {}),
     ...(contactSignals.supportEmail || contactSignals.securityEmail
       ? {
