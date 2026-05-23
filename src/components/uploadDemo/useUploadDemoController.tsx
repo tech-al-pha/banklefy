@@ -169,7 +169,11 @@ export const useUploadDemoController = () => {
   const [uploadPrepLabel, setUploadPrepLabel] = useState(uploadUiCopy.readingDoc);
   const [uploadPrepFileName, setUploadPrepFileName] = useState<string | null>(null);
   const preparedPdfDataRef = useRef<
-    Map<string, { transactions?: BatchFilePayload["pdfParsedTransactions"]; bankMetadata?: BatchFilePayload["pdfParsedBankMetadata"] }>
+    Map<string, {
+      transactions?: BatchFilePayload["pdfParsedTransactions"];
+      bankMetadata?: BatchFilePayload["pdfParsedBankMetadata"];
+      pdfType?: "text-based" | "scanned-or-image-based";
+    }>
   >(new Map());
   const preparedPdfImagesRef = useRef<Map<string, string[]>>(new Map());
   const passwordAutoSubmitTimerRef = useRef<number | null>(null);
@@ -892,16 +896,16 @@ export const useUploadDemoController = () => {
                   password: pdfPassword.trim() || undefined,
                   maxPdfRenderPages,
                 });
-                const parsedTxCount = parsedPdf.transactions?.length ?? 0;
-                const parsedPageCount = Math.max(1, parsedPdf.pageCount ?? 1);
-                const minimumExpectedRows = Math.max(12, Math.ceil(parsedPageCount * 4));
-                const localTextParseLooksReliable = parsedTxCount >= minimumExpectedRows;
+                const localTextParseLooksReliable = parsedPdf.pdfType === "text-based" &&
+                  (parsedPdf.transactions?.length ?? 0) > 0 &&
+                  (parsedPdf.balanceMismatchRatio ?? 1) <= 0.35;
                 preparedPdfDataRef.current.set(cacheKey, {
                   transactions: localTextParseLooksReliable ? parsedPdf.transactions : [],
                   bankMetadata: parsedPdf.bankMetadata,
+                  pdfType: parsedPdf.pdfType,
                 });
 
-                const isTextBasedPdf = localTextParseLooksReliable;
+                const isTextBasedPdf = parsedPdf.pdfType === "text-based";
                 if (!isTextBasedPdf) {
                   setUploadPrepProgress(65);
                   setUploadPrepLabel(uploadUiCopy.preparingOcr);
@@ -1114,11 +1118,11 @@ export const useUploadDemoController = () => {
         const cacheKey = getFileCacheKey(fileToConvert);
         const cachedParsedPdf = preparedPdfDataRef.current.get(cacheKey);
         const parsedPdfTransactionsCount = cachedParsedPdf?.transactions?.length ?? 0;
-        const isTextBasedPdf = parsedPdfTransactionsCount > 0;
+        const isTextBasedPdf = cachedParsedPdf?.pdfType === "text-based";
         if (cachedParsedPdf?.bankMetadata) {
           requestBody.pdfParsedBankMetadata = cachedParsedPdf.bankMetadata;
         }
-        if (isTextBasedPdf) {
+        if (parsedPdfTransactionsCount > 0) {
           requestBody.pdfParsedTransactions = cachedParsedPdf.transactions;
         }
         if (!isTextBasedPdf) {
@@ -1408,7 +1412,7 @@ export const useUploadDemoController = () => {
           // Continue with normal success path below.
         } else {
         const cachedParsedPdf = preparedPdfDataRef.current.get(getFileCacheKey(fileToConvert));
-        const isTextBasedPdf = (cachedParsedPdf?.transactions?.length ?? 0) > 0;
+        const isTextBasedPdf = cachedParsedPdf?.pdfType === "text-based";
         const isRequiresImageFallbackError =
           isPdf &&
           !("pdfPageImages" in requestBody) &&
@@ -1749,9 +1753,12 @@ export const useUploadDemoController = () => {
           const cacheKey = getFileCacheKey(file);
           const cachedParsedPdf = preparedPdfDataRef.current.get(cacheKey);
           const parsedPdfTransactionsCount = cachedParsedPdf?.transactions?.length ?? 0;
-          const isTextBasedPdf = parsedPdfTransactionsCount > 0;
+          const isTextBasedPdf = cachedParsedPdf?.pdfType === "text-based";
           if (cachedParsedPdf?.bankMetadata) {
             payload.pdfParsedBankMetadata = cachedParsedPdf.bankMetadata;
+          }
+          if (parsedPdfTransactionsCount > 0) {
+            payload.pdfParsedTransactions = cachedParsedPdf.transactions;
           }
           if (!isTextBasedPdf) {
             let cachedPageImages = preparedPdfImagesRef.current.get(cacheKey);
