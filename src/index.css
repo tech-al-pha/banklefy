@@ -337,6 +337,71 @@
     z-index: 1;
   }
 
+  .card-3d-surface {
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.03),
+      0 1px 0 rgba(255, 255, 255, 0.04),
+      0 16px 30px -22px rgba(0, 0, 0, 0.98),
+      0 26px 50px -34px rgba(0, 0, 0, 0.88);
+    transform: translateZ(0);
+    transition:
+      box-shadow 240ms ease-out,
+      transform 240ms ease-out,
+      border-color 240ms ease-out,
+      background-color 240ms ease-out;
+  }
+
+  .card-3d-surface::after {
+    content: "";
+    position: absolute;
+    inset: auto 14px 0;
+    height: 18px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.12), transparent 72%);
+    opacity: 0.2;
+    filter: blur(16px);
+    pointer-events: none;
+  }
+
+  .card-3d-surface:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+      0 1px 0 rgba(255, 255, 255, 0.06),
+      0 22px 40px -24px rgba(0, 0, 0, 0.98),
+      0 34px 60px -34px rgba(0, 0, 0, 0.88);
+  }
+
+  .card-3d-panel {
+    position: relative;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 10px 22px -18px rgba(0, 0, 0, 0.95),
+      0 20px 36px -28px rgba(0, 0, 0, 0.82);
+  }
+
+  .btn-card-elevated {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+      0 10px 24px -18px rgba(0, 0, 0, 0.9),
+      0 18px 34px -24px rgba(0, 0, 0, 0.8);
+  }
+
+  .btn-card-elevated:hover:not(:disabled),
+  .btn-card-elevated:focus-visible:not(:disabled) {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.24),
+      0 14px 28px -18px rgba(0, 0, 0, 0.9),
+      0 24px 42px -24px rgba(0, 0, 0, 0.84) !important;
+  }
+
   .chip-muted {
     color: #676767;
     border: 1px solid rgba(103, 103, 103, 0.55);

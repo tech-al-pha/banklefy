@@ -51,7 +51,7 @@ const HowItWorksPage = () => {
           {steps.map((step) => (
             <Card
               key={step.title}
-              className="rounded-2xl border border-primary/20 bg-[#141414] p-6 space-y-4"
+              className="card-3d-surface rounded-2xl border border-primary/20 bg-[#141414] p-6 space-y-4"
             >
               <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                 <step.icon className="h-6 w-6" />

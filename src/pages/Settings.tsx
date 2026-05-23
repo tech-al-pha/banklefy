@@ -582,7 +582,7 @@ const Settings = () => {
     return (
       <div className="space-y-4">
         {items.map((item) => (
-          <Card key={item.id} className="bg-surface-elevated/60 border-primary/20 backdrop-blur-sm">
+          <Card key={item.id} className="card-3d-surface bg-surface-elevated/60 border-primary/20 backdrop-blur-sm">
             <CardContent className="p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                 <div className="flex items-start sm:items-center gap-3 sm:gap-4">
