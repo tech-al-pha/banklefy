@@ -162,7 +162,7 @@ export default function SampleReport() {
                   key={file.href}
                   href={file.href}
                   download
-                  className="group rounded-xl border border-white/15 bg-[#141414] p-4 backdrop-blur-xl transition-all duration-300 hover:border-primary/40 hover:shadow-neon"
+                  className="card-3d-surface group rounded-xl border border-white/15 bg-[#141414] p-4 backdrop-blur-xl transition-all duration-300 hover:border-primary/40 hover:shadow-neon"
                 >
                   <div className="flex items-center gap-3">
                     <file.icon className="h-5 w-5 text-primary" />
@@ -181,7 +181,7 @@ export default function SampleReport() {
               {upcomingFormats.map((format) => (
                 <div
                   key={format.label}
-                  className="rounded-xl border border-white/15 bg-[#141414] p-4 backdrop-blur-xl"
+                  className="card-3d-surface rounded-xl border border-white/15 bg-[#141414] p-4 backdrop-blur-xl"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -218,28 +218,28 @@ export default function SampleReport() {
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-white/50">Baseline</p>
                   <p className="mt-2 text-sm font-semibold text-white">Branded cover + audit summary</p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-white/50">Appendix</p>
                   <p className="mt-2 text-sm font-semibold text-white">Transaction tables with clean formatting</p>
                 </div>
                 {hasFoirAccess && (
-                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-white/50">Loan Ready</p>
                     <p className="mt-2 text-sm font-semibold text-white">FOIR snapshot + monthly cashflow</p>
                   </div>
                 )}
                 {hasFraudAccess && (
-                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-white/50">Risk Signals</p>
                     <p className="mt-2 text-sm font-semibold text-white">Edited PDF flags + anomaly summary</p>
                   </div>
                 )}
                 {showPremiumLock && (
-                  <div className="rounded-xl border border-primary/30 bg-primary/10 p-4">
+                  <div className="card-3d-panel rounded-xl border border-primary/30 bg-primary/10 p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-primary/80">Upgrade</p>
                     <p className="mt-2 text-sm font-semibold text-white">
                       Unlock advanced PDF insights with a paid plan.
@@ -274,25 +274,25 @@ export default function SampleReport() {
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                     <p className="text-sm text-muted-foreground">Balance Check</p>
                     <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">16 Errors</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                     <p className="text-sm text-muted-foreground">Avg Daily Balance</p>
                     <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">10,532</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                     <p className="text-sm text-muted-foreground">Lowest Balance</p>
                     <p className="mt-1 text-3xl font-semibold text-[#9AFB3F]">1,129</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                     <p className="text-sm text-muted-foreground">Risk Flags</p>
                     <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">None</p>
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/10 p-4">
+                <div className="card-3d-panel mt-4 rounded-xl border border-amber-400/20 bg-amber-500/10 p-4">
                   <div className="flex items-center gap-2 text-amber-400">
                     <AlertTriangle className="h-4 w-4" />
                     <p className="text-sm font-semibold">1 Alert Detected</p>
@@ -305,22 +305,22 @@ export default function SampleReport() {
                 <div className="mt-5">
                   <h3 className="text-2xl font-semibold text-white">Financial Analytics</h3>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                       <p className="text-sm text-muted-foreground">Total Credits</p>
                       <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">1,14,150.39</p>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                       <p className="text-sm text-muted-foreground">Total Debits</p>
                       <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">2,56,969.40</p>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <TrendingDown className="h-4 w-4" />
                         <p className="text-sm">Net Flow</p>
                       </div>
                       <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">-1,42,819.01</p>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                    <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <AlertTriangle className="h-4 w-4" />
                         <p className="text-sm">Duplicates Found</p>
@@ -346,22 +346,22 @@ export default function SampleReport() {
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                     <p className="text-sm text-muted-foreground">Avg Daily Balance</p>
                     <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">10,532</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                     <p className="text-sm text-muted-foreground">Monthly Inflow</p>
                     <p className="mt-1 text-3xl font-semibold text-[#53EFA3]">1,14,150.39</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <TrendingDown className="h-4 w-4" />
                       <p className="text-sm">Net Flow</p>
                     </div>
                     <p className="mt-1 text-3xl font-semibold text-[#FF4D4D]">-1,42,819.01</p>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-[#181818] p-4">
+                  <div className="card-3d-panel rounded-xl border border-white/10 bg-[#181818] p-4">
                     <p className="text-sm text-muted-foreground">Lowest Balance</p>
                     <p className="mt-1 text-3xl font-semibold text-[#9AFB3F]">1,129</p>
                   </div>

@@ -883,7 +883,7 @@ export const ResultsSection = ({
       )}
 
       {converting && (
-        <Card className="p-4 bg-[#191919]/80 border border-white/10">
+        <Card className="card-3d-surface p-4 bg-[#191919]/80 border border-white/10">
           <div className="space-y-2">
             <p className="text-sm font-semibold text-white">{conversionProgressTitle}</p>
             <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
@@ -921,7 +921,7 @@ export const ResultsSection = ({
           </h3>
 
           <div className="grid grid-cols-4 gap-4">
-            <Card className={`p-4 !bg-[#191919] ${toneClasses[creditTone].border}`}>
+            <Card className={`card-3d-surface p-4 !bg-[#191919] ${toneClasses[creditTone].border}`}>
               <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[creditTone].text}`}>
                 <TrendingUp className={`w-4 h-4 ${toneClasses[creditTone].text}`} />
                 {actionCopy.totalCredits}
@@ -931,7 +931,7 @@ export const ResultsSection = ({
               </p>
             </Card>
 
-            <Card className={`p-4 !bg-[#191919] ${toneClasses[debitTone].border}`}>
+            <Card className={`card-3d-surface p-4 !bg-[#191919] ${toneClasses[debitTone].border}`}>
               <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[debitTone].text}`}>
                 <TrendingDown className={`w-4 h-4 ${toneClasses[debitTone].text}`} />
                 {actionCopy.totalDebits}
@@ -941,7 +941,7 @@ export const ResultsSection = ({
               </p>
             </Card>
 
-            <Card className={`p-4 !bg-[#191919] ${toneClasses[netFlowTone].border}`}>
+            <Card className={`card-3d-surface p-4 !bg-[#191919] ${toneClasses[netFlowTone].border}`}>
               <div className={`flex items-center gap-2 text-sm mb-1 ${toneClasses[netFlowTone].text}`}>
                 {analytics.netFlow >= 0 ? (
                   <TrendingUp className={`w-4 h-4 ${toneClasses[netFlowTone].text}`} />
@@ -956,7 +956,7 @@ export const ResultsSection = ({
             </Card>
 
             {analytics.duplicateCount > 0 && (
-              <Card className="p-4 !bg-[#191919] border-orange-500/30">
+              <Card className="card-3d-surface p-4 !bg-[#191919] border-orange-500/30">
                 <div className="flex items-center gap-2 text-sm tone-moderate-text mb-1">
                   <AlertTriangle className="w-4 h-4 tone-moderate-text" />
                   {actionCopy.duplicatesFound}
@@ -1123,7 +1123,7 @@ export const ResultsSection = ({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Card className="rounded-xl border border-white/20 bg-[#191919]/70 p-3 shadow-none">
+        <Card className="card-3d-surface rounded-xl border border-white/20 bg-[#191919]/70 p-3 shadow-none">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-sky-300" />
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">
@@ -1135,7 +1135,7 @@ export const ResultsSection = ({
           </p>
         </Card>
 
-        <Card className="rounded-xl border border-sky-500/15 bg-sky-500/[0.06] p-3 shadow-none">
+        <Card className="card-3d-surface rounded-xl border border-sky-500/15 bg-sky-500/[0.06] p-3 shadow-none">
           <div className="flex items-center gap-2">
             <ScanSearch className="h-4 w-4 text-sky-300" />
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">

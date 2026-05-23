@@ -30,7 +30,7 @@ export const UploadDemoEditedWarningCard = ({
   }
 
   return (
-    <div className="p-4 bg-[#191919]/80 border border-amber-500/30 rounded-xl space-y-3">
+    <div className="card-3d-surface p-4 bg-[#191919]/80 border border-amber-500/30 rounded-xl space-y-3">
       <div className="flex items-start gap-3">
         <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 flex-shrink-0" />
         <div className="flex-1">
@@ -43,7 +43,7 @@ export const UploadDemoEditedWarningCard = ({
       <div className="flex gap-3">
         <Button
           variant="outline"
-          className="w-full border border-amber-500/40 text-amber-200 bg-amber-500/10 hover:bg-amber-500/20"
+          className="btn-card-elevated w-full border border-amber-500/40 text-amber-200 bg-amber-500/10 hover:bg-amber-500/20"
           onClick={onProceed}
           disabled={false}
         >

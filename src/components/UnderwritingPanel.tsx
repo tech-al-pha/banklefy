@@ -255,7 +255,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
       </div>
 
       {/* Eligibility Summary Card */}
-      <Card className={`p-4 !bg-[#191919] ${showLimitedDataNotice ? "border-amber-500/25" : `${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border}`}`}>
+      <Card className={`card-3d-surface p-4 !bg-[#191919] ${showLimitedDataNotice ? "border-amber-500/25" : `${statusConfig[eligibility.status].bg} ${statusConfig[eligibility.status].border}`}`}>
         <div className="flex items-start gap-3">
           <StatusIcon className={`w-6 h-6 ${showLimitedDataNotice ? "text-amber-200" : statusConfig[eligibility.status].text} flex-shrink-0 mt-0.5`} />
           <div className="flex-1">
@@ -360,7 +360,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
 
       {/* EMI Breakdown by Loan Type */}
       {showProInsights && Object.keys(summary.emiByLoanType).length > 0 && (
-        <Card className="p-4 !bg-[#191919]">
+        <Card className="card-3d-surface p-4 !bg-[#191919]">
           <h4 className="font-medium mb-3 flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-muted-foreground" />
             EMI Breakdown by Loan Type
@@ -369,7 +369,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
             {Object.entries(summary.emiByLoanType).map(([type, data]) => (
               <div 
                 key={type} 
-                className="flex items-center gap-2 p-2 rounded-lg bg-muted/30"
+                className="card-3d-panel flex items-center gap-2 rounded-lg bg-muted/30 p-2"
               >
                 <span className="text-muted-foreground">
                   {loanTypeIcons[type] || loanTypeIcons['Unknown']}
@@ -478,33 +478,33 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
       </Accordion>
 
       {showAdvancedInsights && advancedSignals && hasReliableFoirHistory && (
-        <Card className="p-4 !bg-[#191919] border-primary/20">
+        <Card className="card-3d-surface p-4 !bg-[#191919] border-primary/20">
           <h4 className="font-medium mb-3 flex items-center gap-2">
             <Wallet className="w-4 h-4 text-muted-foreground" />
             Advanced Underwriting Signals
           </h4>
           <div className="grid grid-cols-3 gap-3 text-sm">
-            <div className="rounded-md bg-muted/30 p-2">
+            <div className="card-3d-panel rounded-md bg-muted/30 p-2">
               <p className="label-muted text-xs">Disposable Income</p>
               <p className="font-semibold">{formatAmount(advancedSignals.disposableIncome)}</p>
             </div>
-            <div className="rounded-md bg-muted/30 p-2">
+            <div className="card-3d-panel rounded-md bg-muted/30 p-2">
               <p className="label-muted text-xs">FOIR Cap</p>
               <p className="font-semibold">{advancedSignals.foirCapPercent}%</p>
             </div>
-            <div className="rounded-md bg-muted/30 p-2">
+            <div className="card-3d-panel rounded-md bg-muted/30 p-2">
               <p className="label-muted text-xs">EMI Headroom</p>
               <p className="font-semibold">{formatAmount(advancedSignals.availableEMIHeadroom)}</p>
             </div>
-            <div className="rounded-md bg-muted/30 p-2">
+            <div className="card-3d-panel rounded-md bg-muted/30 p-2">
               <p className="label-muted text-xs">Stress Headroom</p>
               <p className="font-semibold">{formatAmount(advancedSignals.stressAdjustedHeadroom)}</p>
             </div>
-            <div className="rounded-md bg-muted/30 p-2">
+            <div className="card-3d-panel rounded-md bg-muted/30 p-2">
               <p className="label-muted text-xs">Assumed APR</p>
               <p className="font-semibold">{(advancedSignals.assumedAnnualRate * 100).toFixed(2)}%</p>
             </div>
-            <div className="rounded-md bg-muted/30 p-2">
+            <div className="card-3d-panel rounded-md bg-muted/30 p-2">
               <p className="label-muted text-xs">Assumed Tenure</p>
               <p className="font-semibold">{advancedSignals.assumedTenureMonths} months</p>
             </div>
@@ -513,7 +513,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
       )}
 
       {!showAdvancedInsights && (
-        <Card className="p-4 !bg-[#191919] border-primary/20">
+        <Card className="card-3d-surface p-4 !bg-[#191919] border-primary/20">
           <p className="text-sm text-muted-foreground">
             {underwritingTier === 'basic'
               ? 'Basic tier shows FOIR summary only. Upgrade to Pro/Advanced for deeper EMI trends and transaction-level evidence.'
@@ -524,7 +524,7 @@ export const UnderwritingPanel = ({ underwriting, currencyCode, statementMonthCo
 
       {/* No Data Message */}
       {showAdvancedInsights && !showLimitedDataNotice && salaryCredits.length === 0 && emiDebits.length === 0 && (
-        <Card className="p-4 !bg-[#191919] tone-moderate-border">
+        <Card className="card-3d-surface p-4 !bg-[#191919] tone-moderate-border">
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 tone-moderate-text" />
             <div>

@@ -48,7 +48,7 @@ export const UploadDemoPasswordCard = ({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-white/15 bg-[#141414] p-4">
+    <div className="card-3d-surface space-y-3 rounded-xl border border-white/15 bg-[#141414] p-4">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 h-8 w-8 rounded-full bg-primary/15 flex items-center justify-center">
           <Lock className="h-4 w-4 text-primary" />
@@ -102,7 +102,7 @@ export const UploadDemoPasswordCard = ({
           type="button"
           onClick={onUnlock}
           disabled={isBusy || !pdfPassword.trim()}
-          className="sm:w-auto min-w-[120px]"
+          className="btn-card-elevated sm:w-auto min-w-[120px]"
         >
           {isBusy ? (
             <>
