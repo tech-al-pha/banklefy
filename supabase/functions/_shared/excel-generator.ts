@@ -7,6 +7,7 @@ import type {
   ReconciliationResult,
 } from '../_shared/financial-engine.ts';
 import { fromMinorUnits, toMinorUnits } from '../_shared/money.ts';
+import { summariseTotals, validateRunningBalance } from './balance-validator.ts';
 import { chooseStatementPeriodLabel } from './statement-period.ts';
 
 export interface ExcelGenerationResult {
@@ -588,7 +589,9 @@ function addCategoryBreakdownSheet(
 function addAuditSheet(workbook: ExcelJS.Workbook, config: ExcelConfig): void {
   const ws = workbook.addWorksheet('Audit & Reconciliation');
   const txns = config.transactions || [];
-  const mismatchCount = txns.filter((t) => t.balanceMismatch).length;
+  const balanceAudit = validateRunningBalance(txns);
+  const mismatchCount =
+    txns.filter((t) => t.balanceMismatch).length || balanceAudit.majorMismatchRows + balanceAudit.minorMismatchRows;
   const dupCount = txns.filter((t) => t.isDuplicate).length;
   const integrity = config.underwriting?.integrityScore ?? null;
 
@@ -599,10 +602,13 @@ function addAuditSheet(workbook: ExcelJS.Workbook, config: ExcelConfig): void {
     ['Total Transactions', txns.length],
     ['Running-Balance Mismatches', mismatchCount],
     ['Duplicates Detected', dupCount],
-    ['Reconciliation Pass Rate', txns.length > 0 ? Number((1 - mismatchCount / txns.length).toFixed(4)) : 1],
+    [
+      'Reconciliation Pass Rate',
+      balanceAudit.checkedRows > 0 ? Number(balanceAudit.matchRatio.toFixed(4)) : 1,
+    ],
     ['Integrity Score (0-100)', integrity == null ? 'N/A' : Number(integrity)],
     ['Fraud Alerts', (config.fraudAlerts || []).length],
-    [],
+    [], 
     ['Note', 'Text-based pages parsed deterministically (pure code). Vision OCR used only on scanned pages.'],
   ];
   ws.addRows(rows);
@@ -624,6 +630,23 @@ function toArrayBuffer(value: unknown): ArrayBuffer {
 }
 
 export async function generateProfessionalExcel(config: ExcelConfig): Promise<ExcelGenerationResult> {
+  const derivedTotals = summariseTotals(config.transactions);
+  const analyticTotals = {
+    totalCredits: Number((config.analytics?.totalCredits ?? 0).toFixed(2)),
+    totalDebits: Number((config.analytics?.totalDebits ?? 0).toFixed(2)),
+    netFlow: Number((config.analytics?.netFlow ?? 0).toFixed(2)),
+  };
+  const totalsMismatch =
+    Math.abs(derivedTotals.totalCredit - analyticTotals.totalCredits) > 0.01 ||
+    Math.abs(derivedTotals.totalDebit - analyticTotals.totalDebits) > 0.01 ||
+    Math.abs(derivedTotals.netFlow - analyticTotals.netFlow) > 0.01;
+
+  if (totalsMismatch) {
+    throw new Error(
+      `Transaction totals mismatch during Excel generation. Derived=${JSON.stringify(derivedTotals)} Analytics=${JSON.stringify(analyticTotals)}`,
+    );
+  }
+
   const layout = buildColumnLayout(config.transactions);
   const rows: SheetData = [];
   const statementPeriod = chooseStatementPeriodLabel(config.bankInfo?.statementPeriod, config.transactions);
