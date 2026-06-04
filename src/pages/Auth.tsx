@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, ArrowLeft, Eye, EyeOff, Chrome } from 'lucide-react';
 import { z } from 'zod';
-import banklefyLogo from '@/assets/banklefy-logo.png';
+import banklefyLogo from '@/assets/banklefy-logo-transparent.png';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 const emailSchema = z.string().email('Invalid email address').max(255);
