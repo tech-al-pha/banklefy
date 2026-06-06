@@ -39,7 +39,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     "hero.tagline": "Professional Look | OCR-Powered | Instant Results",
 
-    "hero.subtitle": "Banklefy converts bank statement PDFs into clean, structured spreadsheets with accurate extraction and multi-format export (Excel, CSV, etc.). For secure processing, we use Google Sign-In strictly for authentication, ensuring your data is never shared with anyone.",
+    "hero.subtitle": "AI OCR that turns bank statements into clean, structured spreadsheets with secure processing, accurate extraction, and multi-format export.",
 
     "hero.uploadBtn": "Upload Your Statement Now",
 
