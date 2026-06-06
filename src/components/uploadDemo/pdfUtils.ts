@@ -189,6 +189,31 @@ const computeTextLayerBalanceMismatchRatio = (rows: ParsedPdfTransaction[]): num
   return Math.min(forward, reverse);
 };
 
+const computeDateOrderMismatchRatio = (rows: ParsedPdfTransaction[]): number => {
+  if (rows.length <= 1) return 0;
+
+  const stamps = rows
+    .map((row) => {
+      const iso = parseStatementDateToIso(row.date);
+      if (!iso) return null;
+      const ts = Date.parse(`${iso}T00:00:00Z`);
+      return Number.isFinite(ts) ? ts : null;
+    })
+    .filter((value): value is number => value !== null);
+
+  if (stamps.length <= 1) return 0;
+
+  let forwardViolations = 0;
+  let reverseViolations = 0;
+  for (let i = 1; i < stamps.length; i += 1) {
+    if (stamps[i] < stamps[i - 1]) forwardViolations += 1;
+    if (stamps[i] > stamps[i - 1]) reverseViolations += 1;
+  }
+
+  const totalChecks = Math.max(1, stamps.length - 1);
+  return Math.min(forwardViolations, reverseViolations) / totalChecks;
+};
+
 const summarizeFlags = (flags: DetectorFlag[]) => {
   if (flags.length === 0) return "No suspicious forensic markers detected.";
   return [...flags]
@@ -762,6 +787,16 @@ const inferDebitCreditFromContext = (
   return { debit: absAmount, credit: 0 };
 };
 
+const shouldSkipTinyAmountArtifact = (text: string, debit: number, credit: number, balance: number): boolean => {
+  const magnitude = Math.max(Math.abs(debit), Math.abs(credit), Math.abs(balance));
+  if (magnitude > 0.01) return false;
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return true;
+  if (DATE_TOKEN.test(normalized)) return false;
+  if (/[A-Za-z]/.test(normalized) && normalized.length > 12) return false;
+  return true;
+};
+
 const escapeRegExp = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -1196,12 +1231,16 @@ const extractFlexibleAmounts = (
     : explicitMarker === "DR"
       ? { debit: Math.abs(amount), credit: 0 }
       : inferDebitCreditFromContext(normalizedText, amount);
+  const balance = Math.abs(parseAmount(balanceToken.raw));
+  if (shouldSkipTinyAmountArtifact(normalizedText, inferred.debit, inferred.credit, balance)) {
+    return null;
+  }
 
   return {
     textWithoutAmounts: normalizedText.replace(amountRegex, " ").replace(/\s+/g, " ").trim(),
     debit: inferred.debit,
     credit: inferred.credit,
-    balance: Math.abs(parseAmount(balanceToken.raw)),
+    balance,
   };
 };
 
@@ -1220,6 +1259,7 @@ export const assessParsedPdfTextQuality = (input: {
   totalTextChars: number;
   pagesWithText: number;
   balanceMismatchRatio?: number;
+  dateOrderMismatchRatio?: number;
 }): { pdfType: "text-based" | "scanned-or-image-based"; useClientTransactions: boolean } => {
   const pageCount = Math.max(1, input.pageCount || 1);
   const totalTextChars = Math.max(0, input.totalTextChars || 0);
@@ -1228,6 +1268,9 @@ export const assessParsedPdfTextQuality = (input: {
   const balanceMismatchRatio = Number.isFinite(input.balanceMismatchRatio)
     ? Math.max(0, input.balanceMismatchRatio || 0)
     : 1;
+  const dateOrderMismatchRatio = Number.isFinite(input.dateOrderMismatchRatio)
+    ? Math.max(0, input.dateOrderMismatchRatio || 0)
+    : 0;
 
   const pdfType =
     totalTextChars >= Math.max(180, pageCount * 80) || pagesWithText >= Math.max(1, Math.ceil(pageCount * 0.6))
@@ -1238,7 +1281,8 @@ export const assessParsedPdfTextQuality = (input: {
   const useClientTransactions =
     pdfType === "text-based" &&
     transactionCount >= minimumReasonableRows &&
-    balanceMismatchRatio <= 0.35;
+    balanceMismatchRatio <= 0.35 &&
+    dateOrderMismatchRatio <= 0.45;
 
   return { pdfType, useClientTransactions };
 };
@@ -1373,12 +1417,14 @@ export const extractPdfDataFromText = async (
   const transactions = rows.filter((row) => row.date && row.description && Number.isFinite(row.balance));
   const bankMetadata = extractBankMetadataFromLines(metadataLines);
   const balanceMismatchRatio = computeTextLayerBalanceMismatchRatio(transactions);
+  const dateOrderMismatchRatio = computeDateOrderMismatchRatio(transactions);
   const quality = assessParsedPdfTextQuality({
     pageCount: pdf.numPages,
     transactionCount: transactions.length,
     totalTextChars,
     pagesWithText,
     balanceMismatchRatio,
+    dateOrderMismatchRatio,
   });
 
   // Return only meaningful rows and keep original debit/credit/balance values.

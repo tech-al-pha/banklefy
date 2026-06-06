@@ -33,6 +33,22 @@ describe("pdf text quality assessment", () => {
     });
   });
 
+  it("falls back when dates look heavily out of order even if text is present", () => {
+    expect(
+      __pdfTextInternals.assessParsedPdfTextQuality({
+        pageCount: 2,
+        transactionCount: 6,
+        totalTextChars: 2100,
+        pagesWithText: 2,
+        balanceMismatchRatio: 0,
+        dateOrderMismatchRatio: 0.8,
+      }),
+    ).toEqual({
+      pdfType: "text-based",
+      useClientTransactions: false,
+    });
+  });
+
   it("does not treat continuation lines with embedded dates as row starts", () => {
     expect(
       __pdfTextInternals.rowStartPattern.test("00274626 22-02-2026 876201 443912XXXXXX2888 - S90699054"),
