@@ -41,7 +41,7 @@ export const useSettings = () => {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profileData, setProfileData] = useState<{ full_name: string | null; avatar_url?: string | null } | null>(null);
+  const [profileData, setProfileData] = useState<{ full_name: string | null } | null>(null);
 
   // Load settings from localStorage and profile from Supabase
   useEffect(() => {
@@ -65,7 +65,7 @@ export const useSettings = () => {
           if (error) {
             if (import.meta.env.DEV) { console.error('Failed to load profile:', error); }
         } else if (profile) {
-            setProfileData(profile as { full_name: string | null; avatar_url?: string | null });
+            setProfileData(profile as { full_name: string | null });
           }
         }
       } catch (e) {
