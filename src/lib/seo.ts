@@ -5,7 +5,7 @@ export const DEFAULT_META: RouteMeta = {
   title: "Bank Statement to Excel, CSV, MT940 & Tally in Seconds | Banklefy",
   description:
     "Convert bank statement PDFs into clean Excel, CSV, JSON, MT940 and Tally-ready exports with fast AI OCR and secure processing.",
-  image: "https://www.banklefy.site/og-banklefy.jpg",
+  image: "https://www.banklefy.site/og-banklefy.jpg?v=3",
 };
 
 export const META_BY_PATH: Record<string, RouteMeta> = {
