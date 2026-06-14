@@ -6,10 +6,10 @@ const Logo = () => {
     <Link
       to="/"
       aria-label="Banklefy home"
-      className="group flex h-10 sm:h-14 cursor-pointer items-center"
+      className="group flex h-9 sm:h-14 cursor-pointer items-center"
     >
       {/* Logo Container */}
-      <div className="relative flex h-8 w-8 sm:h-12 sm:w-12 items-center justify-center overflow-visible">
+      <div className="relative flex h-7 w-7 sm:h-12 sm:w-12 items-center justify-center overflow-visible">
         <img
           src={banklefyLogo} 
           alt="Banklefy" 
@@ -18,7 +18,7 @@ const Logo = () => {
       </div>
 
       {/* Banklefy Text */}
-      <span className="ml-1.5 sm:ml-2 block bg-gradient-to-r from-[#FFFFFF] via-[#B5B5B5] to-[#717171] bg-clip-text text-base sm:text-xl font-black uppercase tracking-[0.02em] tracking-tighter text-transparent drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)] font-noir">
+      <span className="ml-1 sm:ml-2 block bg-gradient-to-r from-[#FFFFFF] via-[#B5B5B5] to-[#717171] bg-clip-text text-sm sm:text-xl font-black uppercase tracking-[0.01em] sm:tracking-[0.02em] tracking-tighter text-transparent drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)] font-noir">
         Banklefy
       </span>
     </Link>
