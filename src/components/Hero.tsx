@@ -49,30 +49,25 @@ export const Hero = () => {
   const heroHighlights = heroHighlightsByLanguage[language] ?? heroHighlightsByLanguage.en;
 
   return (
-    <section className="relative flex min-h-[70vh] items-center justify-center bg-transparent pb-8 pt-2 md:pt-8">
+    <section className="relative flex min-h-[70vh] items-center justify-center bg-transparent pb-8 pt-1 md:pt-6">
 
       <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 text-left">
-        <div className="mx-auto grid max-w-none grid-cols-1 md:grid-cols-[1.1fr_0.9fr] items-center gap-5 md:gap-10 pt-3 md:pt-16">
+        <div className="mx-auto grid max-w-none grid-cols-1 md:grid-cols-[1.1fr_0.9fr] items-center gap-5 md:gap-10 pt-1 sm:pt-2 md:pt-12">
           <div className="flex flex-col items-start space-y-5 sm:space-y-6">
             <div className="inline-flex w-fit max-w-full flex-col items-start leading-tight overflow-visible">
               <h1
                 className="w-full font-bold tracking-tight mt-2 sm:mt-4 font-lequire hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[0.98] sm:leading-[1.02]"
                 style={{ fontSize: "clamp(2.3rem, 8vw, 5.7rem)", textWrap: "balance" }}
               >
-                {t('hero.titleLine1')}
+                <span className="block leading-[0.92]">BANK</span>
+                <span className="block leading-[0.92] mt-1">STATEMENT</span>
               </h1>
               <h2
-                className="w-full font-black uppercase font-lequire mt-1 sm:mt-2 hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[0.92] sm:leading-[0.98]"
-                style={{ fontSize: "clamp(3rem, 11vw, 7.8rem)" }}
-                aria-label={titleLine2}
+                className="w-full font-black uppercase font-lequire mt-1 sm:mt-2 hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[0.9] sm:leading-[0.96]"
+                style={{ fontSize: "clamp(2.7rem, 10.5vw, 7.8rem)" }}
+                aria-label={`${t('hero.titleLine1')} ${titleLine2}`}
               >
-                <span className="flex w-full justify-between gap-1 sm:gap-2">
-                  {titleLine2Chars.map((char, index) => (
-                    <span key={`${char}-${index}`} className="inline-block">
-                      {char}
-                    </span>
-                  ))}
-                </span>
+                <span className="block leading-[0.9]">CONVERTER</span>
               </h2>
             </div>
 
@@ -84,20 +79,20 @@ export const Hero = () => {
               {t("hero.subtitle")}
             </p>
 
-            <div className="hero-cta-group mt-4 sm:mt-10 md:mt-14 flex w-full max-w-2xl flex-row items-stretch justify-start gap-2.5 sm:gap-4">
+            <div className="hero-cta-group mt-4 sm:mt-8 md:mt-12 flex w-full max-w-2xl flex-row items-stretch justify-start gap-2.5 sm:gap-4">
               <Button
                 size="lg"
-                className="group hero-cta-primary w-[68%] sm:w-auto border-0 bg-primary px-4 sm:px-8 text-xs sm:text-base text-primary-foreground shadow-none transition-all duration-300 hover:scale-105 no-glow"
+                className="group hero-cta-primary w-[68%] sm:w-auto border-0 bg-primary px-4 sm:px-8 text-[0.72rem] sm:text-base text-primary-foreground shadow-none transition-all duration-300 hover:scale-105 no-glow"
                 onClick={() => scrollToId("demo")}
               >
-                <Upload className="mr-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:rotate-12 transition-transform" aria-hidden="true" />
+                <Upload className="mr-2 h-3.5 w-3.5 sm:h-5 sm:w-5 group-hover:rotate-12 transition-transform" aria-hidden="true" />
                 {t('hero.uploadBtn')}
               </Button>
 
               <Button
                 size="lg"
                 variant="outline"
-                className="btn-target-glow hero-cta-secondary w-[32%] sm:w-auto border-primary/40 bg-[#141414] px-3 sm:px-8 text-xs sm:text-base text-primary shadow-none backdrop-blur-xl transition-all duration-300"
+                className="btn-target-glow hero-cta-secondary w-[32%] sm:w-auto border-primary/40 bg-[#141414] px-3 sm:px-8 text-[0.68rem] sm:text-base text-primary shadow-none backdrop-blur-xl transition-all duration-300"
                 onClick={() => navigate("/sample-data")}
               >
                 Sample Data
