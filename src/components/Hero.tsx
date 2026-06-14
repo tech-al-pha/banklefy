@@ -63,7 +63,7 @@ export const Hero = () => {
                 <span className="block leading-[0.92] mt-1">STATEMENT</span>
               </h1>
               <h2
-                className="w-full font-black uppercase font-lequire mt-1 sm:mt-2 hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[0.9] sm:leading-[0.96]"
+                className="w-full font-black uppercase font-lequire mt-1 sm:mt-2 hero-title-3d bg-gradient-to-r from-[#ffffff] via-[#b9b9b9] to-[#0f0f0f] bg-clip-text text-transparent leading-[0.9] sm:leading-[0.96] drop-shadow-[0_12px_20px_rgba(0,0,0,0.45)]"
                 style={{ fontSize: "clamp(2.7rem, 10.5vw, 7.8rem)" }}
                 aria-label={`${t('hero.titleLine1')} ${titleLine2}`}
               >
@@ -79,7 +79,7 @@ export const Hero = () => {
                 {t('hero.titleLine1')}
               </h1>
               <h2
-                className="w-full font-black uppercase font-lequire mt-2 hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[0.98]"
+                className="w-full font-black uppercase font-lequire mt-2 hero-title-3d bg-gradient-to-r from-[#ffffff] via-[#b9b9b9] to-[#0f0f0f] bg-clip-text text-transparent leading-[0.98] drop-shadow-[0_12px_20px_rgba(0,0,0,0.45)]"
                 style={{ fontSize: "clamp(3.5rem, 12vw, 7.8rem)" }}
                 aria-label={titleLine2}
               >
