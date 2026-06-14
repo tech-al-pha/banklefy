@@ -13,11 +13,12 @@ const routes = [
     path: "/",
     title: "Bank Statement to Excel, CSV, MT940 & Tally in Seconds | Banklefy",
     description:
-      "Convert bank statement PDFs into clean Excel, CSV, JSON, MT940 and Tally-ready exports with fast AI OCR and secure processing.",
+      "Banklefy is a bank statement converter, PDF to Excel and CSV tool, and edited PDF detector for FOIR, EMI, loan, fraud, and statement analysis with fast AI OCR.",
     heading: "Convert bank statements into clean exports in minutes",
     sections: [
       "Upload bank statement PDFs, scanned pages, or mobile captures and convert them into structured Excel, CSV, JSON, XML, and MT940 outputs.",
       "Banklefy combines deterministic parsing for text PDFs with OCR only when needed so finance teams can reconcile faster and reduce manual copy-paste work.",
+      "Use Banklefy when you need a bank statement converter, PDF to Excel tool, PDF to CSV export, edited PDF detection, FOIR checks, EMI checks, or loan analysis.",
     ],
     schemaType: "SoftwareApplication",
   },
@@ -36,18 +37,18 @@ const routes = [
     path: "/features",
     title: "Features | Banklefy Bank Statement Converter",
     description:
-      "Explore AI OCR, PDF to Excel/CSV, multilingual support, and secure processing for fast conversions.",
+      "Explore AI OCR, PDF to Excel/CSV, multilingual support, edited PDF detection, FOIR analysis, EMI checker insights, and secure processing for fast conversions.",
     heading: "Features built for statement extraction accuracy",
     sections: [
       "Banklefy supports PDF, image, and scanned bank statements with conversion into spreadsheet-ready outputs.",
-      "Core features include OCR when required, deterministic parsing for text PDFs, multiple export formats, and secure processing controls.",
+      "Core features include OCR when required, deterministic parsing for text PDFs, multiple export formats, edited PDF signals, FOIR support, EMI support, and secure processing controls.",
     ],
   },
   {
     path: "/benefits",
     title: "Benefits | Banklefy Statement Converter",
     description:
-      "Reduce manual work, speed reconciliation, and improve accuracy with AI bank statement conversion.",
+      "Reduce manual work, speed reconciliation, and improve accuracy with AI bank statement conversion, fraud review, and statement analysis.",
     heading: "Why teams switch from manual copy-paste",
     sections: [
       "Automation reduces time spent retyping statements and helps teams move faster on reconciliation, audit prep, and underwriting.",
@@ -57,11 +58,11 @@ const routes = [
   {
     path: "/how-it-works",
     title: "How It Works | Banklefy",
-    description: "See how Banklefy converts bank statements into clean exports in three steps.",
+    description: "See how Banklefy converts bank statements into clean exports in three steps, with OCR, edited PDF detection, and accurate transaction extraction.",
     heading: "How the conversion flow works",
     sections: [
       "Upload your statement, let Banklefy detect the best extraction path, then download a clean export once processing is complete.",
-      "The workflow is designed to keep inputs simple while producing structured outputs suitable for accounting, finance, and operations teams.",
+      "The workflow is designed to keep inputs simple while producing structured outputs suitable for accounting, finance, operations teams, FOIR review, EMI review, and fraud analysis.",
     ],
     schemaType: "HowTo",
   },
@@ -69,7 +70,7 @@ const routes = [
     path: "/security",
     title: "Security | Banklefy",
     description:
-      "How Banklefy handles data, encryption, access control, retention, and third-party dependencies.",
+      "How Banklefy handles data, encryption, access control, retention, edited PDF detection, and third-party dependencies.",
     heading: "Security and data handling",
     sections: [
       "This page explains how Banklefy approaches file handling, session access, deletion flow, and operational safeguards.",
@@ -80,11 +81,11 @@ const routes = [
     path: "/faqs",
     title: "FAQs & Help | Banklefy",
     description:
-      "Direct answers and practical notes about file types, passwords, limits, retention, and exports.",
+      "Direct answers and practical notes about file types, passwords, limits, retention, exports, edited PDF detection, FOIR, EMI, and support.",
     heading: "Frequently asked questions",
     sections: [
       "Find practical answers about supported formats, password-protected PDFs, processing limits, and export options.",
-      "The FAQ section helps users understand how the converter behaves before they start a session.",
+      "The FAQ section helps users understand how the converter behaves before they start a session, including edited PDF detection and underwriting-style analysis signals.",
     ],
     schemaType: "FAQPage",
   },
@@ -92,18 +93,18 @@ const routes = [
     path: "/about",
     title: "About | Banklefy",
     description:
-      "Product notes for Banklefy, including text-PDF parsing, OCR for scanned pages, session-only processing, and support channels.",
+      "Product notes for Banklefy, including text-PDF parsing, OCR for scanned pages, edited PDF detection, FOIR and EMI analysis, session-only processing, and support channels.",
     heading: "About Banklefy",
     sections: [
       "Banklefy is built to turn bank statements into structured files that are easier to review, reconcile, and import into downstream systems.",
-      "The product focuses on practical extraction accuracy, predictable exports, and workflows that reduce manual finance operations work.",
+      "The product focuses on practical extraction accuracy, predictable exports, edited PDF review, and workflows that reduce manual finance operations work.",
     ],
   },
   {
     path: "/contact",
     title: "Contact | Banklefy",
     description:
-      "Contact Banklefy support for bank statement conversion issues, billing questions, privacy requests, or account access help.",
+      "Contact Banklefy support for bank statement conversion issues, billing questions, privacy requests, account access help, edited PDF detection, FOIR checks, and EMI checks.",
     heading: "Contact Banklefy support",
     sections: [
       "Use the contact page when you need help with bank statement conversion errors, account access, payment questions, refunds, or privacy-related requests.",
@@ -178,7 +179,7 @@ const routes = [
   {
     path: "/blog/launch",
     title: "Introducing Banklefy: Bank Statement to Excel in Minutes",
-    description: "Meet Banklefy and see how it speeds up statement conversion with secure processing.",
+    description: "Meet Banklefy and see how it speeds up statement conversion with secure processing, OCR, and accurate extraction.",
     heading: "Introducing Banklefy",
     sections: [
       "This launch note explains who Banklefy is built for and how it reduces time spent manually retyping statement data.",
@@ -189,7 +190,7 @@ const routes = [
   {
     path: "/blog/accuracy",
     title: "How We Improve OCR Accuracy on Low-Quality Scans",
-    description: "Learn the OCR safeguards and scanning tips that improve bank statement accuracy.",
+    description: "Learn the OCR safeguards and scanning tips that improve bank statement accuracy and OCR reliability.",
     heading: "Improving OCR accuracy on low-quality scans",
     sections: [
       "This article explains the safeguards Banklefy uses when statements are blurry, skewed, or captured from mobile photos.",
@@ -236,7 +237,7 @@ const routes = [
     path: "/blog/underwriting",
     title: "AI-Powered Underwriting & Risk Analysis from Bank Statements | Banklefy",
     description:
-      "Get ADB, FOIR score, net cashflow, and balance dip analysis automatically from converted bank statements.",
+      "Get ADB, FOIR score, EMI analysis, net cashflow, and balance dip analysis automatically from converted bank statements.",
     heading: "Underwriting and risk analysis",
     sections: [
       "This note explains how structured statement data supports underwriting and risk review workflows with derived financial indicators.",
@@ -248,7 +249,7 @@ const routes = [
     path: "/blog/fraud-detection",
     title: "Detecting Tampered Bank Statements with AI Fraud Alerts | Banklefy",
     description:
-      "Automated fraud detection flags balance discontinuity, duplicate entries, and formatting inconsistencies in bank statements.",
+      "Automated fraud detection flags balance discontinuity, duplicate entries, formatting inconsistencies, and edited PDF signals in bank statements.",
     heading: "Detecting tampered statements",
     sections: [
       "This article describes the kinds of anomalies that can be highlighted when reviewing bank statements for edits or irregularities.",
@@ -325,6 +326,7 @@ const buildStructuredData = (route) => {
       operatingSystem: "Web Browser",
       description: route.description,
       url: canonical,
+      keywords: "bank statement converter, pdf to excel, pdf to csv, edited pdf detector, FOIR checker, EMI checker, loan checker, fraud detection, bank statement analysis",
       offers: {
         "@type": "Offer",
         price: "0",

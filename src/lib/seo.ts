@@ -4,7 +4,7 @@ export type JsonLd = Record<string, unknown>;
 export const DEFAULT_META: RouteMeta = {
   title: "Bank Statement to Excel, CSV, MT940 & Tally in Seconds | Banklefy",
   description:
-    "Convert bank statement PDFs into clean Excel, CSV, JSON, MT940 and Tally-ready exports with fast AI OCR and secure processing.",
+    "Banklefy is a bank statement converter, PDF to Excel and CSV tool, and edited PDF detector for FOIR, EMI, loan, fraud, and statement analysis with fast AI OCR.",
   image: "https://www.banklefy.site/og-banklefy.jpg?v=3",
 };
 
@@ -13,22 +13,22 @@ export const META_BY_PATH: Record<string, RouteMeta> = {
   "/pricing": {
     title: "Pricing | Banklefy Bank Statement Converter",
     description:
-      "Transparent INR pricing for AI bank statement conversion. Free trial and one-time credit packs with higher limits and premium exports.",
+      "Transparent INR pricing for AI bank statement conversion. Free trial and one-time credit packs with higher limits, premium exports, FOIR checks, EMI checks, and edited PDF detection.",
   },
   "/features": {
     title: "Features | Banklefy Bank Statement Converter",
     description:
-      "Explore AI OCR, PDF to Excel/CSV, multilingual support, and secure processing for fast conversions.",
+      "Explore AI OCR, PDF to Excel/CSV, multilingual support, edited PDF detection, FOIR analysis, EMI checker insights, and secure processing for fast conversions.",
   },
   "/benefits": {
     title: "Benefits | Banklefy Statement Converter",
     description:
-      "Reduce manual work, speed reconciliation, and improve accuracy with AI bank statement conversion.",
+      "Reduce manual work, speed reconciliation, and improve accuracy with AI bank statement conversion, fraud review, and statement analysis.",
   },
   "/about": {
     title: "About | Banklefy",
     description:
-      "Product notes for Banklefy, including text-PDF parsing, OCR for scanned pages, session-only processing, and support channels.",
+      "Product notes for Banklefy, including text-PDF parsing, OCR for scanned pages, edited PDF detection, FOIR and EMI analysis, session-only processing, and support channels.",
   },
   "/sample-data": {
     title: "Sample Data | Banklefy Bank Statement Converter",
@@ -61,19 +61,19 @@ export const META_BY_PATH: Record<string, RouteMeta> = {
   },
   "/help": {
     title: "FAQs & Help | Banklefy",
-    description: "Direct help and FAQ notes for file types, passwords, limits, exports, and support.",
+    description: "Direct help and FAQ notes for file types, passwords, limits, exports, edited PDF detection, FOIR, EMI, and support.",
   },
   "/how-it-works": {
     title: "How It Works | Banklefy",
-    description: "See how Banklefy converts bank statements into clean exports in three steps.",
+    description: "See how Banklefy converts bank statements into clean exports in three steps, with OCR, edited PDF detection, and accurate transaction extraction.",
   },
   "/security": {
     title: "Security | Banklefy",
-    description: "How Banklefy handles data, encryption, access control, retention, and third-party dependencies.",
+    description: "How Banklefy handles data, encryption, access control, retention, edited PDF detection, and third-party dependencies.",
   },
   "/contact": {
     title: "Contact | Banklefy",
-    description: "How to contact Banklefy support for conversion, billing, privacy, and account issues.",
+    description: "How to contact Banklefy support for conversion, billing, privacy, account issues, FOIR checks, EMI checks, and edited PDF detection.",
   },
   "/cancellation-and-refund": {
     title: "Cancellation & Refund Policy | Banklefy",
@@ -93,11 +93,11 @@ export const META_BY_PATH: Record<string, RouteMeta> = {
   },
   "/blog/launch": {
     title: "Introducing Banklefy: Bank Statement to Excel in Minutes",
-    description: "Meet Banklefy and see how it speeds up statement conversion with secure processing.",
+    description: "Meet Banklefy and see how it speeds up statement conversion with secure processing, OCR, and accurate extraction.",
   },
   "/blog/accuracy": {
     title: "How We Improve OCR Accuracy on Low-Quality Scans",
-    description: "Learn the OCR safeguards and scanning tips that improve bank statement accuracy.",
+    description: "Learn the OCR safeguards and scanning tips that improve bank statement accuracy and OCR reliability.",
   },
   "/blog/privacy": {
     title: "Privacy by Default: Secure File Handling and Deletion Control",
@@ -113,11 +113,11 @@ export const META_BY_PATH: Record<string, RouteMeta> = {
   },
   "/blog/underwriting": {
     title: "AI-Powered Underwriting & Risk Analysis from Bank Statements | Banklefy",
-    description: "Get ADB, FOIR score, net cashflow, and balance dip analysis automatically from converted bank statements.",
+    description: "Get ADB, FOIR score, EMI analysis, net cashflow, and balance dip analysis automatically from converted bank statements.",
   },
   "/blog/fraud-detection": {
     title: "Detecting Tampered Bank Statements with AI Fraud Alerts | Banklefy",
-    description: "Automated fraud detection flags balance discontinuity, duplicate entries, and formatting inconsistencies in bank statements.",
+    description: "Automated fraud detection flags balance discontinuity, duplicate entries, formatting inconsistencies, and edited PDF signals in bank statements.",
   },
   "/blog/multi-language": {
     title: "Multi-Language Support: Use Banklefy in Your Preferred Language",
@@ -221,6 +221,17 @@ export const getStructuredDataByRoute = (
     operatingSystem: "Web Browser",
     description: meta.description,
     url: canonical,
+    keywords: [
+      "bank statement converter",
+      "pdf to excel",
+      "pdf to csv",
+      "edited pdf detector",
+      "FOIR checker",
+      "EMI checker",
+      "loan checker",
+      "fraud detection",
+      "bank statement analysis",
+    ].join(", "),
     offers: {
       "@type": "Offer",
       price: "0",
@@ -307,7 +318,7 @@ export const getStructuredDataByRoute = (
       "@context": "https://schema.org",
       "@type": "HowTo",
       name: "How Banklefy works",
-      description: "Upload, convert, and download clean bank statement exports.",
+      description: "Upload, convert, and download clean bank statement exports with OCR and edited PDF detection.",
       step: [
         {
           "@type": "HowToStep",
@@ -339,6 +350,14 @@ export const getStructuredDataByRoute = (
       operatingSystem: "Web Browser",
       description: meta.description,
       url: canonical,
+      keywords: [
+        "bank statement converter",
+        "pdf to excel",
+        "pdf to csv",
+        "edited pdf detector",
+        "FOIR checker",
+        "EMI checker",
+      ].join(", "),
       offers: {
         "@type": "Offer",
         price: "0",
