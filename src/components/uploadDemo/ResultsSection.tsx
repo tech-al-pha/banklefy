@@ -112,8 +112,15 @@ type ResultsSectionProps = {
     score?: number;
     riskLevel?: "low" | "medium" | "high";
     editor?: string | null;
+    producer?: string | null;
+    creator?: string | null;
+    likelySource?: string | null;
+    provenanceSummary?: string | null;
+    provenanceConfidence?: "low" | "medium" | "high";
     creationDate?: string | null;
     modificationDate?: string | null;
+    sourceType?: "text-based" | "image-based" | "mixed" | "unknown";
+    sourceEvidence?: string[];
     pageAnomalies?: Array<{ pageNumber: number; codes: string[]; summary: string }>;
   } | null;
   showUnderwriting?: boolean;
@@ -884,12 +891,25 @@ export const ResultsSection = ({
               {(editedPdfCheckResult.editor || editedPdfCheckResult.creationDate || editedPdfCheckResult.modificationDate || editedPdfCheckResult.pageAnomalies?.length) && (
                 <div className="mt-2 space-y-1 text-xs text-white/70">
                   {editedPdfCheckResult.editor ? <p>Editor/Producer: {editedPdfCheckResult.editor}</p> : null}
+                  {editedPdfCheckResult.likelySource ? <p>Likely app: {editedPdfCheckResult.likelySource}</p> : null}
+                  {editedPdfCheckResult.provenanceConfidence ? <p>Confidence: {editedPdfCheckResult.provenanceConfidence}</p> : null}
+                  {editedPdfCheckResult.sourceType ? <p>Source type: {editedPdfCheckResult.sourceType}</p> : null}
+                  {editedPdfCheckResult.producer ? <p>Producer: {editedPdfCheckResult.producer}</p> : null}
+                  {editedPdfCheckResult.creator ? <p>Creator: {editedPdfCheckResult.creator}</p> : null}
                   {editedPdfCheckResult.creationDate ? <p>Created: {editedPdfCheckResult.creationDate}</p> : null}
                   {editedPdfCheckResult.modificationDate ? <p>Modified: {editedPdfCheckResult.modificationDate}</p> : null}
+                  {editedPdfCheckResult.provenanceSummary ? <p>{editedPdfCheckResult.provenanceSummary}</p> : null}
                   {editedPdfCheckResult.pageAnomalies?.length ? (
                     <p>
                       Suspicious pages: {editedPdfCheckResult.pageAnomalies.map((page) => page.pageNumber).join(", ")}
                     </p>
+                  ) : null}
+                  {editedPdfCheckResult.sourceEvidence?.length ? (
+                    <div className="space-y-0.5">
+                      {editedPdfCheckResult.sourceEvidence.slice(0, 3).map((line, index) => (
+                        <p key={`${line}-${index}`}>{line}</p>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
               )}
@@ -994,11 +1014,18 @@ export const ResultsSection = ({
                 <p className={`text-2xl font-bold ${editedPdfTone ? toneClasses[editedPdfTone].text : "tone-good-text"}`}>
                   {editedPdfCheckResult.status === "suspected" ? "Review" : "Clean"}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                  {editedPdfCheckResult.reason}
-                </p>
-              </Card>
-            )}
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                {editedPdfCheckResult.reason}
+              </p>
+              <div className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                {editedPdfCheckResult.likelySource ? <p>Likely source: {editedPdfCheckResult.likelySource}</p> : null}
+                {editedPdfCheckResult.sourceType ? <p>Source type: {editedPdfCheckResult.sourceType}</p> : null}
+                {editedPdfCheckResult.provenanceConfidence ? <p>Confidence: {editedPdfCheckResult.provenanceConfidence}</p> : null}
+                {editedPdfCheckResult.producer ? <p>Producer: {editedPdfCheckResult.producer}</p> : null}
+                {editedPdfCheckResult.creator ? <p>Creator: {editedPdfCheckResult.creator}</p> : null}
+              </div>
+            </Card>
+          )}
           </div>
 
           <div className="mt-4">

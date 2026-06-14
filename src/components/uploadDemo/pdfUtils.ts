@@ -84,8 +84,15 @@ export interface PdfEditDetectionResult {
   reason: string;
   flags: string[];
   editor?: string | null;
+  producer?: string | null;
+  creator?: string | null;
+  likelySource?: string | null;
+  provenanceSummary?: string | null;
+  provenanceConfidence?: "low" | "medium" | "high";
   creationDate?: string | null;
   modificationDate?: string | null;
+  sourceType?: "text-based" | "image-based" | "mixed" | "unknown";
+  sourceEvidence?: string[];
   pageAnomalies?: PdfEditDetectionPageAnomaly[];
   pageCount?: number;
 }
@@ -245,6 +252,85 @@ const resolveEditorFromProducer = (producer: string, creator: string): string | 
   return null;
 };
 
+const inferProvenanceSource = (params: {
+  producer: string;
+  creator: string;
+  totalTextChars: number;
+  pagesWithText: number;
+  pages: number;
+  imageObjectCount: number;
+  pageAnomalies: PdfEditDetectionPageAnomaly[];
+}): {
+  sourceType: "text-based" | "image-based" | "mixed" | "unknown";
+  likelySource: string | null;
+  provenanceConfidence: "low" | "medium" | "high";
+  sourceEvidence: string[];
+} => {
+  const { producer, creator, totalTextChars, pagesWithText, pages, imageObjectCount, pageAnomalies } = params;
+  const sourceBlob = `${producer} ${creator}`.trim();
+  const normalized = sourceBlob.toLowerCase();
+  const sourceEvidence: string[] = [];
+  let sourceType: "text-based" | "image-based" | "mixed" | "unknown" = "unknown";
+  let likelySource: string | null = null;
+  let provenanceConfidence: "low" | "medium" | "high" = "low";
+
+  if (sourceBlob) {
+    const matchedEditor = resolveEditorFromProducer(producer, creator);
+    if (matchedEditor) {
+      likelySource = matchedEditor;
+      sourceEvidence.push(`Metadata producer/creator matched ${matchedEditor}.`);
+      provenanceConfidence = "high";
+    } else {
+      sourceEvidence.push(`Metadata producer/creator found: ${sourceBlob}.`);
+      provenanceConfidence = "medium";
+    }
+  } else {
+    sourceEvidence.push("No producer/creator metadata exposed by PDF.");
+  }
+
+  const mostlyText = pages > 0 && pagesWithText >= Math.max(1, Math.ceil(pages * 0.7));
+  const mostlyImages = imageObjectCount > 0 && totalTextChars > 0 && totalTextChars / Math.max(1, imageObjectCount) < 180;
+  const mixedSignals = pages > 0 && pagesWithText > 0 && pagesWithText < pages;
+
+  if (mostlyText && !mostlyImages) {
+    sourceType = "text-based";
+    sourceEvidence.push("Selectable text exists on most pages, so this looks text-based.");
+  } else if (mostlyImages && !mostlyText) {
+    sourceType = "image-based";
+    sourceEvidence.push("Image-heavy structure with sparse selectable text suggests a scanned/image-based PDF.");
+  } else if (mixedSignals || (mostlyText && mostlyImages)) {
+    sourceType = "mixed";
+    sourceEvidence.push("Mixed text and image signals were found across the document.");
+  } else {
+    sourceType = "unknown";
+    sourceEvidence.push("Insufficient structural evidence to classify the PDF source type with confidence.");
+  }
+
+  if (pageAnomalies.length > 0) {
+    sourceEvidence.push(`Page-level text gaps were found on ${pageAnomalies.slice(0, 5).map((entry) => entry.pageNumber).join(", ")}.`);
+  }
+
+  if (!likelySource && normalized) {
+    if (/acrobat|adobe/.test(normalized)) likelySource = "Adobe Acrobat";
+    else if (/word|microsoft/.test(normalized)) likelySource = "Microsoft Word";
+    else if (/foxit/.test(normalized)) likelySource = "Foxit";
+    else if (/nitro/.test(normalized)) likelySource = "Nitro PDF";
+    else if (/canva/.test(normalized)) likelySource = "Canva";
+    else if (/ilovepdf/.test(normalized)) likelySource = "iLovePDF";
+    else if (/smallpdf/.test(normalized)) likelySource = "Smallpdf";
+    else if (/sejda/.test(normalized)) likelySource = "Sejda";
+    else if (/pdf24/.test(normalized)) likelySource = "PDF24";
+    else if (/itext/.test(normalized)) likelySource = "iText";
+    else if (/libreoffice/.test(normalized)) likelySource = "LibreOffice";
+  }
+
+  if (!sourceBlob && sourceType !== "unknown") {
+    provenanceConfidence = sourceType === "mixed" ? "low" : "medium";
+  }
+
+  return { sourceType, likelySource, provenanceConfidence, sourceEvidence };
+};
+
 export const getPdfPageCount = async (file: File, password?: string): Promise<number | null> => {
   const pdfjsLib = (await import("pdfjs-dist")) as unknown as PdfJsModule;
   pdfjsLib.GlobalWorkerOptions.workerSrc = await getPdfWorkerSrc();
@@ -372,6 +458,8 @@ export const detectEditedPdf = async (
   const charsPerPage: number[] = [];
   let pages = 0;
   let editorHint: string | null = null;
+  let producerString: string | null = null;
+  let creatorString: string | null = null;
   let creationDateString: string | null = null;
   let modificationDateString: string | null = null;
   const pageAnomalies: PdfEditDetectionPageAnomaly[] = [];
@@ -393,6 +481,8 @@ export const detectEditedPdf = async (
       const producer = String(info.Producer || "");
       const creator = String(info.Creator || "");
       const fullProducer = `${producer} ${creator}`.trim();
+      producerString = producer || null;
+      creatorString = creator || null;
 
       editorHint = resolveEditorFromProducer(producer, creator) || null;
       if (!editorHint && fullProducer) {
@@ -644,10 +734,23 @@ export const detectEditedPdf = async (
         ? "medium"
         : "low";
 
+  const provenance = inferProvenanceSource({
+    producer: producerString ?? "",
+    creator: creatorString ?? "",
+    totalTextChars,
+    pagesWithText,
+    pages,
+    imageObjectCount,
+    pageAnomalies,
+  });
   const metadataSummaries: string[] = [];
   if (editorHint) {
     metadataSummaries.push(`Detected producer/editor: ${editorHint}`);
   }
+  if (provenance.likelySource) {
+    metadataSummaries.push(`Likely source app: ${provenance.likelySource}`);
+  }
+  metadataSummaries.push(`Source type: ${provenance.sourceType}`);
   if (creationDateString) {
     metadataSummaries.push(`Creation date: ${creationDateString}`);
   }
@@ -665,6 +768,13 @@ export const detectEditedPdf = async (
     riskLevel,
     flags: flags.map((f) => `${f.code}: ${f.label}`),
     editor: editorHint,
+    producer: producerString,
+    creator: creatorString,
+    likelySource: provenance.likelySource,
+    provenanceSummary: provenance.sourceEvidence.join(" "),
+    provenanceConfidence: provenance.provenanceConfidence,
+    sourceType: provenance.sourceType,
+    sourceEvidence: provenance.sourceEvidence,
     creationDate: creationDateString,
     modificationDate: modificationDateString,
     pageAnomalies: pageAnomalies.length > 0 ? pageAnomalies : undefined,

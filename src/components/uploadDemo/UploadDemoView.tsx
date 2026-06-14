@@ -87,7 +87,24 @@ type UploadDemoViewProps = {
   ) => string;
   truncateDecimals: (value: number, decimals?: number) => number;
   resultMode: ConversionMode;
-  editedPdfCheckResult: { fileName: string; status: "clean" | "suspected"; reason: string } | null;
+  editedPdfCheckResult: {
+    fileName: string;
+    status: "clean" | "suspected";
+    reason: string;
+    score?: number;
+    riskLevel?: "low" | "medium" | "high";
+    editor?: string | null;
+    producer?: string | null;
+    creator?: string | null;
+    likelySource?: string | null;
+    provenanceSummary?: string | null;
+    provenanceConfidence?: "low" | "medium" | "high";
+    creationDate?: string | null;
+    modificationDate?: string | null;
+    sourceType?: "text-based" | "image-based" | "mixed" | "unknown";
+    sourceEvidence?: string[];
+    pageAnomalies?: Array<{ pageNumber: number; codes: string[]; summary: string }>;
+  } | null;
   showUnderwriting: boolean;
   showFraudSignals: boolean;
   progressStep: number;
