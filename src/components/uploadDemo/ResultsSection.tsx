@@ -554,6 +554,16 @@ export const ResultsSection = ({
   const creditTone: ToneName = analytics ? getCreditTone(analytics.totalCredits) : "good";
   const debitTone: ToneName = analytics ? getDebitTone(analytics.totalCredits, analytics.totalDebits) : "moderate";
   const netFlowTone: ToneName = analytics ? getNetFlowTone(analytics.netFlow, analytics.totalCredits) : "moderate";
+  const editedPdfTone: ToneName | null = editedPdfCheckResult
+    ? editedPdfCheckResult.status === "suspected"
+      ? "bad"
+      : "excellent"
+    : null;
+  const editedPdfLabel = editedPdfCheckResult
+    ? editedPdfCheckResult.status === "suspected"
+      ? "Edited PDF"
+      : "Edit Check"
+    : null;
   const statementMonthCount = new Set(
     transactions
       .map((transaction) => parseStatementDateToIso(transaction.date)?.slice(0, 7))
@@ -846,7 +856,7 @@ export const ResultsSection = ({
         </div>
       )}
 
-      {isTallyOnlyMode && showEditDetectorSignals && editedPdfCheckResult && (
+      {showEditDetectorSignals && editedPdfCheckResult && (
         <Card
           className={`p-4 border ${
             editedPdfCheckResult.status === "suspected"
@@ -865,6 +875,12 @@ export const ResultsSection = ({
                 {actionCopy.editPdfCheck} {editedPdfCheckResult.status === "suspected" ? actionCopy.possibleEditDetected : actionCopy.noEditSignalDetected}
               </p>
               <p className="text-xs text-white/70">{editedPdfCheckResult.reason}</p>
+              {(editedPdfCheckResult.score || editedPdfCheckResult.riskLevel) && (
+                <p className="text-[11px] uppercase tracking-[0.2em] text-white/45">
+                  {editedPdfCheckResult.riskLevel ? `${editedPdfCheckResult.riskLevel} risk` : null}
+                  {editedPdfCheckResult.score != null ? `${editedPdfCheckResult.riskLevel ? " · " : ""}score ${editedPdfCheckResult.score}` : null}
+                </p>
+              )}
               {(editedPdfCheckResult.editor || editedPdfCheckResult.creationDate || editedPdfCheckResult.modificationDate || editedPdfCheckResult.pageAnomalies?.length) && (
                 <div className="mt-2 space-y-1 text-xs text-white/70">
                   {editedPdfCheckResult.editor ? <p>Editor/Producer: {editedPdfCheckResult.editor}</p> : null}
@@ -962,6 +978,25 @@ export const ResultsSection = ({
                   {actionCopy.duplicatesFound}
                 </div>
                 <p className="text-2xl font-bold tone-moderate-text">{analytics.duplicateCount}</p>
+              </Card>
+            )}
+
+            {showEditDetectorSignals && editedPdfCheckResult && (
+              <Card className={`card-3d-surface p-4 !bg-[#191919] ${editedPdfCheckResult.status === "suspected" ? "border-amber-500/40" : "border-emerald-500/35"}`}>
+                <div className={`flex items-center gap-2 text-sm mb-1 ${editedPdfTone ? toneClasses[editedPdfTone].text : "tone-good-text"}`}>
+                  {editedPdfCheckResult.status === "suspected" ? (
+                    <AlertTriangle className={`w-4 h-4 ${editedPdfTone ? toneClasses[editedPdfTone].text : "tone-bad-text"}`} />
+                  ) : (
+                    <CheckCircle className={`w-4 h-4 ${editedPdfTone ? toneClasses[editedPdfTone].text : "tone-excellent-text"}`} />
+                  )}
+                  {editedPdfLabel}
+                </div>
+                <p className={`text-2xl font-bold ${editedPdfTone ? toneClasses[editedPdfTone].text : "tone-good-text"}`}>
+                  {editedPdfCheckResult.status === "suspected" ? "Review" : "Clean"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                  {editedPdfCheckResult.reason}
+                </p>
               </Card>
             )}
           </div>

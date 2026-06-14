@@ -433,31 +433,6 @@ const Settings = () => {
       ),
     },
     {
-      id: "privacy-edited-warning",
-      title: "Edited PDF Warning Timing",
-      description: "Choose when the edited-PDF warning should appear.",
-      category: "privacy",
-      icon: <Eye className="h-5 w-5" />,
-      component: (
-        <div className="flex flex-nowrap gap-1 sm:gap-2">
-          <Button
-            size="sm"
-            variant={settings.editedPdfWarningTiming === "upload" ? "default" : "outline"}
-            onClick={() => updateSetting("editedPdfWarningTiming", "upload")}
-          >
-            After Upload
-          </Button>
-          <Button
-            size="sm"
-            variant={settings.editedPdfWarningTiming === "convert" ? "default" : "outline"}
-            onClick={() => updateSetting("editedPdfWarningTiming", "convert")}
-          >
-            On Convert
-          </Button>
-        </div>
-      ),
-    },
-    {
       id: "privacy-data",
       title: "Download my data",
       description: "Export your settings and account preferences.",

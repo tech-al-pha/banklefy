@@ -10,7 +10,6 @@ export interface UserSettings {
   soundEnabled: boolean;
   autoDownload: boolean;
   premiumExcelExport: boolean; // Toggle for Premium vs Simple Excel
-  editedPdfWarningTiming: "upload" | "convert";
   defaultExportFormat: "xlsx" | "csv";
   defaultDateFormat: "DD/MM/YYYY" | "MM/DD/YYYY" | "YYYY-MM-DD";
 }
@@ -22,7 +21,6 @@ const DEFAULT_SETTINGS: UserSettings = {
   soundEnabled: true,
   autoDownload: false,
   premiumExcelExport: true, // Default to premium
-  editedPdfWarningTiming: "convert",
   defaultExportFormat: "xlsx",
   defaultDateFormat: "DD/MM/YYYY",
 };

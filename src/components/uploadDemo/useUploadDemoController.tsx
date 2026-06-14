@@ -185,7 +185,6 @@ export const useUploadDemoController = () => {
   const { user } = useAuth();
   const { settings } = useSettings();
   const navigate = useNavigate();
-  const editedPdfWarningTiming = settings.editedPdfWarningTiming ?? "convert";
   const getErrorMessage = (error: unknown, fallback: string) => {
     if (error instanceof Error && error.message) return error.message;
     if (typeof error === 'string') return error;
@@ -951,15 +950,6 @@ export const useUploadDemoController = () => {
         setEditedPdfWarning(null);
         setEditedPdfCheckResult(null);
 
-        if (hasEditPdfDetectorAccess && editedPdfWarningTiming === "upload") {
-          for (const file of newFiles) {
-            const shouldBlockForEditedPdf = await runEditedPdfDetection(file);
-            if (shouldBlockForEditedPdf) {
-              break;
-            }
-          }
-        }
-
         toast({
           title: uploadUiCopy.filesSelected,
           description: uploadUiCopy.filesAddedReady(newFiles.length),
@@ -1075,10 +1065,8 @@ export const useUploadDemoController = () => {
     // For anonymous users, reCAPTCHA v3 runs in background - token generated at conversion time
 
     const isPdf = fileToConvert.name.toLowerCase().endsWith('.pdf');
-    if (editedPdfWarningTiming === "convert") {
-      const shouldBlockForEditedPdf = await runEditedPdfDetection(fileToConvert);
-      if (shouldBlockForEditedPdf) return;
-    }
+    const shouldBlockForEditedPdf = await runEditedPdfDetection(fileToConvert);
+    if (shouldBlockForEditedPdf) return;
 
     setCurrencyCode('');
     setBankInfo(null);
@@ -1735,11 +1723,9 @@ export const useUploadDemoController = () => {
       }
 
       for (const [index, file] of selectedFiles.entries()) {
-        if (editedPdfWarningTiming === "convert") {
-          const shouldBlockForEditedPdf = await runEditedPdfDetection(file);
-          if (shouldBlockForEditedPdf) {
-            return;
-          }
+        const shouldBlockForEditedPdf = await runEditedPdfDetection(file);
+        if (shouldBlockForEditedPdf) {
+          return;
         }
 
         const isPdf = file.name.toLowerCase().endsWith('.pdf');
