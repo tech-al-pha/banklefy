@@ -10,7 +10,7 @@ const applyInitialTheme = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     const parsed = stored ? JSON.parse(stored) : {};
-    const themeMode = parsed?.themeMode ?? (typeof parsed?.darkMode === "boolean" ? (parsed.darkMode ? "dark" : "light") : "system");
+    const themeMode = parsed?.themeMode ?? (typeof parsed?.darkMode === "boolean" ? (parsed.darkMode ? "dark" : "light") : "dark");
     const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const resolvedTheme = themeMode === "system" ? (systemPrefersDark ? "dark" : "light") : themeMode;
     document.documentElement.classList.toggle("dark", resolvedTheme === "dark");

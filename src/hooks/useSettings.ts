@@ -15,7 +15,7 @@ export interface UserSettings {
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
-  themeMode: "system",
+  themeMode: "dark",
   emailNotifications: true,
   pushNotifications: false,
   soundEnabled: true,
@@ -43,8 +43,7 @@ export const useSettings = () => {
 
   const resolveThemeMode = useCallback((themeMode: UserSettings["themeMode"]) => {
     if (themeMode === "light" || themeMode === "dark") return themeMode;
-    if (typeof window === "undefined") return "dark";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return "dark";
   }, []);
 
   const applyTheme = useCallback((themeMode: UserSettings["themeMode"]) => {
