@@ -73,6 +73,30 @@
     color: rgba(15, 23, 42, 0.72) !important;
   }
 
+  html[data-theme="light"] .text-white {
+    color: #0f172a !important;
+  }
+
+  html[data-theme="light"] .text-white\/95,
+  html[data-theme="light"] .text-white\/90,
+  html[data-theme="light"] .text-white\/85,
+  html[data-theme="light"] .text-white\/84,
+  html[data-theme="light"] .text-white\/80,
+  html[data-theme="light"] .text-white\/78,
+  html[data-theme="light"] .text-white\/75,
+  html[data-theme="light"] .text-white\/70,
+  html[data-theme="light"] .text-white\/68,
+  html[data-theme="light"] .text-white\/65,
+  html[data-theme="light"] .text-white\/60,
+  html[data-theme="light"] .text-white\/55,
+  html[data-theme="light"] .text-white\/50,
+  html[data-theme="light"] .text-white\/45,
+  html[data-theme="light"] .text-white\/40,
+  html[data-theme="light"] .text-white\/35,
+  html[data-theme="light"] .text-white\/30 {
+    color: #334155 !important;
+  }
+
   html[data-theme="light"] [class*="bg-[#141414]"],
   html[data-theme="light"] [class*="bg-[#161616]"],
   html[data-theme="light"] [class*="bg-[#171717]"],
@@ -225,6 +249,12 @@
   html[data-theme="light"] .bg-white\/80,
   html[data-theme="light"] .bg-white\/70 {
     color: #0f172a !important;
+  }
+
+  html[data-theme="light"] [class*="text-white"].text-primary,
+  html[data-theme="light"] [class*="text-white"].text-foreground,
+  html[data-theme="light"] [class*="text-white"].text-muted-foreground {
+    color: inherit !important;
   }
 
   html[data-theme="light"] .text-white,
