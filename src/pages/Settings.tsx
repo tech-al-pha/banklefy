@@ -44,6 +44,9 @@ import {
   UserCircle2,
   Lock,
   Bell,
+  SunMedium,
+  MoonStar,
+  MonitorCog,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatPlanLabel } from "@/lib/planLabels";
@@ -255,6 +258,33 @@ const Settings = () => {
       category: "preferences",
       icon: <MonitorSmartphone className="h-5 w-5" />,
       component: <LanguageSelector />,
+    },
+    {
+      id: "pref-theme",
+      title: "Theme",
+      description: "Choose device default, light, or dark.",
+      category: "preferences",
+      icon: <Palette className="h-5 w-5" />,
+      component: (
+        <div className="flex flex-wrap gap-2">
+          {[
+            { value: "system", label: "Device default", icon: MonitorCog },
+            { value: "light", label: "Light", icon: SunMedium },
+            { value: "dark", label: "Dark", icon: MoonStar },
+          ].map(({ value, label, icon: Icon }) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={settings.themeMode === value ? "default" : "outline"}
+              onClick={() => updateSetting("themeMode", value as "system" | "light" | "dark")}
+              className="gap-2"
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </Button>
+          ))}
+        </div>
+      ),
     },
     {
       id: "pref-export-format",

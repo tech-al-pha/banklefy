@@ -4,7 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 
 export interface UserSettings {
-  darkMode: boolean;
+  themeMode: "system" | "light" | "dark";
   emailNotifications: boolean;
   pushNotifications: boolean;
   soundEnabled: boolean;
@@ -15,7 +15,7 @@ export interface UserSettings {
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
-  darkMode: true,
+  themeMode: "system",
   emailNotifications: true,
   pushNotifications: false,
   soundEnabled: true,
@@ -41,6 +41,20 @@ export const useSettings = () => {
   const [saving, setSaving] = useState(false);
   const [profileData, setProfileData] = useState<{ full_name: string | null } | null>(null);
 
+  const resolveThemeMode = useCallback((themeMode: UserSettings["themeMode"]) => {
+    if (themeMode === "light" || themeMode === "dark") return themeMode;
+    if (typeof window === "undefined") return "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }, []);
+
+  const applyTheme = useCallback((themeMode: UserSettings["themeMode"]) => {
+    if (typeof document === "undefined") return;
+    const resolvedTheme = resolveThemeMode(themeMode);
+    document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
+    document.documentElement.dataset.theme = themeMode;
+    document.documentElement.style.colorScheme = resolvedTheme;
+  }, [resolveThemeMode]);
+
   // Load settings from localStorage and profile from Supabase
   useEffect(() => {
     const loadData = async () => {
@@ -49,7 +63,14 @@ export const useSettings = () => {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
-          setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+          const legacyThemeMode = typeof parsed?.darkMode === "boolean"
+            ? (parsed.darkMode ? "dark" : "light")
+            : undefined;
+          setSettings({
+            ...DEFAULT_SETTINGS,
+            ...parsed,
+            themeMode: parsed?.themeMode ?? legacyThemeMode ?? DEFAULT_SETTINGS.themeMode,
+          });
         }
 
         // Load profile data from Supabase if user is authenticated
@@ -76,14 +97,10 @@ export const useSettings = () => {
     loadData();
   }, [user]);
 
-  // Apply dark mode to document
+  // Apply theme to document
   useEffect(() => {
-    if (settings.darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [settings.darkMode]);
+    applyTheme(settings.themeMode);
+  }, [applyTheme, settings.themeMode]);
 
   const updateSetting = useCallback(<K extends keyof UserSettings>(
     key: K,
@@ -91,6 +108,9 @@ export const useSettings = () => {
   ) => {
     setSettings(prev => {
       const newSettings = { ...prev, [key]: value };
+      if (key === "themeMode") {
+        applyTheme(value as UserSettings["themeMode"]);
+      }
       // Persist to localStorage
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
@@ -99,7 +119,45 @@ export const useSettings = () => {
       }
       return newSettings;
     });
-  }, []);
+  }, [applyTheme]);
+
+  useEffect(() => {
+    const onStorage = () => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return;
+        const parsed = JSON.parse(stored);
+        if (parsed?.themeMode) {
+          applyTheme(parsed.themeMode);
+        }
+      } catch {
+        // Ignore storage parsing failures.
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [applyTheme]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => {
+      setSettings((prev) => {
+        if (prev.themeMode !== "system") return prev;
+        applyTheme("system");
+        return prev;
+      });
+    };
+
+    if (media.addEventListener) {
+      media.addEventListener("change", handleChange);
+      return () => media.removeEventListener("change", handleChange);
+    }
+
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
+  }, [applyTheme]);
 
   const updateProfile = useCallback(async (fullName: string) => {
     if (!user) return;

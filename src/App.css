@@ -1,5 +1,5 @@
 #root {
   min-height: 100vh;
-  background: #000000;
-  color: #B5B5B5;
+  background: var(--background);
+  color: var(--text-body);
 }

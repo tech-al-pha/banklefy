@@ -9,14 +9,17 @@ const STORAGE_KEY = "banklefy_user_settings";
 const applyInitialTheme = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    const darkMode = stored ? Boolean(JSON.parse(stored)?.darkMode) : true;
-    if (darkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    const parsed = stored ? JSON.parse(stored) : {};
+    const themeMode = parsed?.themeMode ?? (typeof parsed?.darkMode === "boolean" ? (parsed.darkMode ? "dark" : "light") : "system");
+    const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const resolvedTheme = themeMode === "system" ? (systemPrefersDark ? "dark" : "light") : themeMode;
+    document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
+    document.documentElement.dataset.theme = themeMode;
+    document.documentElement.style.colorScheme = resolvedTheme;
   } catch {
     document.documentElement.classList.add("dark");
+    document.documentElement.dataset.theme = "dark";
+    document.documentElement.style.colorScheme = "dark";
   }
 };
 
