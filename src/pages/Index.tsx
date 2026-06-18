@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Settings, Menu, Sparkles, CircleDollarSign, Gift } from "lucide-react";
+import { Settings, Menu, Sparkles, CircleDollarSign, Gift, BadgeAlert, Rocket } from "lucide-react";
 import { useEffect } from "react";
 import Logo from "@/components/Logo";
 import { LanguageSelector } from "@/components/LanguageSelector";
@@ -72,7 +73,39 @@ const Index = () => {
               <Logo />
             </div>
           <div className="hidden lg:flex items-center gap-3">
-              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="beta-chip rounded-full border-[#cbd5e1] bg-white px-3 py-1.5 text-[10px] font-extrabold tracking-[0.24em] text-[#334155] shadow-sm hover:bg-slate-50 hover:text-[#0f172a]"
+                    aria-label="Beta release information"
+                  >
+                    <BadgeAlert className="mr-1 h-3 w-3 text-[#2563eb]" />
+                    BETA
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  sideOffset={10}
+                  className="beta-popover w-[320px] border border-slate-200 bg-white p-4 text-slate-700 shadow-[0_20px_60px_rgba(15,23,42,0.14)] z-[70]"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Rocket className="h-4 w-4 text-[#2563eb]" />
+                      <p className="text-sm font-bold text-slate-900">Beta Release</p>
+                    </div>
+                    <p className="text-sm leading-6 text-slate-600">
+                      Banklefy is a new web app in beta. If you find any issue, please email us and let us know.
+                      We are actively improving statement conversion, fraud checks, and banking workflows.
+                    </p>
+                    <p className="text-sm font-medium text-slate-700">
+                      Thanks for trying Banklefy early. Your feedback helps us improve faster.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               {/* Pricing Button */}
               <Link
                 to="/pricing"
