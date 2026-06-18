@@ -643,7 +643,7 @@ const Settings = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => navigate('/')}
-                className="btn-target-glow w-auto border-primary/50 bg-[#141414] text-foreground"
+                className="btn-target-glow w-auto border-primary/30 bg-white text-[#0f172a] shadow-none hover:bg-slate-50 hover:text-[#0f172a]"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 {t('settings.backToHome')}

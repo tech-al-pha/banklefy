@@ -1168,6 +1168,13 @@
     box-shadow: none !important;
   }
 
+  html[data-theme="light"] .back-pill svg,
+  html[data-theme="light"] .back-pill * {
+    color: inherit !important;
+    fill: currentColor !important;
+    stroke: currentColor !important;
+  }
+
   html[data-theme="light"] .back-pill:hover,
   html[data-theme="light"] .back-pill:focus-visible {
     background: rgba(255, 255, 255, 0.9) !important;
