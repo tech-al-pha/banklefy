@@ -13,7 +13,7 @@ const Logo = () => {
         <img
           src={banklefyLogo} 
           alt="Banklefy" 
-          className="w-full h-full object-contain transition-all duration-500 group-hover:drop-shadow-[0_0_16px_rgba(255,255,255,0.25)] group-hover:scale-110"
+          className="banklefy-logo-mark w-full h-full object-contain transition-all duration-500 group-hover:drop-shadow-[0_0_16px_rgba(255,255,255,0.25)] group-hover:scale-110"
         />
       </div>
 
