@@ -93,13 +93,13 @@ const Index = () => {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <Rocket className="h-4 w-4 text-[#2563eb]" />
-                      <p className="text-sm font-bold text-slate-900">Beta Release</p>
+                      <p className="beta-popover-title text-sm font-bold text-slate-900">Beta Release</p>
                     </div>
-                    <p className="text-sm leading-6 text-slate-600">
+                    <p className="text-sm leading-6">
                       Banklefy is a new web app in beta. If you find any issue, please email us and let us know.
                       We are actively improving statement conversion, fraud checks, and banking workflows.
                     </p>
-                    <p className="text-sm font-medium text-slate-700">
+                    <p className="text-sm font-medium">
                       Thanks for trying Banklefy early. Your feedback helps us improve faster.
                     </p>
                   </div>

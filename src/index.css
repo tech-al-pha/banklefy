@@ -231,6 +231,34 @@
     color: inherit !important;
   }
 
+  html[data-theme="light"] .beta-chip {
+    background: #ffffff !important;
+    border-color: rgba(148, 163, 184, 0.55) !important;
+    color: #334155 !important;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08) !important;
+  }
+
+  html[data-theme="light"] .beta-chip:hover,
+  html[data-theme="light"] .beta-chip:focus-visible {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+  }
+
+  html[data-theme="light"] .beta-popover {
+    background: #ffffff !important;
+    border-color: rgba(226, 232, 240, 1) !important;
+    color: #475569 !important;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12) !important;
+  }
+
+  html[data-theme="light"] .beta-popover p {
+    color: #475569 !important;
+  }
+
+  html[data-theme="light"] .beta-popover .beta-popover-title {
+    color: #0f172a !important;
+  }
+
   html[data-theme="light"] [class*="bg-white/5"],
   html[data-theme="light"] [class*="bg-white/10"],
   html[data-theme="light"] [class*="bg-white/[0.03]"],
