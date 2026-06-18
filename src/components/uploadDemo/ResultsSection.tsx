@@ -1185,7 +1185,7 @@ export const ResultsSection = ({
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Card className="card-3d-surface rounded-xl border border-white/20 bg-[#191919]/70 p-3 shadow-none">
+        <Card className="dark-blue-glass card-3d-surface rounded-xl border border-sky-500/15 bg-sky-500/[0.06] p-3 shadow-none">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-sky-300" />
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">

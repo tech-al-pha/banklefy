@@ -56,14 +56,14 @@ export const Hero = () => {
           <div className="flex flex-col items-start space-y-4 sm:space-y-6">
             <div className="inline-flex w-fit max-w-full flex-col items-start leading-tight overflow-visible lg:hidden">
               <h1
-                className="w-full font-bold tracking-tight mt-0.5 sm:mt-4 font-lequire hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[0.94] sm:leading-[1.02]"
+                className="hero-bank-title hero-metal-title w-full font-bold tracking-tight mt-0.5 sm:mt-4 font-lequire hero-title-3d bg-gradient-to-r from-[#f4f4f4] via-[#a8acb3] to-[#666b76] bg-clip-text text-transparent leading-[0.94] sm:leading-[1.02]"
                 style={{ fontSize: "clamp(2.15rem, 7.6vw, 5.7rem)", textWrap: "balance" }}
               >
                 <span className="block leading-[0.92]">BANK</span>
                 <span className="block leading-[0.92] mt-1">STATEMENT</span>
               </h1>
               <h2
-                className="w-full font-black uppercase font-lequire mt-0.5 sm:mt-2 hero-title-3d bg-gradient-to-r from-[#ffffff] via-[#b9b9b9] to-[#0f0f0f] bg-clip-text text-transparent leading-[0.88] sm:leading-[0.96] drop-shadow-[0_12px_20px_rgba(0,0,0,0.45)]"
+                className="hero-converter-title hero-metal-title hero-converter-metal w-full font-black uppercase font-lequire mt-0.5 sm:mt-2 hero-title-3d bg-gradient-to-r from-[#f8f8f8] via-[#9ca3af] to-[#50555f] bg-clip-text text-transparent leading-[0.88] sm:leading-[0.96]"
                 style={{ fontSize: "clamp(2.45rem, 9.5vw, 7.8rem)" }}
                 aria-label={`${t('hero.titleLine1')} ${titleLine2}`}
               >
@@ -73,13 +73,13 @@ export const Hero = () => {
 
             <div className="hidden lg:inline-flex w-fit max-w-full flex-col items-start leading-tight overflow-visible">
               <h1
-                className="w-full font-bold tracking-tight mt-4 font-lequire hero-title-3d bg-gradient-to-r from-[#f2f2f2] via-[#b7b7b7] to-[#7a7a7a] bg-clip-text text-transparent leading-[1.02]"
+                className="hero-bank-title hero-metal-title w-full font-bold tracking-tight mt-4 font-lequire hero-title-3d bg-gradient-to-r from-[#f4f4f4] via-[#a8acb3] to-[#666b76] bg-clip-text text-transparent leading-[1.02]"
                 style={{ fontSize: "clamp(2.6rem, 8.5vw, 5.7rem)", textWrap: "balance" }}
               >
                 {t('hero.titleLine1')}
               </h1>
               <h2
-                className="w-full font-black uppercase font-lequire mt-2 hero-title-3d bg-gradient-to-r from-[#ffffff] via-[#b9b9b9] to-[#0f0f0f] bg-clip-text text-transparent leading-[0.98] drop-shadow-[0_12px_20px_rgba(0,0,0,0.45)]"
+                className="hero-converter-title hero-metal-title hero-converter-metal w-full font-black uppercase font-lequire mt-2 hero-title-3d bg-gradient-to-r from-[#f8f8f8] via-[#9ca3af] to-[#50555f] bg-clip-text text-transparent leading-[0.98]"
                 style={{ fontSize: "clamp(3.5rem, 12vw, 7.8rem)" }}
                 aria-label={titleLine2}
               >
