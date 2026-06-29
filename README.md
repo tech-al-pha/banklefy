@@ -51,7 +51,7 @@ Secure • Fast • Mobile-Friendly
 * Multiple file uploads
 * Merge or separate reports
 * Automated analyzed PDF reports
-* No aren't kept you data
+* We don't store your data
 * reCAPTCHA protection
 * Privacy-focused workflow
 
