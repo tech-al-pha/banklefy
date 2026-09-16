@@ -11,7 +11,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { RequireAuth, RequirePaid } from "@/components/RouteGuards";
 import LoadingScreen from "@/components/LoadingScreen";
-import { LuxuryCursor } from "@/components/LuxuryCursor";
 import { SEOManager } from "@/components/SEOManager";
 import { CentennialBonusDialog } from "@/components/CentennialBonusDialog";
 import { SpeedInsights } from "@vercel/speed-insights/react";
@@ -32,8 +31,6 @@ const Blog = lazyWithRetry(() => import("./pages/Blog"));
 const HowItWorksPage = lazyWithRetry(() => import("./pages/HowItWorksPage"));
 const SecurityPage = lazyWithRetry(() => import("./pages/Security"));
 const FaqsPage = lazyWithRetry(() => import("./pages/Faqs"));
-const CancellationRefundPage = lazyWithRetry(() => import("./pages/CancellationRefund"));
-const ShippingExchangePage = lazyWithRetry(() => import("./pages/ShippingExchange"));
 const BlogLaunch = lazyWithRetry(() => import("./pages/blog/LaunchPost"));
 const BlogAccuracy = lazyWithRetry(() => import("./pages/blog/AccuracyPost"));
 const BlogPrivacy = lazyWithRetry(() => import("./pages/blog/PrivacyPost"));
@@ -92,8 +89,6 @@ const AppRoutes = () => {
           <Route path="/contact" element={<Contact />} />
           <Route path="/cookie-policy" element={<Navigate to="/privacy" replace />} />
           <Route path="/documentation" element={<Navigate to="/faqs#help" replace />} />
-          <Route path="/cancellation-and-refund" element={<CancellationRefundPage />} />
-          <Route path="/shipping-and-exchange" element={<ShippingExchangePage />} />
           <Route path="/faqs" element={<FaqsPage />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/launch" element={<BlogLaunch />} />
@@ -119,7 +114,6 @@ const App = () => (
       <LanguageProvider>
         <AuthProvider>
           <TooltipProvider>
-            <LuxuryCursor />
             <Toaster />
             <Sonner />
             <CentennialBonusDialog />
